@@ -21,7 +21,7 @@ Two art bibles exist and were merged per area on 2026-11-21:
 | Orbital Silk-Spinner | Chilled dark basalt | ±0.8 °C / ±2% RH | Zero-expansion reticle silk | Multi-rover autopilot on flare days |
 | Basalt Thermal-Vent | Heated volcanic slag | ±0.4 °C / ±1.5% RH | Mag-shielded thermal resin | Rovers work in the magnetic dead zone |
 
-The Week 2 dome starter is Curlyhair. One optical silk spool cuts rover uplink lag 60% (`data/items.json`), the locked Week 2 call. Cobalt Sentinel's 25% is stored as its species `lag_reduction_pct`. How species values combine with the spool is still open.
+The Week 2 dome starter is Curlyhair. One optical silk spool cuts rover uplink lag 60% (`data/items.json`), and the spinning species' `lag_reduction_pct` stacks on top, multiplicatively: lag × (1 − 0.60) × (1 − species %). Curlyhair (5%): × 0.38, so 0.45 s occluded becomes 0.17 s. Cobalt Sentinel (25%): × 0.30.
 
 ## Mining biomes: from WE
 
