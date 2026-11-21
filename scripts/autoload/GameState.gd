@@ -37,6 +37,10 @@ var molt_progress: float = 0.0
 var molt_stage: MoltStage = MoltStage.ACTIVE
 var optical_silk_spools: int = 0
 var relay_slotted: bool = false
+## Species that spun the spool now in the relay (its lag_reduction_pct stacks).
+var slotted_spool_species: StringName = &""
+## Species of each spool in inventory, oldest first (parallel to optical_silk_spools).
+var _spool_species: Array[StringName] = []
 ## Every calibration event, oldest first. Week 3 audits read this, so a
 ## FAIL can't be erased by calibrating again.
 var cal_log: Array[Dictionary] = []
@@ -135,6 +139,7 @@ func collect_spool() -> bool:
 	if not is_spool_ready():
 		return false
 	optical_silk_spools += 1
+	_spool_species.append(dome_species_id)
 	molt_progress = 0.0
 	molt_stage = MoltStage.ACTIVE
 	silk_changed.emit(optical_silk_spools)
@@ -152,18 +157,25 @@ func slot_spool_into_relay() -> bool:
 	if not can_slot_spool():
 		return false
 	optical_silk_spools -= 1
+	slotted_spool_species = _spool_species.pop_front() if not _spool_species.is_empty() else dome_species_id
 	relay_slotted = true
 	silk_changed.emit(optical_silk_spools)
 	relay_changed.emit(relay_slotted)
 	return true
 
 
-## Multiplier applied to rover uplink lag (1.0 = no upgrade).
+## Multiplier applied to rover uplink lag (1.0 = no upgrade). The spool's base
+## cut and the spinning species' lag_reduction_pct stack multiplicatively:
+## (1 - spool%) * (1 - species%). Curlyhair: 0.40 * 0.95 = 0.38.
 func get_relay_lag_multiplier() -> float:
 	if not relay_slotted:
 		return 1.0
-	var pct: float = DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/relay_lag_reduction_pct", 0.0)
-	return clampf(1.0 - pct / 100.0, 0.0, 1.0)
+	var spool_pct: float = DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/relay_lag_reduction_pct", 0.0)
+	var species_pct: float = 0.0
+	var raw: Variant = DataManager.get_record(SPECIES_TABLE, slotted_spool_species).get("lag_reduction_pct")
+	if typeof(raw) == TYPE_FLOAT or typeof(raw) == TYPE_INT:  # null for undesigned morphs
+		species_pct = float(raw)
+	return clampf((1.0 - spool_pct / 100.0) * (1.0 - species_pct / 100.0), 0.0, 1.0)
 
 
 func get_dome_species() -> Dictionary:

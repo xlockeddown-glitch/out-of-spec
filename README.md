@@ -29,6 +29,7 @@ scripts/metrology/  DriftingSensor: shared instrument drift + guard-band status
 scripts/dome/       dome interior + terrarium visuals
 assets/voxels/   MagicaVoxel exports (Week 4)
 docs/design/     concept blueprint, art bible, Week 2 board (ignored by Godot via docs/.gdignore)
+docs/canon.md      which design source wins (merged art bibles)
 docs/decisions.md  design calls that shape code and data
 ```
 
