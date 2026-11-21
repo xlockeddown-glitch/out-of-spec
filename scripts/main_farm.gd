@@ -1,12 +1,10 @@
 extends Node
-## Composition root for the farm scene. Wires rover / GameState <-> HUD and
-## routes dispatch lines. Holds no gameplay rules of its own.
+## Composition root for the farm scene. Wires rover / GameState <-> HUD.
+## Holds no gameplay rules of its own. Dispatches and audits come from
+## GameState's phone log, so they survive scene swaps.
 
-const DISPATCH_TABLE: StringName = &"dialogue_dispatches"
-const MORNING_SECTION: String = "morning_dispatches"
-
-## Only the first farm visit gets a morning dispatch, not every swap back.
-static var _posted_boot_dispatch: bool = false
+## Phone-log lines replayed into the HUD when the farm loads.
+const LOG_REPLAY_LINES: int = 6
 
 var _had_los: bool = true
 var _last_band: int = DriftingSensor.Band.IN_BAND
@@ -29,15 +27,21 @@ func _ready() -> void:
 	# Bound methods so the autoload drops them when this scene is freed.
 	GameState.silk_changed.connect(_on_silk_changed)
 	GameState.relay_changed.connect(_on_relay_changed)
+	GameState.phone_message.connect(_hud.push_log)
+	GameState.credits_changed.connect(_hud.set_credits)
 
 	var relay_name: String = _rover.satellite_relay.relay_name if _rover.satellite_relay else "NO RELAY"
 	_hud.configure(relay_name, _rover.steering.mpe, _rover.steering.acceptance_ratio)
 	_last_band = _rover.get_drift_band()
 	_rover.broadcast_state()
 	_refresh_relay_hud()
-	if not _posted_boot_dispatch:
-		_posted_boot_dispatch = true
-		_post_random_morning_dispatch()
+	_hud.set_credits(GameState.credits)
+	for line: String in GameState.phone_log.slice(-LOG_REPLAY_LINES):
+		_hud.push_log(line)
+
+
+func _process(_delta: float) -> void:
+	_hud.set_clock(GameClock.format_now())
 
 
 func _on_uplink_changed(has_los: bool, quality: float, lag_s: float) -> void:
@@ -92,11 +96,3 @@ func _on_till_rejected(reason: String) -> void:
 func _go_to_dome() -> void:
 	SceneSwitcher.swap_to(SceneSwitcher.DOME_SCENE)
 
-
-## Placeholder for the Week 3 day clock: one random morning dispatch at boot.
-func _post_random_morning_dispatch() -> void:
-	var dispatches: Array[Dictionary] = DataManager.get_records(DISPATCH_TABLE, MORNING_SECTION)
-	if dispatches.is_empty():
-		return
-	var entry: Dictionary = dispatches.pick_random()
-	_hud.push_log("[%s] %s" % [entry.get("sender", "?"), entry.get("text", "")])

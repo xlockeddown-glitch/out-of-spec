@@ -70,6 +70,27 @@ theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
 theme_override_font_sizes/font_size = 26
 text = "FIELD PHONE // UPLINK"
 
+[node name="ClockRow" type="HBoxContainer" parent="Bezel/Screen/Content"]
+layout_mode = 2
+
+[node name="ClockLabel" type="Label" parent="Bezel/Screen/Content/ClockRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.85, 0.95, 0.88, 1)
+theme_override_font_sizes/font_size = 22
+text = "DAY 1  06:00"
+
+[node name="ClockSpacer" type="Control" parent="Bezel/Screen/Content/ClockRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CreditsLabel" type="Label" parent="Bezel/Screen/Content/ClockRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.65, 0.14, 1)
+theme_override_font_sizes/font_size = 22
+text = "0 CR"
+
 [node name="RelayLabel" type="Label" parent="Bezel/Screen/Content"]
 unique_name_in_owner = true
 layout_mode = 2

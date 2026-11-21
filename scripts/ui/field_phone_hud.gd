@@ -29,6 +29,8 @@ var _log_lines: PackedStringArray = []
 @onready var _spool_label: Label = %SpoolLabel
 @onready var _slot_spool_button: Button = %SlotSpoolButton
 @onready var _dome_button: Button = %DomeButton
+@onready var _clock_label: Label = %ClockLabel
+@onready var _credits_label: Label = %CreditsLabel
 
 
 func _ready() -> void:
@@ -71,6 +73,15 @@ func set_relay(slotted: bool, spools: int, can_slot: bool) -> void:
 		"font_color", Color(0.45, 0.9, 1) if slotted else Color(0.4, 0.7, 0.45))
 	_spool_label.text = "SILK x%d" % spools
 	_slot_spool_button.disabled = not can_slot
+
+
+func set_clock(text: String) -> void:
+	_clock_label.text = text
+
+
+func set_credits(credits: int) -> void:
+	_credits_label.text = "%d CR" % credits
+	_credits_label.add_theme_color_override("font_color", COLOR_FAIL if credits < 0 else COLOR_WARN)
 
 
 func push_log(line: String) -> void:

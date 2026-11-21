@@ -9,6 +9,10 @@ signal molt_changed(progress: float, stage: int)
 signal silk_changed(spools: int)
 signal relay_changed(slotted: bool)
 signal calibration_recorded(record: Dictionary)
+signal phone_message(text: String)
+signal credits_changed(credits: int)
+signal audit_completed(report: Dictionary)
+signal drop_pod_changed(present: bool)
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -16,6 +20,14 @@ const STEERING_ID: String = "rover_steering_encoder"
 const HYGROMETER_ID: String = "hygrometer"
 const SPECIES_TABLE: StringName = &"tarantula_species"
 const ITEMS_TABLE: StringName = &"items"
+const ECONOMY_TABLE: StringName = &"economy"
+const DRIFT_TABLE: StringName = &"sensor_drift_config"
+const DISPATCH_TABLE: StringName = &"dialogue_dispatches"
+const PHONE_LOG_MAX: int = 40
+const INSTRUMENT_NAMES: Dictionary = {
+	"rover_steering_encoder": "Steering",
+	"hygrometer": "Hygrometer",
+}
 
 # --- Playtest tuning (Week 2 board: keep the loop under two minutes) ---------
 ## Seconds for a full molt while the hygrometer stays within MPE.
@@ -47,6 +59,21 @@ var cal_log: Array[Dictionary] = []
 ## Instrument id -> most recent record (convenience view of cal_log).
 var last_cal_records: Dictionary = {}
 
+## Credits (MegaCorp scrip). Fines come out of this; can go negative.
+var credits: int = 0
+## Phone messages that should survive scene swaps (dispatches, audits).
+var phone_log: Array[String] = []
+## One report per audit (see AuditEngine.evaluate).
+var audit_log: Array[Dictionary] = []
+## instrument_id -> number of audits that fined it (repeat surcharge).
+var offence_counts: Dictionary = {}
+## True from an audit morning until the pod departs that evening.
+var drop_pod_present: bool = false
+var _drop_pod_day: int = 0
+
+var _cal_index_at_last_audit: int = 0
+var _dispatch_deck: Array[Dictionary] = []
+
 ## Farm persistence across swaps.
 var rover_transform: Transform3D = Transform3D.IDENTITY
 var has_rover_transform: bool = false
@@ -61,6 +88,16 @@ func _ready() -> void:
 	hygrometer.max_error = hygrometer.mpe * MAX_ERROR_MPE_MULTIPLE
 	hygrometer.error = hygrometer.mpe * HYGROMETER_START_ERROR_RATIO
 	GameClock.time_advanced.connect(_on_time_advanced)
+	GameClock.day_started.connect(_on_day_started)
+	credits = int(DataManager.get_number(ECONOMY_TABLE, "starting_credits", 0.0))
+	_post_morning_dispatch()  # day 1 is already under way at boot
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Debug builds only: F9 skips to the next 06:00 (sensors drift for the skipped time).
+	var key := event as InputEventKey
+	if OS.is_debug_build() and key and key.pressed and not key.echo and key.physical_keycode == KEY_F9:
+		GameClock.skip_to_next_morning()
 
 
 func _process(delta: float) -> void:
@@ -108,6 +145,81 @@ func calibrate(instrument_id: String) -> Dictionary:
 func _on_time_advanced(delta_days: float) -> void:
 	steering.advance_days(delta_days)
 	hygrometer.advance_days(delta_days)
+	# Leaves at the departure hour, or at once if a time skip jumped past that evening.
+	if drop_pod_present and (GameClock.get_day_index() != _drop_pod_day
+			or GameClock.get_hour() >= _schedule("drop_pod_departs_hour", 18.0)):
+		drop_pod_present = false
+		drop_pod_changed.emit(false)
+		post_phone("AUD-1T: Departing. Please remain compliant in our absence.")
+
+
+# --- Phone, dispatches, audits ------------------------------------------------
+
+func post_phone(text: String) -> void:
+	phone_log.append(text)
+	while phone_log.size() > PHONE_LOG_MAX:
+		phone_log.remove_at(0)
+	phone_message.emit(text)
+
+
+func add_credits(amount: int) -> void:
+	credits += amount
+	credits_changed.emit(credits)
+
+
+func _on_day_started(day: int) -> void:
+	_post_morning_dispatch()
+	var cadence: int = int(_schedule("cadence_days", 5.0))
+	if cadence > 0 and day % cadence == 0:
+		_run_audit(day)
+
+
+## One morning dispatch per day, no repeats until the whole deck is used.
+func _post_morning_dispatch() -> void:
+	if _dispatch_deck.is_empty():
+		_dispatch_deck = DataManager.get_records(DISPATCH_TABLE, "morning_dispatches")
+		_dispatch_deck.shuffle()
+	if _dispatch_deck.is_empty():
+		return
+	var entry: Dictionary = _dispatch_deck.pop_back()
+	post_phone("DAY %d  [%s] %s" % [GameClock.get_day_index(), entry.get("sender", "?"), entry.get("text", "")])
+
+
+func _run_audit(day: int) -> void:
+	var since: Array[Dictionary] = []
+	since.assign(cal_log.slice(_cal_index_at_last_audit))
+	_cal_index_at_last_audit = cal_log.size()
+	var sensors: Dictionary = { STEERING_ID: steering, HYGROMETER_ID: hygrometer }
+	var report: Dictionary = AuditEngine.evaluate(day, sensors, offence_counts, since)
+
+	drop_pod_present = true
+	_drop_pod_day = day
+	drop_pod_changed.emit(true)
+	post_phone("AUDIT DAY %d: Inspector Vance and AUD-1T have landed." % day)
+	for line: Dictionary in report["lines"]:
+		var sensor: DriftingSensor = get_sensor(line["instrument_id"])
+		var label: String = "%s %s (%.2f x MPE) %s" % [
+			INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"]),
+			sensor.format_value(line["as_found"]), line["ratio"], DriftingSensor.band_label(line["band"])]
+		if line["fine"] > 0:
+			offence_counts[line["instrument_id"]] = int(offence_counts.get(line["instrument_id"], 0)) + 1
+			label += ": FINE %d CR" % line["fine"]
+		post_phone(label)
+	post_phone("Traceability: %d calibration record(s) since last audit, %d found out of tolerance." % [
+		report["cal_records"], report["cal_fails_found"]])
+	if report["passed"]:
+		post_phone("VANCE: Compliant. Disappointing, frankly.")
+	else:
+		add_credits(-int(report["total_fine"]))
+		var fines: Array[Dictionary] = DataManager.get_records(DISPATCH_TABLE, "audit_fines")
+		var footer: String = fines.pick_random().get("snarky_footer", "") if not fines.is_empty() else ""
+		post_phone("TOTAL FINE %d CR. Balance %d CR. %s" % [report["total_fine"], credits, footer])
+	audit_log.append(report)
+	audit_completed.emit(report)
+
+
+func _schedule(key: String, fallback: float) -> float:
+	return DataManager.get_number(DRIFT_TABLE, "audit_schedule/" + key, fallback)
 
 
 # --- Molt & silk ----------------------------------------------------------------

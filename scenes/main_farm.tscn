@@ -7,6 +7,8 @@
 [ext_resource type="Script" uid="uid://bbl4ndy88s6ud" path="res://scripts/camera/iso_camera.gd" id="5_cam"]
 [ext_resource type="PackedScene" path="res://ui/field_phone_hud.tscn" id="6_hud"]
 [ext_resource type="Script" path="res://scripts/world/clickable.gd" id="7_click"]
+[ext_resource type="Script" path="res://scripts/world/day_night.gd" id="8_daynight"]
+[ext_resource type="Script" path="res://scripts/world/drop_pod.gd" id="9_pod"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -43,6 +45,17 @@ emission_enabled = true
 emission = Color(0.3, 0.85, 1, 1)
 emission_energy_multiplier = 2.0
 
+[sub_resource type="StandardMaterial3D" id="MatPod"]
+albedo_color = Color(0.78, 0.42, 0.16, 1)
+metallic = 0.4
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="MatAmberGlow"]
+albedo_color = Color(0.96, 0.65, 0.14, 1)
+emission_enabled = true
+emission = Color(0.96, 0.65, 0.14, 1)
+emission_energy_multiplier = 3.0
+
 [sub_resource type="BoxShape3D" id="AirlockShape"]
 size = Vector3(3, 3, 1.2)
 
@@ -68,9 +81,11 @@ render_target_update_mode = 4
 [node name="WorldEnvironment" type="WorldEnvironment" parent="WorldView/WorldViewport/World" unique_id=207294089]
 environment = SubResource("Env")
 
-[node name="Sun" type="DirectionalLight3D" parent="WorldView/WorldViewport/World" unique_id=245484382]
+[node name="Sun" type="DirectionalLight3D" parent="WorldView/WorldViewport/World" unique_id=245484382 node_paths=PackedStringArray("environment_node")]
 transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
 shadow_enabled = true
+script = ExtResource("8_daynight")
+environment_node = NodePath("../WorldEnvironment")
 
 [node name="IsoCamera" type="Camera3D" parent="WorldView/WorldViewport/World" unique_id=548626872 node_paths=PackedStringArray("target")]
 current = true
@@ -147,6 +162,49 @@ material = SubResource("MatRelay")
 position = Vector3(0, 1.25, 0.12)
 size = Vector3(1.8, 2.3, 0.15)
 material = SubResource("MatCyanGlow")
+
+[node name="DropPod" type="Node3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("drone")]
+visible = false
+position = Vector3(-3, 0, 13.5)
+script = ExtResource("9_pod")
+drone = NodePath("AUD1T")
+
+[node name="Hull" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/DropPod"]
+position = Vector3(0, 1.2, 0)
+radius = 1.0
+height = 2.4
+sides = 10
+material = SubResource("MatPod")
+
+[node name="Nose" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/DropPod"]
+position = Vector3(0, 2.9, 0)
+radius = 1.0
+height = 1.0
+sides = 10
+cone = true
+material = SubResource("MatPod")
+
+[node name="Hatch" type="CSGBox3D" parent="WorldView/WorldViewport/World/DropPod"]
+position = Vector3(0, 1.1, 0.95)
+size = Vector3(0.9, 1.5, 0.12)
+material = SubResource("MatAmberGlow")
+
+[node name="AUD1T" type="Node3D" parent="WorldView/WorldViewport/World/DropPod"]
+position = Vector3(1.9, 2.4, 0.6)
+
+[node name="Body" type="CSGSphere3D" parent="WorldView/WorldViewport/World/DropPod/AUD1T"]
+radius = 0.4
+material = SubResource("MatRelay")
+
+[node name="Eye" type="CSGSphere3D" parent="WorldView/WorldViewport/World/DropPod/AUD1T"]
+position = Vector3(0.12, 0, 0.3)
+radius = 0.14
+material = SubResource("MatAmberGlow")
+
+[node name="EyeLight" type="OmniLight3D" parent="WorldView/WorldViewport/World/DropPod/AUD1T"]
+position = Vector3(0.2, 0, 0.6)
+light_color = Color(0.96, 0.65, 0.14, 1)
+omni_range = 3.0
 
 [node name="SatelliteRelay" type="Node3D" parent="WorldView/WorldViewport/World" unique_id=2137581624 node_paths=PackedStringArray("uplink_point", "beacon", "spool_visual")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -70, 0, -70)

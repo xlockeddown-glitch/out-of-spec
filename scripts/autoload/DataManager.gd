@@ -25,6 +25,7 @@ const DATA_FILES: Dictionary = {
 	&"sensor_drift_config": "res://data/sensor_drift_config.json",
 	&"dialogue_dispatches": "res://data/dialogue_dispatches.json",
 	&"items": "res://data/items.json",
+	&"economy": "res://data/economy.json",
 }
 
 ## Table -> { section -> required fields (besides "id") }.
@@ -44,6 +45,7 @@ const RECORD_SECTIONS: Dictionary = {
 	},
 	&"sensor_drift_config": {},
 	&"items": {},
+	&"economy": {},
 }
 
 var is_loaded: bool = false
