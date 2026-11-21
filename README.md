@@ -1,10 +1,10 @@
 # Out of Spec
 
-Desktop (1920x1080, Steam/PC) chunky 3D voxel life-sim: satellite-linked remote farming/mining, indoor tarantula terrariums, satirical metrology. Godot 4.5, Forward+, GDScript.
+Desktop (1920x1080, Steam/PC) chunky 3D voxel life-sim: satellite-linked remote farming/mining, indoor tarantula terrariums, satirical metrology. Godot 4.7, Forward+, GDScript.
 
 ## Run
 
-Open `project.godot` in Godot 4.5 and press F5. Main scene: `scenes/main_farm.tscn`.
+Open `project.godot` in Godot 4.7 and press F5. Main scene: `scenes/main_farm.tscn`.
 
 | Input | Action |
 |---|---|
@@ -19,8 +19,10 @@ scenes/          playable scenes
 scripts/         GDScript (autoload/, rover/, world/, camera/, ui/)
 ui/              UI scenes (field phone HUD)
 data/            JSON game data, loaded by the DataManager autoload
+scripts/metrology/  DriftModel: shared instrument drift + guard-band status
 assets/voxels/   MagicaVoxel exports (Week 4)
 docs/design/     concept blueprint and art bible (ignored by Godot via docs/.gdignore)
+docs/decisions.md  design calls that shape code and data
 ```
 
 ## Data

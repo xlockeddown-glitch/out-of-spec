@@ -6,7 +6,7 @@ const DISPATCH_TABLE: StringName = &"dialogue_dispatches"
 const MORNING_SECTION: String = "morning_dispatches"
 
 var _had_los: bool = true
-var _last_drift_status: int = RoverController.DriftStatus.IN_TOLERANCE
+var _last_drift_status: int = DriftModel.Status.IN_TOLERANCE
 
 @onready var _rover: RoverController = %Rover
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
@@ -21,7 +21,7 @@ func _ready() -> void:
 	_hud.zero_steering_pressed.connect(_on_zero_pressed)
 
 	var relay_name: String = _rover.satellite_relay.relay_name if _rover.satellite_relay else "NO RELAY"
-	_hud.configure(relay_name, _rover.tolerance_deg, _rover.acceptance_ratio)
+	_hud.configure(relay_name, _rover.steering.mpe, _rover.steering.acceptance_ratio)
 	_rover.broadcast_state()
 	_post_random_morning_dispatch()
 
@@ -35,8 +35,8 @@ func _on_uplink_changed(has_los: bool, quality: float, lag_s: float) -> void:
 
 func _on_drift_changed(drift_deg: float, status: int) -> void:
 	_hud.set_drift(drift_deg, status)
-	if status == RoverController.DriftStatus.OUT_OF_SPEC and _last_drift_status != status:
-		_hud.push_log("SYS: steering exceeds MPE ±%.2f°" % _rover.tolerance_deg)
+	if status == DriftModel.Status.OUT_OF_SPEC and _last_drift_status != status:
+		_hud.push_log("SYS: steering exceeds MPE ±%.2f°" % _rover.steering.mpe)
 	_last_drift_status = status
 
 

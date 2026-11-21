@@ -2,13 +2,15 @@
   "instruments": {
     "hygrometer": {
       "error_unit": "percentage_points_rh",
-      "daily_drift_rate": 0.30,
+      "daily_drift_rate": 0.3,
       "max_permissible_error": 2.0
     },
     "rover_steering_encoder": {
       "error_unit": "degrees",
       "daily_drift_rate": 0.12,
-      "max_permissible_error": 0.80
+      "usage_drift_rate": 0.03,
+      "usage_unit": "metre_driven",
+      "max_permissible_error": 0.8
     },
     "relay_dish_azimuth": {
       "error_unit": "degrees",
@@ -19,7 +21,7 @@
   "guardband": {
     "green": {
       "label": "Green",
-      "max_error_ratio_inclusive": 0.80
+      "max_error_ratio_inclusive": 0.8
     },
     "amber_warning": {
       "label": "Amber Warning",

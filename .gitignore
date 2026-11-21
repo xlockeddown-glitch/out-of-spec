@@ -2,3 +2,7 @@
 .godot/
 /android/
 *.translation
+
+# Local Godot editor builds dropped into the project folder
+Godot_v*/
+Godot_v*.exe
