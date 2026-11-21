@@ -40,9 +40,14 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if visible and event.is_action_pressed(&"ui_cancel"):
+	if not visible:
+		return
+	if event.is_action_pressed(&"ui_cancel"):
 		get_viewport().set_input_as_handled()
 		close()
+	elif event.is_action_pressed(&"swap_scene"):
+		# Don't let Tab yank the player out of the bench mid-calibration.
+		get_viewport().set_input_as_handled()
 
 
 func open(instrument_id: String = "hygrometer") -> void:
@@ -72,6 +77,7 @@ func _on_instrument_selected(index: int) -> void:
 	_left_value.text = "--"
 	_left_band.text = ""
 	_left_meter.show_needle = false
+	_calibrate_button.disabled = false
 	_result_label.text = _last_record_text(_current_id)
 
 
@@ -79,6 +85,9 @@ func _on_calibrate_pressed() -> void:
 	var record: Dictionary = GameState.calibrate(_current_id)
 	if record.is_empty():
 		return
+	# One calibration per session with this instrument; re-enabled when the
+	# player switches instrument or reopens the bench.
+	_calibrate_button.disabled = true
 	var sensor: DriftingSensor = GameState.get_sensor(_current_id)
 	_show_as_found(sensor, record["as_found"] as float)
 	var as_left: float = record["as_left"]

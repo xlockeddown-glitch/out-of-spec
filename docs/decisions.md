@@ -33,4 +33,4 @@ Resolving conflicts between `docs/design/out_of_spec_week_2_dome_calibration_clo
 - Instruments that wear with use also drift per usage unit (`usage_drift_rate`). Rover steering: 0.03 deg per metre driven (placeholder, tune by feel).
 - Both push the same direction. Zeroing resets to 0, logs as-found, and re-rolls the direction.
 - Status: |error| / MPE <= `guardband.green` ratio (0.80) is in tolerance; <= 1.0 is guard band; > 1.0 is out of spec.
-- Implemented once in `scripts/metrology/drift_model.gd` (`DriftModel`) so the rover, hygrometers, and the relay dish share it.
+- Implemented once in `scripts/metrology/drifting_sensor.gd` (`DriftingSensor`, renamed from `DriftModel`) so the rover, hygrometers, and the relay dish share it. Instances live in `GameState`.

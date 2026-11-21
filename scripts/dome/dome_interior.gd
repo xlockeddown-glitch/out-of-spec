@@ -31,7 +31,7 @@ func _ready() -> void:
 	GameState.calibration_recorded.connect(_on_calibration_recorded)
 
 	var species: Dictionary = GameState.get_dome_species()
-	_species_label.text = "%s  (%s)" % [species.get("common_name", "Unknown"), species.get("scientific_name", "?")]
+	_species_label.text = "%s  (%s)" % [_field(species, "common_name", "Unknown"), _field(species, "scientific_name", "Unclassified")]
 
 
 func _process(delta: float) -> void:
@@ -70,7 +70,7 @@ func _refresh_status() -> void:
 func _on_terrarium_clicked() -> void:
 	var species: Dictionary = GameState.get_dome_species()
 	_toast("%s: ideal %s °C / %s %%RH. Keep the hygrometer within MPE to progress the molt." % [
-		species.get("common_name", "?"), species.get("ideal_temp_c", "?"), species.get("ideal_humidity_pct", "?")])
+		_field(species, "common_name", "?"), _field(species, "ideal_temp_c", "?"), _field(species, "ideal_humidity_pct", "?")])
 
 
 func _on_spool_clicked() -> void:
@@ -81,6 +81,13 @@ func _on_spool_clicked() -> void:
 func _on_calibration_recorded(record: Dictionary) -> void:
 	if record.get("instrument_id", "") == GameState.HYGROMETER_ID and not record.get("as_found_in_tolerance", true):
 		_toast("Hygrometer back in tolerance. Molt resumes.")
+
+
+## Dictionary.get() only falls back when the key is missing; alien morphs carry
+## explicit JSON nulls for undefined values, so treat null as missing too.
+static func _field(record: Dictionary, key: String, fallback: String) -> String:
+	var value: Variant = record.get(key)
+	return fallback if value == null else str(value)
 
 
 func _toast(text: String) -> void:

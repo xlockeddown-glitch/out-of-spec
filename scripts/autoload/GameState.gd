@@ -37,7 +37,10 @@ var molt_progress: float = 0.0
 var molt_stage: MoltStage = MoltStage.ACTIVE
 var optical_silk_spools: int = 0
 var relay_slotted: bool = false
-## Instrument id -> last calibration record (see calibrate()).
+## Every calibration event, oldest first. Week 3 audits read this, so a
+## FAIL can't be erased by calibrating again.
+var cal_log: Array[Dictionary] = []
+## Instrument id -> most recent record (convenience view of cal_log).
 var last_cal_records: Dictionary = {}
 
 ## Farm persistence across swaps.
@@ -92,6 +95,7 @@ func calibrate(instrument_id: String) -> Dictionary:
 		"as_left_band": sensor.band_for(as_left),
 		"day": GameClock.get_day_index(),
 	}
+	cal_log.append(record)
 	last_cal_records[instrument_id] = record
 	calibration_recorded.emit(record)
 	return record
