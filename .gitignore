@@ -6,3 +6,6 @@
 # Local Godot editor builds dropped into the project folder
 Godot_v*/
 Godot_v*.exe
+
+# Files the Claude app saves into the project folder
+Claude outputs/
