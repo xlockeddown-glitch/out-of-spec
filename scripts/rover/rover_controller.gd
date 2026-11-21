@@ -234,4 +234,3 @@ func _till_under_rover() -> void:
 			till_rejected.emit("Cell (%d, %d) already tilled." % [cell.x, cell.z])
 		FarmGrid.TillResult.NOT_SOIL:
 			till_rejected.emit("No soil under tractor.")
-
