@@ -25,7 +25,7 @@ Resolving conflicts between `docs/design/out_of_spec_week_2_dome_calibration_clo
 - Real species are the early game: Curlyhair, Mexican Redknee, Brazilian Black (`tier: "real"`).
 - Art-bible morphs are alien unlocks: Cobalt Reference, Ember-Knee, Verdant Trace, Quartz-Spinner, Dune-Ochre (`tier: "alien"`, `source: "art_bible"`).
 - Values the art bible doesn't define (humidity tolerance, molt days, silk grade, silk yield, lag reduction) are `null` until designed. Code must treat `null` as "not set", not 0.
-- OPEN: Static Mop and Prism Ankles (fictional, from the original JSON) are tagged `alien` for now. Keep, cut, or fold into the art-bible set?
+- Static Mop and Prism Ankles (fictional, from the original JSON) were cut on 2026-11-21 (Neon's suggestion, Ryan approved). Their flavor folds into Dune-Ochre (ion storms / static) and Quartz-Spinner (optical refraction); their numbers were not carried over. Roster is 3 real + 5 alien, 1:1 with the art bible.
 
 ## 2026-11-21: Instrument drift has two sources
 

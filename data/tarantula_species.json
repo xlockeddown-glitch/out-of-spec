@@ -45,36 +45,6 @@
     "lag_reduction_pct": 11
   },
   {
-    "id": "static_mop",
-    "common_name": "Static Mop",
-    "scientific_name": "Electrothera lanigera",
-    "tier": "alien",
-    "source": "tarantula_species.json",
-    "ideal_temp_c": 27,
-    "temp_tolerance_c": 3,
-    "ideal_humidity_pct": 46,
-    "humidity_tolerance_pct": 8,
-    "molt_days": 10,
-    "silk_grade": 2,
-    "optical_silk_yield": 4,
-    "lag_reduction_pct": 9
-  },
-  {
-    "id": "prism_ankles",
-    "common_name": "Prism Ankles",
-    "scientific_name": "Prismopelma iridipes",
-    "tier": "alien",
-    "source": "tarantula_species.json",
-    "ideal_temp_c": 22,
-    "temp_tolerance_c": 2,
-    "ideal_humidity_pct": 78,
-    "humidity_tolerance_pct": 5,
-    "molt_days": 14,
-    "silk_grade": 3,
-    "optical_silk_yield": 1,
-    "lag_reduction_pct": 18
-  },
-  {
     "id": "cobalt_reference",
     "common_name": "Cobalt Reference",
     "scientific_name": null,
@@ -136,7 +106,7 @@
     "silk_grade": null,
     "optical_silk_yield": null,
     "lag_reduction_pct": null,
-    "notes": "Needs Tier 3 geode substrate; crystal-core fiber cuts deep-cavern lag."
+    "notes": "Needs Tier 3 geode substrate; crystal-core fiber cuts deep-cavern lag. Absorbs Prism Ankles' optical-refraction flavor."
   },
   {
     "id": "dune_ochre",
@@ -152,6 +122,6 @@
     "silk_grade": null,
     "optical_silk_yield": null,
     "lag_reduction_pct": null,
-    "notes": "Thrives in heatwaves and ion storms when rovers go dark."
+    "notes": "Thrives in heatwaves and ion storms when rovers go dark. Absorbs Static Mop's ion-storm / static-charge flavor."
   }
 ]
