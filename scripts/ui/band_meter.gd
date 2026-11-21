@@ -3,9 +3,10 @@ extends Control
 ## Horizontal tolerance meter: red beyond ±MPE, amber guard band, green
 ## acceptance zone, centre line at nominal, white needle at the current error.
 
-const COLOR_RED := Color(0.55, 0.16, 0.14)
-const COLOR_AMBER := Color(0.62, 0.48, 0.12)
-const COLOR_GREEN := Color(0.16, 0.5, 0.24)
+# Darkened versions of the neon band palette so the white needle reads on top.
+const COLOR_RED := Color("#FF5A5F") * Color(0.55, 0.55, 0.55)
+const COLOR_AMBER := Color("#F5A623") * Color(0.6, 0.6, 0.6)
+const COLOR_GREEN := Color("#38E1C6") * Color(0.5, 0.5, 0.5)
 const COLOR_NEEDLE := Color(1, 1, 1)
 const COLOR_TICK := Color(0.85, 0.95, 0.88, 0.8)
 

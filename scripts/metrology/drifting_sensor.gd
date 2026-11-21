@@ -131,14 +131,20 @@ static func band_label(band: int) -> String:
 			return "OUT OF TOLERANCE"
 
 
+## Neon status palette from the Gemini planning thread (ui_color_hex values).
+const COLOR_IN_BAND := Color("#38E1C6")
+const COLOR_GUARDBAND := Color("#F5A623")
+const COLOR_OUT_OF_TOLERANCE := Color("#FF5A5F")
+
+
 static func band_color(band: int) -> Color:
 	match band:
 		Band.IN_BAND:
-			return Color(0.55, 1.0, 0.6)
+			return COLOR_IN_BAND
 		Band.GUARDBAND:
-			return Color(1.0, 0.85, 0.3)
+			return COLOR_GUARDBAND
 		_:
-			return Color(1.0, 0.38, 0.32)
+			return COLOR_OUT_OF_TOLERANCE
 
 
 func _random_sign() -> float:

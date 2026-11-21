@@ -8,11 +8,11 @@ signal slot_spool_pressed
 signal enter_dome_pressed
 
 const MAX_LOG_LINES: int = 8
-const COLOR_BAR_ON := Color(0.55, 1.0, 0.6)
-const COLOR_BAR_OFF := Color(0.14, 0.22, 0.16)
-const COLOR_OK := Color(0.55, 1.0, 0.6)
-const COLOR_WARN := Color(1.0, 0.85, 0.3)
-const COLOR_FAIL := Color(1.0, 0.38, 0.32)
+const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
+const COLOR_BAR_OFF := Color(0.14, 0.22, 0.2)
+const COLOR_OK := DriftingSensor.COLOR_IN_BAND
+const COLOR_WARN := DriftingSensor.COLOR_GUARDBAND
+const COLOR_FAIL := DriftingSensor.COLOR_OUT_OF_TOLERANCE
 
 var _log_lines: PackedStringArray = []
 
