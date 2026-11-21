@@ -29,6 +29,8 @@ var _log_lines: PackedStringArray = []
 @onready var _spool_label: Label = %SpoolLabel
 @onready var _slot_spool_button: Button = %SlotSpoolButton
 @onready var _dome_button: Button = %DomeButton
+@onready var _clock_label: Label = %ClockLabel
+@onready var _credits_label: Label = %CreditsLabel
 
 
 func _ready() -> void:
@@ -73,11 +75,24 @@ func set_relay(slotted: bool, spools: int, can_slot: bool) -> void:
 	_slot_spool_button.disabled = not can_slot
 
 
+func set_clock(text: String) -> void:
+	_clock_label.text = text
+
+
+func set_credits(credits: int) -> void:
+	_credits_label.text = "%d CR" % credits
+	_credits_label.add_theme_color_override("font_color", COLOR_FAIL if credits < 0 else COLOR_WARN)
+
+
 func push_log(line: String) -> void:
 	_log_lines.append(line)
 	while _log_lines.size() > MAX_LOG_LINES:
 		_log_lines.remove_at(0)
-	_log_label.text = "\n".join(_log_lines)
+	# Newest first, like a phone's notification list: long wrapped lines
+	# would otherwise push the latest message (e.g. an audit) out of view.
+	var newest_first: PackedStringArray = _log_lines.duplicate()
+	newest_first.reverse()
+	_log_label.text = "\n".join(newest_first)
 
 
 func _set_status(text: String, color: Color) -> void:

@@ -40,5 +40,10 @@
     "repeat_surcharge_credits": 25,
     "max_repeat_surcharge_credits": 100,
     "max_fine_credits": 350
+  },
+  "audit_schedule": {
+    "cadence_days": 5,
+    "drop_pod_departs_hour": 18,
+    "_note": "Inspector Vance + AUD-1T land every 5th morning (docs/canon.md). Departure hour is a placeholder."
   }
 }

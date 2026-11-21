@@ -4,6 +4,8 @@ extends Node3D
 
 const DEFAULT_HINT: String = "Click the bench to calibrate  ·  Airlock or Tab: back to farm"
 const TOAST_SECONDS: float = 3.0
+## Long messages (dispatches, audit lines) stay up longer.
+const TOAST_SECONDS_PER_CHAR: float = 0.04
 
 @onready var _bench: Clickable = %BenchClick
 @onready var _airlock: Clickable = %AirlockClick
@@ -11,6 +13,7 @@ const TOAST_SECONDS: float = 3.0
 @onready var _spool: Clickable = %SpoolPickup
 @onready var _bench_ui: CalBenchUI = %CalBenchUI
 
+@onready var _clock_label: Label = %ClockLabel
 @onready var _species_label: Label = %SpeciesLabel
 @onready var _hygro_label: Label = %HygroLabel
 @onready var _hygro_band_label: Label = %HygroBandLabel
@@ -29,6 +32,10 @@ func _ready() -> void:
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)
 	GameState.calibration_recorded.connect(_on_calibration_recorded)
+	GameState.phone_message.connect(_toast)
+	# An audit posts several phone lines in one frame; this fires after them,
+	# so the toast ends on a summary that names the failing instruments.
+	GameState.audit_completed.connect(_on_audit_completed)
 
 	var species: Dictionary = GameState.get_dome_species()
 	_species_label.text = "%s  (%s)" % [_field(species, "common_name", "Unknown"), _field(species, "scientific_name", "Unclassified")]
@@ -44,6 +51,7 @@ func _process(delta: float) -> void:
 
 
 func _refresh_status() -> void:
+	_clock_label.text = "%s   %d CR" % [GameClock.format_now(), GameState.credits]
 	var hygro: DriftingSensor = GameState.hygrometer
 	var reading: String = "--"
 	var ideal: Variant = GameState.get_dome_species().get("ideal_humidity_pct")
@@ -90,6 +98,18 @@ static func _field(record: Dictionary, key: String, fallback: String) -> String:
 	return fallback if value == null else str(value)
 
 
+func _on_audit_completed(report: Dictionary) -> void:
+	if report.get("passed", true):
+		_toast("AUDIT DAY %d: PASS. Vance is disappointed." % report.get("day", 0))
+		return
+	var failing: PackedStringArray = []
+	for line: Dictionary in report.get("lines", []):
+		if line.get("out_of_tolerance", false):
+			failing.append(str(GameState.INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"])))
+	_toast("AUDIT DAY %d: FINE %d CR. Out of tolerance: %s. Details on the phone log." % [
+		report.get("day", 0), report.get("total_fine", 0), ", ".join(failing)])
+
+
 func _toast(text: String) -> void:
 	_hint_label.text = text
-	_toast_left = TOAST_SECONDS
+	_toast_left = maxf(TOAST_SECONDS, text.length() * TOAST_SECONDS_PER_CHAR)
