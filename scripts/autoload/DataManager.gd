@@ -29,8 +29,10 @@ const DATA_FILES: Dictionary = {
 ## Table -> { section -> required fields (besides "id") }.
 ## Records missing a required field are skipped with a warning.
 const RECORD_SECTIONS: Dictionary = {
+	# Alien morphs carry nulls for values the art bible hasn't defined yet, so
+	# numeric fields are checked where they are used, not here.
 	&"tarantula_species": {
-		"": ["common_name", "ideal_temp_c", "temp_tolerance_c", "ideal_humidity_pct", "humidity_tolerance_pct"],
+		"": ["common_name", "tier"],
 	},
 	&"crops": {
 		"": ["name", "growth_days", "soil_moisture_target", "tolerance_band"],

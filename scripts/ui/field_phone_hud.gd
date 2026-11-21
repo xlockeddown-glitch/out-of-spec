@@ -45,13 +45,13 @@ func set_uplink(has_los: bool, quality: float, lag_s: float) -> void:
 	_lag_label.text = "UPLINK LAG  %d ms" % roundi(lag_s * 1000.0)
 
 
-## status is a RoverController.DriftStatus value.
+## status is a DriftModel.Status value.
 func set_drift(drift_deg: float, status: int) -> void:
 	_drift_value.text = "%+.2f°" % drift_deg
 	match status:
-		RoverController.DriftStatus.IN_TOLERANCE:
+		DriftModel.Status.IN_TOLERANCE:
 			_set_status("IN TOLERANCE", COLOR_OK)
-		RoverController.DriftStatus.GUARD_BAND:
+		DriftModel.Status.GUARD_BAND:
 			_set_status("IN GUARD BAND", COLOR_WARN)
 		_:
 			_set_status("OUT OF SPEC", COLOR_FAIL)

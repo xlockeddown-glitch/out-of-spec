@@ -4,20 +4,18 @@ extends CharacterBody3D
 ##
 ## Local input is timestamped and pushed through a simulated uplink whose
 ## latency depends on line of sight (LOS) to a SatelliteRelay. Driving uses a
-## kinematic bicycle model whose steering zero drifts with distance driven,
-## until the operator sends a ZERO_STEERING command (which also rides the uplink).
+## kinematic bicycle model whose steering zero is a DriftModel: it drifts with
+## distance driven and with in-game time, until the operator sends a
+## ZERO_STEERING command (which also rides the uplink).
 
 signal uplink_changed(has_los: bool, quality: float, lag_s: float)
-## status is a DriftStatus value.
+## status is a DriftModel.Status value.
 signal drift_changed(drift_deg: float, status: int)
 signal steering_zeroed(as_found_deg: float)
 signal soil_tilled(cell: Vector3i)
 signal till_rejected(reason: String)
 
 enum Command { TILL, ZERO_STEERING }
-enum DriftStatus { IN_TOLERANCE, GUARD_BAND, OUT_OF_SPEC }
-
-const DRIFT_TABLE: StringName = &"sensor_drift_config"
 
 
 ## One timestamped control sample travelling up the link.
@@ -67,21 +65,17 @@ class UplinkCommand:
 @export_flags_3d_physics var los_collision_mask: int = 4
 
 @export_group("Steering Drift")
-## Key under "instruments" in data/sensor_drift_config.json. Its
-## max_permissible_error overrides `tolerance_deg`, and guardband.green
-## overrides `acceptance_ratio`. Leave empty to use inspector values.
+## Key under "instruments" in data/sensor_drift_config.json. Supplies MPE,
+## daily_drift_rate (deg/day) and usage_drift_rate (deg/metre).
 @export var drift_instrument_id: String = "rover_steering_encoder"
-## Per-metre drift while driving (Week 1 brief). The data file's
-## daily_drift_rate is time-based and is meant for the Week 3 day clock.
-@export var drift_deg_per_m: float = 0.03
+## Clamp so a neglected rover still drives.
 @export var max_drift_deg: float = 12.0
-## Maximum permissible error (MPE), degrees.
-@export var tolerance_deg: float = 0.80
-## |error| / MPE at or below this is IN_TOLERANCE; above it up to 1.0 is the
-## guard band; above 1.0 is OUT_OF_SPEC.
-@export_range(0.0, 1.0) var acceptance_ratio: float = 0.80
 
-var steering_drift_deg: float = 0.0
+## Steering zero error. Read-only from outside; use queue_command() to zero it.
+var steering: DriftModel
+var steering_drift_deg: float:
+	get:
+		return steering.error if steering else 0.0
 var link_quality: float = 1.0
 var has_line_of_sight: bool = true
 
@@ -89,21 +83,26 @@ var _uplink_clock: float = 0.0
 var _speed_mps: float = 0.0
 var _applied_throttle: float = 0.0
 var _applied_steer: float = 0.0
-var _drift_sign: float = 1.0
 var _frames: Array[UplinkFrame] = []
 var _commands: Array[UplinkCommand] = []
-var _rng := RandomNumberGenerator.new()
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 
 
 func _ready() -> void:
-	_apply_drift_profile()
-	_rng.randomize()
-	_drift_sign = _random_sign()
+	steering = DriftModel.from_config(drift_instrument_id, max_drift_deg)
+	steering.error_changed.connect(func(error: float, status: int) -> void: drift_changed.emit(error, status))
+	steering.zeroed.connect(func(as_found: float) -> void: steering_zeroed.emit(as_found))
+	GameClock.time_advanced.connect(steering.advance_days)
 	if satellite_relay == null:
 		push_warning("%s: no SatelliteRelay linked; uplink will read as occluded." % name)
 	if soil_grid == null:
 		push_warning("%s: no FarmGrid linked; tilling disabled." % name)
+
+
+func _exit_tree() -> void:
+	# GameClock outlives this scene; don't leave it holding our DriftModel.
+	if steering and GameClock.time_advanced.is_connected(steering.advance_days):
+		GameClock.time_advanced.disconnect(steering.advance_days)
 
 
 func _physics_process(delta: float) -> void:
@@ -126,18 +125,8 @@ func get_current_lag() -> float:
 	return lerpf(lag_occluded_s, lag_clear_s, clampf(t, 0.0, 1.0))
 
 
-## |drift| / MPE. 1.0 = exactly at the tolerance limit.
-func get_error_ratio() -> float:
-	return absf(steering_drift_deg) / tolerance_deg if tolerance_deg > 0.0 else INF
-
-
-func get_drift_status() -> DriftStatus:
-	var ratio: float = get_error_ratio()
-	if ratio <= acceptance_ratio:
-		return DriftStatus.IN_TOLERANCE
-	if ratio <= 1.0:
-		return DriftStatus.GUARD_BAND
-	return DriftStatus.OUT_OF_SPEC
+func get_drift_status() -> DriftModel.Status:
+	return steering.get_status()
 
 
 ## Re-emit current state, e.g. right after a HUD connects.
@@ -223,30 +212,12 @@ func _drive(delta: float) -> void:
 	var before: Vector3 = global_position
 	move_and_slide()
 	# Horizontal displacement actually achieved; pushing into a rock adds no drift.
-	_accumulate_drift(Vector2(global_position.x - before.x, global_position.z - before.z).length())
-
-
-func _accumulate_drift(distance_m: float) -> void:
-	if distance_m <= 0.0 or drift_deg_per_m <= 0.0:
-		return
-	var previous: float = steering_drift_deg
-	steering_drift_deg = clampf(
-		previous + _drift_sign * drift_deg_per_m * distance_m, -max_drift_deg, max_drift_deg)
-	if steering_drift_deg != previous:
-		drift_changed.emit(steering_drift_deg, get_drift_status())
+	steering.add_usage(Vector2(global_position.x - before.x, global_position.z - before.z).length())
 
 
 func _zero_steering() -> void:
-	var as_found: float = steering_drift_deg
-	steering_drift_deg = 0.0
-	# The root cause was never fixed, so the drift returns. Possibly the other way.
-	_drift_sign = _random_sign()
-	steering_zeroed.emit(as_found)
-	drift_changed.emit(steering_drift_deg, get_drift_status())
-
-
-func _random_sign() -> float:
-	return -1.0 if _rng.randf() < 0.5 else 1.0
+	# DriftModel emits zeroed + error_changed, which re-emit as rover signals.
+	steering.zero()
 
 
 # --- Tilling ----------------------------------------------------------------
@@ -264,15 +235,3 @@ func _till_under_rover() -> void:
 		FarmGrid.TillResult.NOT_SOIL:
 			till_rejected.emit("No soil under tractor.")
 
-
-# --- Data -------------------------------------------------------------------
-
-func _apply_drift_profile() -> void:
-	if drift_instrument_id.is_empty():
-		return
-	var base: String = "instruments/%s" % drift_instrument_id
-	if DataManager.get_value(DRIFT_TABLE, base) == null:
-		push_warning("%s: instrument '%s' not in %s; using inspector values." % [name, drift_instrument_id, DRIFT_TABLE])
-		return
-	tolerance_deg = DataManager.get_number(DRIFT_TABLE, base + "/max_permissible_error", tolerance_deg)
-	acceptance_ratio = DataManager.get_number(DRIFT_TABLE, "guardband/green/max_error_ratio_inclusive", acceptance_ratio)

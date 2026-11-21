@@ -19,8 +19,10 @@ scenes/          playable scenes
 scripts/         GDScript (autoload/, rover/, world/, camera/, ui/)
 ui/              UI scenes (field phone HUD)
 data/            JSON game data, loaded by the DataManager autoload
+scripts/metrology/  DriftModel: shared instrument drift + guard-band status
 assets/voxels/   MagicaVoxel exports (Week 4)
 docs/design/     concept blueprint and art bible (ignored by Godot via docs/.gdignore)
+docs/decisions.md  design calls that shape code and data
 ```
 
 ## Data
