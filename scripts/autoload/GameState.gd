@@ -87,6 +87,13 @@ func _ready() -> void:
 	hygrometer = DriftingSensor.from_config(HYGROMETER_ID)
 	hygrometer.max_error = hygrometer.mpe * MAX_ERROR_MPE_MULTIPLE
 	hygrometer.error = hygrometer.mpe * HYGROMETER_START_ERROR_RATIO
+	# Starting calibrations: steering is in date; the hygrometer's sticker
+	# already expired (due day 0), so it is overdue until calibrated.
+	var initial_interval: int = int(_interval_cfg("initial_days", 5.0))
+	for sensor: DriftingSensor in [steering, hygrometer]:
+		sensor.cal_interval_days = initial_interval
+	steering.cal_due_day = initial_interval
+	hygrometer.cal_due_day = 0
 	GameClock.time_advanced.connect(_on_time_advanced)
 	GameClock.day_started.connect(_on_day_started)
 	credits = int(DataManager.get_number(ECONOMY_TABLE, "starting_credits", 0.0))
@@ -122,19 +129,36 @@ func calibrate(instrument_id: String) -> Dictionary:
 	if sensor == null:
 		push_warning("GameState.calibrate: unknown instrument '%s'." % instrument_id)
 		return {}
+	var today: int = GameClock.get_day_index()
+	var on_time: bool = not sensor.is_overdue(today)
 	var result: Dictionary = sensor.zero()
 	var as_found: float = result["as_found"]
 	var as_left: float = result["as_left"]
+	var as_found_ok: bool = absf(as_found) <= sensor.mpe
+	# Interval adjustment: a failed as-found brings the next calibration
+	# sooner; an on-time pass earns a longer interval; a late pass keeps it.
+	var previous_interval: int = sensor.cal_interval_days
+	if not as_found_ok:
+		sensor.cal_interval_days = maxi(int(_interval_cfg("min_days", 2.0)),
+			previous_interval - int(_interval_cfg("shorten_days", 2.0)))
+	elif on_time:
+		sensor.cal_interval_days = mini(int(_interval_cfg("max_days", 15.0)),
+			previous_interval + int(_interval_cfg("lengthen_days", 2.0)))
+	sensor.cal_due_day = today + sensor.cal_interval_days
 	var record: Dictionary = {
 		"instrument_id": instrument_id,
 		"unit": sensor.error_unit,
 		"mpe": sensor.mpe,
 		"as_found": as_found,
 		"as_found_band": sensor.band_for(as_found),
-		"as_found_in_tolerance": absf(as_found) <= sensor.mpe,
+		"as_found_in_tolerance": as_found_ok,
 		"as_left": as_left,
 		"as_left_band": sensor.band_for(as_left),
-		"day": GameClock.get_day_index(),
+		"day": today,
+		"on_time": on_time,
+		"previous_interval_days": previous_interval,
+		"interval_days": sensor.cal_interval_days,
+		"due_day": sensor.cal_due_day,
 	}
 	cal_log.append(record)
 	last_cal_records[instrument_id] = record
@@ -202,14 +226,18 @@ func _run_audit(day: int) -> void:
 		var label: String = "%s %s (%.3f x MPE) %s" % [
 			INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"]),
 			sensor.format_value(line["as_found"]), line["ratio"], DriftingSensor.band_label(line["band"])]
-		if line["out_of_tolerance"]:
+		if line["overdue"]:
+			label += ", OVERDUE (due day %d)" % line["due_day"]
+		if line["violation"]:
 			offence_counts[line["instrument_id"]] = int(offence_counts.get(line["instrument_id"], 0)) + 1
 			label += ": FINE %d CR" % line["fine"]
 		post_phone(label)
 	post_phone("Traceability: %d calibration record(s) since last audit, %d found out of tolerance." % [
 		report["cal_records"], report["cal_fails_found"]])
 	if report["passed"]:
-		post_phone("VANCE: Compliant. Disappointing, frankly.")
+		# A fully clean audit wipes the repeat-offence history.
+		offence_counts.clear()
+		post_phone("VANCE: Compliant. Repeat-offence record cleared. Disappointing, frankly.")
 	else:
 		add_credits(-int(report["total_fine"]))
 		var fines: Array[Dictionary] = DataManager.get_records(DISPATCH_TABLE, "audit_fines")
@@ -217,6 +245,10 @@ func _run_audit(day: int) -> void:
 		post_phone("TOTAL FINE %d CR. Balance %d CR. %s" % [report["total_fine"], credits, footer])
 	audit_log.append(report)
 	audit_completed.emit(report)
+
+
+func _interval_cfg(key: String, fallback: float) -> float:
+	return DataManager.get_number(DRIFT_TABLE, "calibration_interval/" + key, fallback)
 
 
 func _schedule(key: String, fallback: float) -> float:

@@ -98,8 +98,14 @@ func _on_calibrate_pressed() -> void:
 	_left_meter.value = as_left
 	_left_meter.show_needle = true
 	var passed: bool = record["as_found_in_tolerance"]
-	_result_label.text = ("AS-FOUND IN TOLERANCE: PASS. Zeroed." if passed
-		else "AS-FOUND OUT OF TOLERANCE: FAIL. Adjusted and logged for audit.")
+	var interval_note: String = "Interval %d -> %d d, due day %d." % [
+		record["previous_interval_days"], record["interval_days"], record["due_day"]]
+	if passed and record["on_time"]:
+		_result_label.text = "AS-FOUND IN TOLERANCE, ON TIME: PASS. Interval lengthened. " + interval_note
+	elif passed:
+		_result_label.text = "AS-FOUND IN TOLERANCE, LATE: PASS. Interval unchanged. " + interval_note
+	else:
+		_result_label.text = "AS-FOUND OUT OF TOLERANCE: FAIL. Interval shortened, logged for audit. " + interval_note
 	_result_label.add_theme_color_override(
 		"font_color", DriftingSensor.band_color(DriftingSensor.Band.IN_BAND if passed else DriftingSensor.Band.OUT_OF_TOLERANCE))
 
@@ -115,12 +121,16 @@ func _show_as_found(sensor: DriftingSensor, value: float) -> void:
 
 func _last_record_text(instrument_id: String) -> String:
 	_result_label.remove_theme_color_override("font_color")
+	var sensor: DriftingSensor = GameState.get_sensor(instrument_id)
+	var today: int = GameClock.get_day_index()
+	var due: String = ("OVERDUE since day %d" % (sensor.cal_due_day + 1) if sensor.is_overdue(today)
+		else "Due day %d (interval %d d)" % [sensor.cal_due_day, sensor.cal_interval_days])
 	var record: Dictionary = GameState.last_cal_records.get(instrument_id, {})
 	if record.is_empty():
-		return "No calibration on record."
-	return "Last cal: day %d, as-found %s (%s)" % [
-		record["day"], GameState.get_sensor(instrument_id).format_value(record["as_found"] as float),
-		"PASS" if record["as_found_in_tolerance"] else "FAIL"]
+		return "No calibration on record. " + due
+	return "Last cal: day %d, as-found %s (%s). %s" % [
+		record["day"], sensor.format_value(record["as_found"] as float),
+		"PASS" if record["as_found_in_tolerance"] else "FAIL", due]
 
 
 func _unsigned(sensor: DriftingSensor, value: float) -> String:

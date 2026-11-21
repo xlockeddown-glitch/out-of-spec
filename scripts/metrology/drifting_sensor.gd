@@ -32,6 +32,10 @@ var usage_drift_rate: float = 0.0
 var as_left_residual: float = 0.0
 ## Hard clamp on |error| so a neglected instrument stays playable.
 var max_error: float = INF
+## Calibration interval in days, adjusted on every calibration (GameState).
+var cal_interval_days: int = 5
+## Last day the current calibration is valid. Overdue from the day after.
+var cal_due_day: int = 0
 
 var error: float = 0.0:
 	set(value):
@@ -90,6 +94,10 @@ func zero() -> Dictionary:
 	error = _rng.randf_range(-as_left_residual, as_left_residual)
 	zeroed.emit(as_found, error)
 	return { "as_found": as_found, "as_left": error }
+
+
+func is_overdue(day: int) -> bool:
+	return day > cal_due_day
 
 
 func get_error_ratio() -> float:

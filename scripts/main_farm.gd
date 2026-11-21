@@ -65,7 +65,8 @@ func _on_zero_pressed() -> void:
 
 
 func _on_steering_zeroed(record: Dictionary) -> void:
-	_hud.push_log("As-found %+.2f°  As-left %+.2f°" % [record.get("as_found", 0.0), record.get("as_left", 0.0)])
+	_hud.push_log("As-found %+.2f°  As-left %+.2f°  Next due day %d (%d d)" % [
+		record.get("as_found", 0.0), record.get("as_left", 0.0), record.get("due_day", 0), record.get("interval_days", 0)])
 
 
 func _on_slot_spool_pressed() -> void:

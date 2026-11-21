@@ -39,11 +39,20 @@
     "credits_per_excess_ratio": 100,
     "repeat_surcharge_credits": 25,
     "max_repeat_surcharge_credits": 100,
-    "max_fine_credits": 350
+    "max_fine_credits": 350,
+    "overdue_credits": 50
   },
   "audit_schedule": {
     "cadence_days": 5,
     "drop_pod_departs_hour": 18,
     "_note": "Inspector Vance + AUD-1T land every 5th morning (docs/canon.md). Departure hour is a placeholder."
+  },
+  "calibration_interval": {
+    "initial_days": 5,
+    "min_days": 2,
+    "max_days": 15,
+    "lengthen_days": 2,
+    "shorten_days": 2,
+    "_note": "Interval adjustment (Ryan, 2026-11-21): as-found out of tolerance shortens the interval; an on-time calibration that passes lengthens it; a late pass keeps it. Day counts are placeholders."
   }
 }

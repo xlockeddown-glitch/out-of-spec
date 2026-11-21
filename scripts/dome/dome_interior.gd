@@ -59,7 +59,10 @@ func _refresh_status() -> void:
 		reading = "%.1f %%RH" % (float(ideal) + hygro.error)
 	_hygro_label.text = "HYGROMETER READS  %s" % reading
 	var band: int = hygro.get_band()
-	_hygro_band_label.text = DriftingSensor.band_label(band)
+	var today: int = GameClock.get_day_index()
+	var due_text: String = ("CAL OVERDUE (due day %d)" % hygro.cal_due_day if hygro.is_overdue(today)
+		else "cal due day %d" % hygro.cal_due_day)
+	_hygro_band_label.text = "%s  ·  %s" % [DriftingSensor.band_label(band), due_text]
 	_hygro_band_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
 
 	_molt_bar.value = GameState.molt_progress
@@ -104,9 +107,15 @@ func _on_audit_completed(report: Dictionary) -> void:
 		return
 	var failing: PackedStringArray = []
 	for line: Dictionary in report.get("lines", []):
-		if line.get("out_of_tolerance", false):
-			failing.append(str(GameState.INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"])))
-	_toast("AUDIT DAY %d: FINE %d CR. Out of tolerance: %s. Details on the phone log." % [
+		if line.get("violation", false):
+			var name_text: String = str(GameState.INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"]))
+			var why: PackedStringArray = []
+			if line.get("out_of_tolerance", false):
+				why.append("out of tolerance")
+			if line.get("overdue", false):
+				why.append("overdue")
+			failing.append("%s (%s)" % [name_text, ", ".join(why)])
+	_toast("AUDIT DAY %d: FINE %d CR. %s. Details on the phone log." % [
 		report.get("day", 0), report.get("total_fine", 0), ", ".join(failing)])
 
 
