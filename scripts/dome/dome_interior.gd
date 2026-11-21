@@ -102,6 +102,10 @@ static func _field(record: Dictionary, key: String, fallback: String) -> String:
 
 
 func _on_audit_completed(report: Dictionary) -> void:
+	if report.get("warning", false):
+		_toast("AUDIT DAY %d: WARNING ONLY. Your manager recalibrated %s before Vance got in. One time only." % [
+			report.get("day", 0), report.get("waived_names", "")])
+		return
 	if report.get("passed", true):
 		_toast("AUDIT DAY %d: PASS. Vance is disappointed." % report.get("day", 0))
 		return

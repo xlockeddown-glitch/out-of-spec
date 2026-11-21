@@ -70,6 +70,9 @@ var offence_counts: Dictionary = {}
 ## True from an audit morning until the pod departs that evening.
 var drop_pod_present: bool = false
 var _drop_pod_day: int = 0
+## One-time grace: the first audit that would fine you becomes a warning,
+## because your manager recalibrated the offenders before Vance got in.
+var audit_grace_used: bool = false
 
 var _cal_index_at_last_audit: int = 0
 var _dispatch_deck: Array[Dictionary] = []
@@ -124,7 +127,7 @@ func get_sensor(instrument_id: String) -> DriftingSensor:
 
 ## Zeroes an instrument and stores the record. Same path for the bench and the
 ## phone's remote ZERO STEERING, so every calibration lands in the log.
-func calibrate(instrument_id: String) -> Dictionary:
+func calibrate(instrument_id: String, performed_by: String = "You") -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(instrument_id)
 	if sensor == null:
 		push_warning("GameState.calibrate: unknown instrument '%s'." % instrument_id)
@@ -161,6 +164,7 @@ func calibrate(instrument_id: String) -> Dictionary:
 		"as_left": as_left,
 		"as_left_band": sensor.band_for(as_left),
 		"day": today,
+		"performed_by": performed_by,
 		"on_time": on_time,
 		"days_in_service": days_in_service,
 		"interval_evidence": enough_service,
@@ -224,6 +228,9 @@ func _run_audit(day: int) -> void:
 	var sensors: Dictionary = { STEERING_ID: steering, HYGROMETER_ID: hygrometer }
 	var report: Dictionary = AuditEngine.evaluate(day, sensors, offence_counts, since)
 
+	if not report["passed"] and not audit_grace_used:
+		_apply_audit_grace(report)
+
 	drop_pod_present = true
 	_drop_pod_day = day
 	drop_pod_changed.emit(true)
@@ -236,13 +243,18 @@ func _run_audit(day: int) -> void:
 			sensor.format_value(line["as_found"]), SP811.number(line["ratio"], 3), DriftingSensor.band_label(line["band"])]
 		if line["overdue"]:
 			label += ", OVERDUE (due day %d)" % line["due_day"]
-		if line["violation"]:
+		if line.get("waived", false):
+			label += ": WAIVED (one-time warning)"
+		elif line["violation"]:
 			offence_counts[line["instrument_id"]] = int(offence_counts.get(line["instrument_id"], 0)) + 1
 			label += ": FINE %s CR" % SP811.integer(line["fine"])
 		post_phone(label)
 	post_phone("Traceability: %d calibration record(s) since last audit, %d found out of tolerance." % [
 		report["cal_records"], report["cal_fails_found"]])
-	if report["passed"]:
+	if report.get("warning", false):
+		post_phone("MANAGER: Caught %s before Vance got in and recalibrated. One-time favor. Don't make it a habit." % report["waived_names"])
+		post_phone("VANCE: Warning issued. Next time it's a fine.")
+	elif report["passed"]:
 		# A fully clean audit wipes the repeat-offence history.
 		offence_counts.clear()
 		post_phone("VANCE: Compliant. Repeat-offence record cleared. Disappointing, frankly.")
@@ -253,6 +265,23 @@ func _run_audit(day: int) -> void:
 		post_phone("TOTAL FINE %s CR. Balance %s CR. %s" % [SP811.integer(report["total_fine"]), SP811.integer(credits), footer])
 	audit_log.append(report)
 	audit_completed.emit(report)
+
+
+## Turns this audit's fines into a one-time warning. The manager calibrates
+## each violating instrument (logged as theirs) before Vance inspects. Not a
+## clean audit, so repeat-offence counts are neither raised nor cleared.
+func _apply_audit_grace(report: Dictionary) -> void:
+	audit_grace_used = true
+	var names: PackedStringArray = []
+	for line: Dictionary in report["lines"]:
+		if line["violation"]:
+			calibrate(line["instrument_id"], "Manager")
+			line["fine"] = 0
+			line["waived"] = true
+			names.append(str(INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"])).to_lower())
+	report["total_fine"] = 0
+	report["warning"] = true
+	report["waived_names"] = " and the ".join(names).insert(0, "the ")
 
 
 func _interval_cfg(key: String, fallback: float) -> float:

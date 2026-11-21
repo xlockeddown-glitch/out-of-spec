@@ -12,6 +12,7 @@ Follow NIST SP 811 in game as much as possible (Ryan). Rules in `docs/sp811.md`,
 - Interval adjustment on every calibration: as-found out of tolerance shortens the interval (sooner next cal); an on-time pass lengthens it; a late pass keeps it. `calibration_interval` in `sensor_drift_config.json` (initial 5 d, min 2, max 15, ±2 d; placeholders).
 - Start state: steering due day 5; the hygrometer's sticker already expired (due day 0).
 - Repeat-offence counts reset after a fully clean audit.
+- One-time grace (Ryan): the first audit that would fine you is a warning instead. Your manager recalibrates the violating instruments before Vance gets in (calibration records say "Manager"). No fine, no offence counted, offences not cleared.
 - The phone's remote ZERO STEERING counts as a calibration (same path as the bench).
 
 ## 2026-11-21: Two art bibles merged per area (see `docs/canon.md`)
