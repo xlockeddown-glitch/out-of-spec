@@ -51,7 +51,7 @@ func _process(delta: float) -> void:
 
 
 func _refresh_status() -> void:
-	_clock_label.text = "%s   %d CR" % [GameClock.format_now(), GameState.credits]
+	_clock_label.text = "%s   %s CR" % [GameClock.format_now(), SP811.integer(GameState.credits)]
 	var hygro: DriftingSensor = GameState.hygrometer
 	var reading: String = "--"
 	var ideal: Variant = GameState.get_dome_species().get("ideal_humidity_pct")
@@ -115,8 +115,8 @@ func _on_audit_completed(report: Dictionary) -> void:
 			if line.get("overdue", false):
 				why.append("overdue")
 			failing.append("%s (%s)" % [name_text, ", ".join(why)])
-	_toast("AUDIT DAY %d: FINE %d CR. %s. Details on the phone log." % [
-		report.get("day", 0), report.get("total_fine", 0), ", ".join(failing)])
+	_toast("AUDIT DAY %d: FINE %s CR. %s. Details on the phone log." % [
+		report.get("day", 0), SP811.integer(int(report.get("total_fine", 0))), ", ".join(failing)])
 
 
 func _toast(text: String) -> void:

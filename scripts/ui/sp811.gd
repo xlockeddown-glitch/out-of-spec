@@ -15,12 +15,12 @@ const NARROW_NBSP: String = " "
 
 ## Always-signed value, e.g. +5.60 or −0.48.
 static func signed(value: float, decimals: int = 2) -> String:
-	return _group(("%+." + str(decimals) + "f") % value).replace("-", MINUS)
+	return _group(("%+." + str(decimals) + "f") % _snap(value, decimals)).replace("-", MINUS)
 
 
 ## Unsigned or naturally signed value, e.g. 73.6 or −12.0.
 static func number(value: float, decimals: int = 2) -> String:
-	return _group(("%." + str(decimals) + "f") % value).replace("-", MINUS)
+	return _group(("%." + str(decimals) + "f") % _snap(value, decimals)).replace("-", MINUS)
 
 
 ## Whole number with SP 811 grouping, e.g. 427, 12 000, −1500.
@@ -28,10 +28,17 @@ static func integer(value: int) -> String:
 	return _group(str(value)).replace("-", MINUS)
 
 
+## Values that round to zero become exactly 0, so they never print as −0.00.
+static func _snap(value: float, decimals: int) -> float:
+	var step: float = pow(10.0, -decimals)
+	var snapped: float = snappedf(value, step)
+	return 0.0 if is_zero_approx(snapped) else snapped
+
+
 static func _group(text: String) -> String:
-	var sign: String = ""
+	var sign_char: String = ""
 	if text.begins_with("+") or text.begins_with("-"):
-		sign = text.substr(0, 1)
+		sign_char = text.substr(0, 1)
 		text = text.substr(1)
 	var parts: PackedStringArray = text.split(".")
 	var int_part: String = parts[0]
@@ -53,5 +60,5 @@ static func _group(text: String) -> String:
 					g += NARROW_NBSP
 				g += frac[i]
 			frac = g
-		return sign + int_part + "." + frac
-	return sign + int_part
+		return sign_char + int_part + "." + frac
+	return sign_char + int_part

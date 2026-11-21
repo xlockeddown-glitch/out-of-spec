@@ -36,6 +36,8 @@ var max_error: float = INF
 var cal_interval_days: int = 5
 ## Last day the current calibration is valid. Overdue from the day after.
 var cal_due_day: int = 0
+## Day of the last calibration (-1 = never).
+var last_cal_day: int = -1
 
 var error: float = 0.0:
 	set(value):

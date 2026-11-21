@@ -17,22 +17,37 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 RULES: list[tuple[str, re.Pattern[str]]] = [
-    ("§7.2 space before % (write 80 %)", re.compile(r"\d%(?!%)|%[-+0-9.]*[dfs]%%")),
-    ("§7.4/§7.5 no qualifier on % (name relative humidity in the text)", re.compile(r"%%?\s?RH\b")),
+    ("§7.2 space before % (write 80 %)", re.compile(r"\d%")),
+    ("§7.4/§7.5 no qualifier on % (name relative humidity in the text)", re.compile(r"%\s?RH\b")),
     ("§10.5.3 no comma digit grouping (12 000 with U+202F)", re.compile(r"\d,\d{3}(?!\d)")),
-    ("§7.2 space between number and unit symbol", re.compile(r"\d(?:ms|mm|cm|km|kg|Hz|kHz|MHz|°C)\b")),
-    ("× for multiplication, not x", re.compile(r"\bx\s*MPE|\bx%[.d]|\bx\s?\d+(?:\.\d+)?\b(?!\s*\d)")),
-    ("§6.1.8 nonstandard abbreviation", re.compile(r"\b(?:sec|secs|hr|hrs|mins|mps|cc|ppm|ppb|sccm)\b")),
+    ("§7.2 space between number and unit symbol",
+     re.compile(r"\d(?:ms|mm|cm|km|kg|Hz|kHz|MHz|min|s|h|d|V|A|W|L)\b|\d°C")),
+    ("× for multiplication, not x", re.compile(r"\bx\s*MPE|\bx\s?\d+(?:\.\d+)?\b(?!\s*\d)")),
+    ("§6.1.8 nonstandard abbreviation", re.compile(r"\d\s*(?:sec|secs|hr|hrs|mins|mps|cc)\b|\b(?:ppm|ppb|sccm)\b")),
+    ("U+2212 minus sign, not a hyphen", re.compile(r"(?<![\w.\-])-\d")),
+    ("× for multiplication, not x (2× speed)", re.compile(r"\d\s?x\s")),
     ("plane-angle ° takes no space", re.compile(r"\d\s+°(?!C)")),
-    ("°C needs a space", re.compile(r"\d°C")),
 ]
 
 GD_STRING = re.compile(r'"((?:[^"\\]|\\.)*)"')
-TSCN_TEXT = re.compile(r'^\s*text\s*=\s*"((?:[^"\\]|\\.)*)"')
+TSCN_TEXT = re.compile(r'^\s*(?:text|placeholder_text|tooltip_text|item_\d+/text)\s*=\s*"((?:[^"\\]|\\.)*)"')
+
+
+FORMAT_SPEC = re.compile(r"%[-+0-9.]*[dfs]")
+PATH_LIKE = re.compile(r"[\w.:-]+(?:/[\w.:-]+)+")
+SIGNED_FORMAT = ("signed format: use SP811.signed()", re.compile(r"%\+\.?\d*f"))
 
 
 def check_text(text: str) -> list[str]:
-    return [name for name, pattern in RULES if pattern.search(text)]
+    """Rules run on the text with printf specs replaced by a digit, so
+    "%dms" is caught but "%02d:%02d" is not. Engine paths are skipped."""
+    if PATH_LIKE.fullmatch(text):
+        return []
+    normalized = FORMAT_SPEC.sub("9", text.replace("%%", "%"))
+    found = [name for name, pattern in RULES if pattern.search(normalized)]
+    if SIGNED_FORMAT[1].search(text):
+        found.append(SIGNED_FORMAT[0])
+    return found
 
 
 def scan_gd(path: Path) -> list[str]:
@@ -80,6 +95,8 @@ def scan_json(path: Path) -> list[str]:
 def main() -> int:
     problems: list[str] = []
     for p in sorted(ROOT.glob("scripts/**/*.gd")):
+        if p.name == "sp811.gd":  # the formatter itself builds signed formats
+            continue
         problems += scan_gd(p)
     for p in sorted(ROOT.glob("**/*.tscn")):
         problems += scan_tscn(p)

@@ -137,14 +137,20 @@ func calibrate(instrument_id: String) -> Dictionary:
 	var as_found_ok: bool = absf(as_found) <= sensor.mpe
 	# Interval adjustment: a failed as-found brings the next calibration
 	# sooner; an on-time pass earns a longer interval; a late pass keeps it.
+	# A pass only counts as interval evidence if the instrument has run at
+	# least half its interval since the last calibration, so re-calibrating
+	# the same day can't farm longer intervals or erase a shortened one.
 	var previous_interval: int = sensor.cal_interval_days
+	var days_in_service: int = today - sensor.last_cal_day if sensor.last_cal_day >= 0 else previous_interval
+	var enough_service: bool = days_in_service >= ceili(previous_interval / 2.0)
 	if not as_found_ok:
 		sensor.cal_interval_days = maxi(int(_interval_cfg("min_days", 2.0)),
 			previous_interval - int(_interval_cfg("shorten_days", 2.0)))
-	elif on_time:
+	elif on_time and enough_service:
 		sensor.cal_interval_days = mini(int(_interval_cfg("max_days", 15.0)),
 			previous_interval + int(_interval_cfg("lengthen_days", 2.0)))
 	sensor.cal_due_day = today + sensor.cal_interval_days
+	sensor.last_cal_day = today
 	var record: Dictionary = {
 		"instrument_id": instrument_id,
 		"unit": sensor.error_unit,
@@ -156,6 +162,8 @@ func calibrate(instrument_id: String) -> Dictionary:
 		"as_left_band": sensor.band_for(as_left),
 		"day": today,
 		"on_time": on_time,
+		"days_in_service": days_in_service,
+		"interval_evidence": enough_service,
 		"previous_interval_days": previous_interval,
 		"interval_days": sensor.cal_interval_days,
 		"due_day": sensor.cal_due_day,
@@ -230,7 +238,7 @@ func _run_audit(day: int) -> void:
 			label += ", OVERDUE (due day %d)" % line["due_day"]
 		if line["violation"]:
 			offence_counts[line["instrument_id"]] = int(offence_counts.get(line["instrument_id"], 0)) + 1
-			label += ": FINE %d CR" % line["fine"]
+			label += ": FINE %s CR" % SP811.integer(line["fine"])
 		post_phone(label)
 	post_phone("Traceability: %d calibration record(s) since last audit, %d found out of tolerance." % [
 		report["cal_records"], report["cal_fails_found"]])

@@ -98,10 +98,12 @@ func _on_calibrate_pressed() -> void:
 	_left_meter.value = as_left
 	_left_meter.show_needle = true
 	var passed: bool = record["as_found_in_tolerance"]
-	var interval_note: String = "Interval %d -> %d d, due day %d." % [
+	var interval_note: String = "Interval %d d → %d d, due day %d." % [
 		record["previous_interval_days"], record["interval_days"], record["due_day"]]
-	if passed and record["on_time"]:
+	if passed and record["on_time"] and record["interval_evidence"]:
 		_result_label.text = "AS-FOUND IN TOLERANCE, ON TIME: PASS. Interval lengthened. " + interval_note
+	elif passed and record["on_time"]:
+		_result_label.text = "AS-FOUND IN TOLERANCE: PASS. Too soon after the last calibration to change the interval. " + interval_note
 	elif passed:
 		_result_label.text = "AS-FOUND IN TOLERANCE, LATE: PASS. Interval unchanged. " + interval_note
 	else:
