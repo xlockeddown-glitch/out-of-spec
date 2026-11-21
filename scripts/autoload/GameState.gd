@@ -90,7 +90,7 @@ func _ready() -> void:
 	GameClock.time_advanced.connect(_on_time_advanced)
 	GameClock.day_started.connect(_on_day_started)
 	credits = int(DataManager.get_number(ECONOMY_TABLE, "starting_credits", 0.0))
-	_post_morning_dispatch()  # day 1 is already under way at boot
+	_post_morning_dispatch(1)  # day 1 is already under way at boot
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -168,21 +168,21 @@ func add_credits(amount: int) -> void:
 
 
 func _on_day_started(day: int) -> void:
-	_post_morning_dispatch()
+	_post_morning_dispatch(day)
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)
 
 
 ## One morning dispatch per day, no repeats until the whole deck is used.
-func _post_morning_dispatch() -> void:
+func _post_morning_dispatch(day: int) -> void:
 	if _dispatch_deck.is_empty():
 		_dispatch_deck = DataManager.get_records(DISPATCH_TABLE, "morning_dispatches")
 		_dispatch_deck.shuffle()
 	if _dispatch_deck.is_empty():
 		return
 	var entry: Dictionary = _dispatch_deck.pop_back()
-	post_phone("DAY %d  [%s] %s" % [GameClock.get_day_index(), entry.get("sender", "?"), entry.get("text", "")])
+	post_phone("DAY %d  [%s] %s" % [day, entry.get("sender", "?"), entry.get("text", "")])
 
 
 func _run_audit(day: int) -> void:
@@ -198,10 +198,11 @@ func _run_audit(day: int) -> void:
 	post_phone("AUDIT DAY %d: Inspector Vance and AUD-1T have landed." % day)
 	for line: Dictionary in report["lines"]:
 		var sensor: DriftingSensor = get_sensor(line["instrument_id"])
-		var label: String = "%s %s (%.2f x MPE) %s" % [
+		# Three decimals so 1.004 x MPE doesn't read as "1.00 ... OUT OF TOLERANCE".
+		var label: String = "%s %s (%.3f x MPE) %s" % [
 			INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"]),
 			sensor.format_value(line["as_found"]), line["ratio"], DriftingSensor.band_label(line["band"])]
-		if line["fine"] > 0:
+		if line["out_of_tolerance"]:
 			offence_counts[line["instrument_id"]] = int(offence_counts.get(line["instrument_id"], 0)) + 1
 			label += ": FINE %d CR" % line["fine"]
 		post_phone(label)

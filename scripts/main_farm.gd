@@ -30,14 +30,15 @@ func _ready() -> void:
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.credits_changed.connect(_hud.set_credits)
 
+	# Replay the persistent phone log first, so fresh SYS lines land on top of it.
+	for line: String in GameState.phone_log.slice(-LOG_REPLAY_LINES):
+		_hud.push_log(line)
 	var relay_name: String = _rover.satellite_relay.relay_name if _rover.satellite_relay else "NO RELAY"
 	_hud.configure(relay_name, _rover.steering.mpe, _rover.steering.acceptance_ratio)
 	_last_band = _rover.get_drift_band()
 	_rover.broadcast_state()
 	_refresh_relay_hud()
 	_hud.set_credits(GameState.credits)
-	for line: String in GameState.phone_log.slice(-LOG_REPLAY_LINES):
-		_hud.push_log(line)
 
 
 func _process(_delta: float) -> void:

@@ -27,7 +27,8 @@ func _process(delta: float) -> void:
 	advance(delta / seconds_per_day)
 
 
-## Moves time forward. Drift, molt and day_started all follow from this.
+## Moves time forward. Drift and day_started follow from this. (Molt still
+## runs on real seconds in GameState for the 20 s playtest.)
 func advance(delta_days: float) -> void:
 	if delta_days <= 0.0:
 		return

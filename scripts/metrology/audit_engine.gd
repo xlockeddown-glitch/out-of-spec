@@ -23,13 +23,16 @@ const CONFIG_TABLE: StringName = &"sensor_drift_config"
 static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, cal_records: Array[Dictionary]) -> Dictionary:
 	var lines: Array[Dictionary] = []
 	var total_fine: int = 0
+	var any_out_of_tolerance: bool = false
 	for id_key: Variant in sensors:
 		var instrument_id: String = id_key
 		var sensor: DriftingSensor = sensors[instrument_id]
 		var ratio: float = sensor.get_error_ratio()
 		var band: int = sensor.get_band()
 		var repeats: int = int(prior_offences.get(instrument_id, 0))
-		var fine: int = fine_for(ratio, repeats) if band == DriftingSensor.Band.OUT_OF_TOLERANCE else 0
+		var out_of_tolerance: bool = band == DriftingSensor.Band.OUT_OF_TOLERANCE
+		any_out_of_tolerance = any_out_of_tolerance or out_of_tolerance
+		var fine: int = fine_for(ratio, repeats) if out_of_tolerance else 0
 		total_fine += fine
 		lines.append({
 			"instrument_id": instrument_id,
@@ -38,6 +41,7 @@ static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, 
 			"mpe": sensor.mpe,
 			"ratio": ratio,
 			"band": band,
+			"out_of_tolerance": out_of_tolerance,
 			"prior_offences": repeats,
 			"fine": fine,
 		})
@@ -45,7 +49,9 @@ static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, 
 		"day": day,
 		"lines": lines,
 		"total_fine": total_fine,
-		"passed": total_fine == 0,
+		# Pass/fail follows the band, not the fine: a tuned-down fine that rounds
+		# to 0 CR must not turn an out-of-tolerance instrument into a pass.
+		"passed": not any_out_of_tolerance,
 		"cal_records": cal_records.size(),
 		"cal_fails_found": cal_records.filter(func(r: Dictionary) -> bool: return not r.get("as_found_in_tolerance", true)).size(),
 	}

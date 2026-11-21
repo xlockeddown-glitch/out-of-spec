@@ -33,6 +33,9 @@ func _ready() -> void:
 	_spool.clicked.connect(_on_spool_clicked)
 	GameState.calibration_recorded.connect(_on_calibration_recorded)
 	GameState.phone_message.connect(_toast)
+	# An audit posts several phone lines in one frame; this fires after them,
+	# so the toast ends on a summary that names the failing instruments.
+	GameState.audit_completed.connect(_on_audit_completed)
 
 	var species: Dictionary = GameState.get_dome_species()
 	_species_label.text = "%s  (%s)" % [_field(species, "common_name", "Unknown"), _field(species, "scientific_name", "Unclassified")]
@@ -93,6 +96,18 @@ func _on_calibration_recorded(record: Dictionary) -> void:
 static func _field(record: Dictionary, key: String, fallback: String) -> String:
 	var value: Variant = record.get(key)
 	return fallback if value == null else str(value)
+
+
+func _on_audit_completed(report: Dictionary) -> void:
+	if report.get("passed", true):
+		_toast("AUDIT DAY %d: PASS. Vance is disappointed." % report.get("day", 0))
+		return
+	var failing: PackedStringArray = []
+	for line: Dictionary in report.get("lines", []):
+		if line.get("out_of_tolerance", false):
+			failing.append(str(GameState.INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"])))
+	_toast("AUDIT DAY %d: FINE %d CR. Out of tolerance: %s. Details on the phone log." % [
+		report.get("day", 0), report.get("total_fine", 0), ", ".join(failing)])
 
 
 func _toast(text: String) -> void:
