@@ -1,10 +1,10 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene format=3 uid="uid://t68buwschid3"]
 
-[ext_resource type="Script" path="res://scripts/main_farm.gd" id="1_main"]
-[ext_resource type="Script" path="res://scripts/rover/rover_controller.gd" id="2_rover"]
-[ext_resource type="Script" path="res://scripts/world/satellite_relay.gd" id="3_relay"]
-[ext_resource type="Script" path="res://scripts/world/farm_grid.gd" id="4_grid"]
-[ext_resource type="Script" path="res://scripts/camera/iso_camera.gd" id="5_cam"]
+[ext_resource type="Script" uid="uid://bcwvaalkth0lm" path="res://scripts/main_farm.gd" id="1_main"]
+[ext_resource type="Script" uid="uid://5o6uwubquyfv" path="res://scripts/rover/rover_controller.gd" id="2_rover"]
+[ext_resource type="Script" uid="uid://csnckofjd3kwt" path="res://scripts/world/satellite_relay.gd" id="3_relay"]
+[ext_resource type="Script" uid="uid://dvora5o5wfe7l" path="res://scripts/world/farm_grid.gd" id="4_grid"]
+[ext_resource type="Script" uid="uid://bbl4ndy88s6ud" path="res://scripts/camera/iso_camera.gd" id="5_cam"]
 [ext_resource type="PackedScene" path="res://ui/field_phone_hud.tscn" id="6_hud"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
@@ -18,16 +18,17 @@ sky = SubResource("Sky")
 ambient_light_source = 3
 tonemap_mode = 2
 
-[sub_resource type="BoxShape3D" id="RoverShape"]
-size = Vector3(1.6, 1, 2.4)
-
 [sub_resource type="StandardMaterial3D" id="MatGround"]
 albedo_color = Color(0.42, 0.5, 0.3, 1)
-roughness = 1.0
 
 [sub_resource type="StandardMaterial3D" id="MatRock"]
 albedo_color = Color(0.5, 0.48, 0.45, 1)
-roughness = 1.0
+
+[sub_resource type="StandardMaterial3D" id="MatRelay"]
+albedo_color = Color(0.85, 0.87, 0.9, 1)
+
+[sub_resource type="BoxShape3D" id="RoverShape"]
+size = Vector3(1.6, 1, 2.4)
 
 [sub_resource type="StandardMaterial3D" id="MatRover"]
 albedo_color = Color(0.9, 0.55, 0.12, 1)
@@ -35,175 +36,169 @@ albedo_color = Color(0.9, 0.55, 0.12, 1)
 [sub_resource type="StandardMaterial3D" id="MatDark"]
 albedo_color = Color(0.12, 0.12, 0.13, 1)
 
-[sub_resource type="StandardMaterial3D" id="MatRelay"]
-albedo_color = Color(0.85, 0.87, 0.9, 1)
-
-[node name="MainFarm" type="Node"]
+[node name="MainFarm" type="Node" unique_id=111713122]
 script = ExtResource("1_main")
 
-[node name="WorldView" type="SubViewportContainer" parent="."]
-layout_mode = 3
+[node name="WorldView" type="SubViewportContainer" parent="." unique_id=777552688]
+anchors_preset = -1
 anchor_right = 0.68
 anchor_bottom = 1.0
+offset_left = -75.0
+offset_top = 134.0
+offset_right = -75.0
+offset_bottom = 134.0
 grow_vertical = 2
 stretch = true
 
-[node name="WorldViewport" type="SubViewport" parent="WorldView"]
+[node name="WorldViewport" type="SubViewport" parent="WorldView" unique_id=296276192]
 handle_input_locally = false
 msaa_3d = 2
-size = Vector2i(1306, 1080)
+size = Vector2i(1305, 1080)
 render_target_update_mode = 4
 
-[node name="World" type="Node3D" parent="WorldView/WorldViewport"]
+[node name="World" type="Node3D" parent="WorldView/WorldViewport" unique_id=494122415]
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="WorldView/WorldViewport/World"]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="WorldView/WorldViewport/World" unique_id=207294089]
 environment = SubResource("Env")
 
-[node name="Sun" type="DirectionalLight3D" parent="WorldView/WorldViewport/World"]
-rotation_degrees = Vector3(-50, -30, 0)
+[node name="Sun" type="DirectionalLight3D" parent="WorldView/WorldViewport/World" unique_id=245484382]
+transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
 shadow_enabled = true
 
-[node name="IsoCamera" type="Camera3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("target")]
+[node name="IsoCamera" type="Camera3D" parent="WorldView/WorldViewport/World" unique_id=548626872 node_paths=PackedStringArray("target")]
 current = true
 script = ExtResource("5_cam")
 target = NodePath("../Rover")
 
-[node name="Ground" type="CSGBox3D" parent="WorldView/WorldViewport/World"]
-position = Vector3(0, -0.5, 0)
+[node name="Ground" type="CSGBox3D" parent="WorldView/WorldViewport/World" unique_id=1000800481]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 use_collision = true
-collision_layer = 1
 collision_mask = 0
 size = Vector3(160, 1, 160)
 material = SubResource("MatGround")
 
-[node name="SoilGrid" type="GridMap" parent="WorldView/WorldViewport/World"]
-position = Vector3(0, -0.15, 0)
+[node name="SoilGrid" type="GridMap" parent="WorldView/WorldViewport/World" unique_id=56551322]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
 cell_size = Vector3(2, 0.2, 2)
 collision_layer = 0
 collision_mask = 0
 script = ExtResource("4_grid")
 
-[node name="Rocks" type="Node3D" parent="WorldView/WorldViewport/World"]
+[node name="Rocks" type="Node3D" parent="WorldView/WorldViewport/World" unique_id=573734627]
 
-[node name="RockA" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks"]
-position = Vector3(-17, 2, -10)
+[node name="RockA" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks" unique_id=1022918678]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 2, -10)
 use_collision = true
 collision_layer = 5
 collision_mask = 0
 size = Vector3(5, 4, 4)
 material = SubResource("MatRock")
 
-[node name="RockB" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks"]
-position = Vector3(-9, 1.75, -17)
+[node name="RockB" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks" unique_id=1506736533]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 1.75, -17)
 use_collision = true
 collision_layer = 5
 collision_mask = 0
 size = Vector3(4, 3.5, 5)
 material = SubResource("MatRock")
 
-[node name="RockC" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks"]
-position = Vector3(16, 2, 9)
+[node name="RockC" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks" unique_id=1587308848]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2, 9)
 use_collision = true
 collision_layer = 5
 collision_mask = 0
 size = Vector3(4, 4, 4)
 material = SubResource("MatRock")
 
-[node name="RockD" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks"]
-position = Vector3(5, 1.5, -16)
+[node name="RockD" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks" unique_id=845893544]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.5, -16)
 use_collision = true
 collision_layer = 5
 collision_mask = 0
 size = Vector3(3, 3, 3)
 material = SubResource("MatRock")
 
-[node name="SatelliteRelay" type="Node3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("uplink_point")]
-position = Vector3(-70, 0, -70)
+[node name="SatelliteRelay" type="Node3D" parent="WorldView/WorldViewport/World" unique_id=2137581624 node_paths=PackedStringArray("uplink_point")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -70, 0, -70)
 script = ExtResource("3_relay")
 uplink_point = NodePath("Dish")
 
-[node name="Mast" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/SatelliteRelay"]
-position = Vector3(0, 8, 0)
-radius = 0.5
+[node name="Mast" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/SatelliteRelay" unique_id=2013150468]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
 height = 16.0
 material = SubResource("MatRelay")
 
-[node name="Dish" type="Marker3D" parent="WorldView/WorldViewport/World/SatelliteRelay"]
-position = Vector3(0, 16, 0)
+[node name="Dish" type="Marker3D" parent="WorldView/WorldViewport/World/SatelliteRelay" unique_id=764750310]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 16, 0)
 
-[node name="DishMesh" type="CSGSphere3D" parent="WorldView/WorldViewport/World/SatelliteRelay/Dish"]
+[node name="DishMesh" type="CSGSphere3D" parent="WorldView/WorldViewport/World/SatelliteRelay/Dish" unique_id=425951318]
 radius = 1.5
 material = SubResource("MatRelay")
 
-[node name="Rover" type="CharacterBody3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("satellite_relay", "soil_grid", "antenna")]
+[node name="Rover" type="CharacterBody3D" parent="WorldView/WorldViewport/World" unique_id=221386182 node_paths=PackedStringArray("satellite_relay", "soil_grid", "antenna")]
 unique_name_in_owner = true
-position = Vector3(0, 0.05, 2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 2)
 collision_layer = 2
-collision_mask = 1
 script = ExtResource("2_rover")
 satellite_relay = NodePath("../SatelliteRelay")
 soil_grid = NodePath("../SoilGrid")
 antenna = NodePath("Antenna")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rover"]
-position = Vector3(0, 0.5, 0)
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rover" unique_id=806680600]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 shape = SubResource("RoverShape")
 
-[node name="VisualRoot" type="Node3D" parent="WorldView/WorldViewport/World/Rover"]
+[node name="VisualRoot" type="Node3D" parent="WorldView/WorldViewport/World/Rover" unique_id=1748996152]
 
-[node name="Chassis" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
-position = Vector3(0, 0.6, 0)
+[node name="Chassis" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot" unique_id=1978092636]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
 size = Vector3(1.4, 0.5, 2.4)
 material = SubResource("MatRover")
 
-[node name="Cab" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
-position = Vector3(0, 1.25, 0.5)
-size = Vector3(1.2, 0.8, 1.0)
+[node name="Cab" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot" unique_id=1504684747]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0.5)
+size = Vector3(1.2, 0.8, 1)
 material = SubResource("MatRover")
 
-[node name="Grille" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
-position = Vector3(0, 0.7, -1.25)
-size = Vector3(1.0, 0.3, 0.12)
+[node name="Grille" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot" unique_id=1070771076]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, -1.25)
+size = Vector3(1, 0.3, 0.12)
 material = SubResource("MatDark")
 
-[node name="WheelFL" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
-position = Vector3(-0.85, 0.45, -0.8)
-rotation_degrees = Vector3(0, 0, 90)
+[node name="WheelFL" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot" unique_id=2058933030]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.85, 0.45, -0.8)
 radius = 0.45
 height = 0.3
 material = SubResource("MatDark")
 
-[node name="WheelFR" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
-position = Vector3(0.85, 0.45, -0.8)
-rotation_degrees = Vector3(0, 0, 90)
+[node name="WheelFR" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot" unique_id=2018686994]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0.85, 0.45, -0.8)
 radius = 0.45
 height = 0.3
 material = SubResource("MatDark")
 
-[node name="WheelRL" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
-position = Vector3(-0.85, 0.45, 0.8)
-rotation_degrees = Vector3(0, 0, 90)
+[node name="WheelRL" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot" unique_id=17662113]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.85, 0.45, 0.8)
 radius = 0.45
 height = 0.3
 material = SubResource("MatDark")
 
-[node name="WheelRR" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
-position = Vector3(0.85, 0.45, 0.8)
-rotation_degrees = Vector3(0, 0, 90)
+[node name="WheelRR" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot" unique_id=692265830]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0.85, 0.45, 0.8)
 radius = 0.45
 height = 0.3
 material = SubResource("MatDark")
 
-[node name="AntennaMast" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
-position = Vector3(0.4, 1.9, 0.8)
+[node name="AntennaMast" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot" unique_id=1146133402]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 1.9, 0.8)
 radius = 0.04
 height = 0.6
 material = SubResource("MatDark")
 
-[node name="Antenna" type="Marker3D" parent="WorldView/WorldViewport/World/Rover"]
-position = Vector3(0.4, 2.2, 0.8)
+[node name="Antenna" type="Marker3D" parent="WorldView/WorldViewport/World/Rover" unique_id=752251794]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 2.2, 0.8)
 
-[node name="HUDLayer" type="CanvasLayer" parent="."]
+[node name="HUDLayer" type="CanvasLayer" parent="." unique_id=1890206993]
 
-[node name="FieldPhoneHUD" parent="HUDLayer" instance=ExtResource("6_hud")]
+[node name="FieldPhoneHUD" parent="HUDLayer" unique_id=1260413487 instance=ExtResource("6_hud")]
 unique_name_in_owner = true
