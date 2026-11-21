@@ -88,7 +88,11 @@ func push_log(line: String) -> void:
 	_log_lines.append(line)
 	while _log_lines.size() > MAX_LOG_LINES:
 		_log_lines.remove_at(0)
-	_log_label.text = "\n".join(_log_lines)
+	# Newest first, like a phone's notification list: long wrapped lines
+	# would otherwise push the latest message (e.g. an audit) out of view.
+	var newest_first: PackedStringArray = _log_lines.duplicate()
+	newest_first.reverse()
+	_log_label.text = "\n".join(newest_first)
 
 
 func _set_status(text: String, color: Color) -> void:

@@ -1,11 +1,11 @@
 class_name DayNight
 extends DirectionalLight3D
-## Drives the farm sun from GameClock: rises at 06:00, peaks at noon, sets at
-## 18:00. Warm at dawn/dusk, dim moonlight at night. Also scales the
+## Drives the farm sun from GameClock: rises at 04:30, peaks at noon, sets at
+## 19:30, so the 06:00 start of each game day is already light. Warm at dawn/dusk, dim moonlight at night. Also scales the
 ## environment's sky and ambient light so nights read as nights.
 
-const DAWN_HOUR: float = 6.0
-const DUSK_HOUR: float = 18.0
+const DAWN_HOUR: float = 4.5
+const DUSK_HOUR: float = 19.5
 const COLOR_LOW_SUN := Color(1.0, 0.62, 0.38)
 const COLOR_HIGH_SUN := Color(1.0, 0.97, 0.92)
 const COLOR_MOON := Color(0.55, 0.65, 1.0)
