@@ -4,9 +4,9 @@ extends Control
 ## acceptance zone, centre line at nominal, white needle at the current error.
 
 # Darkened versions of the neon band palette so the white needle reads on top.
-const COLOR_RED := Color("#FF5A5F") * Color(0.55, 0.55, 0.55)
-const COLOR_AMBER := Color("#F5A623") * Color(0.6, 0.6, 0.6)
-const COLOR_GREEN := Color("#38E1C6") * Color(0.5, 0.5, 0.5)
+const COLOR_RED := Color("#FF5A5F") * Color(0.55, 0.55, 0.55, 1.0)
+const COLOR_AMBER := Color("#F5A623") * Color(0.6, 0.6, 0.6, 1.0)
+const COLOR_GREEN := Color("#38E1C6") * Color(0.5, 0.5, 0.5, 1.0)
 const COLOR_NEEDLE := Color(1, 1, 1)
 const COLOR_TICK := Color(0.85, 0.95, 0.88, 0.8)
 
