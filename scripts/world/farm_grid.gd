@@ -5,6 +5,9 @@ extends GridMap
 ## Week 1 builds a greybox MeshLibrary in code. Week 4: export the MagicaVoxel
 ## tiles to a MeshLibrary with the SAME item IDs as `Tile` and assign it to
 ## `mesh_library_override` (or straight to `mesh_library`); no code changes.
+##
+## Tilled cells are mirrored into GameState.tilled_cells so they survive
+## farm <-> dome scene swaps.
 
 signal tile_changed(cell: Vector3i, tile: int)
 
@@ -34,6 +37,7 @@ func till_cell(cell: Vector3i) -> TillResult:
 	match get_cell_item(cell):
 		Tile.SOIL_UNTILLED:
 			set_cell_item(cell, Tile.SOIL_TILLED)
+			GameState.tilled_cells[cell] = true
 			tile_changed.emit(cell, Tile.SOIL_TILLED)
 			return TillResult.TILLED
 		Tile.SOIL_TILLED:
@@ -48,6 +52,8 @@ func _fill_plot() -> void:
 			var cell := Vector3i(plot_origin_cell.x + x, 0, plot_origin_cell.y + z)
 			if get_cell_item(cell) == INVALID_CELL_ITEM:
 				set_cell_item(cell, Tile.SOIL_UNTILLED)
+	for tilled: Variant in GameState.tilled_cells:
+		set_cell_item(tilled as Vector3i, Tile.SOIL_TILLED)
 
 
 func _build_greybox_library() -> MeshLibrary:
