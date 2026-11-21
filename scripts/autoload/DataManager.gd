@@ -24,6 +24,7 @@ const DATA_FILES: Dictionary = {
 	&"crops": "res://data/crops.json",
 	&"sensor_drift_config": "res://data/sensor_drift_config.json",
 	&"dialogue_dispatches": "res://data/dialogue_dispatches.json",
+	&"items": "res://data/items.json",
 }
 
 ## Table -> { section -> required fields (besides "id") }.
@@ -42,6 +43,7 @@ const RECORD_SECTIONS: Dictionary = {
 		"audit_fines": ["title", "credit_penalty"],
 	},
 	&"sensor_drift_config": {},
+	&"items": {},
 }
 
 var is_loaded: bool = false

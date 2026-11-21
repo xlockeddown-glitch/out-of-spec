@@ -3,14 +3,16 @@
     "hygrometer": {
       "error_unit": "percentage_points_rh",
       "daily_drift_rate": 0.3,
-      "max_permissible_error": 2.0
+      "max_permissible_error": 5.0,
+      "as_left_residual": 0.2
     },
     "rover_steering_encoder": {
       "error_unit": "degrees",
       "daily_drift_rate": 0.12,
       "usage_drift_rate": 0.03,
       "usage_unit": "metre_driven",
-      "max_permissible_error": 0.8
+      "max_permissible_error": 4.0,
+      "as_left_residual": 0.2
     },
     "relay_dish_azimuth": {
       "error_unit": "degrees",

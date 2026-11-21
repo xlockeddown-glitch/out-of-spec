@@ -1,0 +1,7 @@
+{
+  "optical_silk_spool": {
+    "display_name": "Optical Silk Spool",
+    "relay_lag_reduction_pct": 60,
+    "_note": "Week 2 decision: one spool cuts rover uplink lag ~60% (0.45 s -> 0.18 s occluded)."
+  }
+}

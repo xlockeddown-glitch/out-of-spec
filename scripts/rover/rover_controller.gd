@@ -4,14 +4,15 @@ extends CharacterBody3D
 ##
 ## Local input is timestamped and pushed through a simulated uplink whose
 ## latency depends on line of sight (LOS) to a SatelliteRelay. Driving uses a
-## kinematic bicycle model whose steering zero is a DriftModel: it drifts with
-## distance driven and with in-game time, until the operator sends a
-## ZERO_STEERING command (which also rides the uplink).
+## kinematic bicycle model whose steering zero is GameState.steering (a
+## DriftingSensor): it drifts with distance driven and with in-game time, until
+## the operator sends a ZERO_STEERING command (which also rides the uplink).
+## A slotted optical silk spool on the relay multiplies the lag down.
 
 signal uplink_changed(has_los: bool, quality: float, lag_s: float)
-## status is a DriftModel.Status value.
-signal drift_changed(drift_deg: float, status: int)
-signal steering_zeroed(as_found_deg: float)
+## band is a DriftingSensor.Band value.
+signal drift_changed(drift_deg: float, band: int)
+signal steering_zeroed(record: Dictionary)
 signal soil_tilled(cell: Vector3i)
 signal till_rejected(reason: String)
 
@@ -64,15 +65,8 @@ class UplinkCommand:
 @export var link_slew_per_s: float = 3.0
 @export_flags_3d_physics var los_collision_mask: int = 4
 
-@export_group("Steering Drift")
-## Key under "instruments" in data/sensor_drift_config.json. Supplies MPE,
-## daily_drift_rate (deg/day) and usage_drift_rate (deg/metre).
-@export var drift_instrument_id: String = "rover_steering_encoder"
-## Clamp so a neglected rover still drives.
-@export var max_drift_deg: float = 12.0
-
-## Steering zero error. Read-only from outside; use queue_command() to zero it.
-var steering: DriftModel
+## Steering zero error (lives in GameState). Use queue_command() to zero it.
+var steering: DriftingSensor
 var steering_drift_deg: float:
 	get:
 		return steering.error if steering else 0.0
@@ -89,10 +83,12 @@ var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 
 
 
 func _ready() -> void:
-	steering = DriftModel.from_config(drift_instrument_id, max_drift_deg)
-	steering.error_changed.connect(func(error: float, status: int) -> void: drift_changed.emit(error, status))
-	steering.zeroed.connect(func(as_found: float) -> void: steering_zeroed.emit(as_found))
-	GameClock.time_advanced.connect(steering.advance_days)
+	steering = GameState.steering
+	# Bound methods (not lambdas) so Godot drops these connections when the
+	# rover is freed on a scene swap; the sensor outlives us.
+	steering.error_changed.connect(_on_steering_error_changed)
+	if GameState.has_rover_transform:
+		global_transform = GameState.rover_transform
 	if satellite_relay == null:
 		push_warning("%s: no SatelliteRelay linked; uplink will read as occluded." % name)
 	if soil_grid == null:
@@ -100,9 +96,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
-	# GameClock outlives this scene; don't leave it holding our DriftModel.
-	if steering and GameClock.time_advanced.is_connected(steering.advance_days):
-		GameClock.time_advanced.disconnect(steering.advance_days)
+	GameState.rover_transform = global_transform
+	GameState.has_rover_transform = true
 
 
 func _physics_process(delta: float) -> void:
@@ -122,17 +117,18 @@ func queue_command(command: Command) -> void:
 
 func get_current_lag() -> float:
 	var t: float = inverse_lerp(occluded_link_quality, 1.0, link_quality)
-	return lerpf(lag_occluded_s, lag_clear_s, clampf(t, 0.0, 1.0))
+	var base_lag: float = lerpf(lag_occluded_s, lag_clear_s, clampf(t, 0.0, 1.0))
+	return base_lag * GameState.get_relay_lag_multiplier()
 
 
-func get_drift_status() -> DriftModel.Status:
-	return steering.get_status()
+func get_drift_band() -> DriftingSensor.Band:
+	return steering.get_band()
 
 
 ## Re-emit current state, e.g. right after a HUD connects.
 func broadcast_state() -> void:
 	uplink_changed.emit(has_line_of_sight, link_quality, get_current_lag())
-	drift_changed.emit(steering_drift_deg, get_drift_status())
+	drift_changed.emit(steering_drift_deg, get_drift_band())
 
 
 # --- Uplink -----------------------------------------------------------------
@@ -216,8 +212,12 @@ func _drive(delta: float) -> void:
 
 
 func _zero_steering() -> void:
-	# DriftModel emits zeroed + error_changed, which re-emit as rover signals.
-	steering.zero()
+	# Same calibration path as the bench, so the record lands in GameState.
+	steering_zeroed.emit(GameState.calibrate(GameState.STEERING_ID))
+
+
+func _on_steering_error_changed(error: float, band: int) -> void:
+	drift_changed.emit(error, band)
 
 
 # --- Tilling ----------------------------------------------------------------

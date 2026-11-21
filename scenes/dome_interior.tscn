@@ -1,0 +1,363 @@
+[gd_scene load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://scripts/dome/dome_interior.gd" id="1_dome"]
+[ext_resource type="Script" path="res://scripts/dome/terrarium.gd" id="2_terr"]
+[ext_resource type="Script" path="res://scripts/world/clickable.gd" id="3_click"]
+[ext_resource type="PackedScene" path="res://ui/cal_bench_ui.tscn" id="4_bench"]
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 1
+background_color = Color(0.05, 0.05, 0.06, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.4, 0.33, 0.26, 1)
+ambient_light_energy = 0.7
+tonemap_mode = 2
+
+[sub_resource type="StandardMaterial3D" id="MatFloor"]
+albedo_color = Color(0.22, 0.2, 0.19, 1)
+
+[sub_resource type="StandardMaterial3D" id="MatWall"]
+albedo_color = Color(0.3, 0.29, 0.3, 1)
+
+[sub_resource type="StandardMaterial3D" id="MatBench"]
+albedo_color = Color(0.42, 0.3, 0.2, 1)
+
+[sub_resource type="StandardMaterial3D" id="MatGlass"]
+transparency = 1
+albedo_color = Color(0.7, 0.9, 1, 0.15)
+roughness = 0.05
+
+[sub_resource type="StandardMaterial3D" id="MatSubstrate"]
+albedo_color = Color(0.35, 0.25, 0.15, 1)
+
+[sub_resource type="StandardMaterial3D" id="MatExuvia"]
+transparency = 1
+albedo_color = Color(0.95, 0.9, 0.75, 0.6)
+
+[sub_resource type="StandardMaterial3D" id="MatMetal"]
+albedo_color = Color(0.5, 0.52, 0.55, 1)
+metallic = 0.6
+roughness = 0.4
+
+[sub_resource type="StandardMaterial3D" id="MatCyanGlow"]
+albedo_color = Color(0.3, 0.85, 1, 1)
+emission_enabled = true
+emission = Color(0.3, 0.85, 1, 1)
+emission_energy_multiplier = 2.0
+
+[sub_resource type="StandardMaterial3D" id="MatScreen"]
+albedo_color = Color(0.2, 0.6, 0.3, 1)
+emission_enabled = true
+emission = Color(0.3, 1, 0.5, 1)
+emission_energy_multiplier = 1.5
+
+[sub_resource type="BoxShape3D" id="TerrariumShape"]
+size = Vector3(1.5, 1, 1)
+
+[sub_resource type="SphereShape3D" id="SpoolShape"]
+radius = 0.3
+
+[sub_resource type="BoxShape3D" id="BenchShape"]
+size = Vector3(2, 1, 1.4)
+
+[sub_resource type="BoxShape3D" id="AirlockShape"]
+size = Vector3(1.8, 2.8, 0.6)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status"]
+content_margin_left = 20.0
+content_margin_top = 16.0
+content_margin_right = 20.0
+content_margin_bottom = 16.0
+bg_color = Color(0.03, 0.07, 0.045, 0.88)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.2, 0.35, 0.24, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="DomeInterior" type="Node3D"]
+script = ExtResource("1_dome")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Env")
+
+[node name="CeilingLight" type="OmniLight3D" parent="."]
+position = Vector3(0, 4, 1)
+light_color = Color(1, 0.85, 0.7, 1)
+light_energy = 1.5
+shadow_enabled = true
+omni_range = 12.0
+
+[node name="Camera3D" type="Camera3D" parent="."]
+position = Vector3(0, 4.2, 6.5)
+rotation_degrees = Vector3(-25, 0, 0)
+current = true
+fov = 55.0
+
+[node name="Room" type="Node3D" parent="."]
+
+[node name="Floor" type="CSGBox3D" parent="Room"]
+position = Vector3(0, -0.1, 1)
+size = Vector3(14, 0.2, 10)
+material = SubResource("MatFloor")
+
+[node name="BackWall" type="CSGBox3D" parent="Room"]
+position = Vector3(0, 2.5, -4)
+size = Vector3(14, 5, 0.3)
+material = SubResource("MatWall")
+
+[node name="LeftWall" type="CSGBox3D" parent="Room"]
+position = Vector3(-7, 2.5, 1)
+size = Vector3(0.3, 5, 10)
+material = SubResource("MatWall")
+
+[node name="RightWall" type="CSGBox3D" parent="Room"]
+position = Vector3(7, 2.5, 1)
+size = Vector3(0.3, 5, 10)
+material = SubResource("MatWall")
+
+[node name="LeftBench" type="CSGBox3D" parent="."]
+position = Vector3(-3, 0.5, 0)
+size = Vector3(3.6, 1, 1.6)
+material = SubResource("MatBench")
+
+[node name="Terrarium" type="Node3D" parent="." node_paths=PackedStringArray("status_led", "heat_lamp", "tarantula", "exuvia", "spool_pickup")]
+position = Vector3(-3, 1, 0)
+script = ExtResource("2_terr")
+status_led = NodePath("StatusLED")
+heat_lamp = NodePath("HeatLamp")
+tarantula = NodePath("Tarantula")
+exuvia = NodePath("Exuvia")
+spool_pickup = NodePath("SpoolPickup")
+
+[node name="Glass" type="CSGBox3D" parent="Terrarium"]
+position = Vector3(0, 0.45, 0)
+size = Vector3(1.4, 0.9, 0.9)
+material = SubResource("MatGlass")
+
+[node name="Substrate" type="CSGBox3D" parent="Terrarium"]
+position = Vector3(0, 0.06, 0)
+size = Vector3(1.36, 0.12, 0.86)
+material = SubResource("MatSubstrate")
+
+[node name="Tarantula" type="Node3D" parent="Terrarium"]
+position = Vector3(-0.1, 0.2, 0.05)
+
+[node name="Abdomen" type="CSGSphere3D" parent="Terrarium/Tarantula"]
+position = Vector3(0, 0, 0.14)
+radius = 0.13
+
+[node name="Cephalothorax" type="CSGSphere3D" parent="Terrarium/Tarantula"]
+position = Vector3(0, -0.02, -0.06)
+radius = 0.1
+
+[node name="Legs" type="CSGBox3D" parent="Terrarium/Tarantula"]
+position = Vector3(0, -0.06, -0.04)
+size = Vector3(0.5, 0.03, 0.28)
+
+[node name="Exuvia" type="CSGBox3D" parent="Terrarium"]
+visible = false
+position = Vector3(0.35, 0.15, -0.15)
+size = Vector3(0.3, 0.05, 0.22)
+material = SubResource("MatExuvia")
+
+[node name="HygroPod" type="CSGBox3D" parent="Terrarium"]
+position = Vector3(0.5, 0.6, 0.48)
+size = Vector3(0.18, 0.12, 0.06)
+material = SubResource("MatMetal")
+
+[node name="StatusLED" type="CSGSphere3D" parent="Terrarium"]
+position = Vector3(0.5, 0.69, 0.5)
+radius = 0.04
+
+[node name="LampHead" type="CSGCylinder3D" parent="Terrarium"]
+position = Vector3(0, 1.3, 0)
+radius = 0.18
+height = 0.2
+material = SubResource("MatMetal")
+
+[node name="HeatLamp" type="OmniLight3D" parent="Terrarium"]
+position = Vector3(0, 1.15, 0)
+light_color = Color(1, 0.72, 0.42, 1)
+light_energy = 2.5
+omni_range = 2.5
+
+[node name="TerrariumClick" type="Area3D" parent="Terrarium"]
+unique_name_in_owner = true
+position = Vector3(0, 0.45, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("3_click")
+hint = "Terrarium: Curlyhair"
+
+[node name="Shape" type="CollisionShape3D" parent="Terrarium/TerrariumClick"]
+shape = SubResource("TerrariumShape")
+
+[node name="SpoolPickup" type="Area3D" parent="Terrarium"]
+unique_name_in_owner = true
+visible = false
+position = Vector3(1, 0.15, 0.45)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("3_click")
+hint = "Collect optical silk spool"
+enabled = false
+
+[node name="Shape" type="CollisionShape3D" parent="Terrarium/SpoolPickup"]
+shape = SubResource("SpoolShape")
+
+[node name="SpoolMesh" type="CSGCylinder3D" parent="Terrarium/SpoolPickup"]
+radius = 0.1
+height = 0.22
+material = SubResource("MatCyanGlow")
+
+[node name="SpoolLight" type="OmniLight3D" parent="Terrarium/SpoolPickup"]
+light_color = Color(0.3, 0.85, 1, 1)
+omni_range = 1.2
+
+[node name="RightBench" type="CSGBox3D" parent="."]
+position = Vector3(3, 0.5, 0)
+size = Vector3(3.6, 1, 1.6)
+material = SubResource("MatBench")
+
+[node name="CalStation" type="Node3D" parent="."]
+position = Vector3(3, 1, 0)
+
+[node name="Body" type="CSGBox3D" parent="CalStation"]
+position = Vector3(0, 0.3, -0.1)
+size = Vector3(1.4, 0.6, 0.8)
+material = SubResource("MatMetal")
+
+[node name="Screen" type="CSGBox3D" parent="CalStation"]
+position = Vector3(0, 0.35, 0.32)
+size = Vector3(1, 0.4, 0.05)
+material = SubResource("MatScreen")
+
+[node name="ScreenLight" type="OmniLight3D" parent="CalStation"]
+position = Vector3(0, 0.4, 0.8)
+light_color = Color(0.3, 1, 0.5, 1)
+light_energy = 0.6
+omni_range = 2.0
+
+[node name="SilkTray" type="CSGBox3D" parent="CalStation"]
+position = Vector3(1.25, 0.04, 0.3)
+size = Vector3(0.6, 0.08, 0.4)
+material = SubResource("MatMetal")
+
+[node name="BenchClick" type="Area3D" parent="CalStation"]
+unique_name_in_owner = true
+position = Vector3(0, 0.35, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("3_click")
+hint = "Calibration bench"
+
+[node name="Shape" type="CollisionShape3D" parent="CalStation/BenchClick"]
+shape = SubResource("BenchShape")
+
+[node name="Airlock" type="Node3D" parent="."]
+position = Vector3(0, 0, -3.84)
+
+[node name="Frame" type="CSGBox3D" parent="Airlock"]
+position = Vector3(0, 1.5, 0)
+size = Vector3(2.2, 3, 0.2)
+material = SubResource("MatMetal")
+
+[node name="Door" type="CSGBox3D" parent="Airlock"]
+position = Vector3(0, 1.3, 0.1)
+size = Vector3(1.6, 2.6, 0.1)
+material = SubResource("MatCyanGlow")
+
+[node name="AirlockClick" type="Area3D" parent="Airlock"]
+unique_name_in_owner = true
+position = Vector3(0, 1.3, 0.2)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("3_click")
+hint = "Airlock: back to farm"
+
+[node name="Shape" type="CollisionShape3D" parent="Airlock/AirlockClick"]
+shape = SubResource("AirlockShape")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="StatusPanel" type="PanelContainer" parent="UI"]
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 584.0
+offset_bottom = 300.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_status")
+
+[node name="VBox" type="VBoxContainer" parent="UI/StatusPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="UI/StatusPanel/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 24
+text = "DOME // TERRARIUM 01"
+
+[node name="SpeciesLabel" type="Label" parent="UI/StatusPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="HygroLabel" type="Label" parent="UI/StatusPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 20
+
+[node name="HygroBandLabel" type="Label" parent="UI/StatusPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+
+[node name="MoltLabel" type="Label" parent="UI/StatusPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="MoltBar" type="ProgressBar" parent="UI/StatusPanel/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+max_value = 1.0
+step = 0.001
+show_percentage = false
+
+[node name="SilkLabel" type="Label" parent="UI/StatusPanel/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 18
+
+[node name="HintLabel" type="Label" parent="UI"]
+unique_name_in_owner = true
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -760.0
+offset_top = -90.0
+offset_right = 760.0
+offset_bottom = -30.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.85, 0.95, 0.88, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="CalBenchUI" parent="UI" instance=ExtResource("4_bench")]
+unique_name_in_owner = true

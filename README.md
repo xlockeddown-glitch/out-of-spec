@@ -4,13 +4,18 @@ Desktop (1920x1080, Steam/PC) chunky 3D voxel life-sim: satellite-linked remote 
 
 ## Run
 
-Open `project.godot` in Godot 4.7 and press F5. Main scene: `scenes/main_farm.tscn`.
+Open `project.godot` in Godot 4.7 and press F5. Main scene: `scenes/main_farm.tscn`; dome: `scenes/dome_interior.tscn`.
 
 | Input | Action |
 |---|---|
 | WASD / arrows | Drive rover (through the uplink lag) |
 | Space | Till the soil tile under the rover |
-| R or ZERO STEERING button | Re-zero steering drift |
+| R or ZERO STEERING button | Re-zero steering drift remotely |
+| Tab, airlock, or ENTER DOME | Swap farm <-> dome |
+| Click (dome) | Bench calibration, terrarium info, collect silk spool |
+| INSTALL SILK SPOOL (phone) | Slot a spool into the relay (cuts uplink lag) |
+
+Week 2 loop: dome hygrometer starts out of tolerance -> calibrate at the bench -> molt fills (20 s) -> collect spool -> farm -> install spool -> lower lag.
 
 ## Layout
 
@@ -19,9 +24,11 @@ scenes/          playable scenes
 scripts/         GDScript (autoload/, rover/, world/, camera/, ui/)
 ui/              UI scenes (field phone HUD)
 data/            JSON game data, loaded by the DataManager autoload
-scripts/metrology/  DriftModel: shared instrument drift + guard-band status
+scripts/autoload/   DataManager, GameClock, GameState (live state across scenes), SceneSwitcher
+scripts/metrology/  DriftingSensor: shared instrument drift + guard-band status
+scripts/dome/       dome interior + terrarium visuals
 assets/voxels/   MagicaVoxel exports (Week 4)
-docs/design/     concept blueprint and art bible (ignored by Godot via docs/.gdignore)
+docs/design/     concept blueprint, art bible, Week 2 board (ignored by Godot via docs/.gdignore)
 docs/decisions.md  design calls that shape code and data
 ```
 

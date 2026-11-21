@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://dvora5o5wfe7l" path="res://scripts/world/farm_grid.gd" id="4_grid"]
 [ext_resource type="Script" uid="uid://bbl4ndy88s6ud" path="res://scripts/camera/iso_camera.gd" id="5_cam"]
 [ext_resource type="PackedScene" path="res://ui/field_phone_hud.tscn" id="6_hud"]
+[ext_resource type="Script" path="res://scripts/world/clickable.gd" id="7_click"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -36,6 +37,15 @@ albedo_color = Color(0.9, 0.55, 0.12, 1)
 [sub_resource type="StandardMaterial3D" id="MatDark"]
 albedo_color = Color(0.12, 0.12, 0.13, 1)
 
+[sub_resource type="StandardMaterial3D" id="MatCyanGlow"]
+albedo_color = Color(0.3, 0.85, 1, 1)
+emission_enabled = true
+emission = Color(0.3, 0.85, 1, 1)
+emission_energy_multiplier = 2.0
+
+[sub_resource type="BoxShape3D" id="AirlockShape"]
+size = Vector3(3, 3, 1.2)
+
 [node name="MainFarm" type="Node" unique_id=111713122]
 script = ExtResource("1_main")
 
@@ -43,15 +53,12 @@ script = ExtResource("1_main")
 anchors_preset = -1
 anchor_right = 0.68
 anchor_bottom = 1.0
-offset_left = -75.0
-offset_top = 134.0
-offset_right = -75.0
-offset_bottom = 134.0
 grow_vertical = 2
 stretch = true
 
 [node name="WorldViewport" type="SubViewport" parent="WorldView" unique_id=296276192]
 handle_input_locally = false
+physics_object_picking = true
 msaa_3d = 2
 size = Vector2i(1305, 1080)
 render_target_update_mode = 4
@@ -118,10 +125,35 @@ collision_mask = 0
 size = Vector3(3, 3, 3)
 material = SubResource("MatRock")
 
-[node name="SatelliteRelay" type="Node3D" parent="WorldView/WorldViewport/World" unique_id=2137581624 node_paths=PackedStringArray("uplink_point")]
+[node name="Airlock" type="Area3D" parent="WorldView/WorldViewport/World"]
+unique_name_in_owner = true
+position = Vector3(8, 0, 14)
+rotation_degrees = Vector3(0, 45, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("7_click")
+hint = "Enter dome"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Airlock"]
+position = Vector3(0, 1.5, 0)
+shape = SubResource("AirlockShape")
+
+[node name="Frame" type="CSGBox3D" parent="WorldView/WorldViewport/World/Airlock"]
+position = Vector3(0, 1.5, -0.25)
+size = Vector3(3, 3, 0.6)
+material = SubResource("MatRelay")
+
+[node name="Door" type="CSGBox3D" parent="WorldView/WorldViewport/World/Airlock"]
+position = Vector3(0, 1.25, 0.12)
+size = Vector3(1.8, 2.3, 0.15)
+material = SubResource("MatCyanGlow")
+
+[node name="SatelliteRelay" type="Node3D" parent="WorldView/WorldViewport/World" unique_id=2137581624 node_paths=PackedStringArray("uplink_point", "beacon", "spool_visual")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -70, 0, -70)
 script = ExtResource("3_relay")
 uplink_point = NodePath("Dish")
+beacon = NodePath("Dish/Beacon")
+spool_visual = NodePath("SpoolBay")
 
 [node name="Mast" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/SatelliteRelay" unique_id=2013150468]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 0)
@@ -134,6 +166,18 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 16, 0)
 [node name="DishMesh" type="CSGSphere3D" parent="WorldView/WorldViewport/World/SatelliteRelay/Dish" unique_id=425951318]
 radius = 1.5
 material = SubResource("MatRelay")
+
+[node name="Beacon" type="OmniLight3D" parent="WorldView/WorldViewport/World/SatelliteRelay/Dish"]
+position = Vector3(0, 2, 0)
+light_color = Color(0.3, 0.85, 1, 1)
+omni_range = 25.0
+
+[node name="SpoolBay" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/SatelliteRelay"]
+position = Vector3(0.8, 3, 0)
+visible = false
+radius = 0.4
+height = 0.8
+material = SubResource("MatCyanGlow")
 
 [node name="Rover" type="CharacterBody3D" parent="WorldView/WorldViewport/World" unique_id=221386182 node_paths=PackedStringArray("satellite_relay", "soil_grid", "antenna")]
 unique_name_in_owner = true

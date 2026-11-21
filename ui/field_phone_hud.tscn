@@ -175,6 +175,50 @@ focus_mode = 0
 theme_override_font_sizes/font_size = 26
 text = "ZERO STEERING  [R]"
 
+[node name="RelayRow" type="HBoxContainer" parent="Bezel/Screen/Content"]
+layout_mode = 2
+
+[node name="RelayStatusLabel" type="Label" parent="Bezel/Screen/Content/RelayRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_override_font_sizes/font_size = 18
+text = "RELAY: STOCK TRANSCEIVER"
+
+[node name="RelaySpacer" type="Control" parent="Bezel/Screen/Content/RelayRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SpoolLabel" type="Label" parent="Bezel/Screen/Content/RelayRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.45, 0.9, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "SILK x0"
+
+[node name="ActionRow" type="HBoxContainer" parent="Bezel/Screen/Content"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SlotSpoolButton" type="Button" parent="Bezel/Screen/Content/ActionRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+disabled = true
+theme_override_font_sizes/font_size = 18
+text = "INSTALL SILK SPOOL"
+
+[node name="DomeButton" type="Button" parent="Bezel/Screen/Content/ActionRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 52)
+layout_mode = 2
+size_flags_horizontal = 3
+focus_mode = 0
+theme_override_font_sizes/font_size = 18
+text = "ENTER DOME  [Tab]"
+
 [node name="Sep2" type="HSeparator" parent="Bezel/Screen/Content"]
 layout_mode = 2
 
