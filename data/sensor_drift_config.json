@@ -1,0 +1,40 @@
+{
+  "instruments": {
+    "hygrometer": {
+      "error_unit": "percentage_points_rh",
+      "daily_drift_rate": 0.30,
+      "max_permissible_error": 2.0
+    },
+    "rover_steering_encoder": {
+      "error_unit": "degrees",
+      "daily_drift_rate": 0.12,
+      "max_permissible_error": 0.80
+    },
+    "relay_dish_azimuth": {
+      "error_unit": "degrees",
+      "daily_drift_rate": 0.06,
+      "max_permissible_error": 0.45
+    }
+  },
+  "guardband": {
+    "green": {
+      "label": "Green",
+      "max_error_ratio_inclusive": 0.80
+    },
+    "amber_warning": {
+      "label": "Amber Warning",
+      "max_error_ratio_inclusive": 1.0
+    },
+    "red_out_of_spec": {
+      "label": "Red Out-of-Spec",
+      "min_error_ratio_exclusive": 1.0
+    }
+  },
+  "compliance_fine": {
+    "base_credits": 50,
+    "credits_per_excess_ratio": 100,
+    "repeat_surcharge_credits": 25,
+    "max_repeat_surcharge_credits": 100,
+    "max_fine_credits": 350
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "schema_version": "1.0",
+  "megacorp_name": "OmniSpec Orbital Compliance",
+  "morning_dispatches": [
+    {
+      "id": "disp_01",
+      "sender": "Orbital Compliance",
+      "severity": "warning",
+      "text": "Reminder: Tractor wheel circumference exceeds nominal spec by 1.4%. Any unauthorized harvest mileage will be billed as recreational joyriding."
+    },
+    {
+      "id": "disp_02",
+      "sender": "Calibration Desk",
+      "severity": "info",
+      "text": "Your bench hygrometer's gold sticker expired at 03:00. All humidity observed since then is legally considered hearsay."
+    },
+    {
+      "id": "disp_03",
+      "sender": "Bio-Security Bot",
+      "severity": "warning",
+      "text": "Thermal scan detected eight-legged heat signatures indoors. Please confirm they are licensed productivity assets and not emotional support arthropods."
+    },
+    {
+      "id": "disp_04",
+      "sender": "Telemetry Ops",
+      "severity": "alert",
+      "text": "Solar flare expected at noon. OmniSpec is not liable if your mower develops free will or harvests your mailbox."
+    },
+    {
+      "id": "disp_05",
+      "sender": "Audit Division",
+      "severity": "info",
+      "text": "Quarterly surprise inspection scheduled for Thursday. Please act surprised; our drone logs facial enthusiasm."
+    },
+    {
+      "id": "disp_06",
+      "sender": "Supply Chain",
+      "severity": "warning",
+      "text": "Unregistered optical silk detected in relay dish #1. Great signal-to-noise ratio, terrible paperwork. Expect a form."
+    },
+    {
+      "id": "disp_07",
+      "sender": "HR & Morale",
+      "severity": "info",
+      "text": "Outpost loneliness is down 4% after we reclassified talking to your rover as 'verbal diagnostics.'"
+    },
+    {
+      "id": "disp_08",
+      "sender": "Metrology Governance",
+      "severity": "alert",
+      "text": "A neighbor reported your soil plots look 'suspiciously straight.' Prepare to prove your laser level is traceable to Orbit."
+    },
+    {
+      "id": "disp_09",
+      "sender": "Orbital Compliance",
+      "severity": "warning",
+      "text": "Reminder: 'Eyeballing it' is not an approved uncertainty budget method under Frontier Clause 19-B."
+    },
+    {
+      "id": "disp_10",
+      "sender": "Drop-Pod Dispatch",
+      "severity": "info",
+      "text": "Your replacement reference weight fell off the cargo rail at 12,000 meters. Please re-zero it before use."
+    }
+  ],
+  "audit_fines": [
+    {
+      "id": "fine_01",
+      "title": "Unapproved Arachnid-Assisted Telemetry",
+      "reason": "Used homegrown tarantula silk to out-perform a 40,000-credit corporate transceiver.",
+      "credit_penalty": 175,
+      "snarky_footer": "Innovation without a Form 88-C is just vandalism with better tolerances."
+    },
+    {
+      "id": "fine_02",
+      "title": "Expired Calibration Sticker (By 4 Minutes)",
+      "reason": "Rover steering encoder operated past its 08:00 certification window.",
+      "credit_penalty": 90,
+      "snarky_footer": "Time is a precision instrument. Yours is late."
+    },
+    {
+      "id": "fine_03",
+      "title": "Aesthetic Crop Deviation",
+      "reason": "Drifting tractor carved a 7-degree curve into Row 3, lowering orbital satellite photo morale.",
+      "credit_penalty": 120,
+      "snarky_footer": "Please keep all frontier geometry depressing and orthogonal."
+    },
+    {
+      "id": "fine_04",
+      "title": "Missing Witness Signature on Solo Outpost",
+      "reason": "Failed to have a second certified technician countersign your morning zeroing log.",
+      "credit_penalty": 65,
+      "snarky_footer": "We do not accept tarantula paw prints as notarized consent."
+    },
+    {
+      "id": "fine_05",
+      "title": "Excessive Signal Clarity",
+      "reason": "Satellite relay latency dropped below your paid subscription tier.",
+      "credit_penalty": 210,
+      "snarky_footer": "Upgrade to Platinum Uplink or kindly re-introduce 200ms of lag."
+    }
+  ],
+  "npcs": {
+    "bram": {
+      "name": "Bram",
+      "role": "Scrapyard Rover Mechanic",
+      "location": "scrapyard_rover_bay",
+      "greetings": [
+        "Morning, Doc. Heard your tractor tried to till a boulder again—need a fresh axle or a therapist?",
+        "If OmniSpec asks, this whole garage is 'temporarily uncalibrated.' Saves me three hundred credits a week.",
+        "Coffee's burnt, treads are bald, and the orbital relay's blinking amber. Standard Tuesday.",
+        "Look who crawled out of the spider dome. Bring me anything shiny from the canyon?"
+      ],
+      "tarantula_silk_reactions": [
+        "Wait—your cobalt spider spun THAT? Throw away the corporate fiber cable, this stuff doesn't even kink.",
+        "I don't do eight legs, friend, but if their silk keeps my torque wrench in spec, I'll knit 'em tiny sweaters.",
+        "Careful waving that spool around. If the audit drone scans it, they'll tax your spiders as subcontractors.",
+        "Wildest thing I've seen off-world: a fuzzy little bug out-engineering an entire orbital lab."
+      ],
+      "upgrade_and_audit_hints": [
+        "Drop a relay post on the north ridge before mining deep—otherwise your phone lag'll drive that drill straight into a cliff.",
+        "Bring me six crystal ore and I'll bolt wider treads onto your tractor. Cuts steering drift in half on loose dirt.",
+        "Tip for Thursday's audit: zero your hygrometers before noon. The drone always checks the dome first.",
+        "When a solar flare hits, park the bots and stay indoors. Saves me welding your bumper back on."
+      ]
+    }
+  }
+}

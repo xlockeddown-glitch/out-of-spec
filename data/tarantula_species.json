@@ -1,0 +1,67 @@
+[
+  {
+    "id": "curlyhair",
+    "common_name": "Curlyhair",
+    "scientific_name": "Tliltocatl albopilosus",
+    "ideal_temp_c": 24,
+    "temp_tolerance_c": 4,
+    "ideal_humidity_pct": 68,
+    "humidity_tolerance_pct": 14,
+    "molt_days": 9,
+    "silk_grade": 1,
+    "optical_silk_yield": 3,
+    "lag_reduction_pct": 5
+  },
+  {
+    "id": "mexican_redknee",
+    "common_name": "Mexican Redknee",
+    "scientific_name": "Brachypelma hamorii",
+    "ideal_temp_c": 25,
+    "temp_tolerance_c": 3,
+    "ideal_humidity_pct": 54,
+    "humidity_tolerance_pct": 12,
+    "molt_days": 8,
+    "silk_grade": 1,
+    "optical_silk_yield": 2,
+    "lag_reduction_pct": 8
+  },
+  {
+    "id": "brazilian_black",
+    "common_name": "Brazilian Black",
+    "scientific_name": "Grammostola pulchra",
+    "ideal_temp_c": 23,
+    "temp_tolerance_c": 3,
+    "ideal_humidity_pct": 62,
+    "humidity_tolerance_pct": 10,
+    "molt_days": 12,
+    "silk_grade": 2,
+    "optical_silk_yield": 2,
+    "lag_reduction_pct": 11
+  },
+  {
+    "id": "static_mop",
+    "common_name": "Static Mop",
+    "scientific_name": "Electrothera lanigera",
+    "ideal_temp_c": 27,
+    "temp_tolerance_c": 3,
+    "ideal_humidity_pct": 46,
+    "humidity_tolerance_pct": 8,
+    "molt_days": 10,
+    "silk_grade": 2,
+    "optical_silk_yield": 4,
+    "lag_reduction_pct": 9
+  },
+  {
+    "id": "prism_ankles",
+    "common_name": "Prism Ankles",
+    "scientific_name": "Prismopelma iridipes",
+    "ideal_temp_c": 22,
+    "temp_tolerance_c": 2,
+    "ideal_humidity_pct": 78,
+    "humidity_tolerance_pct": 5,
+    "molt_days": 14,
+    "silk_grade": 3,
+    "optical_silk_yield": 1,
+    "lag_reduction_pct": 18
+  }
+]

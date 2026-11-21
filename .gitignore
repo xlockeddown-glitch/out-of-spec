@@ -1,0 +1,4 @@
+# Godot 4 cache
+.godot/
+/android/
+*.translation

@@ -1,0 +1,194 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/field_phone_hud.gd" id="1_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bezel"]
+content_margin_left = 22.0
+content_margin_top = 40.0
+content_margin_right = 22.0
+content_margin_bottom = 40.0
+bg_color = Color(0.11, 0.12, 0.11, 1)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.25, 0.27, 0.25, 1)
+corner_radius_top_left = 28
+corner_radius_top_right = 28
+corner_radius_bottom_right = 28
+corner_radius_bottom_left = 28
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_screen"]
+content_margin_left = 22.0
+content_margin_top = 22.0
+content_margin_right = 22.0
+content_margin_bottom = 22.0
+bg_color = Color(0.03, 0.07, 0.045, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.2, 0.35, 0.24, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[node name="FieldPhoneHUD" type="Control"]
+layout_mode = 3
+anchor_left = 0.68
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 0
+grow_vertical = 2
+script = ExtResource("1_hud")
+
+[node name="Bezel" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = -20.0
+offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_bezel")
+
+[node name="Screen" type="PanelContainer" parent="Bezel"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_screen")
+
+[node name="Content" type="VBoxContainer" parent="Bezel/Screen"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="Bezel/Screen/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 26
+text = "FIELD PHONE // UPLINK"
+
+[node name="RelayLabel" type="Label" parent="Bezel/Screen/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_override_font_sizes/font_size = 18
+text = "SAT-RELAY"
+
+[node name="SignalRow" type="HBoxContainer" parent="Bezel/Screen/Content"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SigCaption" type="Label" parent="Bezel/Screen/Content/SignalRow"]
+layout_mode = 2
+size_flags_vertical = 8
+theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 20
+text = "SIG "
+
+[node name="Bar1" type="ColorRect" parent="Bezel/Screen/Content/SignalRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(18, 14)
+layout_mode = 2
+size_flags_vertical = 8
+color = Color(0.14, 0.22, 0.16, 1)
+
+[node name="Bar2" type="ColorRect" parent="Bezel/Screen/Content/SignalRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(18, 26)
+layout_mode = 2
+size_flags_vertical = 8
+color = Color(0.14, 0.22, 0.16, 1)
+
+[node name="Bar3" type="ColorRect" parent="Bezel/Screen/Content/SignalRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(18, 38)
+layout_mode = 2
+size_flags_vertical = 8
+color = Color(0.14, 0.22, 0.16, 1)
+
+[node name="Bar4" type="ColorRect" parent="Bezel/Screen/Content/SignalRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(18, 50)
+layout_mode = 2
+size_flags_vertical = 8
+color = Color(0.14, 0.22, 0.16, 1)
+
+[node name="Spacer" type="Control" parent="Bezel/Screen/Content/SignalRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="LinkLabel" type="Label" parent="Bezel/Screen/Content/SignalRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 8
+theme_override_font_sizes/font_size = 22
+text = "LOS --"
+
+[node name="LagLabel" type="Label" parent="Bezel/Screen/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 20
+text = "UPLINK LAG  -- ms"
+
+[node name="Sep1" type="HSeparator" parent="Bezel/Screen/Content"]
+layout_mode = 2
+
+[node name="DriftCaption" type="Label" parent="Bezel/Screen/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_override_font_sizes/font_size = 18
+text = "STEERING DRIFT (AS-FOUND)"
+
+[node name="DriftValue" type="Label" parent="Bezel/Screen/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 64
+text = "+0.00°"
+horizontal_alignment = 1
+
+[node name="StatusLabel" type="Label" parent="Bezel/Screen/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 24
+text = "IN TOLERANCE"
+horizontal_alignment = 1
+
+[node name="ToleranceLabel" type="Label" parent="Bezel/Screen/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_override_font_sizes/font_size = 16
+text = "TOL --"
+horizontal_alignment = 1
+
+[node name="ZeroButton" type="Button" parent="Bezel/Screen/Content"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 72)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 26
+text = "ZERO STEERING  [R]"
+
+[node name="Sep2" type="HSeparator" parent="Bezel/Screen/Content"]
+layout_mode = 2
+
+[node name="LogCaption" type="Label" parent="Bezel/Screen/Content"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_override_font_sizes/font_size = 18
+text = "DISPATCH LOG"
+
+[node name="LogLabel" type="Label" parent="Bezel/Screen/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 3
+clip_text = true

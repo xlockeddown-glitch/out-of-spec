@@ -1,0 +1,52 @@
+[
+  {
+    "id": "biscuit_reed",
+    "name": "Biscuit Reed",
+    "growth_days": 3,
+    "soil_moisture_target": 0.40,
+    "tolerance_band": 0.18,
+    "base_sell_credits": 24,
+    "out_of_spec_penalty_pct": 15,
+    "substrate_byproduct": "reed_chaff"
+  },
+  {
+    "id": "dust_turnip",
+    "name": "Dust Turnip",
+    "growth_days": 4,
+    "soil_moisture_target": 0.25,
+    "tolerance_band": 0.12,
+    "base_sell_credits": 36,
+    "out_of_spec_penalty_pct": 20,
+    "substrate_byproduct": "root_coir"
+  },
+  {
+    "id": "bubble_pods",
+    "name": "Bubble Pods",
+    "growth_days": 5,
+    "soil_moisture_target": 0.75,
+    "tolerance_band": 0.10,
+    "base_sell_credits": 50,
+    "out_of_spec_penalty_pct": 25,
+    "substrate_byproduct": "pod_pith"
+  },
+  {
+    "id": "suncatch_squash",
+    "name": "Suncatch Squash",
+    "growth_days": 6,
+    "soil_moisture_target": 0.55,
+    "tolerance_band": 0.08,
+    "base_sell_credits": 69,
+    "out_of_spec_penalty_pct": 30,
+    "substrate_byproduct": "husk_flakes"
+  },
+  {
+    "id": "lensberry",
+    "name": "Lensberry",
+    "growth_days": 8,
+    "soil_moisture_target": 0.62,
+    "tolerance_band": 0.05,
+    "base_sell_credits": 104,
+    "out_of_spec_penalty_pct": 40,
+    "substrate_byproduct": "vine_fiber"
+  }
+]

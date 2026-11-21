@@ -1,0 +1,15 @@
+# Normalize text files to LF in the repo (Godot writes LF).
+* text=auto eol=lf
+
+*.gd text eol=lf
+*.tscn text eol=lf
+*.tres text eol=lf
+*.godot text eol=lf
+*.json text eol=lf
+
+# Binary assets
+*.png binary
+*.glb binary
+*.vox binary
+*.wav binary
+*.ogg binary
