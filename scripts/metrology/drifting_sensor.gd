@@ -118,15 +118,28 @@ func band_for(value: float) -> Band:
 	return Band.OUT_OF_TOLERANCE
 
 
-## Human-readable value in this instrument's unit.
+## Human-readable signed value in this instrument's unit, per NIST SP 811:
+## U+2212 minus, no space before the plane-angle degree, a space before %, and
+## no "RH" qualifier on the % symbol (use quantity_name() in the label instead).
 func format_value(value: float) -> String:
 	match error_unit:
 		"degrees":
-			return "%+.2f°" % value
+			return SP811.signed(value, 2) + "°"
 		"percentage_points_rh":
-			return "%+.2f %%RH" % value
+			return SP811.signed(value, 2) + " %"
 		_:
-			return "%+.3f %s" % [value, error_unit]
+			return "%s %s" % [SP811.signed(value, 3), error_unit]
+
+
+## The quantity the error is in, for labels ("relative humidity").
+func quantity_name() -> String:
+	match error_unit:
+		"degrees":
+			return "steering angle"
+		"percentage_points_rh":
+			return "relative humidity"
+		_:
+			return error_unit
 
 
 static func band_label(band: int) -> String:

@@ -2,6 +2,10 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-21: NIST SP 811 for all player-facing text
+
+Follow NIST SP 811 in game as much as possible (Ryan). Rules in `docs/sp811.md`, formatter `SP811`, check `tools/check_sp811.py`. First pass fixed `%RH` labels, missing spaces before `%`, `x` for multiplication, hyphen minus signs, and comma digit grouping in dispatch text.
+
 ## 2026-11-21: Calibration intervals and audit rules (after Fable's Week 3 review)
 
 - Overdue is a violation: an instrument past its cal due day at audit (including never calibrated) is fined `overdue_credits` (50, placeholder) whatever its reading.

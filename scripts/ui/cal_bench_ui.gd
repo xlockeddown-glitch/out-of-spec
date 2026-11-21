@@ -70,9 +70,9 @@ func _on_instrument_selected(index: int) -> void:
 	for meter: BandMeter in [_found_meter, _left_meter]:
 		meter.mpe = sensor.mpe
 		meter.acceptance_ratio = sensor.acceptance_ratio
-	_mpe_label.text = "MPE ±%s   ACCEPT ±%s (%d%% of MPE)" % [
-		_unsigned(sensor, sensor.mpe), _unsigned(sensor, sensor.mpe * sensor.acceptance_ratio),
-		roundi(sensor.acceptance_ratio * 100.0)]
+	_mpe_label.text = "%s   MPE ±%s   ACCEPT ±%s (%d %% of MPE)" % [
+		sensor.quantity_name().capitalize(), _unsigned(sensor, sensor.mpe),
+		_unsigned(sensor, sensor.mpe * sensor.acceptance_ratio), roundi(sensor.acceptance_ratio * 100.0)]
 	_show_as_found(sensor, sensor.error)
 	_left_value.text = "--"
 	_left_band.text = ""

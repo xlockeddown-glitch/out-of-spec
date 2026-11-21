@@ -56,8 +56,8 @@ func _refresh_status() -> void:
 	var reading: String = "--"
 	var ideal: Variant = GameState.get_dome_species().get("ideal_humidity_pct")
 	if typeof(ideal) == TYPE_FLOAT or typeof(ideal) == TYPE_INT:
-		reading = "%.1f %%RH" % (float(ideal) + hygro.error)
-	_hygro_label.text = "HYGROMETER READS  %s" % reading
+		reading = SP811.number(float(ideal) + hygro.error, 1) + " %"
+	_hygro_label.text = "RELATIVE HUMIDITY  %s" % reading
 	var band: int = hygro.get_band()
 	var today: int = GameClock.get_day_index()
 	var due_text: String = ("CAL OVERDUE (due day %d)" % hygro.cal_due_day if hygro.is_overdue(today)
@@ -70,17 +70,17 @@ func _refresh_status() -> void:
 		GameState.MoltStage.MOLTED:
 			_molt_label.text = "MOLTED: optical silk spool ready"
 		GameState.MoltStage.PRE_MOLT:
-			_molt_label.text = "PRE-MOLT  %d%%" % roundi(GameState.molt_progress * 100.0)
+			_molt_label.text = "PRE-MOLT  %d %%" % roundi(GameState.molt_progress * 100.0)
 		_:
 			_molt_label.text = ("MOLT PAUSED: hygrometer out of tolerance" if GameState.is_molt_paused()
-				else "MOLT  %d%%" % roundi(GameState.molt_progress * 100.0))
+				else "MOLT  %d %%" % roundi(GameState.molt_progress * 100.0))
 	_silk_label.text = "SILK SPOOLS %d   RELAY: %s" % [
 		GameState.optical_silk_spools, "OPTICAL SILK" if GameState.relay_slotted else "STOCK"]
 
 
 func _on_terrarium_clicked() -> void:
 	var species: Dictionary = GameState.get_dome_species()
-	_toast("%s: ideal %s °C / %s %%RH. Keep the hygrometer within MPE to progress the molt." % [
+	_toast("%s: ideal %s °C, relative humidity %s %%. Keep the hygrometer within MPE to progress the molt." % [
 		_field(species, "common_name", "?"), _field(species, "ideal_temp_c", "?"), _field(species, "ideal_humidity_pct", "?")])
 
 

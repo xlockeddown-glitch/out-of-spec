@@ -223,9 +223,9 @@ func _run_audit(day: int) -> void:
 	for line: Dictionary in report["lines"]:
 		var sensor: DriftingSensor = get_sensor(line["instrument_id"])
 		# Three decimals so 1.004 x MPE doesn't read as "1.00 ... OUT OF TOLERANCE".
-		var label: String = "%s %s (%.3f x MPE) %s" % [
+		var label: String = "%s %s (%s × MPE) %s" % [
 			INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"]),
-			sensor.format_value(line["as_found"]), line["ratio"], DriftingSensor.band_label(line["band"])]
+			sensor.format_value(line["as_found"]), SP811.number(line["ratio"], 3), DriftingSensor.band_label(line["band"])]
 		if line["overdue"]:
 			label += ", OVERDUE (due day %d)" % line["due_day"]
 		if line["violation"]:
@@ -242,7 +242,7 @@ func _run_audit(day: int) -> void:
 		add_credits(-int(report["total_fine"]))
 		var fines: Array[Dictionary] = DataManager.get_records(DISPATCH_TABLE, "audit_fines")
 		var footer: String = fines.pick_random().get("snarky_footer", "") if not fines.is_empty() else ""
-		post_phone("TOTAL FINE %d CR. Balance %d CR. %s" % [report["total_fine"], credits, footer])
+		post_phone("TOTAL FINE %s CR. Balance %s CR. %s" % [SP811.integer(report["total_fine"]), SP811.integer(credits), footer])
 	audit_log.append(report)
 	audit_completed.emit(report)
 
