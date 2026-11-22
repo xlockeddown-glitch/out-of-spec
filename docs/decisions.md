@@ -473,3 +473,13 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - Groundwork goes one PR per README "known exception". First: seeded randomness. The farm has one `world_seed`; morning dispatches, audit footers, Bram's lines and every sensor's drift direction and as-left residual come from it, so a new co-op farm started from the same seed plays out the same. Joining mid-game will also need the generator states and sensor signs, which comes with host save/load. Bram's bay lines draw from the shared generator too; in co-op the host should run them.
+
+## 2026-11-22: Lab pack meter names
+
+### Ryan chose
+
+- Give the two meters "generic ones that fit game theme" instead of real model numbers.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The game already names both: the reference meter is the Longscale LS-8.5 Reference Meter (equipment design doc) and the handheld is the Arsia Fieldworks FM-3 Field Meter (the `field_meter_dc` standard). The models are now `ref_meter_ls85` and `field_meter_fm3`; the voxels are unchanged.

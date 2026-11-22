@@ -1,4 +1,4 @@
-ref_multimeter_8588a - 16 x 14 x 6 (benchtop reference multimeter). From Ryan's Metrology Lab Bench & Multimeters generator (0.025 m voxels), 2026-11-22.
+ref_meter_ls85 - 16 x 14 x 6 (benchtop reference multimeter, the Longscale LS-8.5 Reference Meter). From Ryan's Metrology Lab Bench & Multimeters generator (0.025 m voxels), 2026-11-22.
 X: 0..15 left to right, Y: 13..0 rear (+Y) to front (-Y), first row = highest Y.
 Palette: C1 = #D4DAE0, C2 = #8D99AE, F1 = #2E3844, K1 = #6C7A89, Y1 = #E5B53B, S = #1D222B
 

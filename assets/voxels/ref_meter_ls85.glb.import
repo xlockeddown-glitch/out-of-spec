@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://dbgh0codlkrts"
-path="res://.godot/imported/handheld_dmm_289.glb-c2727347fcb7cd1187a32fa6d5b6634c.scn"
+uid="uid://dpjyae276nt77"
+path="res://.godot/imported/ref_meter_ls85.glb-53a89f7ba2e6f5fe4e0dd08c0260ad6e.scn"
 
 [deps]
 
-source_file="res://assets/voxels/handheld_dmm_289.glb"
-dest_files=["res://.godot/imported/handheld_dmm_289.glb-c2727347fcb7cd1187a32fa6d5b6634c.scn"]
+source_file="res://assets/voxels/ref_meter_ls85.glb"
+dest_files=["res://.godot/imported/ref_meter_ls85.glb-53a89f7ba2e6f5fe4e0dd08c0260ad6e.scn"]
 
 [params]
 
