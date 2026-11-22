@@ -589,3 +589,16 @@ Agent's notes (flagged for Ryan, not his words):
 - Ryan's answer was to the question of what to place next.
 - The pallet stands at (1, 0, 13.3) m, beside the harvest crate with 0.8 m between them, its near side 0.7 m past the plot's front edge, so the two read as a packing spot. It faces the camera like the crate. Its nearest edge is 2.3 m from the edge of the drop pod's spot.
 - It is at true size (1.4 m × 1.2 m × 0.3 m). Set dressing only: no collision, nothing stacked on it, and no load rating; the crate stays on the ground beside it.
+
+## 2026-11-22: Dry gulch tiles in the farm
+
+### Ryan chose
+
+- "Dry gulch tiles"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next. The pack has one gulch tile (`dry_gulch_straight`), so this places a run of it.
+- Six tiles stand in a row under a `Gulch` node, a 12 m wash along X behind the plot, centered at (0, −25) m (x −6 m to 6 m, z −26 m to −24 m). Every rock, fissure and clutter piece is at least 3 m from the run's edge (fissure E's center is the nearest).
+- Each tile is sunk 0.4 m, so the channel floor is level with the ground and the banks stand 0.8 m above it. The farm's ground is a flat box, so sinking deeper would bury the channel; standing on the ground would lift the channel floor 0.4 m. This answers the open question in the art doc for now.
+- Open: the run's ends stop at the cut banks, since the pack has no end caps. From the farm's camera distance the run reads more as a low wall than as a wash. Set dressing only: no collision, so the rover drives through it.
