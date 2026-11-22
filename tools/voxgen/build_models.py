@@ -543,44 +543,97 @@ def relay_mast() -> Model:
 
 
 # ---------------------------------------------------------------- boulders
-# No concept sheet yet (Next item 3). First pass from canon ("surface boulders" on the
-# Terracotta Plateau) in the fissure's plateau palette, sized to the greybox boxes.
+# Concepts from Gemini (2026-11-21): boulder_a as a layer grid (sheets/boulder_a.txt),
+# b-d as rendered concept images only, rebuilt here by boulder_block. Plateau palette
+# from the ore fissure; each fills its greybox box collider. Z=0 sits on the ground.
 PLATEAU = ("#A8422B", "#8E3522", "#6E2617", "#5E2214")  # clay, clay 2, rust crust, crack
 
 
-def boulder(name: str, w: int, h: int, d: int, seed: int) -> Model:
-    """w x h x d voxels at 0.2 m, origin at ground level on the footprint center.
-    A boxy, weathered block that fills the greybox collision box (the collider stays
-    a box), with banded strata, a dusty cap and a few cracks. One extra voxel layer
-    sinks below the ground so the base doesn't show a seam."""
-    import random
-    rng = random.Random(seed)
-    m = Model(name, offset=(-w / 2.0, -1.0, -d / 2.0))
-    clay, clay2, crust, crack = PLATEAU
-    cx, cz = (w - 1) / 2.0, (d - 1) / 2.0
-    top = h  # rows 0..h; row 0 is sunk
-    for x in range(w):
-        for z in range(d):
-            for y in range(top + 1):
-                nx, nz = abs(x - cx) / (w / 2.0), abs(z - cz) / (d / 2.0)
-                ny = y / (top + 0.5)
-                # superellipse footprint that narrows toward the top: boxy but not a box
-                shrink = 1.0 - 0.35 * max(0.0, ny - 0.55) / 0.45
-                r = (nx ** 4 + nz ** 4) ** 0.25 / max(shrink, 0.01)
-                if r > 1.0 - 0.06 * rng.random():
+def boulder_block(name: str, w: int, h: int, d: int, *, chamfer: int, bands: dict[int, int],
+                  crack: list[tuple[int, int]], crack_depth: int, lean: int = 0,
+                  top_slot: tuple[int, int] | None = None) -> Model:
+    """A boulder following Gemini's rendered concept (no layer grid): a chamfered block,
+    Z=0 on the ground, origin on the footprint center. `bands` maps a layer to a PLATEAU
+    index (1 = clay 2, 2 = rust crust) for the strata lines; the top layer is a rust crust
+    inset one voxel from a clay rim. `crack` is (layer, x) points down the front (+z)
+    face, cut `crack_depth` voxels in with a SHADOW floor. `lean` pulls the +x face in by
+    that many voxels at the top. `top_slot` = (x, z_from) cuts the crack back across the
+    top as a slot from the front edge to z_from."""
+    clay, clay2, crust, dark = PLATEAU
+    m = Model(name, offset=(-w / 2.0, 0.0, -d / 2.0))
+    for y in range(h):
+        bevel = 1 if y in (0, h - 1) else 0  # small step at the base and the top edge
+        c = chamfer + bevel
+        x_max = w - 1 - bevel - round(lean * y / max(h - 1, 1))
+        for x in range(bevel, x_max + 1):
+            for z in range(bevel, d - bevel):
+                # cut corners: stepped chamfer measured from the nearest corner
+                ex = min(x - bevel, x_max - x)
+                ez = min(z - bevel, d - 1 - bevel - z)
+                if ex + ez < c:
                     continue
-                band = (y // 3 + (1 if (x + z) % 7 == 0 else 0)) % 2
-                m.put("rock", x, y, z, clay if band == 0 else clay2)
-    # dusty rust crust on the exposed top faces
-    for (x, y, z) in list(m.voxels):
-        if (x, y + 1, z) not in m.voxels and y > 1:
-            m.put("rock", x, y, z, crust if rng.random() < 0.55 else clay)
-    # a few vertical cracks on the sides
-    for _ in range(max(2, w // 6)):
-        x, z = rng.randrange(w), rng.randrange(d)
-        for y in range(1, top - rng.randrange(2, 5)):
-            if (x, y, z) in m.voxels:
-                m.put("rock", x, y, z, crack)
+                color = (clay, clay2, crust)[bands.get(y, 0)]
+                if y == h - 1 and ex >= 1 and ez >= 1:
+                    color = dark
+                m.put("rock", x, y, z, color)
+    # crack, 2 voxels wide: interpolate the polyline layer by layer and cut in from the
+    # front face; the walls take the dark crack color and the floor is SHADOW
+    pts = sorted(crack)
+    cut: set[tuple[int, int, int]] = set()
+    floor: set[tuple[int, int, int]] = set()
+    for (y0, x0), (y1, x1) in zip(pts, pts[1:]):
+        for y in range(y0, y1 + 1):
+            xc = round(x0 + (x1 - x0) * (y - y0) / max(y1 - y0, 1))
+            for x in (xc, xc + 1):
+                front = max((z for (vx, vy, z) in m.voxels if vx == x and vy == y), default=None)
+                if front is None:
+                    continue
+                cut.update((x, y, z) for z in range(front - crack_depth + 1, front + 1))
+                floor.add((x, y, front - crack_depth))
+    if top_slot:
+        sx, z_from = top_slot
+        for z in range(z_from, d):
+            for x in (sx, sx + 1):
+                cut.update({(x, h - 1, z), (x, h - 2, z)})
+                floor.add((x, h - 3, z))
+    for v in cut:
+        m.clear(*v)
+    for (x, y, z) in cut:
+        for nx in (x - 1, x + 1):
+            if (nx, y, z) in m.voxels and (nx, y, z) not in floor:
+                m.put("rock", nx, y, z, dark)
+    for v in floor - cut:
+        if v in m.voxels:
+            m.put("rock", *v, SHADOW)
+    return m
+
+
+def boulder_sheet(name: str, sheet: str) -> Model:
+    """Built voxel for voxel from a layer-grid concept sheet in tools/voxgen/sheets/.
+    Sheet axes are MagicaVoxel's: "Z=n" headers are layers bottom up, each layer has
+    one row per Y (first row = highest Y, the back) and one character per X. Cells:
+    1-4 = PLATEAU colors, S = SHADOW, . = empty. Layer Z=0 sits on the ground; origin
+    is the footprint center. MagicaVoxel (x, y, z) maps to Godot (x, z, -y)."""
+    import re
+    colors = dict(zip("1234", PLATEAU)) | {"S": SHADOW}
+    layers: dict[int, list[str]] = {}
+    current = -1
+    for line in (Path(__file__).parent / "sheets" / sheet).read_text(encoding="utf-8").splitlines():
+        header = re.match(r"Z=(\d+)", line)
+        if header:
+            current = int(header.group(1))
+            layers[current] = []
+        elif current >= 0 and re.fullmatch(r"[.1234S]+", line):
+            layers[current].append(line)
+    w = len(layers[0][0])
+    d = len(layers[0])
+    m = Model(name, offset=(-w / 2.0, 0.0, -d / 2.0))
+    for y, rows in layers.items():
+        assert len(rows) == d and all(len(r) == w for r in rows), f"{sheet}: Z={y} is not {w} x {d}"
+        for z, row in enumerate(rows):
+            for x, cell in enumerate(row):
+                if cell != ".":
+                    m.put("rock", x, y, z, colors[cell])
     return m
 
 
@@ -617,8 +670,18 @@ MODELS = [
     (drop_pod, 0.2), (aud1t, 0.2), (relay_mast, 0.5),
     (dome_room, 0.2), (dome_bench, 0.1), (cal_station, 0.1),
     # boulders match the greybox boxes: RockA 5 x 4 x 4 m, B 4 x 3.5 x 5 m, C 4 m cube, D 3 m cube
-    (lambda: boulder("boulder_a", 25, 20, 20, 1), 0.2), (lambda: boulder("boulder_b", 20, 18, 25, 2), 0.2),
-    (lambda: boulder("boulder_c", 20, 20, 20, 3), 0.2), (lambda: boulder("boulder_d", 15, 15, 15, 4), 0.2),
+    # a: Gemini layer grid; b, c, d: Gemini concept renders (no grid), see boulder_block
+    (lambda: boulder_sheet("boulder_a", "boulder_a.txt"), 0.2),
+    (lambda: boulder_block("boulder_b", 20, 18, 25, chamfer=2, lean=3,
+                           bands={4: 2, 5: 1, 9: 2, 10: 1, 14: 2},
+                           crack=[(0, 11), (8, 10), (17, 8)], crack_depth=4), 0.2),
+    (lambda: boulder_block("boulder_c", 20, 20, 20, chamfer=2,
+                           bands={6: 2, 7: 1, 11: 2, 12: 1},
+                           crack=[(6, 10), (12, 10), (19, 9)], crack_depth=5,
+                           top_slot=(9, 10)), 0.2),
+    (lambda: boulder_block("boulder_d", 15, 15, 15, chamfer=3,
+                           bands={4: 2, 5: 1, 9: 2, 10: 1},
+                           crack=[(0, 7), (4, 8), (8, 7), (11, 8), (14, 7)], crack_depth=3), 0.2),
     (lambda: soil_tile(False), 0.1), (lambda: soil_tile(True), 0.1),
 ]
 

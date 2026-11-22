@@ -228,11 +228,11 @@ Where the generated models differ from the footprints above:
 - **Tractor hull color.** The greybox's orange (`#E68C1F`) and answer A's gold (`#D99B26`) both sit too close to guard-band amber. I picked B's `#C85A2A`; say if you want something else.
 - **Material values are unverified.** The Strength, Power and Flux numbers in the source answers aren't checked against MagicaVoxel's material panel. The game ignores them: glow comes from the `emit_*` naming.
 
-## Boulders and soil tiles (first pass, no concept sheet)
+## Boulders and soil tiles
 
-No concept sheet or source answer covers these; spec not found. The generated first pass uses only what the project already fixes:
-
-- **Boulders** (`boulder_a`–`boulder_d`, 0.2 m): canon puts surface boulders on the Terracotta Plateau, so they use the ore fissure's plateau palette (`#A8422B`, `#8E3522`, `#6E2617`, crack `#5E2214`). Each matches its greybox box (A 5 m × 4 m × 4 m, B 4 m × 3.5 m × 5 m, C 4 m cube, D 3 m cube) because the collider stays that box. No glow.
+- **Boulders** (`boulder_a`–`boulder_d`, 0.2 m): canon puts surface boulders on the Terracotta Plateau, so they use the ore fissure's plateau palette (`#A8422B`, `#8E3522`, `#6E2617`, crack `#5E2214`) plus shadow `#1D222B` in the cracks. Each matches its greybox box (A 5 m × 4 m × 4 m, B 4 m × 3.5 m × 5 m, C 4 m cube, D 3 m cube) because the collider stays that box; B's model is 3.6 m tall (18 voxels). Layer 0 sits on the ground. No glow.
+  - `boulder_a` is built voxel for voxel from Gemini's layer grid, saved as `tools/voxgen/sheets/boulder_a.txt` (25 × 20 × 20, MagicaVoxel axes). Gemini's rendered image of boulder_a (a box with a raised top block) doesn't match its own grid; the grid wins.
+  - `boulder_b`–`boulder_d` follow Gemini's rendered concepts (no grids): chamfered blocks with strata bands, a dark rust top inset from a clay rim, and a 2-voxel crack down the front face (B leans in on +x; C's crack runs back across the top; D's zigzags). Built by `boulder_block` in `build_models.py`; swap in `boulder_sheet` if grids arrive.
 - **Soil tiles** (`soil_untilled`, `soil_tilled`, 0.1 m): 1.9 m × 0.2 m × 1.9 m in the 2 m cell, in the greybox tile browns. Tilled is darker, with furrows along X.
 
-Replace these once there is a concept sheet.
+Soil tiles still have no concept sheet; spec not found. Replace them once there is one.
