@@ -191,3 +191,10 @@ Choices made in building these (flagged for Ryan):
 - **A unit due shortly before the standard returns** is still excused at its first overdue audit, even if the standard came back a few days before that audit. Example: courier sent day 6, back day 13, unit due day 11, excused at the day 15 audit, must be calibrated by day 20. Another example: sent day 13, back day 20, unit due day 14, excused at the day 15 and day 20 audits, must be calibrated by day 25.
 - **Sending while already away** is refused ("Already at OIRM until day N").
 - **The route is picked by the pod,** not by the player: with the pod on the pad the button is SEND TO OIRM (150 CR); without it, SEND BY COURIER (300 CR). The bench text gives the courier return day and the next pod day so the player can choose to wait.
+
+## 2026-11-22: Ryan's answers after milestone 3a (PR #42)
+
+- **Next up: M3a hooks.** Give the new sensors jobs before adding more equipment: the terrarium thermometer feeds the molt, AUD-1T checks tire pressure, and the tire gauge gets a field calibration spot. M3b (Rb-2D, HM-3) and the save system come after.
+- **The dome stays at 2.84:1 on purpose.** Against the WD-1 the bench allows it but it is never a clean 4:1 calibration; the HB-700 (Tier 3) fixes that.
+- **Buying a standard takes two presses.** The first press (key or button) shows the price; the second buys. Applies to Bram's Tier 1 standards.
+- **Numbers: research first, then tune.** Every [PLACEHOLDER] for the M3a sensors and standards (MPEs, drift rates, prices, the 15 °C per volt thermometer scale) starts from real datasheet classes, cited in the data notes, then gets tuned for feel in playtest. Prices stay game balance, not research.
