@@ -102,7 +102,7 @@ func test_aud1t_tire_line_warns_then_fines() -> String:
 	var line_fines: int = 0
 	for line: Dictionary in second["lines"]:
 		line_fines += int(line["fine"])
-	var phone: String = "\n".join(gs.phone_log)
+	var phone: Array[String] = gs.phone_log.duplicate()
 	var credits_after: int = gs.credits
 	GameClock.elapsed_days = saved
 	gs.free()
@@ -118,8 +118,18 @@ func test_aud1t_tire_line_warns_then_fines() -> String:
 			second["total_fine"], line_fines, second_tire["fine"]]
 	if credits_before - credits_after != int(second["total_fine"]):
 		return "Credits must drop by the total fine."
-	if not phone.contains("AUD-1T: Rover tires") or not phone.contains("PETTY FINE"):
-		return "AUD-1T must post its own tire line on the phone."
+	var tire_index: int = -1
+	var verdict_index: int = -1
+	for i: int in phone.size():
+		if phone[i].begins_with("AUD-1T: Rover tires"):
+			tire_index = i
+		elif phone[i].begins_with("TOTAL FINE"):
+			verdict_index = i
+	var tire_line: String = phone[tire_index] if tire_index >= 0 else ""
+	if not tire_line.contains("below set point") or not tire_line.ends_with("PETTY FINE %d CR" % int(second_tire["fine"])):
+		return "AUD-1T's own line must name the offset and the fine, got '%s'." % tire_line
+	if verdict_index - tire_index != 1:
+		return "AUD-1T's line must post just before the verdict so the phone keeps it."
 	return ""
 
 
@@ -133,3 +143,22 @@ func test_no_tire_check_before_wd1() -> String:
 	GameClock.elapsed_days = saved
 	gs.free()
 	return "" if not report.has("tire_check") else "Without the WD-1 the tire gauge is out of service; AUD-1T must skip the tires."
+
+
+func test_tire_limit_edge_and_compliant_line() -> String:
+	var limit: float = DataManager.get_number(DRIFT, "compliance_fine/aud1t_tire_limit_kpa", NAN)
+	var gs: GameStateScript = _make_state()
+	var at_limit: Dictionary = AuditEngine.tire_check(-limit)
+	var just_over: Dictionary = AuditEngine.tire_check(-(limit + 0.01))
+	var at_line: String = gs._tire_check_line(at_limit)
+	var over_line: String = gs._tire_check_line(just_over)
+	gs.free()
+	if at_limit["violation"] or at_limit["fine"] != 0:
+		return "Exactly at the limit must be compliant: %s" % at_limit
+	if not at_line.ends_with(". Compliant."):
+		return "A compliant check must say so, got '%s'." % at_line
+	if not just_over["violation"]:
+		return "0.01 kPa past the limit must be a violation: %s" % just_over
+	if not over_line.contains("%s kPa above set point" % SP811.number(limit + 0.01, 2)):
+		return "A fine just past the limit must show enough digits to read past it, got '%s'." % over_line
+	return ""

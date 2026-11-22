@@ -506,13 +506,14 @@ func _run_audit(day: int) -> void:
 			offence_counts[line["instrument_id"]] = int(offence_counts.get(line["instrument_id"], 0)) + 1
 			label += ": FINE %s CR" % SP811.integer(line["fine"])
 		post_phone(label)
-	if report.has("tire_check"):
-		post_phone(_tire_check_line(report["tire_check"]))
 	post_phone("Traceability: %d calibration record(s) since last audit, %d found out of tolerance." % [
 		report["cal_records"], report["cal_fails_found"]])
 	for id: String in unit_ids():
 		var chain: Dictionary = traceability_chain(id)
 		post_phone(("Chain: %s" if chain["traceable"] else "Chain BROKEN: %s") % chain["text"])
+	# Last before the verdict, so the HUD's short log still shows it.
+	if report.has("tire_check"):
+		post_phone(_tire_check_line(report["tire_check"]))
 	if report.get("warning", false):
 		post_phone("MANAGER: Caught it before Vance got in: %s. One-time favor. Don't make it a habit." % report["waived_names"])
 		post_phone("VANCE: Warning issued. Next time it's a fine.")
@@ -533,8 +534,13 @@ func _run_audit(day: int) -> void:
 ## "AUD-1T: Rover tires 7.2 kPa below set point (limit 6.9 kPa). PETTY FINE 20 CR"
 func _tire_check_line(tire: Dictionary) -> String:
 	var offset: float = tire["offset_kpa"]
+	# Two decimals when one would round onto the wrong side of the limit,
+	# so a fined 6.91 kPa never reads "6.9 kPa (limit 6.9 kPa)".
+	var digits: int = 1
+	if bool(tire["violation"]) != (snappedf(absf(offset), 0.1) > snappedf(tire["limit_kpa"], 0.1)):
+		digits = 2
 	var where: String = ("at set point" if is_zero_approx(offset)
-		else "%s kPa %s set point" % [SP811.number(absf(offset), 1), "below" if offset < 0.0 else "above"])
+		else "%s kPa %s set point" % [SP811.number(absf(offset), digits), "below" if offset < 0.0 else "above"])
 	var text: String = "AUD-1T: Rover tires %s (limit %s kPa)" % [where, SP811.number(tire["limit_kpa"], 1)]
 	if tire.get("waived", false):
 		return text + ". WAIVED (one-time warning)"

@@ -225,14 +225,15 @@ Agent's notes (flagged for Ryan, not his words):
 Ryan chose:
 
 - **Thermometer: "Like humidity".** The molt pauses while the terrarium thermometer's true error is past its MPE (±0.5 °C), the same as the hygrometer. The pause text names the cause: "temperature out of range", "humidity out of range", or both.
-- **AUD-1T tires: "AUD-1T's own line".** On audit day AUD-1T measures the real tire pressure. The tires were filled to what the tire gauge reads, so they sit off the set point by minus the gauge's error. Past the tire limit, AUD-1T posts its own phone line with a small petty fine, on top of Vance's line for the gauge.
-- **Field calibration spot: "Pad by the airlock".** A marked pad by the dome airlock with the field survey tripod. Park the rover on it and press E to calibrate the tire gauge against the WD-1 without going into the dome.
+- **AUD-1T tires: "AUD-1T's own line".** A petty fine on AUD-1T's own phone line when the tires are out of spec, on top of Vance's line for the gauge.
+- **Field calibration spot: "Pad by the airlock".** A pad by the dome airlock. Park the rover on it and press E to calibrate the tire gauge against the WD-1.
 
 Agent's notes (flagged for Ryan, not his words):
 
 - **Thermometer only while in service.** It holds the molt only once the FM-3 is on the colony; before that the player can't calibrate it, so it can't block the molt. The dome panel shows the TEMPERATURE reading and band only while it is in service, and the heat lamp turns harsh for either cause.
 - **Tire limit and fine are [PLACEHOLDER], not researched:** 6.9 kPa (1 psi, about 2 × the gauge MPE) and 20 CR, in `compliance_fine/aud1t_tire_*`. With the limit above the MPE, a tire fine always comes with an out-of-tolerance gauge line. No repeat surcharge.
-- **Tires follow the gauge's current true error** at audit time; there is no separate fill event or tire state yet.
+- **Tires follow the gauge's current true error** at audit time: they were filled to what the gauge reads, so they sit off the set point by minus its error. There is no separate fill event or tire state yet.
+- **Pad details:** the field survey tripod stands by the pad as set dressing, the rover must be stopped, and AUD-1T's line posts last before the verdict so the phone's short log keeps it.
 - **AUD-1T checks the tires only while the tire gauge is in service** (WD-1 owned). It posts a line every audit, compliant or not.
 - **The one-time grace waives the tire fine too;** the manager's line adds "reset the rover tires".
 - **The pad uses the same calibration as the bench,** including the 20 min of bench time. The bench in the dome can still calibrate the tire gauge.

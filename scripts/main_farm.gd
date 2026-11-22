@@ -156,6 +156,9 @@ func _on_rover_entered_cal_pad() -> void:
 
 
 func _try_field_cal() -> void:
+	if not _rover.is_stopped():
+		_hud.push_log("FIELD CAL PAD: stop the rover on the pad first.")
+		return
 	var sensor: DriftingSensor = GameState.get_sensor(GameState.TIRE_ID)
 	var record: Dictionary = GameState.calibrate_at_bench(GameState.TIRE_ID)
 	if record.is_empty():
@@ -223,6 +226,8 @@ func _try_buy_standard(standard_id: String) -> void:
 	if problem.is_empty():
 		_bram_line = "Handle it like it's worth more than your tractor. It nearly is."
 	else:
+		# Replace any "press again" prompt so it can't outlive the armed offer.
+		_bram_line = problem
 		_hud.push_log("BRAM: " + problem)
 	_refresh_bram()
 
@@ -235,6 +240,7 @@ func _try_trade() -> void:
 	if problem.is_empty():
 		_bram_line = "Fresh treads, wide stance. Try not to till a boulder with them."
 	else:
+		_bram_line = problem
 		_hud.push_log("BRAM: " + problem)
 	_refresh_bram()
 

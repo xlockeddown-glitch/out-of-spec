@@ -69,11 +69,10 @@ func _refresh_status() -> void:
 	match GameState.molt_stage:
 		GameState.MoltStage.MOLTED:
 			_molt_label.text = "MOLTED: optical silk spool ready"
-		GameState.MoltStage.PRE_MOLT:
-			_molt_label.text = "PRE-MOLT  %d %%" % roundi(GameState.molt_progress * 100.0)
 		_:
-			_molt_label.text = ("MOLT PAUSED: " + GameState.molt_pause_reason() if GameState.is_molt_paused()
-				else "MOLT  %d %%" % roundi(GameState.molt_progress * 100.0))
+			var stage: String = "PRE-MOLT" if GameState.molt_stage == GameState.MoltStage.PRE_MOLT else "MOLT"
+			_molt_label.text = (stage + " PAUSED: " + GameState.molt_pause_reason() if GameState.is_molt_paused()
+				else "%s  %d %%" % [stage, roundi(GameState.molt_progress * 100.0)])
 	_silk_label.text = "SILK SPOOLS %d   RELAY: %s" % [
 		GameState.optical_silk_spools, "OPTICAL SILK" if GameState.relay_slotted else "STOCK"]
 
