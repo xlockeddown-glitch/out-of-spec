@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://scripts/world/bram_bay.gd" id="11_bram"]
 [ext_resource type="Script" path="res://scripts/world/model_slot.gd" id="12_slot"]
 [ext_resource type="Script" path="res://scripts/world/uplink_beam.gd" id="13_beam"]
+[ext_resource type="Script" path="res://scripts/rover/cab_readout.gd" id="15_readout"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -79,6 +80,9 @@ roughness = 0.7
 
 [sub_resource type="BoxShape3D" id="AirlockShape"]
 size = Vector3(3, 3, 1.2)
+
+[sub_resource type="BoxMesh" id="CabReadoutMesh"]
+size = Vector3(0.2, 0.1, 0.1)
 
 [node name="MainFarm" type="Node" unique_id=111713122]
 script = ExtResource("1_main")
@@ -414,6 +418,12 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 1.9, 0.8)
 radius = 0.04
 height = 0.6
 material = SubResource("MatDark")
+
+[node name="CabReadout" type="MeshInstance3D" parent="WorldView/WorldViewport/World/Rover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, -0.05)
+cast_shadow = 0
+mesh = SubResource("CabReadoutMesh")
+script = ExtResource("15_readout")
 
 [node name="Antenna" type="Marker3D" parent="WorldView/WorldViewport/World/Rover" unique_id=752251794]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22, 1.88, 0.38)

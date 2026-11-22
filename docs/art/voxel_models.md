@@ -56,7 +56,7 @@ Superseded in part by the Neon concept sheet section below: the whip and `emit_a
   - Headlamps: `emit_headlights`, `#F5A623`.
 - **Changes:**
   - Removed B's red hitch plug and A's red bypass LED.
-  - B's amber sat-phone "mode display" becomes a dark socket. No node drives it yet; a steering-band readout is a later addition.
+  - B's amber sat-phone "mode display" becomes a dark socket. The Neon sheet dropped the sat-phone unit, so the game-driven steering readout (`Rover/CabReadout`, `scripts/rover/cab_readout.gd`) sits on the cab dash behind the windshield instead: 2 × 1 × 1 voxels at (0, 0.95, −0.05) m, colored by the steering band. Keep that spot empty in hand-refined models.
 - **Wide variant:** swapped in automatically when Bram fits the treads, if `tractor_wide.glb` exists.
 
 ## 2. Terrarium and Curlyhair (`terrarium.glb`, `curlyhair.glb`)
@@ -73,7 +73,7 @@ Superseded in part by the Neon concept sheet section below: the whip and `emit_a
   - lamp hood: `#9E7D3B` (B)
   - lamp bulb: `emit_heat_lamp`, `#F5A623`
 - **From B:** the water dish and the bark slab tilted into the back corner.
-- **Spider:** *Tliltocatl albopilosus*, a separate model. The pre-molt squash (scale) already applies to it; hiding it on molt and a voxel exuvia are not built yet.
+- **Spider:** *Tliltocatl albopilosus*, a separate model. The pre-molt squash (scale) already applies to it, and it is hidden while molted (until the spool is taken). A voxel exuvia is not built yet.
   - carapace `#261710` (A)
   - gold curly tips `#D4A359` (A), on leg tips and joints and as abdomen speckle
   - B's shape: 3 × 4 abdomen, 2 × 2 prosoma, center origin
