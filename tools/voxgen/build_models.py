@@ -434,7 +434,7 @@ def dome_room() -> Model:
 
 
 def dome_bench() -> Model:
-    """3.6 m x 1.0 m x 1.6 m work table at 0.1 m (matches the greybox benches): worn
+    """3.6 m x 1.0 m x 1.6 m work table at 0.1 m (matches the LeftBench greybox): worn
     steel top, slate legs and a lower shelf. Origin on the floor at the table center."""
     m = Model("dome_bench")
     TOP, LEG, SHELF = "#9AA0A8", "#4F5D73", "#3A4150"
@@ -716,7 +716,8 @@ GULCH_RIM = ("dry_gulch_straight", "plateau_rim_straight", "plateau_rim_corner")
 # voxels) and two meters at 0.025 m voxels, a new class for bench
 # instruments and hand-held kit. Colors are his
 # generator's own (the bench reuses the cistern's steel and brass; S is SHADOW; no glow, blank
-# screens). Built and turned like the field props. Not placed in any scene yet.
+# screens). Built and turned like the field props. The bench stands in the dome; the meters
+# are not placed yet.
 METROLOGY_LAB = {
     "lab_calibration_bench": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "E1": "#3A4E5C",
                                "B1": "#D9A13B", "S": SHADOW}, 0.1),
@@ -729,7 +730,7 @@ METROLOGY_LAB = {
 # Ryan's Environmental Chamber pack (2026-11-22, 0.1 m voxels): an environmental chamber
 # on a rolling cart. Colors are his generator's own (C1/C2 the reference meter's case,
 # F1 the meters' front panel, B1/S the bench's; no glow, a blank recessed screen). Built and turned like the field props.
-# Not placed in any scene yet.
+# It stands in the dome, right of the calibration bench.
 ENV_CHAMBER = {"C1": "#D4DAE0", "C2": "#8D99AE", "M1": "#3B5978", "F1": "#2E3844", "B1": "#D9A13B",
                "S": SHADOW}
 
