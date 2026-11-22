@@ -61,6 +61,78 @@
       "sender": "Drop-Pod Dispatch",
       "severity": "info",
       "text": "Your replacement reference weight fell off the cargo rail at 12 000 meters. Please re-zero it before use."
+    },
+    {
+      "id": "disp_11",
+      "sender": "Calibration Desk",
+      "severity": "warning",
+      "text": "Your steering test uncertainty ratio (TUR) fell below 4:1. The approval button has been replaced with a larger button labeled 'Are You Sure?'"
+    },
+    {
+      "id": "disp_12",
+      "sender": "Orbital Compliance",
+      "severity": "warning",
+      "text": "The rover is inside tolerance but outside our guard-banded acceptance limit. It may remain parked in the space marked 'Technically Fine.'"
+    },
+    {
+      "id": "disp_13",
+      "sender": "Audit Division",
+      "severity": "info",
+      "text": "Encoder error logged at −0.48° as found and +0.12° as left. Inspector Vance has asked that the turnip rows be given the same chance to correct themselves."
+    },
+    {
+      "id": "disp_14",
+      "sender": "Metrology Governance",
+      "severity": "warning",
+      "text": "Your bench hygrometer's uncertainty budget lists the reference standard, resolution and repeatability. Please add the fan you switched off for the auditor."
+    },
+    {
+      "id": "disp_15",
+      "sender": "Supply Chain",
+      "severity": "warning",
+      "text": "One calibration certificate is missing from your reference hygrometer's traceability chain. We can trace the invoice all the way to Orbit."
+    },
+    {
+      "id": "disp_16",
+      "sender": "Calibration Desk",
+      "severity": "info",
+      "text": "Drift history supports a shorter calibration interval. Procurement asks whether the encoder could drift more slowly until the next budget cycle."
+    },
+    {
+      "id": "disp_17",
+      "sender": "Bio-Security Bot",
+      "severity": "info",
+      "text": "Tarantula molt logged as a second resident. Please submit a departure time for whichever spider is empty."
+    },
+    {
+      "id": "disp_18",
+      "sender": "Telemetry Ops",
+      "severity": "alert",
+      "text": "Uplink delay climbed behind the boulder again. If you already sent reverse, give it a moment before sending reverse with feeling."
+    },
+    {
+      "id": "disp_19",
+      "sender": "HR & Morale",
+      "severity": "info",
+      "text": "Employee engagement fell 3 % after we made the morning morale survey mandatory. The survey now opens before your rover controls."
+    },
+    {
+      "id": "disp_20",
+      "sender": "Drop-Pod Dispatch",
+      "severity": "warning",
+      "text": "Your seed order landed 5 m outside the plot. The delivery photo shows a boulder signing for it."
+    },
+    {
+      "id": "disp_21",
+      "sender": "Telemetry Ops",
+      "severity": "info",
+      "text": "Optical silk cleared the morning packet backlog. Your rover has now received all seven copies of 'please ignore my last command.'"
+    },
+    {
+      "id": "disp_22",
+      "sender": "Audit Division",
+      "severity": "info",
+      "text": "AUD-1T flagged a crooked sticker on its own charging dock. The dock has requested a different inspector."
     }
   ],
   "audit_fines": [
@@ -109,7 +181,13 @@
         "Morning, Doc. Heard your tractor tried to till a boulder again—need a fresh axle or a therapist?",
         "If OmniSpec asks, this whole garage is 'temporarily uncalibrated.' Saves me three hundred credits a week.",
         "Coffee's burnt, treads are bald, and the orbital relay's blinking amber. Standard Tuesday.",
-        "Look who crawled out of the spider dome. Bring me anything shiny from the canyon?"
+        "Look who crawled out of the spider dome. Bring me anything shiny from the canyon?",
+        "Morning, Doc. Park it over the old oil stain. We'll see if it can make a better one.",
+        "Got fresh treads and one good battery. The battery's spoken for until I finish this coffee.",
+        "Come on in. If the bench wobbles, grab the short leg. It's got the only current calibration sticker in here.",
+        "You hear that rattle on the way over? Good. Last time a rover came in quiet, the part was still out in the canyon.",
+        "Set your scrap by the vise. If it sticks to the magnet, I'll buy it. If it sticks to me, I'm taking lunch.",
+        "I found dirt in your signal booster. Fine dirt, too. You've been somewhere worth charging extra for."
       ],
       "tarantula_silk_reactions": [
         "Wait—your cobalt spider spun THAT? Throw away the corporate fiber cable, this stuff doesn't even kink.",
