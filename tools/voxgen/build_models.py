@@ -582,36 +582,42 @@ def boulder_sheet(name: str, sheet: str) -> Model:
 # GridMap items for FarmGrid.Tile (0 = untilled, 1 = tilled), built into
 # assets/voxels/soil_tiles.tres by tools/voxgen/build_soil_library.gd. 19 x 2 x 19
 # voxels at 0.1 m = 1.9 m x 0.2 m x 1.9 m in a 2 m x 0.2 m x 2 m cell, centered on
-# the cell (voxel rows -1 and 0). Colors sampled off the Gemini concepts.
-def soil_sheet(tilled: bool) -> Model:
-    """Built from a top-view sheet (sheets/soil_tilled.txt, sheets/soil_untilled.txt),
-    sampled off Gemini's concepts (2026-11-21). One character per voxel column, first row
-    = back (-z). Tilled: R/D ridges stand on layer 0 over a layer -1 base, E/G furrows
-    are layer -1 only. Untilled: B/L/D are a flush 2-layer slab, the letter coloring the
-    top layer."""
+# the cell (voxel rows -1 and 0). Gemini's layer grids give no hex values; the colors
+# are sampled off its concept images.
+def token_sheet(sheet: str) -> dict[int, list[list[str]]]:
+    """Reads a token layer grid from tools/voxgen/sheets/: "Z = n" headers are layers
+    bottom up; each "Y=NN  t t t ..." row lists one token per X (".." = empty), first
+    row = highest Y. Anything after "<-" is a comment. Returns {z: rows}."""
     import re
+    layers: dict[int, list[list[str]]] = {}
+    current = -1
+    for line in (Path(__file__).parent / "sheets" / sheet).read_text(encoding="utf-8").splitlines():
+        header = re.match(r"Z\s*=\s*(\d+)", line)
+        row = re.match(r"Y=\d+\s+(.*)", line)
+        if header:
+            current = int(header.group(1))
+            layers[current] = []
+        elif row and current >= 0:
+            layers[current].append(row.group(1).split("<-")[0].split())
+    w, d = len(layers[0][0]), len(layers[0])
+    for z, rows in layers.items():
+        assert len(rows) == d and all(len(r) == w for r in rows), f"{sheet}: Z={z} is not {w} x {d}"
+    return layers
+
+
+def soil_sheet(tilled: bool) -> Model:
+    """Built voxel for voxel from Gemini's layer grids (sheets/soil_tilled.txt,
+    sheets/soil_untilled.txt). Sheet Z=0 is voxel row -1, Z=1 is row 0; the first
+    sheet row (Y=18) is the back (-z). Tilled furrows are the empty cells of Z=1."""
     name = "soil_tilled" if tilled else "soil_untilled"
-    rows = [line for line in (Path(__file__).parent / "sheets" / f"{name}.txt")
-            .read_text(encoding="utf-8").splitlines() if re.fullmatch(r"[BLDREG]{19}", line)]
-    assert len(rows) == 19, f"{name}.txt: {len(rows)} rows, need 19"
+    colors = {"U1": "#78563B", "U2": "#A98463", "U3": "#563D26",   # base, light, dark speckle
+              "T1": "#442E21", "T2": "#2A1D15", "T3": "#2D1E14"}   # ridge, wet base/furrow, speckle
     m = Model(name, offset=(-9.5, 0.0, -9.5))
-    if tilled:
-        top = {"R": "#442E21", "D": "#2D1E14"}             # ridge, ridge speckle
-        floor = {"E": "#1A100A", "G": "#2A1D15"}           # furrow shadow edge, furrow floor
-        under = "#33231A"                                  # layer -1 below the ridges
-    else:
-        top = {"B": "#78563B", "L": "#A98463", "D": "#563D26"}
-    for z, row in enumerate(rows):
-        for x, cell in enumerate(row):
-            if tilled:
-                if cell in top:
-                    m.put("soil", x, -1, z, under)
-                    m.put("soil", x, 0, z, top[cell])
-                else:
-                    m.put("soil", x, -1, z, floor[cell])
-            else:
-                m.put("soil", x, -1, z, top["B"])
-                m.put("soil", x, 0, z, top[cell])
+    for layer, rows in token_sheet(f"{name}.txt").items():
+        for z, row in enumerate(rows):
+            for x, cell in enumerate(row):
+                if cell != "..":
+                    m.put("soil", x, layer - 1, z, colors[cell])
     return m
 
 
