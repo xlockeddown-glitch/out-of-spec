@@ -28,16 +28,24 @@ func _process(delta: float) -> void:
 	advance(delta / seconds_per_day)
 
 
-## Moves time forward. Drift and day_started follow from this. (Molt still
-## runs on real seconds in GameState for the 20 s playtest.)
+## Moves time forward. Drift and day_started follow from this. A jump across
+## 06:00 is split at each morning, so day_started sees the clock and the drift
+## exactly as they were at 06:00. (Molt still runs on real seconds in
+## GameState for the 20 s playtest.)
 func advance(delta_days: float) -> void:
 	if delta_days <= 0.0:
 		return
-	var previous_day: int = get_day_index()
-	elapsed_days += delta_days
-	time_advanced.emit(delta_days)
-	for day: int in range(previous_day + 1, get_day_index() + 1):
-		day_started.emit(day)
+	var end: float = elapsed_days + delta_days
+	while floorf(end) > floorf(elapsed_days):
+		var morning: float = floorf(elapsed_days) + 1.0
+		var step: float = morning - elapsed_days
+		elapsed_days = morning
+		time_advanced.emit(step)
+		day_started.emit(get_day_index())
+	if end > elapsed_days:
+		var rest: float = end - elapsed_days
+		elapsed_days = end
+		time_advanced.emit(rest)
 
 
 ## Debug helper: jump to the next 06:00. Sensors drift for the skipped time.

@@ -15,6 +15,10 @@ signal drift_changed(drift_deg: float, band: int)
 signal steering_zeroed(record: Dictionary)
 signal soil_tilled(cell: Vector3i)
 signal till_rejected(reason: String)
+## Space on a cell that is already tilled: plant, check or harvest it.
+## `seed_id` and `offset_steps` are the seed and planting offset selected when
+## the command was sent.
+signal tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int)
 signal ore_mined(fissure_id: StringName)
 
 enum Command { TILL, ZERO_STEERING }
@@ -36,10 +40,17 @@ class UplinkFrame:
 class UplinkCommand:
 	var sent_at: float
 	var command: int
+	## Seed selected when a TILL was sent, so switching seeds while the
+	## command is in flight doesn't change what gets planted.
+	var seed_id: String
+	## Planting offset (set point steps) selected when a TILL was sent.
+	var offset_steps: int
 
-	func _init(p_sent_at: float, p_command: int) -> void:
+	func _init(p_sent_at: float, p_command: int, p_seed_id: String = "", p_offset_steps: int = 0) -> void:
 		sent_at = p_sent_at
 		command = p_command
+		seed_id = p_seed_id
+		offset_steps = p_offset_steps
 
 
 @export_group("Scene Links")
@@ -88,6 +99,10 @@ var _applied_throttle: float = 0.0
 var _applied_steer: float = 0.0
 var _frames: Array[UplinkFrame] = []
 var _commands: Array[UplinkCommand] = []
+## Seeds selected at each till key press since the last physics tick, so a C
+## pressed before the tick can't change them and no press is lost.
+## Each entry is {"seed": String, "offset": int}.
+var _till_presses: Array[Dictionary] = []
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 
 
@@ -111,6 +126,11 @@ func _exit_tree() -> void:
 	GameState.has_rover_transform = true
 
 
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"rover_till", false):
+		_till_presses.append({"seed": GameState.current_seed(), "offset": GameState.planting_offset_steps})
+
+
 func _physics_process(delta: float) -> void:
 	_uplink_clock += delta
 	_update_line_of_sight(delta)
@@ -121,9 +141,13 @@ func _physics_process(delta: float) -> void:
 
 # --- Public API -------------------------------------------------------------
 
-## Queue a one-shot command. It executes after the current uplink lag.
-func queue_command(command: Command) -> void:
-	_commands.append(UplinkCommand.new(_uplink_clock, command))
+## Queue a one-shot command. It executes after the current uplink lag. A TILL
+## carries `seed_id` and `offset_steps`, or the current ones if no seed is given.
+func queue_command(command: Command, seed_id: String = "", offset_steps: int = 0) -> void:
+	if command == Command.TILL and seed_id == "":
+		seed_id = GameState.current_seed()
+		offset_steps = GameState.planting_offset_steps
+	_commands.append(UplinkCommand.new(_uplink_clock, command, seed_id, offset_steps))
 
 
 func get_current_lag() -> float:
@@ -176,8 +200,9 @@ func _sample_local_input() -> void:
 	# +steer = left = +yaw about Y.
 	var steer: float = Input.get_axis(&"rover_steer_right", &"rover_steer_left")
 	_frames.append(UplinkFrame.new(_uplink_clock, throttle, steer))
-	if Input.is_action_just_pressed(&"rover_till"):
-		queue_command(Command.TILL)
+	for press: Dictionary in _till_presses:
+		queue_command(Command.TILL, str(press["seed"]), int(press["offset"]))
+	_till_presses.clear()
 	if Input.is_action_just_pressed(&"rover_zero_steering"):
 		queue_command(Command.ZERO_STEERING)
 
@@ -193,13 +218,13 @@ func _deliver_uplink() -> void:
 		_applied_steer = frame.steer
 	while not _commands.is_empty() and _commands[0].sent_at <= arrival_cutoff:
 		var cmd: UplinkCommand = _commands.pop_front()
-		_execute(cmd.command)
+		_execute(cmd)
 
 
-func _execute(command: int) -> void:
-	match command:
+func _execute(cmd: UplinkCommand) -> void:
+	match cmd.command:
 		Command.TILL:
-			_till_under_rover()
+			_till_under_rover(cmd.seed_id, cmd.offset_steps)
 		Command.ZERO_STEERING:
 			_zero_steering()
 
@@ -244,7 +269,7 @@ func _on_steering_error_changed(_error: float, _band: int) -> void:
 
 # --- Tilling ----------------------------------------------------------------
 
-func _till_under_rover() -> void:
+func _till_under_rover(seed_id: String, offset_steps: int) -> void:
 	if _try_mine():
 		return
 	if soil_grid == null:
@@ -255,9 +280,16 @@ func _till_under_rover() -> void:
 		FarmGrid.TillResult.TILLED:
 			soil_tilled.emit(cell)
 		FarmGrid.TillResult.ALREADY_TILLED:
-			till_rejected.emit("Cell (%d, %d) already tilled." % [cell.x, cell.z])
+			tilled_cell_used.emit(cell, seed_id, offset_steps)
 		FarmGrid.TillResult.NOT_SOIL:
 			till_rejected.emit("No soil under tractor.")
+
+
+## The soil cell under the rover (y = 0), or (0, -1, 0) without a grid.
+func cell_under() -> Vector3i:
+	if soil_grid == null:
+		return Vector3i(0, -1, 0)
+	return soil_grid.world_to_cell(global_position)
 
 
 func _try_mine() -> bool:

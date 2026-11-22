@@ -277,3 +277,81 @@ Agent's notes (flagged for Ryan, not his words):
 - The phone shows the band under the clock, e.g. "CRED: PROVISIONAL, 33 % to TRUSTED", and the open contract on a second line ("OIRM CONTRACT: 2 of 5 on time", then "OIRM CONTRACT DONE: HB-700 at Bram's").
 - **Known economy limit:** the discounted HB-700 costs 800 CR, more than the 500 CR start, and this build has no income (every credit change is a fine, fee or purchase). So the contract can be earned but not yet redeemed in a normal playthrough. It needs the crop/harvest income or an economy decision from Ryan; even Tier 1 standards are tight today.
 - There is no save system yet, so credibility and the contract reset with a new game.
+
+## 2026-11-22: Ryan's answers after the credibility milestone (PR #47)
+
+### Ryan chose
+
+- **Income: "Both".** Crop sales first, then paid calibration jobs unlocked at TRUSTED.
+- **Next milestone: "Income loop".** Build the income so the OIRM contract can be redeemed.
+- **Moisture: "New soil probe".** A soil-moisture probe that drifts and needs calibration like the other units; a drifted probe means off-spec crops. Its specs are [PLACEHOLDER].
+- **Buyer: "Lin".** Lin, the botanist and substrate dealer, appears in this milestone and buys crops.
+- **Watering: "Auto-irrigation".** Set a target moisture per plot, and irrigation holds it using the probe's reading.
+
+### Agent's notes on the crop build (flagged for Ryan, not his words)
+
+- The soil probe's numbers are [PLACEHOLDER]: drift 0.15 %/day (percentage points of volumetric water content), MPE 3.0 %, as-left residual 0.2 %, 40 minutes on the bench.
+- It is calibrated against a "Gravimetric Soil Reference Kit" (weigh, oven-dry, reweigh), a Tier 0 standard owned from the start. The kit is the agent's proposal, since the probe needed a standard; its numbers are [PLACEHOLDER] too.
+- How the probe drives the crop: irrigation holds the probe's *reading* at the set point, so the soil really sits at set point minus the probe's error. The player can calibrate the probe, or offset a plot's set point by the known error ([ and ] keys, 1 % steps).
+- A harvest is off spec if the soil left the crop's tolerance band on any growing day. Lin then pays the base price less the crop's out-of-spec penalty (from data/crops.json). The any-day rule is the agent's choice; a share-of-days rule would be gentler.
+- Seeds cost 25 % of the crop's base price ([PLACEHOLDER], data/economy.json). C changes the seed; using the rover on tilled soil plants, reports, or harvests.
+- Lin buys the whole harvest bin at Bram's bay (L key) until she has a place of her own.
+- Crops show as the existing crop_stage voxel models: stages 0 to 2 while growing, stage 3 when ready, and the wilted model once the soil has left its band. That wilting is a visible clue that the probe has drifted; hiding it would make the drift harder to spot.
+- After GPT's first review: the off-spec check now catches soil that leaves the band at any time between mornings (when the probe drifts or is calibrated, or a set point changes), not only at the morning check. Soil exactly on a band edge counts as in band.
+- Growth counts time since planting: a morning counts once at least half a day has passed, so a crop planted just before 06:00 waits for the next morning. That half-day rule is the agent's choice.
+- If fines leave the player without enough credits for a seed, Lin fronts it and takes its cost out of that crop's sale. That keeps fines from locking the player out of farming. The rule is the agent's choice.
+- Open balance question for Ryan (from GPT's second review): a player deep in debt with every standard overdue pays fines faster than crops can earn, and OIRM wants credits up front. The paid calibration jobs in the next PR add income; a fine cap or an OIRM payment plan could also help.
+- A clock jump across 06:00 (such as a bench calibration) now splits at the morning, so growth and drift are judged as they stood at 06:00.
+- With no crop under the rover, `[` and `]` set an offset that new plantings start with, so a player who knows the probe's error can correct for it before planting (GPT's third review). The offset is the agent's choice.
+- Soil out of band at 06:00 counts against the new day as well as the old one.
+- The seed chosen when Space is sent is the one planted, even if C changes it while the command is on its way up the link.
+- Biscuit Reed (±18 %), Dust Turnip (±12 %) and Bubble Pods (±10 %) tolerate even the probe's worst drift (capped at ±9 %), so a probe left alone only spoils Suncatch Squash (±8 %) and Lensberry (±5 %). The agent kept that on purpose: the starter crops are forgiving, and the drift starts to matter as the player moves to pricier crops. Ryan may want the bands tightened instead.
+- Paid calibration jobs at TRUSTED come in the next PR.
+
+## 2026-11-22: Ryan's idea, a calibration robot helper
+
+### Ryan said
+
+- A robot helper that gets taught calibrations and improves over time (levels, maybe tied to a skill), until it can do harder calibrations and assist in the lab. That frees the player for other things as they master calibrations.
+- Different types of robots do different jobs at first. As build and skill technology unlocks, more human-like robots arrive that automate a wider range of skills.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Not scheduled yet; to be offered as a roadmap option after the income milestone. docs/design/equipment_skills_robots.md already sketches robots and skills, and the bench already records calibrations by "the Manager", which don't count toward OIRM contracts; the helper would need the same rule decided.
+
+## 2026-11-22: Ryan's ideas, an automation path and a rogue lab
+
+### Ryan said
+
+- An automation path for most things: manual control at first, then automation with a human in the loop, then automation run remotely from a control panel through a system like Starlink or SI.
+- Let a lab "go rogue" and skip calibrations. That makes the game wonky: weird things happen, things go right when you press left, the wrong things happen. It shouldn't just be miserable; it should be funny and goofy, with some misery.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Not scheduled yet; both go on the roadmap options after the income milestone, next to the robot helper (the automation path fits it: manual, then a taught helper, then remote).
+- The rogue lab fits the drift already in the game: overdue instruments could cause comic glitches scaled by how far out of tolerance they are (swapped controls, odd phone messages), on top of the credibility cost. Which glitches, and how strong, are Ryan's call.
+
+## 2026-11-22: Ryan's idea, specializing instead of calibrating everything
+
+### Ryan said
+
+- You don't need to calibrate every parameter to succeed. A single route is a harder path than being a jack of all trades, but it works: for example, serving customers only for pressure and torque, or electrical only.
+- You still manage what you use to keep your own site going, but you worry much less about all the standards and everything else.
+- You have to make money in many ways, or be really good at what you do.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Not scheduled yet; it shapes the paid calibration jobs coming at TRUSTED. Jobs could be grouped by discipline (pressure, torque, electrical, ...), so a lab that owns only some disciplines' standards can still earn, at higher stakes per job.
+- Open questions for Ryan: how a specialist is rewarded (better pay, steadier customers, faster credibility in that discipline), and how the site's own instruments outside the specialty get looked after (an outside cal service, Bram, a robot helper).
+
+## 2026-11-22: Ryan's idea, an upgradeable lab building
+
+### Ryan said
+
+- The lab building is upgradeable, to allow bigger sections or dedicated calibration areas.
+- Start with a small lab with one or a few sections. Upgrade to a medium lab, where areas can be made bigger or more separate areas added. Then a large lab, with one really big area or many separate areas, depending on how you specialize.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Not scheduled yet. It pairs with the specialization idea: one big area suits a specialist, many small areas suit a jack of all trades.
+- The dome interior today is a single room with the calibration bench; sizes, costs and what each area enables (for example, a discipline's jobs need a matching area) are Ryan's call.

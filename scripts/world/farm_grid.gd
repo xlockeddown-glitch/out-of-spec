@@ -11,12 +11,20 @@ extends GridMap
 
 signal tile_changed(cell: Vector3i, tile: int)
 
+## CROP_* are tilled cells with a crop (GameState.plantings) growing or ready.
 enum Tile { SOIL_UNTILLED = 0, SOIL_TILLED = 1 }
 enum TillResult { TILLED, ALREADY_TILLED, NOT_SOIL }
 
 @export var plot_origin_cell: Vector2i = Vector2i(-6, -6)
 @export var plot_size_cells: Vector2i = Vector2i(12, 12)
 @export var mesh_library_override: MeshLibrary
+
+const CROP_STAGE_MODEL := "res://assets/voxels/crop_stage_%d.glb"
+const CROP_WILTED_MODEL := "res://assets/voxels/crop_stage_wilted.glb"
+## Crop models use 0.1 m voxels.
+const CROP_VOXEL_M := 0.1
+
+var _crop_models: Dictionary[Vector3i, Node3D] = {}
 
 
 func _ready() -> void:
@@ -25,6 +33,7 @@ func _ready() -> void:
 	elif mesh_library == null:
 		mesh_library = _build_greybox_library()
 	_fill_plot()
+	GameState.crops_changed.connect(refresh_crops)
 
 
 func world_to_cell(world_pos: Vector3) -> Vector3i:
@@ -54,6 +63,61 @@ func _fill_plot() -> void:
 				set_cell_item(cell, Tile.SOIL_UNTILLED)
 	for tilled: Variant in GameState.tilled_cells:
 		set_cell_item(tilled as Vector3i, Tile.SOIL_TILLED)
+	refresh_crops()
+
+
+## Places a crop model on each planted cell: growth stages 0 to 2 while it
+## grows, stage 3 when ready, and the wilted model once its soil has left the
+## moisture band (the harvest will be off spec).
+func refresh_crops() -> void:
+	for cell: Vector3i in _crop_models.keys():
+		if not GameState.plantings.has(cell):
+			_crop_models[cell].queue_free()
+			_crop_models.erase(cell)
+	for key: Variant in GameState.plantings:
+		var cell: Vector3i = key
+		var path: String = _crop_model_path(cell)
+		var shown: Node3D = _crop_models.get(cell, null)
+		if shown != null and shown.get_meta(&"model_path", "") == path:
+			continue
+		if shown != null:
+			shown.queue_free()
+		var model: Node3D = _make_crop_model(path)
+		model.set_meta(&"model_path", path)
+		model.position = map_to_local(cell) + Vector3(0.0, cell_size.y * 0.5, 0.0)
+		add_child(model)
+		_crop_models[cell] = model
+
+
+func _crop_model_path(cell: Vector3i) -> String:
+	var planting: Dictionary = GameState.plantings[cell]
+	if int(planting["out_of_band_days"]) > 0 or planting.get("out_today", false):
+		return CROP_WILTED_MODEL
+	if GameState.is_crop_ready(cell):
+		return CROP_STAGE_MODEL % 3
+	var growth_days: int = maxi(1, int(GameState.crop(planting["crop_id"]).get("growth_days", 1)))
+	return CROP_STAGE_MODEL % clampi(floori(float(int(planting["days_grown"]) * 3) / float(growth_days)), 0, 2)
+
+
+## The voxel model at `path`, or a small green box if it can't load.
+func _make_crop_model(path: String) -> Node3D:
+	var scene: PackedScene = load(path) as PackedScene if ResourceLoader.exists(path) else null
+	if scene != null:
+		var instance: Node3D = scene.instantiate() as Node3D
+		if instance != null:
+			instance.scale = Vector3.ONE * CROP_VOXEL_M
+			return instance
+	var box := MeshInstance3D.new()
+	var mesh := BoxMesh.new()
+	mesh.size = Vector3(cell_size.x * 0.4, 0.4, cell_size.z * 0.4)
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = Color(0.30, 0.55, 0.22)
+	mesh.material = mat
+	box.mesh = mesh
+	box.position.y = 0.2
+	var holder := Node3D.new()
+	holder.add_child(box)
+	return holder
 
 
 func _build_greybox_library() -> MeshLibrary:

@@ -30,6 +30,7 @@ func _ready() -> void:
 	_rover.steering_zeroed.connect(_on_steering_zeroed)
 	_rover.soil_tilled.connect(_on_soil_tilled)
 	_rover.till_rejected.connect(_on_till_rejected)
+	_rover.tilled_cell_used.connect(_on_tilled_cell_used)
 	_hud.zero_steering_pressed.connect(_on_zero_pressed)
 	_hud.slot_spool_pressed.connect(_on_slot_spool_pressed)
 	_hud.enter_dome_pressed.connect(_go_to_dome)
@@ -111,7 +112,27 @@ func _refresh_relay_hud() -> void:
 
 
 func _on_soil_tilled(cell: Vector3i) -> void:
-	_hud.push_log("Tilled cell (%d, %d)" % [cell.x, cell.z])
+	_hud.push_log("Tilled cell (%s, %s). Space again plants %s (%s CR seed); C changes the seed, [ and ] its starting set point." % [
+		SP811.integer(cell.x), SP811.integer(cell.z), GameState.crop_name(GameState.current_seed()),
+		SP811.integer(GameState.seed_cost(GameState.current_seed()))])
+
+
+## Space on tilled soil: harvest a ready crop, report a growing one, or plant.
+func _on_tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int) -> void:
+	if GameState.is_crop_ready(cell):
+		var entry: Dictionary = GameState.harvest_crop(cell)
+		var grade: String = ("in spec" if entry["in_spec"]
+			else "OFF SPEC: the soil left its moisture band on %s days" % SP811.integer(entry["out_of_band_days"]))
+		_hud.push_log("HARVESTED %s, %s. Bin: %s crops for Lin at Bram's bay." % [
+			GameState.crop_name(entry["crop_id"]), grade, SP811.integer(GameState.harvest_bin.size())])
+	elif GameState.plantings.has(cell):
+		_hud.push_log(GameState.crop_status_text(cell) + ". [ and ] move the set point.")
+	else:
+		var problem: String = GameState.plant_crop(cell, seed_id, offset_steps)
+		if problem.is_empty():
+			_hud.push_log("PLANTED " + GameState.crop_status_text(cell))
+		else:
+			_hud.push_log("PLANT FAILED: " + problem)
 
 
 func _on_till_rejected(reason: String) -> void:
@@ -125,6 +146,26 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"interact") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_trade()
+	elif _is_key(event, KEY_L) and _bram_bay.rover_inside:
+		get_viewport().set_input_as_handled()
+		_sell_to_lin()
+	elif _is_key(event, KEY_C):
+		get_viewport().set_input_as_handled()
+		var seed: String = GameState.cycle_seed()
+		_hud.push_log("SEED: %s, %s CR, %s days, soil moisture target %s %%" % [
+			GameState.crop_name(seed), SP811.integer(GameState.seed_cost(seed)),
+			SP811.integer(int(GameState.crop(seed).get("growth_days", 0))),
+			SP811.number(float(GameState.crop(seed).get("soil_moisture_target", 0.0)) * 100.0, 0)])
+	elif _is_key(event, KEY_BRACKETLEFT) or _is_key(event, KEY_BRACKETRIGHT):
+		var cell: Vector3i = _rover.cell_under()
+		var step: int = -1 if _is_key(event, KEY_BRACKETLEFT) else 1
+		get_viewport().set_input_as_handled()
+		if GameState.plantings.has(cell):
+			GameState.adjust_setpoint(cell, step)
+			_hud.push_log(GameState.crop_status_text(cell))
+		else:
+			GameState.adjust_planting_offset(step)
+			_hud.push_log(GameState.planting_offset_text())
 	elif event is InputEventKey and event.pressed and not event.echo and _bram_bay.rover_inside:
 		# [1], [2], ... buy Bram's Tier 1 standards in catalog order.
 		var index: int = (event as InputEventKey).physical_keycode - KEY_1
@@ -132,6 +173,23 @@ func _unhandled_input(event: InputEvent) -> void:
 		if GameState.tier1_unlocked and index >= 0 and index < catalog.size():
 			get_viewport().set_input_as_handled()
 			_try_buy_standard(catalog[index])
+
+
+func _is_key(event: InputEvent, keycode: Key) -> bool:
+	var key := event as InputEventKey
+	if key == null or not key.pressed or key.echo:
+		return false
+	# The key's label, or the character it typed: on German QWERTZ, [ and ]
+	# are AltGr+8 and AltGr+9, whose keycode stays 8 and 9.
+	return key.keycode == keycode or (key.unicode > 0
+		and String.chr(key.unicode).to_upper().unicode_at(0) == keycode)
+
+
+func _sell_to_lin() -> void:
+	if GameState.harvest_bin.is_empty():
+		_hud.push_log("LIN: Nothing in your bin. Bring me crops, and keep that spider away from my stall.")
+		return
+	GameState.sell_harvest_to_lin()
 
 
 func _on_ore_mined(_fissure_id: StringName) -> void:
@@ -195,6 +253,9 @@ func _on_rover_entered_bay() -> void:
 		_bram_line = "That's %d crystal ore. Treads coming right up, hit trade." % cost
 	else:
 		_bram_line = "Bring me %d crystal ore and I'll bolt wider treads onto your tractor. Carrying %d." % [cost, GameState.crystal_ore]
+	if not GameState.harvest_bin.is_empty():
+		_hud.push_log("LIN: %s crops in your bin, %s CR for the lot. Press L to sell." % [
+			SP811.integer(GameState.harvest_bin.size()), SP811.integer(GameState.harvest_bin_value())])
 	_refresh_bram()
 
 

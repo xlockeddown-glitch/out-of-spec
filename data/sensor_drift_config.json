@@ -183,6 +183,32 @@
       "takes_over": ["dome_pressure"],
       "_note": "Tier 3 bench pressure controller (spec section 1.4 #6), offered early and at a discount by the first OIRM credibility contract (Ryan, 2026-11-22). Cited class spec: 0.008 % of reading (Mensor CPC8000 IntelliScale), about 0.008 kPa at a 100 kPa dome reading; the 0.01 kPa MPE rounds that up and is [PLACEHOLDER], as are the certificate uncertainty, drift (MPE in about 120 days), price and interval. takes_over: units whose standard becomes this one when it is bought (the dome gauge, which only reaches 3.11:1 against the WD-1). The tire gauge stays on the WD-1 for field calibration."
     },
+    "soil_probe": {
+      "role": "unit",
+      "display_name": "Plot Soil-Moisture Probe",
+      "short_name": "Soil probe",
+      "error_unit": "percentage_points_vwc",
+      "daily_drift_rate": 0.15,
+      "max_permissible_error": 3.0,
+      "as_left_residual": 0.2,
+      "resolution": 0.1,
+      "calibrated_by": "gravimetric_kit",
+      "bench_minutes": 40,
+      "_note": "Income milestone (Ryan, 2026-11-22: 'New soil probe'). Auto-irrigation holds each plot at its set point as this probe reads it, so the soil's true volumetric water content is the set point minus the probe's error. The 3.0 % MPE (0.03 m³/m³) follows the generic-calibration accuracy commonly stated for capacitance soil-moisture probes; drift (MPE in 20 days), residual, resolution and bench time are game pace. All [PLACEHOLDER] until Ryan sets them."
+    },
+    "gravimetric_kit": {
+      "role": "standard",
+      "display_name": "Gravimetric Soil Reference Kit",
+      "short_name": "Gravimetric kit",
+      "error_unit": "percentage_points_vwc",
+      "daily_drift_rate": 0.0083,
+      "max_permissible_error": 0.5,
+      "spec_confidence_pct": null,
+      "certificate_uncertainty": 0.3,
+      "certificate_k": 2,
+      "initial_interval_days": 30,
+      "_note": "Tier 0 reference for the soil probe: soil samples weighed wet, oven-dried and weighed again (the gravimetric method), with a certified balance. Agent's proposal, not yet Ryan's; no maker name. Every number is [PLACEHOLDER]; drift takes it to its MPE in about 60 days like the other Tier 0 standards."
+    },
     "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. Tier 0 standards' daily_drift_rate takes one from zero to its MPE in about 60 days, Tier 1 in about 120 days (Ryan, 2026-11-22), so skipping an OIRM cycle risks a recall. resolution (one digit of the unit under test), bench_minutes and the standards' specs and drift rates are placeholders (docs/design/equipment_skills_robots.md section 1.5). tier 0 (or absent) = owned from the start; tier 1+ = bought, arrives with a maker's certificate traceable to OIRM (section 1.7). A unit is in service (audited, on the bench) only while its calibrated_by standard is owned. standard_sensitivity (default 1) converts the standard's unit into the unit's own. display_decimals sets how many decimals readings show."
   },
   "guardband": {

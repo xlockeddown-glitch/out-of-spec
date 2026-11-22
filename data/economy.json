@@ -21,5 +21,9 @@
     },
     "_note": "Ryan, 2026-11-22: audits and overdue instruments feed credibility; the phone shows a named band with the next one hinted; the first contract offers a lower-uncertainty standard at a discount for a run of on-time calibrations. Every number and band name here is [PLACEHOLDER]. Points stay between 0 and max_points. The discount applies to credits, not ore."
   },
-  "_note": "Placeholder balance until crops sell (Week 4+). Audit fines come out of this."
+  "crops": {
+    "seed_cost_pct": 25,
+    "_note": "Income milestone (Ryan, 2026-11-22: crop sales to Lin). Seeds cost this percentage of a crop's base_sell_credits, rounded, bought when planted. An in-spec harvest sells for base_sell_credits; one whose soil left its tolerance band on any growing day sells for out_of_spec_penalty_pct less. [PLACEHOLDER]."
+  },
+  "_note": "Starting balance [PLACEHOLDER]. Crops sold to Lin add credits; audit fines, OIRM fees and purchases take them away."
 }
