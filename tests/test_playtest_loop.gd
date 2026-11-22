@@ -36,6 +36,12 @@ func test_interval_config_is_present() -> String:
 	for key: String in ["initial_days", "min_days", "max_days", "lengthen_days", "shorten_days"]:
 		if is_nan(_cfg(key)):
 			return "sensor_drift_config is missing calibration_interval/%s." % key
+	# The interval tests below can only tell shorten, lengthen and keep apart
+	# if the config leaves room both ways and both steps move the interval.
+	if not (_cfg("min_days") < _cfg("initial_days") and _cfg("initial_days") < _cfg("max_days")):
+		return "calibration_interval needs min_days < initial_days < max_days for the interval tests to mean anything."
+	if _cfg("shorten_days") <= 0.0 or _cfg("lengthen_days") <= 0.0:
+		return "calibration_interval shorten_days and lengthen_days must be > 0 for the interval tests to mean anything."
 	return ""
 
 
@@ -147,6 +153,7 @@ func test_first_failed_audit_is_a_warning_then_fines() -> String:
 	var first: Dictionary = gs.audit_log[-1]
 	var manager_cal: Dictionary = gs.last_cal_records.get(gs.STEERING_ID, {})
 	var first_credits: int = gs.credits
+	var offences_after_grace: Dictionary = gs.offence_counts.duplicate()
 
 	# Second audit: out of tolerance again -> fined, credits drop by the total.
 	_set_day(2 * cadence)
@@ -169,8 +176,12 @@ func test_first_failed_audit_is_a_warning_then_fines() -> String:
 		return "The warning must not change credits (%d -> %d)." % [start_credits, first_credits]
 	if manager_cal.get("performed_by", "") != "Manager":
 		return "The manager must calibrate the violating instrument before Vance inspects: %s" % manager_cal
-	if second.get("warning", false) or second["total_fine"] <= 0:
-		return "The second failed audit must be fined: %s" % second
+	if not offences_after_grace.is_empty():
+		return "The warning must not raise repeat-offence counts: %s" % offences_after_grace
+	if second["passed"] or second.get("warning", false):
+		return "The second failed audit must be fined, not warned: %s" % second
+	if int(second["total_fine"]) != expected_fine:
+		return "The fine must be the AuditEngine.fine_for total (%d CR), got %d CR." % [expected_fine, second["total_fine"]]
 	if second_credits != first_credits - int(second["total_fine"]):
 		return "Credits must drop by the %d CR fine (%d -> %d)." % [second["total_fine"], first_credits, second_credits]
 	return ""
