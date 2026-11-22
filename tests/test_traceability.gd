@@ -192,6 +192,8 @@ func test_unit_due_while_standard_away_is_excused_once() -> String:
 	gs.drop_pod_present = false
 	gs.send_to_oirm(table_id)
 	gs.steering.cal_due_day = 2  # falls due while the table is away
+	_set_day(1 + gs.oirm_courier_days())
+	gs._on_day_started(1 + gs.oirm_courier_days())  # the table comes back
 	_set_day(cadence)
 	gs._run_audit(cadence)
 	var line: Dictionary = _lines_by_id(gs.audit_log[-1])[gs.STEERING_ID]
@@ -208,6 +210,43 @@ func test_unit_due_while_standard_away_is_excused_once() -> String:
 		problem = "Not calibrated by the next audit, it must be an ordinary overdue: %s" % lines[gs.STEERING_ID]
 	elif problem == "" and (lines[gs.HYGROMETER_ID]["excused"] or not lines[gs.HYGROMETER_ID]["violation"]):
 		problem = "A unit whose standard is home must not be excused: %s" % lines[gs.HYGROMETER_ID]
+	GameClock.elapsed_days = saved
+	gs.free()
+	return problem
+
+
+## A courier trip outlasts the audit cadence: a unit stays excused while its
+## standard is away and at the audit the morning it comes back, then has until
+## the next audit.
+func test_excused_while_courier_outlasts_cadence() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var cadence: int = _cadence()
+	var table_id: String = gs.steering.calibrated_by
+	var send_day: int = cadence * 3 - 2
+	var back: int = send_day + gs.oirm_courier_days()
+	var problem: String = ""
+	_all_in_band(gs)
+	for id: String in gs.unit_ids():
+		gs.get_sensor(id).cal_due_day = cadence * 20
+	_set_day(send_day)
+	gs.drop_pod_present = false
+	gs.send_to_oirm(table_id)
+	gs.steering.cal_due_day = send_day + 1
+	var first_audit: int = gs.next_audit_day(send_day)
+	var excused_through: int = gs.next_audit_day(back - 1)
+	for day: int in range(send_day + 1, excused_through + cadence + 1):
+		_set_day(day)
+		gs._on_day_started(day)
+		if day % cadence != 0 or problem != "":
+			continue
+		var line: Dictionary = _lines_by_id(gs.audit_log[-1])[gs.STEERING_ID]
+		if day <= excused_through and not line["excused"]:
+			problem = "Day %d audit: still excused while away or back only that morning (back day %d): %s" % [day, back, line]
+		elif day > excused_through and (line["excused"] or not line["violation"]):
+			problem = "Day %d audit: past the grace it is an ordinary overdue: %s" % [day, line]
+	if problem == "" and excused_through <= first_audit:
+		problem = "Setup: the trip must span more than one audit."
 	GameClock.elapsed_days = saved
 	gs.free()
 	return problem

@@ -398,6 +398,7 @@ func _run_audit(day: int) -> void:
 	since.assign(cal_log.slice(_cal_index_at_last_audit))
 	_cal_index_at_last_audit = cal_log.size()
 	# Standards on this pod come back (and are certified) before Vance inspects.
+	# _on_day_started already did this in play; keep it for direct calls (tests).
 	_receive_oirm_returns(day)
 	# Units and standards; a standard away at OIRM is not here to inspect.
 	var audited: Dictionary = {}
@@ -439,7 +440,7 @@ func _run_audit(day: int) -> void:
 		if line["overdue"]:
 			label += ", OVERDUE (due day %d)" % line["due_day"]
 		if line.get("excused", false):
-			label += ", EXCUSED (its standard was at OIRM when it fell due; calibrate before day %d)" % next_audit_day(day)
+			label += ", EXCUSED (its standard was at OIRM when it fell due; calibrate it before the first audit after the standard is back)"
 		if line.get("suspect", false):
 			label += ", SUSPECT CAL (recalled, not redone)"
 		if line.get("waived", false):
@@ -573,19 +574,23 @@ func oirm_courier_days() -> int:
 
 
 ## Units overdue at this audit only because the standard they need was at OIRM
-## on their due day (Ryan, 2026-11-22). Excused at the first audit after they
-## fall due; by the next one they must have a traceable calibration.
+## when they fell due (Ryan, 2026-11-22). Excused at the first audit where they
+## are overdue, and at any audit while the standard is still away or only came
+## back that morning (a courier trip is longer than the audit cadence). After
+## that they need a traceable calibration by the next audit.
 func _excused_units(day: int) -> Dictionary:
 	var excused: Dictionary = {}
 	var cadence: int = maxi(int(_schedule("cadence_days", 5.0)), 1)
 	for id: String in unit_ids():
 		var sensor: DriftingSensor = sensors[id]
 		var due: int = sensor.cal_due_day
-		if not sensor.is_overdue(day) or due < day - cadence:
+		if not sensor.is_overdue(day):
 			continue
 		for trip: Dictionary in oirm_trips:
-			if trip["standard_id"] == sensor.calibrated_by \
-					and int(trip["sent_day"]) <= due and due < int(trip["return_day"]):
+			var back: int = int(trip["return_day"])
+			# Due after it left (the player could calibrate on the send day) and before it came back.
+			if trip["standard_id"] == sensor.calibrated_by and int(trip["sent_day"]) < due and due < back \
+					and (due >= day - cadence or back >= day):
 				excused[id] = true
 				break
 	return excused
@@ -638,6 +643,11 @@ func oirm_calibrate(standard_id: String, day: int) -> Dictionary:
 	var zeroed: Dictionary = sensor.zero(0.0)
 	sensor.cal_due_day = day + sensor.cal_interval_days
 	sensor.last_cal_day = day
+	# Close the trip on the day it actually came back, in case it was late.
+	for i: int in range(oirm_trips.size() - 1, -1, -1):
+		if oirm_trips[i]["standard_id"] == standard_id:
+			oirm_trips[i]["return_day"] = day
+			break
 	var cert: Dictionary = _issue_certificate(standard_id, day, zeroed["as_found"], zeroed["as_left"], false)
 	post_phone("OIRM: %s returned with certificate %s. As-found %s (%s). Due day %d." % [
 		instrument_name(standard_id, true), cert["id"], sensor.format_value(zeroed["as_found"], 3),
