@@ -563,3 +563,9 @@ script = ExtResource("12_slot")
 model_path = "res://assets/voxels/relay_mast.glb"
 model_scale = 0.5
 greybox = [NodePath("../Mast"), NodePath("../Dish/DishMesh")]
+
+[node name="IrrigationJunctionModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -9, 0, 13.2)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/irrigation_junction.glb"
+model_scale = 0.1

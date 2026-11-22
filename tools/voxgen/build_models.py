@@ -669,7 +669,8 @@ CROP_SUNPOD = {"T1": "#3D2919", "G3": "#2E4F22", "G1": "#4C7A34", "G2": "#6FA34B
 
 # Ryan's Pack 3 (2026-11-22): 0.1 m voxels, origin at the footprint center on the ground,
 # palettes as given in his generator script (S there is already SHADOW). Built and turned
-# like the field props. Not placed in any scene yet.
+# like the field props. The farm shows the wilted crop on planted cells; the tarantula is in the
+# dome and the junction in the farm.
 PACK3 = {
     "crop_stage_wilted": ({"T1": "#3D2919", "W1": "#7A6838", "W2": "#544728", "W3": "#9E8B4F",
                            "S": SHADOW}, "crop"),
