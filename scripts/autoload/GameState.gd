@@ -1282,8 +1282,12 @@ func _credibility_after_calibration(record: Dictionary) -> void:
 		return
 	var needed: int = contract_run_needed()
 	var good: bool = record.get("on_time", false) and record.get("traceable", false)
-	if good and not record.get("interval_evidence", false):
-		return  # a repeat within the same interval: neither counts nor breaks the run
+	# A repeat before the unit has run half its interval since its last
+	# traceable calibration neither counts nor breaks the run. (Unlike
+	# interval_evidence, an untraceable adjustment in between doesn't block it.)
+	var interval: int = int(record.get("previous_interval_days", 0))
+	if good and int(record.get("days_in_service", 0)) < ceili(interval / 2.0):
+		return
 	if good:
 		contract_run += 1
 		if contract_run >= needed:
@@ -1307,7 +1311,7 @@ func contract_text() -> String:
 	match contract_state:
 		"active":
 			var standard: String = contract_standard_id()
-			return "OIRM CONTRACT: %d of %d in a row, on time, traceable\nA unit counts again after half its interval\nReward: %s for %s" % [
+			return "OIRM CONTRACT: %d of %d in a row, on time, traceable\nA unit counts again once half its interval has passed\nReward: %s for %s" % [
 				contract_run, contract_run_needed(),
 				_model_name(standard), _contract_price_text(standard)]
 		"complete":

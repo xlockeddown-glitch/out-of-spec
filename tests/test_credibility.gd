@@ -262,10 +262,17 @@ func test_contract_untraceable_restarts_run() -> String:
 	_calibrate_after_interval(gs)
 	var run: int = gs.contract_run
 	var restarted: bool = _phone_has(gs, "OIRM CONTRACT: run restarted (not traceable)")
+	# The next traceable calibration, half an interval or more after the last
+	# one, counts even though an untraceable adjustment came in between.
+	gs.get_sensor(UNIT_STANDARD).cal_due_day = DAY + 100
+	_calibrate_after_interval(gs)
+	var run_after: int = gs.contract_run
 	gs.free()
 	GameClock.elapsed_days = saved
 	if run != 0 or not restarted:
 		return "An on-time calibration that is not traceable must restart the run, got %d." % run
+	if run_after != 1:
+		return "A traceable calibration after an untraceable one must count once half the interval has passed, got %d." % run_after
 	return ""
 
 
