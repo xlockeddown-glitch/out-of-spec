@@ -98,7 +98,13 @@ var _rng := RandomNumberGenerator.new()
 
 
 func _init() -> void:
-	_rng.randomize()
+	_sign = _random_sign()
+
+
+## Restarts this sensor's randomness (drift direction, as-left residuals)
+## from `p_seed`. GameState derives it from the world seed.
+func reseed(p_seed: int) -> void:
+	_rng.seed = p_seed
 	_sign = _random_sign()
 
 
