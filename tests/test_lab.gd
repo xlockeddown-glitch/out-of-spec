@@ -111,6 +111,7 @@ func test_the_biggest_jobs_need_a_large_area() -> String:
 	var gs: GameStateScript = _make_state()
 	var big: Dictionary = _template(gs, "dome1_cabin_transducer")
 	var need: int = gs.lab_area_spaces_needed(str(big.get("area", "")))
+	var none: String = gs.job_area_problem(big)
 	gs.lab_areas["pressure"] = need - 1
 	var small: String = gs.job_area_problem(big)
 	gs.lab_areas["pressure"] = need
@@ -119,6 +120,8 @@ func test_the_biggest_jobs_need_a_large_area() -> String:
 	_done(gs)
 	if big.get("area", "") != "large" or need < 2:
 		return "The cabin transducer job must need a large area, got '%s' (%d spaces)." % [big.get("area", ""), need]
+	if none.find("Needs a LARGE pressure area") < 0 or none.find("in the large lab") < 0:
+		return "With no pressure area, the job must say it needs a large one in the large lab, got '%s'." % none
 	if small.find("Needs a LARGE pressure area") < 0:
 		return "%d pressure spaces must be too small, got '%s'." % [need - 1, small]
 	if large != "" or size_name != "large":

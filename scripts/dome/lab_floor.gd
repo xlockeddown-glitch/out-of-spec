@@ -29,8 +29,8 @@ func _ready() -> void:
 	rebuild()
 
 
-## X of space `index` (0 is the leftmost of `count` spaces drawn). Spaces
-## fill outward from the airlock on each side, so a small lab sits centred.
+## X of space `index` (0 is the leftmost of `count` spaces laid out), split
+## either side of the airlock.
 static func space_x(index: int, count: int) -> float:
 	var left: int = ceili(count / 2.0)
 	if index < left:
@@ -59,7 +59,16 @@ func rebuild() -> void:
 		for i: int in maxi(int(target.get("areas", 0)) - GameState.lab_spaces(), 0):
 			slots.append({ "kind": "building" })
 	for i: int in slots.size():
-		_add_space(slots[i], Vector3(space_x(i, slots.size()), 0.0, BACK_Z))
+		_add_space(slots[i], Vector3(space_x(i, _layout_count(slots.size())), 0.0, BACK_Z))
+
+
+## Spaces are laid out as in the largest lab, so a space never moves as the
+## lab grows: new spaces appear further along the wall.
+func _layout_count(drawn: int) -> int:
+	var most: int = drawn
+	for size: Dictionary in GameState.lab_sizes():
+		most = maxi(most, int(size.get("areas", 0)))
+	return most
 
 
 func _add_space(slot: Dictionary, at: Vector3) -> void:

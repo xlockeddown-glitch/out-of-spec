@@ -455,7 +455,7 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - Sizes: small lab 3 spaces, medium 5 (600 CR + 4 crystal ore, 2 days), large 8 (1500 CR + 8 crystal ore, 3 days). An area of 1 space is SMALL, 2 MEDIUM, 4 LARGE. All [PLACEHOLDER] in data/economy.json.
-- The lab starts small with one space each for angle, humidity and soil moisture (the founding standards), so nothing the player could do before is taken away. Pressure, electrical and temperature jobs now need a bigger lab first.
+- The lab starts small with one space each for angle, humidity and soil moisture (the founding standards), so nothing the player could do before is taken away. Pressure, electrical and temperature jobs now need a space fitted out for them first: grow the lab, or clear a founding space and refit it.
 - Each space a discipline has is one of its jobs in progress at once. This replaces the old limit of 2 jobs in progress overall, so the starting lab can run 3 at once (one per discipline).
 - Jobs that need a big area: the Dome 1 cabin transducer and the survey theodolite need LARGE; the medbay incubator needs MEDIUM. A large area fits only in the large lab: each lab size caps how big one area can get (small lab 1 space, medium lab 3, large lab no cap), so clearing other areas can't skip a lab size.
 - Fitting a free space out is free. Clearing a space (to change the layout) costs 200 CR + 1 crystal ore and the space is down 1 day; it works at any lab size, not just large. A space with a job in progress can't be cleared, and an area can't shrink below the size a job in progress needs.

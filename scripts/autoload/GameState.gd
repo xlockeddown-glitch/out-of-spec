@@ -1807,9 +1807,10 @@ func lab_area_spaces_needed(size_id: String) -> int:
 ## The most spaces one area may have at the lab's size: the lab's largest
 ## area size reaches up to just below the next area size. Growing the lab is
 ## what opens the bigger areas, so clearing other areas can't skip a size.
-func lab_max_area_spaces() -> int:
-	var largest: String = str(lab_size_record().get("largest_area", ""))
-	var limit: int = lab_spaces()
+func lab_max_area_spaces(index: int = -1) -> int:
+	var record: Dictionary = lab_size_record(index)
+	var largest: String = str(record.get("largest_area", ""))
+	var limit: int = maxi(int(record.get("areas", 0)), 0)
 	if largest == "":
 		return limit
 	var need: int = lab_area_spaces_needed(largest)
@@ -1818,6 +1819,17 @@ func lab_max_area_spaces() -> int:
 		if spaces > need:
 			limit = mini(limit, spaces - 1)
 	return maxi(limit, 1)
+
+
+## ", in the large lab" when the lab is too small for an area of `need`
+## spaces, naming the smallest lab size that holds one; else "".
+func _lab_size_for_area_text(need: int) -> String:
+	if lab_max_area_spaces() >= need:
+		return ""
+	for i: int in lab_sizes().size():
+		if lab_max_area_spaces(i) >= need:
+			return ", in the %s" % lab_size_name(i).to_lower()
+	return ""
 
 
 ## The most spaces any one job of `discipline` in progress needs its area to keep.
@@ -1844,13 +1856,13 @@ func jobs_in_progress(discipline: String) -> int:
 func job_area_problem(job: Dictionary) -> String:
 	var discipline: String = str(job.get("discipline", ""))
 	var spaces: int = lab_space(discipline)
-	if spaces <= 0:
-		return "Needs a %s area in the lab: plan one at the dome plan board." % discipline
 	var size_id: String = str(job.get("area", ""))
 	var need: int = lab_area_spaces_needed(size_id) if size_id != "" else 1
+	if spaces <= 0 and need <= 1:
+		return "Needs a %s area in the lab: plan one at the dome plan board." % discipline
 	if spaces < need:
-		return "Needs a %s %s area (%s spaces); yours has %s." % [size_id.to_upper(), discipline,
-			SP811.integer(need), SP811.integer(spaces)]
+		return "Needs a %s %s area (%s spaces%s); yours has %s." % [size_id.to_upper(), discipline,
+			SP811.integer(need), _lab_size_for_area_text(need), SP811.integer(spaces)]
 	var busy: int = jobs_in_progress(discipline)
 	if busy >= spaces:
 		return "Your %s area is full: %s job%s in progress." % [discipline, SP811.integer(busy), "" if busy == 1 else "s"]

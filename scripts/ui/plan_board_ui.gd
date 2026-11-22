@@ -27,7 +27,7 @@ func _ready() -> void:
 	_build()
 	hide()
 	GameState.lab_changed.connect(_on_lab_changed)
-	GameState.jobs_changed.connect(_refresh_if_open)
+	GameState.jobs_changed.connect(_on_lab_changed)
 	GameState.credits_changed.connect(_refresh_if_open.unbind(1))
 	GameState.ore_changed.connect(_refresh_if_open.unbind(1))
 
@@ -85,7 +85,8 @@ func _build() -> void:
 	column.add_child(close_button)
 
 
-## The layout changed (a build finished, or the player acted): an old answer
+## The layout or the jobs changed (a build finished, a job ended, or the
+## player acted): an old answer
 ## on the board no longer holds. The player's own action sets its answer
 ## right after this.
 func _on_lab_changed() -> void:
