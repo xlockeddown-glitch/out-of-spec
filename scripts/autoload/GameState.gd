@@ -23,6 +23,7 @@ enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
 const STEERING_ID: String = "rover_steering_encoder"
 const HYGROMETER_ID: String = "hygrometer"
+const TIRE_ID: String = "rover_tire_pressure"
 const SPECIES_TABLE: StringName = &"tarantula_species"
 const ITEMS_TABLE: StringName = &"items"
 const ECONOMY_TABLE: StringName = &"economy"
@@ -93,6 +94,9 @@ var clean_audit_streak: int = 0
 ## Tier 1 equipment gate: the first audit with zero violations (Q19).
 var tier1_unlocked: bool = false
 var _next_certificate_number: int = 1
+## Standards on the colony: id -> day acquired. Tier 0 from day 0; Tier 1+
+## once bought from Bram (milestone 3a).
+var owned_standards: Dictionary = {}
 
 ## Credits (MegaCorp scrip). Fines come out of this; can go negative.
 var credits: int = 0
@@ -160,6 +164,7 @@ func build_registry() -> void:
 		push_error("GameState: %s/instruments is not an object." % DRIFT_TABLE)
 		return
 	var initial_interval: int = int(_interval_cfg("initial_days", 5.0))
+	owned_standards.clear()
 	for key: Variant in table:
 		var id: String = str(key)
 		if id.begins_with("_"):
@@ -169,6 +174,8 @@ func build_registry() -> void:
 		sensor.cal_interval_days = sensor.initial_interval_days if sensor.initial_interval_days > 0 else initial_interval
 		sensor.cal_due_day = sensor.cal_interval_days
 		sensors[id] = sensor
+		if sensor.role == "standard" and sensor.tier <= 0:
+			owned_standards[id] = 0
 	steering = sensors.get(STEERING_ID)
 	hygrometer = sensors.get(HYGROMETER_ID)
 	_issue_founding_certificates()
@@ -180,14 +187,44 @@ func get_sensor(instrument_id: String) -> DriftingSensor:
 	return sensors.get(instrument_id)
 
 
-## Ids of the instruments Vance audits and the bench calibrates, in data order.
+## Ids of the instruments Vance audits and the bench calibrates, in data order:
+## the units in service, whose standard is on the colony.
 func unit_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for id: String in all_unit_ids():
+		if is_in_service(id):
+			ids.append(id)
+	return ids
+
+
+## Ids of the reference standards on the colony, in data order.
+func standard_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for id: String in all_standard_ids():
+		if owned_standards.has(id):
+			ids.append(id)
+	return ids
+
+
+## Every unit in the data, in service or not.
+func all_unit_ids() -> Array[String]:
 	return _ids_with_role("unit")
 
 
-## Ids of the reference standards, in data order.
-func standard_ids() -> Array[String]:
+## Every standard in the data, owned or not (Bram's catalog included).
+func all_standard_ids() -> Array[String]:
 	return _ids_with_role("standard")
+
+
+## A unit is in service once the standard it is calibrated against is on the
+## colony; a standard once it is owned. Out-of-service instruments don't drift.
+func is_in_service(instrument_id: String) -> bool:
+	var sensor: DriftingSensor = get_sensor(instrument_id)
+	if sensor == null:
+		return false
+	if sensor.role == "standard":
+		return owned_standards.has(instrument_id)
+	return sensor.calibrated_by != "" and owned_standards.has(sensor.calibrated_by)
 
 
 func _ids_with_role(role: String) -> Array[String]:
@@ -238,6 +275,15 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 	if sensor == null:
 		push_warning("GameState.calibrate: unknown instrument '%s'." % instrument_id)
 		return {}
+	if use_standard and sensor.role == "unit" and not is_in_service(instrument_id):
+		return {
+			"instrument_id": instrument_id,
+			"refused": true,
+			"standard_id": sensor.calibrated_by,
+			"tur": 0.0,
+			"reason": ("%s has no standard on the colony yet." % instrument_name(instrument_id, true)
+				if sensor.calibrated_by == "" else "The %s is not on the colony yet." % instrument_name(sensor.calibrated_by, true)),
+		}
 	var budget: Dictionary = calibration_budget(instrument_id) if use_standard else {}
 	if budget.get("refused", false):
 		return {
@@ -263,7 +309,9 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 	# Without a standard the unit is zeroed against its own idea of zero, which
 	# still carries the offset from its last bench calibration: the as-found is
 	# the observed error and a bad standard stays hidden (Ryan, 2026-11-22).
-	var zeroed: Dictionary = sensor.zero(standard.error if standard else sensor.reference_offset)
+	# A standard of another quantity carries its error through the chain's
+	# sensitivity (FM-3 volts into thermometer degrees Celsius, section 1.5).
+	var zeroed: Dictionary = sensor.zero(standard.error * sensor.standard_sensitivity if standard else sensor.reference_offset)
 	var as_found: float = zeroed["as_found"]
 	var as_left: float = zeroed["as_left"]
 	var as_found_ok: bool = absf(as_found) <= sensor.mpe
@@ -352,7 +400,8 @@ func calibrate_at_bench(instrument_id: String) -> Dictionary:
 
 func _on_time_advanced(delta_days: float) -> void:
 	for id: Variant in sensors:
-		(sensors[id] as DriftingSensor).advance_days(delta_days)
+		if is_in_service(str(id)):
+			(sensors[id] as DriftingSensor).advance_days(delta_days)
 	if drop_pod_present and GameClock.elapsed_days >= _drop_pod_departure_at:
 		drop_pod_present = false
 		drop_pod_changed.emit(false)
@@ -540,14 +589,17 @@ func _issue_founding_certificates() -> void:
 		_issue_certificate(id, 0, null, null, true)
 
 
-## Records a new OIRM certificate for `standard_id` from its current due day.
-## as_found / as_left are null on a founding certificate (no measurement on file).
-func _issue_certificate(standard_id: String, day: int, as_found: Variant, as_left: Variant, founding: bool) -> Dictionary:
+## Records a new certificate for `standard_id` from its current due day: OIRM's,
+## or with `issuer` / `prefix` a maker's certificate traceable to OIRM.
+## as_found / as_left are null when no measurement is on file (founding stock,
+## or the as-found of a new instrument).
+func _issue_certificate(standard_id: String, day: int, as_found: Variant, as_left: Variant, founding: bool,
+		issuer: String = "OIRM", prefix: String = "OIRM") -> Dictionary:
 	var sensor: DriftingSensor = sensors[standard_id]
 	var cert: Dictionary = {
-		"id": "OIRM-%04d" % _next_certificate_number,
+		"id": "%s-%04d" % [prefix, _next_certificate_number],
 		"standard_id": standard_id,
-		"issuer": "OIRM",
+		"issuer": issuer,
 		"day": day,
 		"due_day": sensor.cal_due_day,
 		"as_found": as_found,
@@ -615,6 +667,8 @@ func send_to_oirm(standard_id: String) -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	if sensor == null or sensor.role != "standard":
 		return { "ok": false, "reason": "Only reference standards go to OIRM." }
+	if not owned_standards.has(standard_id):
+		return { "ok": false, "reason": "The %s is not on the colony." % instrument_name(standard_id, true) }
 	if at_oirm.has(standard_id):
 		return { "ok": false, "reason": "Already at OIRM until day %d." % at_oirm[standard_id] }
 	# No pod on the pad: it goes by courier for a surcharge (Ryan, 2026-11-22).
@@ -688,7 +742,10 @@ func recall(standard_id: String, standard_error: float, since_day: int) -> Array
 			continue
 		if int(record["day"]) < since_day or not record.get("traceable", false):
 			continue
-		var corrected: float = float(record["as_found"]) + standard_error
+		# The standard's error in the unit's own quantity (section 1.5).
+		var instrument: DriftingSensor = get_sensor(record["instrument_id"])
+		var carried: float = standard_error * (instrument.standard_sensitivity if instrument else 1.0)
+		var corrected: float = float(record["as_found"]) + carried
 		var rejudged: String = CalUncertainty.classify(corrected, record["mpe"], record["acceptance_limit"])
 		if rejudged == record["result"]:
 			continue
@@ -696,9 +753,8 @@ func recall(standard_id: String, standard_error: float, since_day: int) -> Array
 		record["suspect_result"] = rejudged
 		record["recalled_by"] = standard_id
 		flagged.append(record)
-		var instrument: DriftingSensor = get_sensor(record["instrument_id"])
 		if instrument and instrument.role == "standard":
-			flagged.append_array(recall(record["instrument_id"], standard_error, int(record["day"])))
+			flagged.append_array(recall(record["instrument_id"], carried, int(record["day"])))
 		elif is_same(_last_traceable_record(record["instrument_id"]), record):
 			# A later good calibration already superseded an older suspect one.
 			suspect_units[record["instrument_id"]] = today
@@ -722,7 +778,9 @@ func traceability_chain(instrument_id: String) -> Dictionary:
 			return { "traceable": false, "text": "%s: no OIRM certificate" % name }
 		if sensor.is_overdue(today):
 			return { "traceable": false, "text": "%s ← %s lapsed (due day %d)" % [name, cert["id"], cert["due_day"]] }
-		return { "traceable": true, "text": "%s ← %s (due day %d) ← OIRM" % [name, cert["id"], cert["due_day"]] }
+		# A maker's certificate traces through the maker's own lab to OIRM.
+		var via: String = "" if str(cert.get("issuer", "OIRM")) == "OIRM" else " ← " + str(cert["issuer"])
+		return { "traceable": true, "text": "%s ← %s (due day %d)%s ← OIRM" % [name, cert["id"], cert["due_day"], via] }
 	var record: Dictionary = _last_traceable_record(instrument_id)
 	if record.is_empty():
 		return { "traceable": false, "text": "%s: no traceable calibration on record" % name }
@@ -783,6 +841,73 @@ func buy_wide_treads() -> String:
 	ore_changed.emit(crystal_ore)
 	upgrades_changed.emit()
 	post_phone("BRAM: Treads are on. Steering drift per meter is down %d %%. Don't till any boulders." % roundi((1.0 - mult) * 100.0))
+	return ""
+
+
+## Meters driven also wear the tire gauge, once it is in service.
+func add_tire_usage(meters: float) -> void:
+	if is_in_service(TIRE_ID):
+		get_sensor(TIRE_ID).add_usage(meters)
+
+
+## Tier 1 standards Bram stocks, in data order (owned ones included).
+func bram_catalog() -> Array[String]:
+	var ids: Array[String] = []
+	for id: String in all_standard_ids():
+		if (sensors[id] as DriftingSensor).tier == 1:
+			ids.append(id)
+	return ids
+
+
+## "250 CR + 2 crystal ore" for a standard's price.
+func standard_price_text(standard_id: String) -> String:
+	var sensor: DriftingSensor = get_sensor(standard_id)
+	if sensor == null:
+		return ""
+	return "%s CR + %d crystal ore" % [SP811.integer(sensor.price_credits), sensor.price_ore]
+
+
+## Buys a Tier 1 standard from Bram (section 1.7). Returns "" on success, or
+## the reason it can't happen. It arrives with a maker's certificate traceable
+## to OIRM, valid for its first interval, and puts the units it calibrates in
+## service (due one interval from today, with no calibration on record yet).
+func buy_standard(standard_id: String) -> String:
+	var sensor: DriftingSensor = get_sensor(standard_id)
+	if sensor == null or sensor.role != "standard" or sensor.tier != 1:
+		return "Bram doesn't stock that."
+	if owned_standards.has(standard_id):
+		return "The %s is already on the colony." % sensor.short_name
+	if not tier1_unlocked:
+		return "Tier 1 equipment needs a clean audit on file first."
+	if credits < sensor.price_credits or crystal_ore < sensor.price_ore:
+		return "Costs %s; you have %s CR and %d crystal ore." % [
+			standard_price_text(standard_id), SP811.integer(credits), crystal_ore]
+	add_credits(-sensor.price_credits)
+	crystal_ore -= sensor.price_ore
+	ore_changed.emit(crystal_ore)
+	var today: int = GameClock.get_day_index()
+	owned_standards[standard_id] = today
+	# New from the maker: adjusted against their own OIRM-traceable reference.
+	var zeroed: Dictionary = sensor.zero(0.0)
+	sensor.cal_interval_days = sensor.initial_interval_days if sensor.initial_interval_days > 0 \
+		else int(_interval_cfg("initial_days", 5.0))
+	sensor.cal_due_day = today + sensor.cal_interval_days
+	sensor.last_cal_day = today
+	var prefix: String = sensor.certificate_prefix if sensor.certificate_prefix != "" else "MKR"
+	var issuer: String = sensor.maker if sensor.maker != "" else "the maker"
+	var cert: Dictionary = _issue_certificate(standard_id, today, null, zeroed["as_left"], false, issuer, prefix)
+	var units: PackedStringArray = []
+	for id: String in all_unit_ids():
+		var unit: DriftingSensor = sensors[id]
+		if unit.calibrated_by != standard_id:
+			continue
+		unit.cal_due_day = today + unit.cal_interval_days
+		units.append(_mid_sentence(unit.short_name))
+	post_phone("BRAM: One %s, still in the crate. Certificate %s from %s, good to day %d. %s" % [
+		sensor.short_name, cert["id"], issuer, cert["due_day"],
+		("Calibrate the %s against it before Vance's next visit." % " and the ".join(units)) if not units.is_empty() else ""])
+	upgrades_changed.emit()
+	oirm_changed.emit()
 	return ""
 
 

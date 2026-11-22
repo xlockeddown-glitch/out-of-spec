@@ -31,12 +31,13 @@ func _ready() -> void:
 	GameState.silk_changed.connect(_on_silk_changed)
 	GameState.relay_changed.connect(_on_relay_changed)
 	GameState.phone_message.connect(_hud.push_log)
-	GameState.credits_changed.connect(_hud.set_credits)
+	GameState.credits_changed.connect(_on_credits_changed)
 	GameState.ore_changed.connect(_on_ore_changed)
 	_rover.ore_mined.connect(_on_ore_mined)
 	_bram_bay.rover_entered.connect(_on_rover_entered_bay)
 	_bram_bay.rover_exited.connect(_hud.hide_bram)
 	_hud.trade_pressed.connect(_try_trade)
+	_hud.buy_standard_pressed.connect(_try_buy_standard)
 
 	# Replay the persistent phone log first, so fresh SYS lines land on top of it.
 	for line: String in GameState.phone_log.slice(-LOG_REPLAY_LINES):
@@ -111,10 +112,23 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"interact") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_trade()
+	elif event is InputEventKey and event.pressed and not event.echo and _bram_bay.rover_inside:
+		# [1], [2], ... buy Bram's Tier 1 standards in catalog order.
+		var index: int = (event as InputEventKey).keycode - KEY_1
+		var catalog: Array[String] = GameState.bram_catalog()
+		if GameState.tier1_unlocked and index >= 0 and index < catalog.size():
+			get_viewport().set_input_as_handled()
+			_try_buy_standard(catalog[index])
 
 
 func _on_ore_mined(_fissure_id: StringName) -> void:
 	_hud.push_log("Drilled 1 crystal ore. Carrying %d." % GameState.crystal_ore)
+
+
+func _on_credits_changed(amount: int) -> void:
+	_hud.set_credits(amount)
+	if _bram_bay.rover_inside:
+		_refresh_bram()
 
 
 func _on_ore_changed(ore: int) -> void:
@@ -136,6 +150,31 @@ func _on_rover_entered_bay() -> void:
 
 func _refresh_bram() -> void:
 	_hud.show_bram(_bram_line, GameState.treads_ore_cost(), GameState.crystal_ore, GameState.has_wide_treads)
+	var offers: Array[Dictionary] = []
+	if GameState.tier1_unlocked:
+		var catalog: Array[String] = GameState.bram_catalog()
+		for i: int in catalog.size():
+			var id: String = catalog[i]
+			var sensor: DriftingSensor = GameState.get_sensor(id)
+			var owned: bool = GameState.owned_standards.has(id)
+			offers.append({
+				"id": id,
+				"text": ("%s: ON THE COLONY" % sensor.short_name.to_upper()) if owned
+					else "BUY %s: %s  [%d]" % [sensor.short_name.to_upper(), GameState.standard_price_text(id).to_upper(), i + 1],
+				"disabled": owned or GameState.credits < sensor.price_credits or GameState.crystal_ore < sensor.price_ore,
+			})
+	_hud.show_standards(offers, "" if GameState.tier1_unlocked else "Tier 1 standards: pass one audit clean and Bram will sell them.")
+
+
+func _try_buy_standard(standard_id: String) -> void:
+	if not _bram_bay.rover_inside:
+		return
+	var problem: String = GameState.buy_standard(standard_id)
+	if problem.is_empty():
+		_bram_line = "Handle it like it's worth more than your tractor. It nearly is."
+	else:
+		_hud.push_log("BRAM: " + problem)
+	_refresh_bram()
 
 
 func _try_trade() -> void:

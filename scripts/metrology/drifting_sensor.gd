@@ -48,6 +48,18 @@ var certificate_uncertainty: float = 0.0
 var certificate_k: float = 2.0
 ## Starting calibration interval in days (0 = the global initial interval).
 var initial_interval_days: int = 0
+## Standards only: 0 = owned from the start; 1+ = bought from Bram (section 1.7).
+var tier: int = 0
+## Units only: this unit's error per unit of its standard's error, when the two
+## measure different quantities (FM-3 volts into thermometer degrees Celsius).
+var standard_sensitivity: float = 1.0
+## Decimals readings show at least (-1 = the unit's default).
+var display_decimals: int = -1
+## Standards only: Bram's price, and who makes it (prefix for its certificates).
+var price_credits: int = 0
+var price_ore: int = 0
+var maker: String = ""
+var certificate_prefix: String = ""
 ## Maximum permissible error, in `error_unit`.
 var mpe: float = 1.0
 var acceptance_ratio: float = 0.8
@@ -121,6 +133,13 @@ static func from_config(p_instrument_id: String, p_max_error: float = INF) -> Dr
 	sensor.certificate_uncertainty = DataManager.get_number(CONFIG_TABLE, base + "/certificate_uncertainty", 0.0)
 	sensor.certificate_k = DataManager.get_number(CONFIG_TABLE, base + "/certificate_k", 2.0)
 	sensor.initial_interval_days = int(DataManager.get_number(CONFIG_TABLE, base + "/initial_interval_days", 0.0))
+	sensor.tier = int(DataManager.get_number(CONFIG_TABLE, base + "/tier", 0.0))
+	sensor.standard_sensitivity = DataManager.get_number(CONFIG_TABLE, base + "/standard_sensitivity", 1.0)
+	sensor.display_decimals = int(DataManager.get_number(CONFIG_TABLE, base + "/display_decimals", -1.0))
+	sensor.price_credits = int(DataManager.get_number(CONFIG_TABLE, base + "/price_credits", 0.0))
+	sensor.price_ore = int(DataManager.get_number(CONFIG_TABLE, base + "/price_ore", 0.0))
+	sensor.maker = str(DataManager.get_value(CONFIG_TABLE, base + "/maker", ""))
+	sensor.certificate_prefix = str(DataManager.get_value(CONFIG_TABLE, base + "/certificate_prefix", ""))
 	sensor.acceptance_ratio = DataManager.get_number(
 		CONFIG_TABLE, "guardband/green/max_error_ratio_inclusive", sensor.acceptance_ratio)
 	return sensor
@@ -187,15 +206,25 @@ func band_for(value: float) -> Band:
 ## Human-readable signed value in this instrument's unit, per NIST SP 811:
 ## U+2212 minus, no space before the plane-angle degree, a space before %, and
 ## no "RH" qualifier on the % symbol (use quantity_name() in the label instead).
-## `decimals` < 0 uses the unit's default (2, or 3 for other units).
+## `decimals` < 0 uses the unit's default (2, or 3 for other units);
+## `display_decimals` from the data raises it where the unit needs more digits.
+## Celsius takes a space ("0.30 °C"); fractional frequency shows as "× 10⁻⁶".
 func format_value(value: float, decimals: int = -1) -> String:
+	var places: int = decimals if decimals >= 0 else (3 if _is_plain_unit() else 2)
+	if display_decimals >= 0:
+		places = maxi(places, display_decimals)
+	var number: String = SP811.signed(value, places)
 	match error_unit:
 		"degrees":
-			return SP811.signed(value, decimals if decimals >= 0 else 2) + "°"
+			return number + "°"
 		"percentage_points_rh":
-			return SP811.signed(value, decimals if decimals >= 0 else 2) + " %"
+			return number + " %"
+		"degC":
+			return number + " °C"
+		"fractional_e6":
+			return number + " × 10⁻⁶"
 		_:
-			return "%s %s" % [SP811.signed(value, decimals if decimals >= 0 else 3), error_unit]
+			return "%s %s" % [number, error_unit]
 
 
 ## The quantity the error is in, for labels ("relative humidity").
@@ -205,8 +234,29 @@ func quantity_name() -> String:
 			return "angle"
 		"percentage_points_rh":
 			return "relative humidity"
+		"kPa":
+			return "pressure"
+		"degC":
+			return "temperature"
+		"V":
+			return "DC voltage"
+		"fractional_e6":
+			return "fractional frequency"
 		_:
 			return error_unit
+
+
+## quantity_name() in title case for headings; acronyms stay ("DC Voltage").
+func quantity_title() -> String:
+	var words: PackedStringArray = quantity_name().split(" ")
+	for i: int in words.size():
+		if words[i] != words[i].to_upper():
+			words[i] = words[i].substr(0, 1).to_upper() + words[i].substr(1)
+	return " ".join(words)
+
+
+func _is_plain_unit() -> bool:
+	return not error_unit in ["degrees", "percentage_points_rh", "degC", "fractional_e6"]
 
 
 static func band_label(band: int) -> String:
