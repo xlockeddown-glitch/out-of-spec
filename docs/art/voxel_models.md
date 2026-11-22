@@ -32,7 +32,7 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
   - the rover's cab readout
   - the relay's spool core
 - **Emissive voxels:** put each glowing part in its own MagicaVoxel object named `emit_<part>`, for example `emit_headlights`. `ModelSlot` makes any mesh named `emit_*` glow in its own colors, because MagicaVoxel exports don't carry emission into Godot. Glow parts are emission only (black albedo, no specular, so scene lights don't tint them) at `ModelSlot.EMIT_ENERGY` (1.2). Amber clips toward yellow under the Filmic tonemap long before teal does, so an amber lamp can get a per-part value through the slot's `emit_energy_overrides`. So far only the dome pendants and the terrarium heat lamp have one (0.5, tuned by eye); the farm's amber lamps (tractor headlights and roof lights, work lamp, drop-pod hatch, AUD-1T eye, relay bay lamp) still use 1.2 and haven't been tuned.
-- **Readability at about 40 m:** keep silhouette features at least 2 voxels thick. Where space allows, give lit voxels a 1-voxel `#1D222B` border (from answer A). The generated first pass doesn't yet.
+- **Readability at about 40 m:** keep silhouette features at least 2 voxels thick. Where space allows, give lit voxels a 1-voxel `#1D222B` border (from answer A). The generator does this for every model (`Model.border_lit` in `tools/voxgen/voxlib.py`): it recolors the visible, non-lit, non-glass voxels next to each `emit_*` voxel (all 26 neighbors), keeping each voxel's part. It never adds voxels, so silhouettes don't change, and a free-standing lit voxel (nothing solid beside it) gets no border. Hand edits to a `.vox` should keep the border.
 
 ## 1. Tractor (`tractor.glb`, `tractor_wide.glb`)
 

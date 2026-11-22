@@ -704,12 +704,13 @@ def main() -> None:
     (OUT / "source").mkdir(parents=True, exist_ok=True)
     for build, voxel_m in MODELS:
         m = build()
+        bordered = m.border_lit(SHADOW)  # answer A: lit voxels get a #1D222B border
         m.write_glb(OUT / f"{m.name}.glb")
         m.write_vox(OUT / "source" / f"{m.name}.vox")
         w, h, d = m.size()
         print(f"{m.name:13} {w:3} x {h:3} x {d:3} voxels = "
               f"{w * voxel_m:.1f} m x {h * voxel_m:.1f} m x {d * voxel_m:.1f} m, "
-              f"{len(m.voxels):5} voxels, {len(m.colors()):2} colors")
+              f"{len(m.voxels):5} voxels, {len(m.colors()):2} colors, {bordered:3} bordered")
 
 
 if __name__ == "__main__":

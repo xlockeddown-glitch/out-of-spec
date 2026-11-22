@@ -91,6 +91,43 @@ class Model:
                 for dz in range(thick):
                     self.put(part, math.floor(p[0]) + dx, math.floor(p[1]), math.floor(p[2]) + dz, color)
 
+    def border_lit(self, color: str) -> int:
+        """Give lit (emit_*) voxels a 1-voxel border in `color`, where space allows.
+
+        Recolors the visible, non-lit, non-glass voxels in each lit voxel's
+        26-neighborhood; it never adds or removes voxels, so silhouettes are
+        unchanged. A lit voxel with no solid neighbors (a free-standing beacon)
+        gets no border. Returns the number of voxels recolored.
+        """
+        def lit(pos: tuple[int, int, int]) -> bool:
+            v = self.voxels.get(pos)
+            return v is not None and v[0].startswith("emit_")
+
+        def exposed(pos: tuple[int, int, int]) -> bool:
+            x, y, z = pos
+            for d in ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)):
+                v = self.voxels.get((x + d[0], y + d[1], z + d[2]))
+                if v is None or v[0] in self.glass_parts:
+                    return True
+            return False
+
+        targets: set[tuple[int, int, int]] = set()
+        for (x, y, z), (part, _) in self.voxels.items():
+            if not part.startswith("emit_"):
+                continue
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        n = (x + dx, y + dy, z + dz)
+                        v = self.voxels.get(n)
+                        if v is None or lit(n) or v[0] in self.glass_parts:
+                            continue
+                        if exposed(n):
+                            targets.add(n)
+        for n in targets:
+            self.voxels[n] = (self.voxels[n][0], color.upper())
+        return len(targets)
+
     # --- stats ----------------------------------------------------------
     def bounds(self) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
         arr = np.array(list(self.voxels.keys()))
