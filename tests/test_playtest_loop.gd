@@ -14,12 +14,7 @@ const DRIFT: StringName = &"sensor_drift_config"
 
 func _make_state() -> GameStateScript:
 	var gs: GameStateScript = GameStateScript.new()
-	gs.steering = DriftingSensor.from_config(gs.STEERING_ID)
-	gs.hygrometer = DriftingSensor.from_config(gs.HYGROMETER_ID)
-	var initial: int = int(_cfg("initial_days"))
-	for sensor: DriftingSensor in [gs.steering, gs.hygrometer]:
-		sensor.cal_interval_days = initial
-		sensor.cal_due_day = initial
+	gs.build_registry()
 	return gs
 
 
@@ -142,7 +137,10 @@ func test_first_failed_audit_is_a_warning_then_fines() -> String:
 	if cadence <= 0:
 		gs.free()
 		return "sensor_drift_config is missing a positive audit_schedule/cadence_days."
-	gs.hygrometer.cal_due_day = 4 * cadence  # keep the hygrometer out of it
+	# Keep every other unit out of it.
+	for id: String in gs.unit_ids():
+		if id != gs.STEERING_ID:
+			gs.get_sensor(id).cal_due_day = 4 * cadence
 	gs.credits = int(DataManager.get_number(&"economy", "starting_credits", 0.0))
 
 	# First audit: steering out of tolerance -> one-time warning, no fine.

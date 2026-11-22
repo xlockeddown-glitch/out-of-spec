@@ -27,10 +27,6 @@ const ECONOMY_TABLE: StringName = &"economy"
 const DRIFT_TABLE: StringName = &"sensor_drift_config"
 const DISPATCH_TABLE: StringName = &"dialogue_dispatches"
 const PHONE_LOG_MAX: int = 40
-const INSTRUMENT_NAMES: Dictionary = {
-	"rover_steering_encoder": "Steering",
-	"hygrometer": "Hygrometer",
-}
 
 # --- Playtest tuning (Week 2 board: keep the loop under two minutes) ---------
 ## Seconds for a full molt while the hygrometer stays within MPE.
@@ -48,6 +44,10 @@ const HYGROMETER_START_ERROR_RATIO: float = 1.12
 ## Clamp on |error| as a multiple of MPE.
 const MAX_ERROR_MPE_MULTIPLE: float = 3.0
 
+## Every instrument in sensor_drift_config/instruments, units and standards,
+## in data order: instrument_id -> DriftingSensor. Built by build_registry().
+var sensors: Dictionary = {}
+## Shortcuts into `sensors` for the scenes that read these two directly.
 var steering: DriftingSensor
 var hygrometer: DriftingSensor
 
@@ -100,17 +100,10 @@ var tilled_cells: Dictionary = {}
 
 
 func _ready() -> void:
-	steering = DriftingSensor.from_config(STEERING_ID)
-	steering.max_error = steering.mpe * MAX_ERROR_MPE_MULTIPLE
-	hygrometer = DriftingSensor.from_config(HYGROMETER_ID)
-	hygrometer.max_error = hygrometer.mpe * MAX_ERROR_MPE_MULTIPLE
+	build_registry()
+	# The hygrometer's sticker already expired (due day 0), so it is overdue
+	# and out of tolerance until calibrated; everything else starts in date.
 	hygrometer.error = hygrometer.mpe * HYGROMETER_START_ERROR_RATIO
-	# Starting calibrations: steering is in date; the hygrometer's sticker
-	# already expired (due day 0), so it is overdue until calibrated.
-	var initial_interval: int = int(_interval_cfg("initial_days", 5.0))
-	for sensor: DriftingSensor in [steering, hygrometer]:
-		sensor.cal_interval_days = initial_interval
-	steering.cal_due_day = initial_interval
 	hygrometer.cal_due_day = 0
 	GameClock.time_advanced.connect(_on_time_advanced)
 	GameClock.day_started.connect(_on_day_started)
@@ -132,40 +125,121 @@ func _process(delta: float) -> void:
 
 # --- Instruments --------------------------------------------------------------
 
+## (Re)builds `sensors` from sensor_drift_config/instruments. Each sensor
+## starts in date with its own initial interval (standards) or the global one.
+## Called from _ready(); tests call it on a GameState that is not in the tree.
+func build_registry() -> void:
+	sensors.clear()
+	var table: Variant = DataManager.get_value(DRIFT_TABLE, "instruments", {})
+	if typeof(table) != TYPE_DICTIONARY:
+		push_error("GameState: %s/instruments is not an object." % DRIFT_TABLE)
+		return
+	var initial_interval: int = int(_interval_cfg("initial_days", 5.0))
+	for key: Variant in table:
+		var id: String = str(key)
+		if id.begins_with("_"):
+			continue
+		var sensor: DriftingSensor = DriftingSensor.from_config(id)
+		sensor.max_error = sensor.mpe * MAX_ERROR_MPE_MULTIPLE
+		sensor.cal_interval_days = sensor.initial_interval_days if sensor.initial_interval_days > 0 else initial_interval
+		sensor.cal_due_day = sensor.cal_interval_days
+		sensors[id] = sensor
+	steering = sensors.get(STEERING_ID)
+	hygrometer = sensors.get(HYGROMETER_ID)
+	if steering == null or hygrometer == null:
+		push_error("GameState: %s needs %s and %s." % [DRIFT_TABLE, STEERING_ID, HYGROMETER_ID])
+
+
 func get_sensor(instrument_id: String) -> DriftingSensor:
-	match instrument_id:
-		STEERING_ID:
-			return steering
-		HYGROMETER_ID:
-			return hygrometer
-	return null
+	return sensors.get(instrument_id)
 
 
-## Zeroes an instrument and stores the record. Same path for the bench and the
-## phone's remote ZERO STEERING, so every calibration lands in the log.
-func calibrate(instrument_id: String, performed_by: String = "You") -> Dictionary:
+## Ids of the instruments Vance audits and the bench calibrates, in data order.
+func unit_ids() -> Array[String]:
+	return _ids_with_role("unit")
+
+
+## Ids of the reference standards, in data order.
+func standard_ids() -> Array[String]:
+	return _ids_with_role("standard")
+
+
+func _ids_with_role(role: String) -> Array[String]:
+	var ids: Array[String] = []
+	for id: Variant in sensors:
+		if (sensors[id] as DriftingSensor).role == role:
+			ids.append(str(id))
+	return ids
+
+
+## Short name for phone lines ("Steering"), or the full bench name.
+func instrument_name(instrument_id: String, full: bool = false) -> String:
+	var sensor: DriftingSensor = get_sensor(instrument_id)
+	if sensor == null:
+		return instrument_id
+	return sensor.display_name if full else sensor.short_name
+
+
+## Uncertainty budget for calibrating `instrument_id` against its standard
+## right now (see CalUncertainty.budget). Empty if it has no standard.
+func calibration_budget(instrument_id: String) -> Dictionary:
+	var sensor: DriftingSensor = get_sensor(instrument_id)
+	if sensor == null or sensor.calibrated_by == "":
+		return {}
+	var standard: DriftingSensor = get_sensor(sensor.calibrated_by)
+	if standard == null:
+		push_warning("GameState: %s names unknown standard '%s'." % [instrument_id, sensor.calibrated_by])
+		return {}
+	return CalUncertainty.budget(sensor, standard)
+
+
+## Zeroes an instrument and stores the record. Same path for the bench, the
+## manager's grace calibration and the phone's remote ZERO STEERING, so every
+## calibration lands in the log.
+##
+## With `use_standard` the unit is compared against its standard: the record
+## gets the standard, U, TUR, acceptance limit and a pass / indeterminate /
+## fail result, and the standard's hidden error is carried into the unit. A
+## TUR under the floor refuses the calibration: nothing changes and the
+## returned dictionary has "refused": true and a "reason". Without a standard
+## (the remote zero) the result is plain pass / fail against the MPE.
+func calibrate(instrument_id: String, performed_by: String = "You", use_standard: bool = true) -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(instrument_id)
 	if sensor == null:
 		push_warning("GameState.calibrate: unknown instrument '%s'." % instrument_id)
 		return {}
+	var budget: Dictionary = calibration_budget(instrument_id) if use_standard else {}
+	if budget.get("refused", false):
+		return {
+			"instrument_id": instrument_id,
+			"refused": true,
+			"standard_id": budget["standard_id"],
+			"tur": budget["tur"],
+			"reason": "TUR %s:1 is under the %s:1 floor. The standard is not good enough for this instrument." % [
+				SP811.number(budget["tur"], 1), SP811.number(CalUncertainty.tur_floor(), 0)],
+		}
+	var standard: DriftingSensor = get_sensor(budget["standard_id"]) if not budget.is_empty() else null
 	var today: int = GameClock.get_day_index()
 	var on_time: bool = not sensor.is_overdue(today)
-	var result: Dictionary = sensor.zero()
-	var as_found: float = result["as_found"]
-	var as_left: float = result["as_left"]
+	var zeroed: Dictionary = sensor.zero(standard.error if standard else 0.0)
+	var as_found: float = zeroed["as_found"]
+	var as_left: float = zeroed["as_left"]
 	var as_found_ok: bool = absf(as_found) <= sensor.mpe
+	var limit: float = budget.get("acceptance_limit", sensor.mpe)
+	var result: String = CalUncertainty.classify(as_found, sensor.mpe, limit)
 	# Interval adjustment: a failed as-found brings the next calibration
 	# sooner; an on-time pass earns a longer interval; a late pass keeps it.
+	# An indeterminate result counts as an on-time pass that does not lengthen.
 	# A pass only counts as interval evidence if the instrument has run at
 	# least half its interval since the last calibration, so re-calibrating
 	# the same day can't farm longer intervals or erase a shortened one.
 	var previous_interval: int = sensor.cal_interval_days
 	var days_in_service: int = today - sensor.last_cal_day if sensor.last_cal_day >= 0 else previous_interval
 	var enough_service: bool = days_in_service >= ceili(previous_interval / 2.0)
-	if not as_found_ok:
+	if result == CalUncertainty.FAIL:
 		sensor.cal_interval_days = maxi(int(_interval_cfg("min_days", 2.0)),
 			previous_interval - int(_interval_cfg("shorten_days", 2.0)))
-	elif on_time and enough_service:
+	elif result == CalUncertainty.PASS and on_time and enough_service:
 		sensor.cal_interval_days = mini(int(_interval_cfg("max_days", 15.0)),
 			previous_interval + int(_interval_cfg("lengthen_days", 2.0)))
 	sensor.cal_due_day = today + sensor.cal_interval_days
@@ -187,6 +261,16 @@ func calibrate(instrument_id: String, performed_by: String = "You") -> Dictionar
 		"previous_interval_days": previous_interval,
 		"interval_days": sensor.cal_interval_days,
 		"due_day": sensor.cal_due_day,
+		# "" and null when no standard was used (the remote zero).
+		"standard_id": budget.get("standard_id", ""),
+		"standard_uncertainty": budget.get("expanded_uncertainty"),
+		"tur": budget.get("tur"),
+		"acceptance_limit": limit,
+		"result": result,
+		"traceable": standard != null,
+		"standard_overdue": standard.is_overdue(today) if standard else false,
+		# Set by a recall (milestone 2) if the standard is later found out of tolerance.
+		"suspect": false,
 	}
 	cal_log.append(record)
 	last_cal_records[instrument_id] = record
@@ -194,9 +278,23 @@ func calibrate(instrument_id: String, performed_by: String = "You") -> Dictionar
 	return record
 
 
+## The player's bench calibration: calibrate() against the standard, then the
+## bench time passes on the game clock (instruments keep drifting meanwhile).
+## The record gains "bench_minutes". A refused calibration takes no time.
+func calibrate_at_bench(instrument_id: String) -> Dictionary:
+	var record: Dictionary = calibrate(instrument_id, "You", true)
+	if record.is_empty() or record.get("refused", false):
+		return record
+	var minutes: float = get_sensor(instrument_id).bench_minutes
+	record["bench_minutes"] = minutes
+	if minutes > 0.0:
+		GameClock.advance(minutes / 1440.0)
+	return record
+
+
 func _on_time_advanced(delta_days: float) -> void:
-	steering.advance_days(delta_days)
-	hygrometer.advance_days(delta_days)
+	for id: Variant in sensors:
+		(sensors[id] as DriftingSensor).advance_days(delta_days)
 	if drop_pod_present and GameClock.elapsed_days >= _drop_pod_departure_at:
 		drop_pod_present = false
 		drop_pod_changed.emit(false)
@@ -239,8 +337,11 @@ func _run_audit(day: int) -> void:
 	var since: Array[Dictionary] = []
 	since.assign(cal_log.slice(_cal_index_at_last_audit))
 	_cal_index_at_last_audit = cal_log.size()
-	var sensors: Dictionary = { STEERING_ID: steering, HYGROMETER_ID: hygrometer }
-	var report: Dictionary = AuditEngine.evaluate(day, sensors, offence_counts, since)
+	# Standards are not audited until OIRM certificates land (milestone 2).
+	var audited: Dictionary = {}
+	for id: String in unit_ids():
+		audited[id] = sensors[id]
+	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since)
 
 	if not report["passed"] and not audit_grace_used:
 		_apply_audit_grace(report)
@@ -261,7 +362,7 @@ func _run_audit(day: int) -> void:
 		var sensor: DriftingSensor = get_sensor(line["instrument_id"])
 		# Three decimals so 1.004 x MPE doesn't read as "1.00 ... OUT OF TOLERANCE".
 		var label: String = "%s %s (%s × MPE) %s" % [
-			INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"]),
+			instrument_name(line["instrument_id"]),
 			sensor.format_value(line["as_found"]), SP811.number(line["ratio"], 3), DriftingSensor.band_label(line["band"])]
 		if line["overdue"]:
 			label += ", OVERDUE (due day %d)" % line["due_day"]
@@ -300,7 +401,7 @@ func _apply_audit_grace(report: Dictionary) -> void:
 			calibrate(line["instrument_id"], "Manager")
 			line["fine"] = 0
 			line["waived"] = true
-			names.append(str(INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"])).to_lower())
+			names.append(instrument_name(line["instrument_id"]).to_lower())
 	report["total_fine"] = 0
 	report["warning"] = true
 	report["waived_names"] = " and the ".join(names).insert(0, "the ")

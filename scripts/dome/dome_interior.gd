@@ -112,7 +112,7 @@ func _on_audit_completed(report: Dictionary) -> void:
 	var failing: PackedStringArray = []
 	for line: Dictionary in report.get("lines", []):
 		if line.get("violation", false):
-			var name_text: String = str(GameState.INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"]))
+			var name_text: String = GameState.instrument_name(line["instrument_id"])
 			var why: PackedStringArray = []
 			if line.get("out_of_tolerance", false):
 				why.append("out of tolerance")
