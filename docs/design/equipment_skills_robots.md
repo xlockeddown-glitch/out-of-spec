@@ -145,8 +145,8 @@ Each entry ends with an **accuracy ratio**: the unit under test's MPE divided by
 
 | # | In-game name [ASSUMPTION] | Class | Tier | From | Calibrates | Its own cal comes from |
 |---|---|---|---|---|---|---|
-| 0a | Rotary table (name [PLACEHOLDER]) | Angle | 0 | Issued at start | Steering encoder, dish azimuth, robot joint encoders | OIRM |
-| 0b | Humidity generator chamber, Thunder Scientific class (name [PLACEHOLDER]) | Humidity | 0 | Issued at start | Hygrometer | OIRM |
+| 0a | Pavonis Indexworks PX-1 Rotary Table | Angle | 0 | Issued at start | Steering encoder, dish azimuth, robot joint encoders | OIRM |
+| 0b | Meridiani Dewpoint MD-2P Humidity Generator, Thunder Scientific class | Humidity | 0 | Issued at start | Hygrometer | OIRM |
 | 1 | Arsia Fieldworks FM-3 Field Meter | Handheld meter | 1 | Bram | Thermometer chain, robot soil probes | #2, or OIRM |
 | 7 | Wren & Dufour WD-1 Reference Gauge | Pressure gauge | 1 | Bram | Tire, dome pressure | #6, or OIRM |
 | 5 | Turnwright TW-6 Torque Standard | Torque | 2 | Bram | Wrench, robot grip | OIRM |
@@ -475,7 +475,7 @@ Every open question was answered. Numbering matches the earlier questions, which
 18. **MPE form:** one value computed at a fixed test point per instrument.
 19. **Grace audit:** does not count as clean; Tier 1 needs an audit with zero violations.
 
-Still open: every **[PLACEHOLDER]** number, the fictional names and specs for the two Tier 0 standards, and the **[VERIFY]** items in §1.4.
+Still open: every **[PLACEHOLDER]** number, the specs for the two Tier 0 standards (names picked 2026-11-22, see `docs/decisions.md`), and the **[VERIFY]** items in §1.4.
 
 ## 7. Sources for the [CITED] values
 

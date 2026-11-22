@@ -2,6 +2,13 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-22: Milestone 3 plan and Tier 0 names
+
+- **Split milestone 3 in two** (Ryan). M3a: the five new sensors plus Tier 1 (Bram sells the field meter and the reference gauge after the first clean audit). M3b: the Tier 2 and 3 instruments, Kestrel's uncertified standards and their gates.
+- **Numbers:** the agent proposes realistic MPEs, drift rates, intervals and prices, each marked `[PLACEHOLDER]` and listed in the PR for Ryan to tune (Ryan).
+- **After M3:** straight on to M4 (skills) and M5 (robots), as in the build order (Ryan).
+- **Tier 0 names** (Ryan, after asking Fable, Sonnet and Haiku): the rotary table is the **Pavonis Indexworks PX-1**, the humidity generator chamber the **Meridiani Dewpoint MD-2P**. No trademark search has been run. Dropped in moderation: "Okafor/Okonkwo & Lindqvist" (echoes the shortlist's Okafor & Lindqvist), "Noctis" (consumer brands use it), and generic words likely in use (Dewline, Frostpoint, Truegrade).
+
 ## 2026-11-22: Standard workflow
 
 - Questions to Ryan are multiple choice with a write-in (Ryan).
