@@ -3,9 +3,19 @@ extends SceneTree
 ## An empty string passes. A non-empty string explains a failure.
 
 
+const TIMEOUT_S: float = 60.0
+
+
 func _initialize() -> void:
 	# Wait for the project's autoloads to finish loading their data.
 	_run_tests.call_deferred()
+	# Watchdog: if a suite aborts before quit(), fail instead of hanging.
+	create_timer(TIMEOUT_S).timeout.connect(_on_timeout)
+
+
+func _on_timeout() -> void:
+	print("FAIL runner timed out after %d s" % int(TIMEOUT_S))
+	quit(2)
 
 
 func _run_tests() -> void:

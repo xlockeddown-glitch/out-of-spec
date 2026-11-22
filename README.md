@@ -40,7 +40,7 @@ docs/decisions.md  design calls that shape code and data
 
 Before pushing: open the project in Godot 4.7 with no errors in Output, and run `python tools/check_sp811.py` (NIST SP 811 text rules, see `docs/sp811.md`).
 
-Tests: `godot --headless --path . --script res://tests/run_tests.gd`. On a fresh clone, open the project once in the editor or run `godot --headless --path . --editor --import` first so Godot discovers the script classes.
+Tests: `godot --headless --path . --script res://tests/run_tests.gd` (on Windows, use the `Godot_v4.7.2-stable_win64_console.exe` build so the command waits and returns the exit code). On a fresh clone, open the project once in the editor or run `godot --headless --path . --editor --import` first so Godot discovers the script classes.
 
 ## Data
 
