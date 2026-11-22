@@ -191,3 +191,19 @@ Choices made in building these (flagged for Ryan):
 - **A unit due shortly before the standard returns** is still excused at its first overdue audit, even if the standard came back a few days before that audit. Example: courier sent day 6, back day 13, unit due day 11, excused at the day 15 audit, must be calibrated by day 20. Another example: sent day 13, back day 20, unit due day 14, excused at the day 15 and day 20 audits, must be calibrated by day 25.
 - **Sending while already away** is refused ("Already at OIRM until day N").
 - **The route is picked by the pod,** not by the player: with the pod on the pad the button is SEND TO OIRM (150 CR); without it, SEND BY COURIER (300 CR). The bench text gives the courier return day and the next pod day so the player can choose to wait.
+
+## 2026-11-22: Ryan's answers after milestone 3a (PR #42)
+
+Ryan chose:
+
+- **Next up: M3a hooks.** The terrarium thermometer feeds the molt, AUD-1T checks tire pressure, and the tire gauge gets a field calibration spot.
+- **Keep the dome at 2.84:1 TUR on purpose.**
+- **Buying a standard takes two presses.**
+- **Numbers:** "Research real specs to start but playtest and tune for feel from there."
+
+Agent's notes (flagged for Ryan, not his words):
+
+- M3b (Rb-2D, HM-3) and the save system were the other options offered; they come after the hooks unless Ryan says otherwise.
+- The dome against the WD-1 is allowed by the bench but never counts as a clean 4:1 calibration; the HB-700 (Tier 3) is what fixes that.
+- Two presses means the first press (key or button) shows the price and the second buys. It applies to Bram's Tier 1 standards.
+- Research covers the [PLACEHOLDER] MPEs, resolutions, drift rates and the thermometer's 15 °C/V scale, with sources cited in the data notes. Credit and ore prices have no real-world source, so they are set from game balance and tuned in playtest.
