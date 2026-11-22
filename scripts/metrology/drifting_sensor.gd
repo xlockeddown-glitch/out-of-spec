@@ -207,12 +207,17 @@ func band_for(value: float) -> Band:
 ## U+2212 minus, no space before the plane-angle degree, a space before %, and
 ## no "RH" qualifier on the % symbol (use quantity_name() in the label instead).
 ## `decimals` < 0 uses the unit's default (2, or 3 for other units);
-## `display_decimals` from the data raises it where the unit needs more digits.
+## `display_decimals` from the data sets the default; a caller asking for
+## more precision (uncertainties) still gets at least that many.
 ## Celsius takes a space ("0.30 °C"); fractional frequency shows as "× 10⁻⁶".
 func format_value(value: float, decimals: int = -1) -> String:
-	var places: int = decimals if decimals >= 0 else (3 if _is_plain_unit() else 2)
-	if display_decimals >= 0:
-		places = maxi(places, display_decimals)
+	var places: int
+	if decimals >= 0:
+		places = maxi(decimals, display_decimals)
+	elif display_decimals >= 0:
+		places = display_decimals
+	else:
+		places = 3 if _is_plain_unit() else 2
 	var number: String = SP811.signed(value, places)
 	match error_unit:
 		"degrees":

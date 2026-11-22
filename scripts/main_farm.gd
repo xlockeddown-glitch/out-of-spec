@@ -114,7 +114,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_trade()
 	elif event is InputEventKey and event.pressed and not event.echo and _bram_bay.rover_inside:
 		# [1], [2], ... buy Bram's Tier 1 standards in catalog order.
-		var index: int = (event as InputEventKey).keycode - KEY_1
+		var index: int = (event as InputEventKey).physical_keycode - KEY_1
 		var catalog: Array[String] = GameState.bram_catalog()
 		if GameState.tier1_unlocked and index >= 0 and index < catalog.size():
 			get_viewport().set_input_as_handled()

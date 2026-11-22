@@ -56,6 +56,9 @@ func test_buy_standard_gate_cost_and_certificate() -> String:
 	if problem == "" and gs.buy_standard(FM3) == "":
 		problem = "Bram must not sell without enough credits."
 	gs.credits = 1000
+	gs.crystal_ore = fm.price_ore - 1
+	if problem == "" and gs.buy_standard(FM3) == "":
+		problem = "Bram must not sell without enough crystal ore."
 	gs.crystal_ore = fm.price_ore
 	var reason: String = gs.buy_standard(FM3) if problem == "" else ""
 	var cert: Dictionary = gs.certificates.get(FM3, {})
@@ -71,6 +74,8 @@ func test_buy_standard_gate_cost_and_certificate() -> String:
 		problem = "FM-3 must be due one interval after purchase, got day %d." % fm.cal_due_day
 	elif problem == "" and (not gs.standard_ids().has(FM3) or not gs.unit_ids().has(THERMO)):
 		problem = "Buying the FM-3 must put it and the thermometer in service."
+	elif problem == "" and gs.get_sensor(THERMO).cal_due_day != 7 + gs.get_sensor(THERMO).cal_interval_days:
+		problem = "The thermometer must fall due one interval after the FM-3 arrives."
 	elif problem == "" and gs.buy_standard(FM3) == "":
 		problem = "The same standard can't be bought twice."
 	elif problem == "" and gs.unit_ids().has("relay_timebase"):
@@ -100,6 +105,13 @@ func test_out_of_service_units_do_not_drift() -> String:
 	gs.add_tire_usage(1000.0)
 	if problem == "" and gs.get_sensor("rover_tire_pressure").error == 0.0:
 		problem = "The tire gauge must wear with distance once in service."
+	var dome: DriftingSensor = gs.get_sensor("dome_pressure")
+	dome.error = 0.0
+	gs._on_time_advanced(1.0)
+	if problem == "" and absf(absf(dome.error) - dome.daily_drift_rate) > 1.0e-9:
+		problem = "The dome gauge must drift once the WD-1 is on the colony, got %s." % dome.error
+	if problem == "" and gs.get_sensor("relay_timebase").error != 0.0:
+		problem = "The relay timebase stays out of service until M3b."
 	gs.free()
 	return problem
 
@@ -113,11 +125,14 @@ func test_budget_applies_standard_sensitivity() -> String:
 	var problem: String = ""
 	if absf(budget["u_spec"] - expected_spec) > 1.0e-9:
 		problem = "u_spec must be in degrees Celsius: %s, expected %s." % [budget["u_spec"], expected_spec]
-	elif budget["tur"] < 5.5 or budget["tur"] > 6.5:
-		problem = "Thermometer against FM-3 should be about 5.9:1, got %s." % budget["tur"]
+	elif absf(budget["tur"] - 5.949) > 0.01:
+		problem = "Thermometer against FM-3 should be 5.95:1, got %s." % budget["tur"]
 	var dome: Dictionary = CalUncertainty.budget(gs.get_sensor("dome_pressure"), gs.get_sensor(WD1))
-	if problem == "" and (dome["refused"] or dome["clean"]):
-		problem = "Dome against WD-1 must be between 2:1 and 4:1 on purpose, got %s." % dome["tur"]
+	if problem == "" and (dome["refused"] or dome["clean"] or absf(dome["tur"] - 2.843) > 0.01):
+		problem = "Dome against WD-1 must be 2.84:1, under 4:1 on purpose, got %s." % dome["tur"]
+	var tire: Dictionary = CalUncertainty.budget(gs.get_sensor("rover_tire_pressure"), gs.get_sensor(WD1))
+	if problem == "" and absf(tire["tur"] - 10.81) > 0.01:
+		problem = "Tire gauge against WD-1 should be 10.8:1, got %s." % tire["tur"]
 	gs.free()
 	return problem
 
@@ -150,6 +165,18 @@ func test_calibration_and_recall_carry_sensitivity() -> String:
 			hit = r["suspect_result"] == CalUncertainty.INDETERMINATE
 	if problem == "" and not hit:
 		problem = "Recall must re-judge 0.033 V as 0.495 °C (indeterminate): %s" % [flagged]
+	# The sign matters: as-found +0.3 °C with the FM-3 at −0.02 V corrects to
+	# 0.0 °C (still a pass); at +0.02 V it corrects to +0.6 °C (a fail).
+	_set_day(4)
+	fm.error = 0.0
+	unit.error = 0.3
+	gs.calibrate(THERMO)
+	var low: Array[Dictionary] = gs.recall(FM3, -0.02, 4)
+	if problem == "" and not low.is_empty():
+		problem = "A standard error that cancels the as-found must not flag: %s" % [low]
+	var high: Array[Dictionary] = gs.recall(FM3, 0.02, 4)
+	if problem == "" and (high.size() != 1 or high[0]["suspect_result"] != CalUncertainty.FAIL):
+		problem = "+0.02 V must turn +0.3 °C into a fail: %s" % [high]
 	gs.free()
 	GameClock.elapsed_days = saved
 	return problem
@@ -173,7 +200,11 @@ func test_new_display_formats() -> String:
 			problem = "%s quantity is '%s'." % [id, sensor.quantity_name()]
 	if problem == "" and gs.get_sensor(FM3).quantity_title() != "DC Voltage":
 		problem = "Acronyms must survive the title: '%s'." % gs.get_sensor(FM3).quantity_title()
-	if problem == "" and not gs.get_sensor("dome_pressure").format_value(0.1).contains("0.10"):
+	if problem == "" and gs.get_sensor("dome_pressure").format_value(0.1) != "+0.10 kPa":
 		problem = "Dome readings need two decimals: %s" % gs.get_sensor("dome_pressure").format_value(0.1)
+	if problem == "" and gs.get_sensor("rover_tire_pressure").format_value(0.4) != "+0.4 kPa":
+		problem = "Tire readings need one decimal: %s" % gs.get_sensor("rover_tire_pressure").format_value(0.4)
+	if problem == "" and gs.get_sensor("rover_tire_pressure").format_value(0.4, 3) != "+0.400 kPa":
+		problem = "A caller asking for more digits must get them: %s" % gs.get_sensor("rover_tire_pressure").format_value(0.4, 3)
 	gs.free()
 	return problem

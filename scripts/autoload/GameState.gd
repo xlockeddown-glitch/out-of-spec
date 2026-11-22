@@ -748,6 +748,10 @@ func recall(standard_id: String, standard_error: float, since_day: int) -> Array
 		var corrected: float = float(record["as_found"]) + carried
 		var rejudged: String = CalUncertainty.classify(corrected, record["mpe"], record["acceptance_limit"])
 		if rejudged == record["result"]:
+			# A standard still passing can carry an error that a unit with a
+			# large sensitivity downstream cannot absorb: keep cascading.
+			if instrument and instrument.role == "standard":
+				flagged.append_array(recall(record["instrument_id"], carried, int(record["day"])))
 			continue
 		record["suspect"] = true
 		record["suspect_result"] = rejudged
@@ -775,7 +779,7 @@ func traceability_chain(instrument_id: String) -> Dictionary:
 			return { "traceable": false, "text": "%s: at OIRM until day %d" % [name, at_oirm[instrument_id]] }
 		var cert: Dictionary = certificates.get(instrument_id, {})
 		if cert.is_empty():
-			return { "traceable": false, "text": "%s: no OIRM certificate" % name }
+			return { "traceable": false, "text": "%s: no certificate" % name }
 		if sensor.is_overdue(today):
 			return { "traceable": false, "text": "%s ← %s lapsed (due day %d)" % [name, cert["id"], cert["due_day"]] }
 		# A maker's certificate traces through the maker's own lab to OIRM.
@@ -902,10 +906,14 @@ func buy_standard(standard_id: String) -> String:
 		if unit.calibrated_by != standard_id:
 			continue
 		unit.cal_due_day = today + unit.cal_interval_days
+		# Put in service today: the first calibration is not interval evidence.
+		unit.last_cal_day = today
 		units.append(_mid_sentence(unit.short_name))
-	post_phone("BRAM: One %s, still in the crate. Certificate %s from %s, good to day %d. %s" % [
-		sensor.short_name, cert["id"], issuer, cert["due_day"],
-		("Calibrate the %s against it before Vance's next visit." % " and the ".join(units)) if not units.is_empty() else ""])
+	var text: String = "BRAM: One %s, still in the crate. Certificate %s from %s, good to day %d." % [
+		sensor.short_name, cert["id"], issuer, cert["due_day"]]
+	if not units.is_empty():
+		text += " Calibrate the %s against it before Vance's next visit." % " and the ".join(units)
+	post_phone(text)
 	upgrades_changed.emit()
 	oirm_changed.emit()
 	return ""

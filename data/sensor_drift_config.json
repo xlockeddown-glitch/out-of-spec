@@ -94,7 +94,7 @@
       "display_decimals": 2,
       "calibrated_by": "",
       "bench_minutes": 60,
-      "_note": "M3a [PLACEHOLDER]: fractional frequency in units of 10^-6, a crystal-oscillator class MPE. Its standard, the Rb-2D, comes in M3b; until then it drifts but nothing can calibrate it, so it is not audited."
+      "_note": "M3a [PLACEHOLDER]: fractional frequency in units of 10^-6, a crystal-oscillator class MPE. Its standard, the Rb-2D, comes in M3b; until then it is out of service: it does not drift and is not audited."
     },
     "rotary_table": {
       "role": "standard",
