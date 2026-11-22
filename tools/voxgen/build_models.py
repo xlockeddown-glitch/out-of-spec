@@ -653,23 +653,31 @@ FIELD_PROPS = {
 }
 
 
-def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int) -> Model:
+# Gemini's Plateau Sun-Pod crop growth stages (2026-11-21): crop_stage_0..3, 0.1 m voxels,
+# origin at the footprint center on the ground, palette as given in its generator script.
+# Built and turned like the field props.
+CROP_SUNPOD = {"T1": "#3D2919", "G3": "#2E4F22", "G1": "#4C7A34", "G2": "#6FA34B",
+               "C1": "#D9A13B", "C2": "#F2C96B", "S": SHADOW}
+
+
+def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
+                     colors: dict[str, str], part: str = "prop") -> Model:
     """cells: {(x, y, z): token} in sheet axes (X right, Y back, Z up). Sheet (x, y, z) goes
     to Godot (w-1-x, z, y), so sheet Y=0 (the front) lands at -z after the offset."""
     m = Model(name, offset=(-w / 2.0, 0.0, -d / 2.0))
     for (x, y, z), token in cells.items():
-        m.put("prop", w - 1 - x, z, y, FIELD_PROPS[name][token])
+        m.put(part, w - 1 - x, z, y, colors[token])
     return m
 
 
-def prop_sheet(name: str) -> Model:
+def prop_sheet(name: str, colors: dict[str, str] | None = None, part: str = "prop") -> Model:
     """Built voxel for voxel from Gemini's layer grid in sheets/<name>.txt."""
     layers = token_sheet(f"{name}.txt")
     w, d = len(layers[0][0]), len(layers[0])
     cells = {(x, d - 1 - row_i, z): cell
              for z, rows in layers.items() for row_i, row in enumerate(rows)
              for x, cell in enumerate(row) if cell != ".."}
-    return front_to_minus_z(name, cells, w, d)
+    return front_to_minus_z(name, cells, w, d, colors or FIELD_PROPS[name], part)
 
 
 MODELS = [
@@ -688,6 +696,7 @@ MODELS = [
     (lambda: prop_sheet("soil_moisture_probe"), 0.1),
     (lambda: prop_sheet("steering_encoder_jig"), 0.1),
     (lambda: prop_sheet("field_survey_tripod"), 0.1),
+    *[((lambda n=n: prop_sheet(f"crop_stage_{n}", CROP_SUNPOD, "crop")), 0.1) for n in range(4)],
 ]
 
 

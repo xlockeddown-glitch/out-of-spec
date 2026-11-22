@@ -1,0 +1,27 @@
+crop_stage_0 — 6 × 6 × 3 (X: 0..5 left→right, Y: 5..0 rear → front -Y), seeded mound, from Gemini's Plateau Sun-Pod crop stages
+Palette: T1 #3D2919 seed mound, G3 #2E4F22 dark stalk, G1 #4C7A34 foliage, G2 #6FA34B highlight, C1 #D9A13B pod body, C2 #F2C96B pod crown ribs, S #1D222B shadow
+X:    00 01 02 03 04 05
+
+Z=00
+Y=05  .. T1 T1 T1 T1 ..
+Y=04  T1 T1 T1 T1 T1 T1
+Y=03  T1 T1 T1 T1 T1 T1
+Y=02  T1 T1 T1 T1 T1 T1
+Y=01  T1 T1 T1 T1 T1 T1
+Y=00  .. T1 T1 T1 T1 ..
+
+Z=01
+Y=05  .. .. .. .. .. ..
+Y=04  .. T1 T1 T1 T1 ..
+Y=03  .. T1 G3 G3 T1 ..
+Y=02  .. T1 G3 G3 T1 ..
+Y=01  .. T1 T1 T1 T1 ..
+Y=00  .. .. .. .. .. ..
+
+Z=02
+Y=05  .. .. .. .. .. ..
+Y=04  .. .. .. .. .. ..
+Y=03  .. .. G2 G2 .. ..
+Y=02  .. .. G2 G2 .. ..
+Y=01  .. .. .. .. .. ..
+Y=00  .. .. .. .. .. ..
