@@ -552,3 +552,15 @@ Agent's notes (flagged for Ryan, not his words):
 - Ryan's answer was to the question of what to place next.
 - The cistern stands beside the irrigation junction, at (−11.6, 0, 13.2) m, 0.4 m past the plot's front edge by its left corner, with 1.2 m edge to edge between it and the junction, so the two read as the plot's water supply. It is turned so its front outlet points at the junction and its side outlet points at the plot's front edge. Its nearest edge is 2.6 m from fissure C's center.
 - It is at true size (1.6 m × 1.6 m × 1.8 m). Set dressing only: no collision, no pipe drawn to the junction, and no capacity; those wait for an irrigation milestone.
+
+## 2026-11-22: Plateau clutter in the farm
+
+### Ryan chose
+
+- "Plateau clutter"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next.
+- Two of each piece (scrub bush, cobble cluster, dry stump) stand in the farm under a `Clutter` node, at true size (0.2 m voxels), each turned a different way. They are spread around the plot in the open ground between the boulders, fissures and buildings, each center at least 5 m from theirs, so the plot's surroundings read as plateau without crowding it.
+- Set dressing only: no collision, so the rover drives through them. A sparse first pass; a denser scatter further out, and whether any of them should block the rover, are still open.
