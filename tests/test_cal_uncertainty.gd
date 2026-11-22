@@ -104,24 +104,6 @@ func test_registry_holds_units_and_standards() -> String:
 	return ""
 
 
-func test_audit_skips_standards() -> String:
-	var saved: float = GameClock.elapsed_days
-	var gs: GameStateScript = _make_state()
-	var cadence: int = int(DataManager.get_number(DRIFT, "audit_schedule/cadence_days", 5.0))
-	_set_day(cadence)
-	for id: String in gs.standard_ids():
-		gs.get_sensor(id).error = gs.get_sensor(id).mpe * 2.0  # would be fined if audited
-	gs._run_audit(cadence)
-	var report: Dictionary = gs.audit_log[-1]
-	var standards: Array[String] = gs.standard_ids()
-	GameClock.elapsed_days = saved
-	gs.free()
-	for line: Dictionary in report["lines"]:
-		if standards.has(line["instrument_id"]):
-			return "Standards are not audited until milestone 2: %s" % line
-	return ""
-
-
 func test_standard_error_carries_into_the_unit() -> String:
 	var saved: float = GameClock.elapsed_days
 	var gs: GameStateScript = _make_state()

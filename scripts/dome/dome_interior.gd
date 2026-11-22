@@ -103,7 +103,7 @@ static func _field(record: Dictionary, key: String, fallback: String) -> String:
 
 func _on_audit_completed(report: Dictionary) -> void:
 	if report.get("warning", false):
-		_toast("AUDIT DAY %d: WARNING ONLY. Your manager recalibrated %s before Vance got in. One time only." % [
+		_toast("AUDIT DAY %d: WARNING ONLY. Your manager %s before Vance got in. One time only." % [
 			report.get("day", 0), report.get("waived_names", "")])
 		return
 	if report.get("passed", true):
@@ -118,6 +118,8 @@ func _on_audit_completed(report: Dictionary) -> void:
 				why.append("out of tolerance")
 			if line.get("overdue", false):
 				why.append("overdue")
+			if line.get("suspect", false):
+				why.append("suspect calibration")
 			failing.append("%s (%s)" % [name_text, ", ".join(why)])
 	_toast("AUDIT DAY %d: FINE %s CR. %s. Details on the phone log." % [
 		report.get("day", 0), SP811.integer(int(report.get("total_fine", 0))), ", ".join(failing)])

@@ -63,7 +63,7 @@
       "initial_interval_days": 30,
       "_note": "Tier 0 humidity standard, two-pressure generator class (Ryan, 2026-11-22). Working name; the fictional maker name and every number here are game placeholders, not from a datasheet."
     },
-    "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, not audited until OIRM certificates land (milestone 2). resolution (one digit of the unit under test), bench_minutes and the standards' specs are placeholders (docs/design/equipment_skills_robots.md section 1.5)."
+    "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. resolution (one digit of the unit under test), bench_minutes and the standards' specs are placeholders (docs/design/equipment_skills_robots.md section 1.5)."
   },
   "guardband": {
     "green": {
@@ -85,7 +85,13 @@
     "repeat_surcharge_credits": 25,
     "max_repeat_surcharge_credits": 100,
     "max_fine_credits": 350,
-    "overdue_credits": 50
+    "overdue_credits": 50,
+    "suspect_cal_credits": 75,
+    "_note": "suspect_cal_credits: a unit whose calibration was made suspect by a recall and not redone before the audit (milestone 2). Placeholder."
+  },
+  "oirm": {
+    "fee_credits": 150,
+    "_note": "Orbital Institute of Reference Measures (working name). A standard rides Vance's drop pod after an audit and returns on the next one with a certificate. Fee is a placeholder (docs/design/equipment_skills_robots.md section 1.7)."
   },
   "audit_schedule": {
     "cadence_days": 5,
