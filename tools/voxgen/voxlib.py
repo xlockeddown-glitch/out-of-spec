@@ -17,7 +17,7 @@ from pathlib import Path
 
 import numpy as np
 
-GLASS_ALPHA = 0.3
+GLASS_ALPHA = 0.25
 
 # Face directions: normal and the 4 corner offsets (counter-clockwise seen from outside).
 _FACES = [
@@ -67,7 +67,7 @@ class Model:
                     self.clear(x, y, z)
 
     def disc_y(self, part: str, cx: float, cz: float, r: float, y: int, color: str, hollow: float = -1.0) -> None:
-        """Horizontal disc (or ring if hollow >= 0) centred on voxel-space point (cx, cz)."""
+        """Horizontal disc (or ring if hollow >= 0) centered on voxel-space point (cx, cz)."""
         for x in range(math.floor(cx - r) - 1, math.ceil(cx + r) + 1):
             for z in range(math.floor(cz - r) - 1, math.ceil(cz + r) + 1):
                 d2 = (x + 0.5 - cx) ** 2 + (z + 0.5 - cz) ** 2
@@ -111,10 +111,10 @@ class Model:
         for (x, y, z), (part, color) in occupied.items():
             for normal, corners in _FACES:
                 n = (x + normal[0], y + normal[1], z + normal[2])
-                neighbour = occupied.get(n)
-                if neighbour is not None:
+                neighbor = occupied.get(n)
+                if neighbor is not None:
                     # Glass next to solid still hides; solid next to glass stays visible.
-                    if not (neighbour[0] in self.glass_parts and part not in self.glass_parts):
+                    if not (neighbor[0] in self.glass_parts and part not in self.glass_parts):
                         continue
                 pos, nor, idx = geo.setdefault(part, {}).setdefault(color, ([], [], []))
                 base = len(pos)

@@ -24,7 +24,7 @@ TEAL, AMBER, RED, SHADOW = "#38E1C6", "#F5A623", "#FF5A5F", "#1D222B"
 
 # ---------------------------------------------------------------- tractor
 def tractor(wide: bool) -> Model:
-    """16 x 14 x 24 voxels (W x H x D) at 0.1 m; whip to 2.2 m. Front = -Z."""
+    """16 x 22 x 25 voxels (W x H x D) at 0.1 m; body 14 high, whip to 2.2 m. Front = -Z."""
     m = Model("tractor_wide" if wide else "tractor")
     HULL, STEEL, GLASS, SAT, TIRE = "#C85A2A", "#4D5663", "#4A7A82", "#E2E8F0", "#101216"
     m.glass_parts.add("glass")
@@ -132,7 +132,7 @@ def terrarium() -> Model:
     # heat lamp: arm from the rear-right post, brass hood over the center
     m.box("lamp", 6, 6, 10, 13, -5, -5, FRAME)
     m.line("lamp", (6, 13, -5), (1, 13, -1), FRAME)
-    m.box("lamp", -1, 0, 12, 12, -1, 0, BRASS)
+    m.box("lamp", -1, 0, 12, 13, -1, 0, BRASS)
     m.box("lamp", -2, 1, 11, 11, -2, 1, BRASS)
     m.box("emit_heat_lamp", -1, 0, 11, 11, -1, 0, AMBER)
     return m
@@ -161,7 +161,7 @@ def curlyhair() -> Model:
 # -------------------------------------------------------------- Bram's bay
 def bram_bay() -> Model:
     """24 x 16 x 20 voxels at 0.2 m. Open side faces +Z."""
-    m = Model("bram_bay")
+    m = Model("bram_bay", offset=(0.0, 0.0, -2.5))
     CONC, RUST, OVER, SKIN, TOOL, BEARD = "#3D4654", "#7A3E26", "#2B4C65", "#D99B78", "#8C9BAE", "#5E5855"
     m.box("floor", -12, 11, 0, 0, -10, 9, CONC)
     for x, z in ((-6, -2), (-5, -3), (3, 5), (4, 5), (-2, 6)):
@@ -243,9 +243,9 @@ def drop_pod() -> Model:
     """12 x 16 x 12 voxels at 0.2 m. Hatch faces +Z."""
     m = Model("drop_pod")
     ORANGE, STRUT = "#E85D25", "#4F5D73"
-    for x, z in ((-6, -6), (4, -6), (-6, 4), (4, 4)):
+    for x, z in ((-5, -5), (3, -5), (-5, 3), (3, 3)):
         m.box("hull", x, x + 1, 0, 0, z, z + 1, SHADOW)
-        m.box("hull", x, x + 1, 1, 2, z, z + 1, STRUT)
+        m.box("hull", x, x + 1, 1, 3, z, z + 1, STRUT)
     for y in (2, 3):
         m.disc_y("hull", 0, 0, 5.0, y, SHADOW)  # heat shield skirt
     for y in range(4, 12):
@@ -284,7 +284,7 @@ def aud1t() -> Model:
 
 # ---------------------------------------------------------------- relay
 def relay_mast() -> Model:
-    """18 x 34 x 18 voxels at 0.5 m (9 m x 17 m). Dish near 16 m faces the farm (+X +Z)."""
+    """Lattice mast at 0.5 m per voxel. Dish centered at 16 m faces the farm (+X +Z); beacon on the spire behind it."""
     m = Model("relay_mast")
     LATTICE, FOOT, DISH = "#526075", "#30343D", "#E1E8F0"
     feet = [(0.0, -7.0), (-6.0, 4.0), (6.0, 4.0)]
@@ -298,28 +298,31 @@ def relay_mast() -> Model:
         pts = [(fx * (1 - t), y, fz * (1 - t)) for fx, fz in feet]
         for i in range(3):
             m.line("mast", pts[i], pts[(i + 1) % 3], LATTICE)
-    m.box("mast", -1, 0, top_y, 32, -1, 0, LATTICE)
-    m.box("emit_beacon", -1, 0, 33, 33, -1, 0, TEAL)
-    # dish facing the farm, centered at y = 30
+    # spire rises behind the dish (the dish faces +X +Z, toward the farm)
+    m.line("mast", (0, top_y, 0), (-3, top_y + 3, -3), LATTICE, thick=2)
+    m.box("mast", -4, -3, top_y + 3, 36, -4, -3, LATTICE)
+    # dish centered on the Dish marker: (0, 16, 0) m = (0, 32, 0) voxels
     n = (1.0, 0.5, 1.0)
     ln = math.sqrt(sum(v * v for v in n))
     n = tuple(v / ln for v in n)
-    c = (1.5, 30.0, 1.5)
-    for x in range(-6, 9):
-        for y in range(24, 37):
-            for z in range(-6, 9):
+    c = (0.0, 32.0, 0.0)
+    for x in range(-7, 8):
+        for y in range(26, 39):
+            for z in range(-7, 8):
                 p = (x + 0.5 - c[0], y + 0.5 - c[1], z + 0.5 - c[2])
                 d = sum(p[i] * n[i] for i in range(3))
                 r2 = sum(v * v for v in p) - d * d
                 if abs(d - 0.02 * r2) <= 0.5 and r2 <= 4.6 ** 2:
                     m.put("mast", x, y, z, DISH if r2 < 3.8 ** 2 else LATTICE)
     m.line("mast", c, (c[0] + n[0] * 3, c[1] + n[1] * 3, c[2] + n[2] * 3), SHADOW)
+    m.line("mast", (-3, 32, -3), c, LATTICE)  # dish mount arm from the spire
     # spool bay: open pocket for the game's spool at (0.8, 3, 0) m = (1.6, 6, 0) voxels
     for x in (0, 3):
         m.box("mast", x, x, 4, 8, -2, -2, LATTICE)
     m.box("mast", 0, 3, 8, 8, -2, 1, LATTICE)
     m.box("mast", 0, 3, 4, 4, -2, 1, FOOT)
     m.clear_box(1, 2, 5, 7, -1, 0)
+    m.box("emit_beacon", -4, -3, 37, 37, -4, -3, TEAL)  # built last so nothing overwrites it
     return m
 
 
