@@ -2,6 +2,21 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-22: Co-op is the goal; build so it can be added
+
+Ryan wants the game to be co-op at least, and ideally multiplayer. His calls:
+
+- **Players:** 2 to 4 share one farm and dome, and split the work (field, bench, comms).
+- **Connection:** online. One player hosts and friends join; no dedicated servers.
+- **Timing:** prepare now, build later. Co-op gets its own milestone after robots (milestone 5). Until then, new code follows the co-op-ready rules in the README's [ground rules](../README.md#ground-rules-every-task).
+
+Open questions (not decided; ask Ryan before building on them):
+
+- Are skills (milestone 4) per player, shared by the farm, or both?
+- Are credits one farm wallet or one wallet per player?
+- Does each player get a rover, or do players share the one?
+- When a guest's game isn't open, does the farm's clock keep running only while the host plays?
+
 ## 2026-11-22: PR checks, second review and merging
 
 - A PR stays a draft until Godot shows 0 errors and 0 warnings, the headless tests pass, and `python tools/check_sp811.py` reports 0 problems (Ryan).

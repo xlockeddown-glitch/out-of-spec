@@ -13,6 +13,12 @@ Read this before you start, and again before you open or merge a PR. It keeps lo
 - **Player-facing text follows NIST SP 811.** See [`docs/sp811.md`](docs/sp811.md). In GDScript, format numbers with `SP811`.
 - **Palette:** teal `#38E1C6` in tolerance, amber `#F5A623` guard band, red `#FF5A5F` only when something is truly out of tolerance, shadow `#1D222B`. Red is earned, and the semantic colors are the only glow colors (never plain paint). See [Status palette](docs/canon.md#status-palette) and [Voxel global rules](docs/art/voxel_models.md#global-rules).
 - **Stay in scope.** One PR does one job. Write follow-ups down as open questions or follow-up PRs instead of folding them in.
+- **Keep it co-op ready.** Online co-op for 2 to 4 players is planned after milestone 5 ([decision](docs/decisions.md#2026-11-22-co-op-is-the-goal-build-so-it-can-be-added)). Until then:
+  - Keep game state in the autoloads (`GameState`, `GameClock`), not in scenes or UI nodes.
+  - Change state only through `GameState` functions, so a host can later run them for every player. UI and input call those functions and react to signals; they never write state fields directly. (The one exception today is `rover_controller.gd` saving `GameState.rover_transform`; fix it in the co-op milestone.)
+  - Don't assume there is one player. Anything that belongs to a person (position, held item, skills) should be easy to key by a player id later.
+  - Keep randomness in seeded `RandomNumberGenerator`s owned by the simulation, never the global `randf()`.
+  - Drive the simulation from `GameClock` days and ticks, not frame time.
 - **Ask when unsure.** Design calls, names and numbers are Ryan's to make. If reviewers disagree, ask Ryan.
 
 ### Shortcuts by task
