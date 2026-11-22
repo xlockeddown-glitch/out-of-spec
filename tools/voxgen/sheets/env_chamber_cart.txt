@@ -1,4 +1,4 @@
-env_chamber_cart - 14 x 10 x 16 (humidity and temperature chamber on a rolling cart). From Ryan's Environmental Chamber generator (0.1 m voxels), 2026-11-22.
+env_chamber_cart - 14 x 10 x 16 (environmental chamber on a rolling cart). From Ryan's Environmental Chamber generator (0.1 m voxels), 2026-11-22.
 X: 0..13 left to right, Y: 9..0 rear (+Y) to front (-Y), first row = highest Y.
 Palette: C1 = #D4DAE0, C2 = #8D99AE, M1 = #3B5978, F1 = #2E3844, B1 = #D9A13B, S = #1D222B
 

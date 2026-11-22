@@ -37,7 +37,7 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `lab_calibration_bench.glb` | ESD calibration workbench with a backsplash rail, a drawer, a brass ground lug and a brass terminal, 2.0 m × 1.4 m × 1.0 m tall (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Metrology Lab grid (`tools/voxgen/sheets/lab_calibration_bench.txt`). |
 | `ref_multimeter_8588a.glb` | Benchtop reference multimeter with a blank display bay, 0.4 m × 0.35 m × 0.15 m (not placed in any scene yet) | **0.025 m voxels**, origin at ground level. Built from Ryan's Metrology Lab grid (`tools/voxgen/sheets/ref_multimeter_8588a.txt`). |
 | `handheld_dmm_289.glb` | Yellow handheld digital multimeter lying face up, 0.15 m × 0.25 m × 0.1 m (not placed in any scene yet) | **0.025 m voxels**, origin at ground level. Built from Ryan's Metrology Lab grid (`tools/voxgen/sheets/handheld_dmm_289.txt`). |
-| `env_chamber_cart.glb` | Humidity and temperature chamber on a rolling cart, 1.4 m × 1.0 m × 1.6 m tall (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Environmental Chamber grid (`tools/voxgen/sheets/env_chamber_cart.txt`). |
+| `env_chamber_cart.glb` | Environmental chamber on a rolling cart, 1.4 m × 1.0 m × 1.6 m tall (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Environmental Chamber grid (`tools/voxgen/sheets/env_chamber_cart.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.025 m, 0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 

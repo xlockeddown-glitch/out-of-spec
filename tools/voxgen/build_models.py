@@ -726,9 +726,9 @@ METROLOGY_LAB = {
                           "S": SHADOW}, 0.025),
 }
 
-# Ryan's Environmental Chamber pack (2026-11-22, 0.1 m voxels): a humidity and temperature
-# chamber on a rolling cart. Colors are his generator's own (C1/C2 the reference meter's case,
-# F1/B1/S the bench's; no glow, a blank recessed screen). Built and turned like the field props.
+# Ryan's Environmental Chamber pack (2026-11-22, 0.1 m voxels): an environmental chamber
+# on a rolling cart. Colors are his generator's own (C1/C2 the reference meter's case,
+# F1 the meters' front panel, B1/S the bench's; no glow, a blank recessed screen). Built and turned like the field props.
 # Not placed in any scene yet.
 ENV_CHAMBER = {"C1": "#D4DAE0", "C2": "#8D99AE", "M1": "#3B5978", "F1": "#2E3844", "B1": "#D9A13B",
                "S": SHADOW}
