@@ -11,9 +11,10 @@ extends Control
 
 signal closed
 
+const CALIBRATE_TEXT: String = "ZERO / CALIBRATE"
+
 var _ids: Array[String] = []
 var _current_id: String = ""
-const CALIBRATE_TEXT: String = "ZERO / CALIBRATE"
 ## Budget and acceptance limit of the selected instrument against its standard.
 var _budget: Dictionary = {}
 var _limit: float = 0.0
@@ -102,6 +103,15 @@ func _on_instrument_selected(index: int) -> void:
 	_left_meter.show_needle = false
 	_calibrate_button.disabled = false
 	_result_label.text = _last_record_text(_current_id)
+	var standard_id: String = _budget.get("standard_id", "")
+	if GameState.at_oirm.has(standard_id):
+		_found_value.text = "--"
+		_found_band.text = "STANDARD AT OIRM"
+		_found_band.remove_theme_color_override("font_color")
+		_found_meter.show_needle = false
+		_calibrate_button.disabled = true
+		_result_label.text = "%s is at OIRM until the day %d drop pod. %s" % [
+			GameState.instrument_name(standard_id, true), GameState.at_oirm[standard_id], _result_label.text]
 
 
 ## A standard has no reference on this bench: its error is unknown until OIRM
@@ -197,7 +207,10 @@ func _on_calibrate_pressed() -> void:
 		record["previous_interval_days"], record["interval_days"], record["due_day"],
 		roundi(record.get("bench_minutes", 0.0))]
 	var band: int = DriftingSensor.Band.IN_BAND
-	if result == CalUncertainty.FAIL:
+	if record.get("standard_overdue", false):
+		band = DriftingSensor.Band.GUARDBAND
+		_result_label.text = "STANDARD OVERDUE: unit adjusted, NOT TRACEABLE. Not a calibration; still due day %d. Send the standard to OIRM." % record["due_day"]
+	elif result == CalUncertainty.FAIL:
 		band = DriftingSensor.Band.OUT_OF_TOLERANCE
 		_result_label.text = "AS-FOUND OUT OF TOLERANCE: FAIL. Interval shortened, logged for audit. " + interval_note
 	elif result == CalUncertainty.INDETERMINATE:

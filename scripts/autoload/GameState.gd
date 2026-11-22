@@ -399,7 +399,12 @@ func _run_audit(day: int) -> void:
 	for id: String in unit_ids() + standard_ids():
 		if not at_oirm.has(id):
 			audited[id] = sensors[id]
-	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since, suspect_units)
+	# A recall found on this pod gives the player until the next audit to redo it.
+	var fineable_suspects: Dictionary = {}
+	for id: Variant in suspect_units:
+		if int(suspect_units[id]) < day:
+			fineable_suspects[id] = suspect_units[id]
+	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since, fineable_suspects)
 
 	if not report["passed"] and not audit_grace_used:
 		_apply_audit_grace(report)
@@ -419,9 +424,12 @@ func _run_audit(day: int) -> void:
 	for line: Dictionary in report["lines"]:
 		var sensor: DriftingSensor = get_sensor(line["instrument_id"])
 		# Three decimals so 1.004 x MPE doesn't read as "1.00 ... OUT OF TOLERANCE".
-		var label: String = "%s %s (%s × MPE) %s" % [
-			instrument_name(line["instrument_id"]),
-			sensor.format_value(line["as_found"]), SP811.number(line["ratio"], 3), DriftingSensor.band_label(line["band"])]
+		var label: String = ("%s certificate %s" % [instrument_name(line["instrument_id"]),
+				certificates.get(line["instrument_id"], {}).get("id", "missing")]
+			if line.get("standard", false)
+			else "%s %s (%s × MPE) %s" % [
+				instrument_name(line["instrument_id"]),
+				sensor.format_value(line["as_found"]), SP811.number(line["ratio"], 3), DriftingSensor.band_label(line["band"])])
 		if line["overdue"]:
 			label += ", OVERDUE (due day %d)" % line["due_day"]
 		if line.get("suspect", false):
@@ -615,7 +623,8 @@ func recall(standard_id: String, standard_error: float, since_day: int) -> Array
 		var instrument: DriftingSensor = get_sensor(record["instrument_id"])
 		if instrument and instrument.role == "standard":
 			flagged.append_array(recall(record["instrument_id"], standard_error, int(record["day"])))
-		else:
+		elif _last_traceable_record(record["instrument_id"]) == record:
+			# A later good calibration already superseded an older suspect one.
 			suspect_units[record["instrument_id"]] = today
 	return flagged
 
@@ -645,6 +654,8 @@ func traceability_chain(instrument_id: String) -> Dictionary:
 	var link: String = "%s ← %s (%s, day %d)" % [name, standard_name, record.get("standard_certificate", "?"), record["day"]]
 	if suspect_units.has(instrument_id):
 		return { "traceable": false, "text": "%s: SUSPECT, recalled day %d" % [link, suspect_units[instrument_id]] }
+	if _untraceable_since_cal.has(instrument_id):
+		return { "traceable": false, "text": "%s: adjusted since without a traceable standard" % link }
 	if sensor.is_overdue(today):
 		return { "traceable": false, "text": "%s: calibration lapsed (due day %d)" % [link, sensor.cal_due_day] }
 	return { "traceable": true, "text": link + " ← OIRM" }

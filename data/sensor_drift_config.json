@@ -63,7 +63,7 @@
       "initial_interval_days": 30,
       "_note": "Tier 0 humidity standard, two-pressure generator class (Ryan, 2026-11-22). Working name; the fictional maker name and every number here are game placeholders, not from a datasheet."
     },
-    "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited (overdue or out of tolerance) except while at OIRM; starts with a founding-stock OIRM certificate. resolution (one digit of the unit under test), bench_minutes and the standards' specs are placeholders (docs/design/equipment_skills_robots.md section 1.5)."
+    "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. resolution (one digit of the unit under test), bench_minutes and the standards' specs are placeholders (docs/design/equipment_skills_robots.md section 1.5)."
   },
   "guardband": {
     "green": {

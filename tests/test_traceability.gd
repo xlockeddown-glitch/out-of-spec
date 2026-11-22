@@ -106,19 +106,32 @@ func test_audit_checks_standards_except_at_oirm() -> String:
 	gs.at_oirm[away] = cadence * 3  # delayed: still away at the next audit
 	_set_day(cadence * 2)
 	gs._run_audit(cadence * 2)
-	var audited: Array[String] = []
-	for line: Dictionary in gs.audit_log[-1]["lines"]:
-		audited.append(line["instrument_id"])
+	var lines: Dictionary = _lines_by_id(gs.audit_log[-1])
 	for id: String in gs.standard_ids():
-		if id == away and audited.has(id):
+		if id == away and lines.has(id):
 			problem = "%s is at OIRM and can't be audited." % id
-		elif id != away and not audited.has(id):
+		elif id != away and not lines.has(id):
 			problem = "%s must be audited." % id
-	if problem == "" and gs.audit_log[-1]["passed"]:
-		problem = "An out-of-tolerance standard must fail the audit."
+		elif id != away and lines[id]["violation"]:
+			problem = "Vance can't see a standard's error, only its certificate: %s" % lines[id]
+	# A lapsed certificate is a violation.
+	var home: String = gs.standard_ids()[1]
+	gs.get_sensor(home).cal_due_day = cadence * 2
+	_set_day(cadence * 3)
+	gs._run_audit(cadence * 3)
+	lines = _lines_by_id(gs.audit_log[-1])
+	if problem == "" and not (lines.has(home) and lines[home]["violation"] and lines[home]["overdue"]):
+		problem = "An overdue standard must be a violation: %s" % lines.get(home, {})
 	GameClock.elapsed_days = saved
 	gs.free()
 	return problem
+
+
+func _lines_by_id(report: Dictionary) -> Dictionary:
+	var lines: Dictionary = {}
+	for line: Dictionary in report["lines"]:
+		lines[line["instrument_id"]] = line
+	return lines
 
 
 func test_bench_with_overdue_standard_is_untraceable() -> String:
@@ -195,13 +208,14 @@ func test_recall_flags_only_changed_results() -> String:
 		problem = "Only the steering encoder must be listed suspect: %s" % gs.suspect_units
 	elif gs.traceability_chain(gs.STEERING_ID)["traceable"]:
 		problem = "A suspect calibration must break the chain."
+	elif _lines_by_id(gs.audit_log[-1])[gs.STEERING_ID]["suspect"]:
+		problem = "The audit that announces a recall must not fine it yet."
 	else:
-		var line: Dictionary = {}
-		for l: Dictionary in gs.audit_log[-1]["lines"]:
-			if l["instrument_id"] == gs.STEERING_ID:
-				line = l
-		if not line.get("suspect", false) or line["fine"] < int(DataManager.get_number(DRIFT, "compliance_fine/suspect_cal_credits", 75.0)):
-			problem = "Vance must fine the suspect unit: %s" % line
+		_set_day(cadence * 3)
+		gs._run_audit(cadence * 3)
+		var line: Dictionary = _lines_by_id(gs.audit_log[-1])[gs.STEERING_ID]
+		if not line["suspect"] or line["fine"] < int(DataManager.get_number(DRIFT, "compliance_fine/suspect_cal_credits", 75.0)):
+			problem = "Vance must fine a suspect unit not redone by the next audit: %s" % line
 	if problem == "":
 		gs.calibrate(gs.STEERING_ID)
 		if gs.suspect_units.has(gs.STEERING_ID):
@@ -218,21 +232,63 @@ func test_recall_cascades_through_a_standard() -> String:
 	var second_id: String = gs.standard_ids()[1]
 	var unit_id: String = gs.HYGROMETER_ID
 	# Records built by hand: a standard calibrated against another standard
-	# (no such pair in the data yet), then a unit calibrated against it.
+	# (no such pair in the data yet), then a unit calibrated against it, in log order.
 	gs.cal_log.append({ "instrument_id": second_id, "standard_id": standard_id, "day": 3, "traceable": true,
 		"as_found": 0.38, "mpe": 0.5, "acceptance_limit": 0.4, "result": CalUncertainty.PASS, "suspect": false })
-	gs.cal_log.append({ "instrument_id": unit_id, "standard_id": second_id, "day": 4, "traceable": true,
-		"as_found": 0.08, "mpe": 5.0, "acceptance_limit": 0.1, "result": CalUncertainty.PASS, "suspect": false })
 	gs.cal_log.append({ "instrument_id": unit_id, "standard_id": second_id, "day": 2, "traceable": true,
+		"as_found": 0.08, "mpe": 5.0, "acceptance_limit": 0.1, "result": CalUncertainty.PASS, "suspect": false })
+	gs.cal_log.append({ "instrument_id": unit_id, "standard_id": second_id, "day": 4, "traceable": true,
 		"as_found": 0.08, "mpe": 5.0, "acceptance_limit": 0.1, "result": CalUncertainty.PASS, "suspect": false })
 	var flagged: Array[Dictionary] = gs.recall(standard_id, 0.06, 0)
 	var problem: String = ""
 	if flagged.size() != 2:
 		problem = "The cascade must flag the standard's record and the unit's later one, got %d." % flagged.size()
-	elif gs.cal_log[2]["suspect"]:
+	elif gs.cal_log[-2]["suspect"]:
 		problem = "A unit calibration made before the suspect standard calibration must not cascade."
 	elif not gs.suspect_units.has(unit_id) or gs.suspect_units.has(second_id):
 		problem = "Only units go on the suspect list: %s" % gs.suspect_units
+	gs.free()
+	return problem
+
+
+## An older suspect calibration that a later good one superseded leaves the
+## unit's current calibration standing.
+func test_superseded_record_does_not_make_unit_suspect() -> String:
+	var gs: GameStateScript = _make_state()
+	var standard_id: String = gs.standard_ids()[0]
+	var unit_id: String = gs.HYGROMETER_ID
+	gs.cal_log.append({ "instrument_id": unit_id, "standard_id": standard_id, "day": 2, "traceable": true,
+		"as_found": 0.08, "mpe": 5.0, "acceptance_limit": 0.1, "result": CalUncertainty.PASS, "suspect": false })
+	gs.cal_log.append({ "instrument_id": unit_id, "standard_id": standard_id, "day": 4, "traceable": true,
+		"as_found": 0.0, "mpe": 5.0, "acceptance_limit": 0.1, "result": CalUncertainty.PASS, "suspect": false })
+	var flagged: Array[Dictionary] = gs.recall(standard_id, 0.06, 0)
+	var problem: String = ""
+	if flagged.size() != 1 or not gs.cal_log[-2]["suspect"]:
+		problem = "Only the older record changes result and must be flagged, got %d." % flagged.size()
+	elif gs.suspect_units.has(unit_id):
+		problem = "A superseded record must not make the unit suspect."
+	gs.free()
+	return problem
+
+
+## A remote zero after a traceable calibration breaks the chain until the
+## next traceable calibration.
+func test_untraceable_adjustment_breaks_chain() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	_set_day(2)
+	_all_in_band(gs)
+	gs.calibrate(gs.STEERING_ID)
+	var problem: String = ""
+	if not gs.traceability_chain(gs.STEERING_ID)["traceable"]:
+		problem = "Setup: a fresh bench calibration must be traceable."
+	gs.calibrate(gs.STEERING_ID, "You", false)
+	if problem == "" and gs.traceability_chain(gs.STEERING_ID)["traceable"]:
+		problem = "A remote zero after the last traceable calibration must break the chain."
+	gs.calibrate(gs.STEERING_ID)
+	if problem == "" and not gs.traceability_chain(gs.STEERING_ID)["traceable"]:
+		problem = "A traceable calibration must mend the chain."
+	GameClock.elapsed_days = saved
 	gs.free()
 	return problem
 
@@ -285,6 +341,15 @@ func test_bench_lists_standards_with_send_button() -> String:
 	bench.open(GameState.STEERING_ID)
 	if problem == "" and (button.text != CalBenchUI.CALIBRATE_TEXT or not standard_label.text.contains("Chain")):
 		problem = "A unit must show the calibrate button and its chain: %s / %s" % [button.text, standard_label.text]
+	var table_id: String = GameState.steering.calibrated_by
+	var was_away: bool = GameState.at_oirm.has(table_id)
+	GameState.at_oirm[table_id] = 99
+	bench.open(GameState.STEERING_ID)
+	var result: Label = bench.get_node("%ResultLabel")
+	if problem == "" and (not button.disabled or not result.text.contains("at OIRM")):
+		problem = "With its standard at OIRM a unit can't be calibrated: %s" % result.text
+	if not was_away:
+		GameState.at_oirm.erase(table_id)
 	root.remove_child(bench)
 	bench.free()
 	return problem

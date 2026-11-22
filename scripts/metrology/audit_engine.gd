@@ -34,8 +34,11 @@ static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, 
 	for id_key: Variant in sensors:
 		var instrument_id: String = id_key
 		var sensor: DriftingSensor = sensors[instrument_id]
-		var ratio: float = sensor.get_error_ratio()
-		var band: int = sensor.get_band()
+		# A standard's error only shows at OIRM (section 1.6): Vance checks its
+		# certificate is in date, not its reading.
+		var is_standard: bool = sensor.role == "standard"
+		var ratio: float = 0.0 if is_standard else sensor.get_error_ratio()
+		var band: int = DriftingSensor.Band.IN_BAND if is_standard else sensor.get_band()
 		var repeats: int = int(prior_offences.get(instrument_id, 0))
 		var out_of_tolerance: bool = band == DriftingSensor.Band.OUT_OF_TOLERANCE
 		var overdue: bool = sensor.is_overdue(day)
@@ -46,6 +49,7 @@ static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, 
 		total_fine += fine
 		lines.append({
 			"instrument_id": instrument_id,
+			"standard": is_standard,
 			"as_found": sensor.error,
 			"unit": sensor.error_unit,
 			"mpe": sensor.mpe,
