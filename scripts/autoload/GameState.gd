@@ -1306,9 +1306,10 @@ func _credibility_after_calibration(record: Dictionary) -> void:
 func contract_text() -> String:
 	match contract_state:
 		"active":
-			return "OIRM CONTRACT: %d of %d on time and traceable\nRepeats don't count. Reward: %s, %d %% off" % [
+			var standard: String = contract_standard_id()
+			return "OIRM CONTRACT: %d of %d in a row, on time, traceable\nA unit counts again after half its interval\nReward: %s for %s" % [
 				contract_run, contract_run_needed(),
-				_model_name(contract_standard_id()), contract_discount_pct()]
+				_model_name(standard), _contract_price_text(standard)]
 		"complete":
 			return "OIRM CONTRACT DONE: %s at Bram's" % _model_name(contract_standard_id())
 	return ""
@@ -1317,6 +1318,12 @@ func contract_text() -> String:
 ## The model part of a short name, e.g. "HB-700" from "HB-700 pressure controller".
 func _model_name(instrument_id: String) -> String:
 	return get_sensor(instrument_id).short_name.get_slice(" ", 0)
+
+
+## The contract price, e.g. "800 CR + 4 crystal ore", even before it is earned.
+func _contract_price_text(standard_id: String) -> String:
+	var sensor: DriftingSensor = get_sensor(standard_id)
+	return "%s CR + %d crystal ore" % [SP811.integer(_discounted(sensor.price_credits)), sensor.price_ore]
 
 
 func contract_standard_id() -> String:

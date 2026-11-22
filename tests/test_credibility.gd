@@ -187,8 +187,13 @@ func test_contract_offer_run_and_reset() -> String:
 	_calibrate_after_interval(gs)
 	if problem == "" and gs.contract_run != 2:
 		problem = "Two on-time traceable calibrations must count 2, got %d." % gs.contract_run
-	if problem == "" and not gs.contract_text().begins_with("OIRM CONTRACT: 2 of %d on time and traceable" % needed):
-		problem = "The phone must show the run, got '%s'." % gs.contract_text()
+	var hb: DriftingSensor = gs.get_sensor(HB700)
+	var price: String = "%s CR + %d crystal ore" % [
+		SP811.integer(hb.price_credits * (100 - gs.contract_discount_pct()) / 100), hb.price_ore]
+	var shown: String = gs.contract_text()
+	if problem == "" and not (shown.begins_with("OIRM CONTRACT: 2 of %d in a row, on time, traceable" % needed)
+			and shown.contains("half its interval") and shown.contains("HB-700 for " + price)):
+		problem = "The phone must show the run, the interval rule and the price, got '%s'." % shown
 	# Calibrating again within the same interval neither counts nor breaks the run.
 	gs.calibrate(UNIT)
 	if problem == "" and gs.contract_run != 2:
