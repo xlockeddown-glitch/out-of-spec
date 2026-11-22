@@ -222,7 +222,7 @@ func format_value(value: float, decimals: int = -1) -> String:
 	match error_unit:
 		"degrees":
 			return number + "°"
-		"percentage_points_rh":
+		"percentage_points_rh", "percentage_points_vwc":
 			return number + " %"
 		"degC":
 			return number + " °C"
@@ -239,6 +239,8 @@ func quantity_name() -> String:
 			return "angle"
 		"percentage_points_rh":
 			return "relative humidity"
+		"percentage_points_vwc":
+			return "soil moisture"
 		"kPa":
 			return "pressure"
 		"degC":
@@ -261,7 +263,7 @@ func quantity_title() -> String:
 
 
 func _is_plain_unit() -> bool:
-	return not error_unit in ["degrees", "percentage_points_rh", "degC", "fractional_e6"]
+	return not error_unit in ["degrees", "percentage_points_rh", "percentage_points_vwc", "degC", "fractional_e6"]
 
 
 static func band_label(band: int) -> String:

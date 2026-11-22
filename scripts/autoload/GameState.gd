@@ -19,6 +19,8 @@ signal upgrades_changed
 ## A standard left on, or came back from, the OIRM drop pod (milestone 2).
 signal oirm_changed
 signal credibility_changed(points: int)
+## A crop was planted, grew, or was harvested (income milestone).
+signal crops_changed
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -31,6 +33,10 @@ const ITEMS_TABLE: StringName = &"items"
 const ECONOMY_TABLE: StringName = &"economy"
 const DRIFT_TABLE: StringName = &"sensor_drift_config"
 const DISPATCH_TABLE: StringName = &"dialogue_dispatches"
+const CROPS_TABLE: StringName = &"crops"
+const SOIL_PROBE_ID: String = "soil_probe"
+## Set-point step for [ and ], as a volumetric fraction (1 %).
+const SETPOINT_STEP: float = 0.01
 const PHONE_LOG_MAX: int = 40
 
 # --- Playtest tuning (Week 2 board: keep the loop under two minutes) ---------
@@ -138,6 +144,15 @@ var _best_band: int = 0
 ## "complete" (its standard is for sale) or "fulfilled" (bought).
 var contract_state: String = ""
 var contract_run: int = 0
+
+## Income milestone (Ryan, 2026-11-22): crops on tilled cells, auto-irrigated
+## to a set point as the soil probe reads it, sold to Lin.
+## Vector3i -> { crop_id, planted_day, days_grown, setpoint, out_of_band_days }
+var plantings: Dictionary = {}
+## Harvested crops waiting for Lin: { crop_id, in_spec, out_of_band_days }.
+var harvest_bin: Array[Dictionary] = []
+## The crop the next planting uses ("" = the first in data/crops.json).
+var seed_crop_id: String = ""
 
 
 func _ready() -> void:
@@ -441,6 +456,7 @@ func _on_day_started(day: int) -> void:
 	# Courier returns land in the morning, before an audit that day.
 	_receive_oirm_returns(day)
 	_charge_overdue_credibility(day)
+	_grow_crops()
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)
@@ -1362,3 +1378,186 @@ func _offer_first_contract() -> void:
 	post_phone("OIRM CONTRACT offered: make %d calibrations in a row on time and traceable, and Bram will sell you the %s for %s CR + %d crystal ore (%d %% off). Calibrating a unit again before it has run half its interval doesn't count." % [
 		contract_run_needed(), instrument_name(standard), SP811.integer(_discounted(sensor.price_credits)),
 		sensor.price_ore, contract_discount_pct()])
+
+
+# --- Crops and Lin (income milestone) ----------------------------------------
+
+## Crop ids in data order.
+func crop_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for id: StringName in DataManager.get_ids(CROPS_TABLE):
+		ids.append(str(id))
+	return ids
+
+
+func crop(crop_id: String) -> Dictionary:
+	return DataManager.get_record(CROPS_TABLE, StringName(crop_id))
+
+
+func current_seed() -> String:
+	var ids: Array[String] = crop_ids()
+	if ids.is_empty():
+		return ""
+	return seed_crop_id if ids.has(seed_crop_id) else ids[0]
+
+
+## Switches the next planting to the following crop; returns its id.
+func cycle_seed() -> String:
+	var ids: Array[String] = crop_ids()
+	if ids.is_empty():
+		return ""
+	seed_crop_id = ids[(ids.find(current_seed()) + 1) % ids.size()]
+	return seed_crop_id
+
+
+func seed_cost(crop_id: String) -> int:
+	var pct: float = DataManager.get_number(ECONOMY_TABLE, "crops/seed_cost_pct", 0.0)
+	return roundi(float(crop(crop_id).get("base_sell_credits", 0)) * pct / 100.0)
+
+
+func crop_name(crop_id: String) -> String:
+	return str(crop(crop_id).get("name", crop_id))
+
+
+## Plants the current seed on a tilled, empty cell. Returns "" or the reason not.
+func plant_crop(cell: Vector3i) -> String:
+	var crop_id: String = current_seed()
+	if crop_id == "":
+		return "No crops in the data."
+	if not tilled_cells.has(cell):
+		return "Till the soil first."
+	if plantings.has(cell):
+		return "Something is already growing here."
+	var cost: int = seed_cost(crop_id)
+	if credits < cost:
+		return "%s seed costs %s CR; you have %s CR." % [crop_name(crop_id), SP811.integer(cost), SP811.integer(credits)]
+	add_credits(-cost)
+	plantings[cell] = {
+		"crop_id": crop_id,
+		"planted_day": GameClock.get_day_index(),
+		"days_grown": 0,
+		"setpoint": float(crop(crop_id).get("soil_moisture_target", 0.0)),
+		"out_of_band_days": 0,
+	}
+	crops_changed.emit()
+	return ""
+
+
+func is_crop_ready(cell: Vector3i) -> bool:
+	if not plantings.has(cell):
+		return false
+	var planting: Dictionary = plantings[cell]
+	return int(planting["days_grown"]) >= int(crop(planting["crop_id"]).get("growth_days", 1))
+
+
+## The soil's true volumetric water content (fraction): irrigation holds the
+## probe's reading at the set point, so the soil sits at set point minus the
+## probe's error.
+func soil_moisture(cell: Vector3i) -> float:
+	var planting: Dictionary = plantings.get(cell, {})
+	if planting.is_empty():
+		return 0.0
+	var probe: DriftingSensor = get_sensor(SOIL_PROBE_ID)
+	var error_fraction: float = probe.error / 100.0 if probe != null else 0.0
+	return clampf(float(planting["setpoint"]) - error_fraction, 0.0, 1.0)
+
+
+func is_soil_in_band(cell: Vector3i) -> bool:
+	var planting: Dictionary = plantings.get(cell, {})
+	if planting.is_empty():
+		return false
+	var spec: Dictionary = crop(planting["crop_id"])
+	var target: float = float(spec.get("soil_moisture_target", 0.0))
+	return absf(soil_moisture(cell) - target) <= float(spec.get("tolerance_band", 0.0))
+
+
+## Each morning: crops still growing note a day out of their moisture band,
+## then grow one day.
+func _grow_crops() -> void:
+	if plantings.is_empty():
+		return
+	for cell: Variant in plantings:
+		if is_crop_ready(cell):
+			continue
+		var planting: Dictionary = plantings[cell]
+		if not is_soil_in_band(cell):
+			planting["out_of_band_days"] = int(planting["out_of_band_days"]) + 1
+		planting["days_grown"] = int(planting["days_grown"]) + 1
+	crops_changed.emit()
+
+
+## Moves a cell's irrigation set point by `steps` × 1 %. Returns the new set
+## point, or -1.0 with nothing planted.
+func adjust_setpoint(cell: Vector3i, steps: int) -> float:
+	if not plantings.has(cell):
+		return -1.0
+	var planting: Dictionary = plantings[cell]
+	planting["setpoint"] = clampf(snappedf(float(planting["setpoint"]) + steps * SETPOINT_STEP, SETPOINT_STEP), 0.0, 1.0)
+	crops_changed.emit()
+	return planting["setpoint"]
+
+
+## Harvests a ready crop into the bin. Returns the bin entry, or {} if not ready.
+func harvest_crop(cell: Vector3i) -> Dictionary:
+	if not is_crop_ready(cell):
+		return {}
+	var planting: Dictionary = plantings[cell]
+	var entry: Dictionary = {
+		"crop_id": planting["crop_id"],
+		"in_spec": int(planting["out_of_band_days"]) == 0,
+		"out_of_band_days": int(planting["out_of_band_days"]),
+	}
+	plantings.erase(cell)
+	harvest_bin.append(entry)
+	crops_changed.emit()
+	return entry
+
+
+## What Lin pays for one bin entry: base price in spec, less the crop's
+## out-of-spec penalty if its soil left the band on any growing day.
+func crop_sale_price(entry: Dictionary) -> int:
+	var spec: Dictionary = crop(entry.get("crop_id", ""))
+	var base: int = int(spec.get("base_sell_credits", 0))
+	if entry.get("in_spec", false):
+		return base
+	return roundi(base * (1.0 - float(spec.get("out_of_spec_penalty_pct", 0)) / 100.0))
+
+
+func harvest_bin_value() -> int:
+	var total: int = 0
+	for entry: Dictionary in harvest_bin:
+		total += crop_sale_price(entry)
+	return total
+
+
+## Lin buys the whole bin. Returns the credits paid (0 if the bin was empty).
+func sell_harvest_to_lin() -> int:
+	if harvest_bin.is_empty():
+		return 0
+	var total: int = harvest_bin_value()
+	var count: int = harvest_bin.size()
+	var off_spec: int = 0
+	for entry: Dictionary in harvest_bin:
+		if not entry.get("in_spec", false):
+			off_spec += 1
+	harvest_bin.clear()
+	add_credits(total)
+	crops_changed.emit()
+	var note: String = ("" if off_spec == 0
+		else " %d off spec, paid at the reduced price." % off_spec)
+	post_phone("LIN: Bought %d crops for %s CR.%s" % [count, SP811.integer(total), note])
+	return total
+
+
+## One line on the crop in `cell`, for the phone.
+func crop_status_text(cell: Vector3i) -> String:
+	var planting: Dictionary = plantings.get(cell, {})
+	if planting.is_empty():
+		return ""
+	var spec: Dictionary = crop(planting["crop_id"])
+	var stage: String = ("ready to harvest" if is_crop_ready(cell)
+		else "day %d of %d" % [int(planting["days_grown"]), int(spec.get("growth_days", 1))])
+	return "%s, %s. Irrigation set point %s %%, target %s %%" % [
+		crop_name(planting["crop_id"]), stage,
+		SP811.number(float(planting["setpoint"]) * 100.0, 0),
+		SP811.number(float(spec.get("soil_moisture_target", 0.0)) * 100.0, 0)]

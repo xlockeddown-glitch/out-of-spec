@@ -277,3 +277,47 @@ Agent's notes (flagged for Ryan, not his words):
 - The phone shows the band under the clock, e.g. "CRED: PROVISIONAL, 33 % to TRUSTED", and the open contract on a second line ("OIRM CONTRACT: 2 of 5 on time", then "OIRM CONTRACT DONE: HB-700 at Bram's").
 - **Known economy limit:** the discounted HB-700 costs 800 CR, more than the 500 CR start, and this build has no income (every credit change is a fine, fee or purchase). So the contract can be earned but not yet redeemed in a normal playthrough. It needs the crop/harvest income or an economy decision from Ryan; even Tier 1 standards are tight today.
 - There is no save system yet, so credibility and the contract reset with a new game.
+
+## 2026-11-22: Ryan's answers after the credibility milestone (PR #47)
+
+### Ryan chose
+
+- **Income: "Both".** Crop sales first, then paid calibration jobs unlocked at TRUSTED.
+- **Next milestone: "Income loop".** Build the income so the OIRM contract can be redeemed.
+- **Moisture: "New soil probe".** A soil-moisture probe that drifts and needs calibration like the other units; a drifted probe means off-spec crops. Its specs are [PLACEHOLDER].
+- **Buyer: "Lin".** Lin, the botanist and substrate dealer, appears in this milestone and buys crops.
+- **Watering: "Auto-irrigation".** Set a target moisture per plot, and irrigation holds it using the probe's reading.
+
+### Agent's notes on the crop build (flagged for Ryan, not his words)
+
+- The soil probe's numbers are [PLACEHOLDER]: drift 0.15 %/day (percentage points of volumetric water content), MPE 3.0 %, as-left residual 0.2 %, 40 minutes on the bench.
+- It is calibrated against a "Gravimetric Soil Reference Kit" (weigh, oven-dry, reweigh), a Tier 0 standard owned from the start. The kit is the agent's proposal, since the probe needed a standard; its numbers are [PLACEHOLDER] too.
+- How the probe drives the crop: irrigation holds the probe's *reading* at the set point, so the soil really sits at set point minus the probe's error. The player can calibrate the probe, or offset a plot's set point by the known error ([ and ] keys, 1 % steps).
+- A harvest is off spec if the soil left the crop's tolerance band on any growing day. Lin then pays the base price less the crop's out-of-spec penalty (from data/crops.json). The any-day rule is the agent's choice; a share-of-days rule would be gentler.
+- Seeds cost 25 % of the crop's base price ([PLACEHOLDER], data/economy.json). C changes the seed; using the rover on tilled soil plants, reports, or harvests.
+- Lin buys the whole harvest bin at Bram's bay (L key) until she has a place of her own.
+- Crops show as the existing crop_stage voxel models: stages 0 to 2 while growing, stage 3 when ready, and the wilted model once the soil has left its band. That wilting is a visible clue that the probe has drifted; hiding it would make the drift harder to spot.
+- Paid calibration jobs at TRUSTED come in the next PR.
+
+## 2026-11-22: Ryan's idea, a calibration robot helper
+
+### Ryan said
+
+- A robot helper that gets taught calibrations and improves over time (levels, maybe tied to a skill), until it can do harder calibrations and assist in the lab. That frees the player for other things as they master calibrations.
+- Different types of robots do different jobs at first. As build and skill technology unlocks, more human-like robots arrive that automate a wider range of skills.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Not scheduled yet; to be offered as a roadmap option after the income milestone. docs/design/equipment_skills_robots.md already sketches robots and skills, and the bench already records calibrations by "the Manager", which don't count toward OIRM contracts; the helper would need the same rule decided.
+
+## 2026-11-22: Ryan's ideas, an automation path and a rogue lab
+
+### Ryan said
+
+- An automation path for most things: manual control at first, then automation with a human in the loop, then automation run remotely from a control panel through a system like Starlink or SI.
+- Let a lab "go rogue" and skip calibrations. That makes the game wonky: weird things happen, things go right when you press left, the wrong things happen. It shouldn't just be miserable; it should be funny and goofy, with some misery.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Not scheduled yet; both go on the roadmap options after the income milestone, next to the robot helper (the automation path fits it: manual, then a taught helper, then remote).
+- The rogue lab fits the drift already in the game: overdue instruments could cause comic glitches scaled by how far out of tolerance they are (swapped controls, odd phone messages), on top of the credibility cost. Which glitches, and how strong, are Ryan's call.

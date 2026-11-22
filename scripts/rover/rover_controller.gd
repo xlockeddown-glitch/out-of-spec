@@ -15,6 +15,8 @@ signal drift_changed(drift_deg: float, band: int)
 signal steering_zeroed(record: Dictionary)
 signal soil_tilled(cell: Vector3i)
 signal till_rejected(reason: String)
+## Space on a cell that is already tilled: plant, check or harvest it.
+signal tilled_cell_used(cell: Vector3i)
 signal ore_mined(fissure_id: StringName)
 
 enum Command { TILL, ZERO_STEERING }
@@ -255,9 +257,16 @@ func _till_under_rover() -> void:
 		FarmGrid.TillResult.TILLED:
 			soil_tilled.emit(cell)
 		FarmGrid.TillResult.ALREADY_TILLED:
-			till_rejected.emit("Cell (%d, %d) already tilled." % [cell.x, cell.z])
+			tilled_cell_used.emit(cell)
 		FarmGrid.TillResult.NOT_SOIL:
 			till_rejected.emit("No soil under tractor.")
+
+
+## The soil cell under the rover (y = 0), or (0, -1, 0) without a grid.
+func cell_under() -> Vector3i:
+	if soil_grid == null:
+		return Vector3i(0, -1, 0)
+	return soil_grid.world_to_cell(global_position)
 
 
 func _try_mine() -> bool:
