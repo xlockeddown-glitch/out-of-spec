@@ -602,3 +602,15 @@ Agent's notes (flagged for Ryan, not his words):
 - Six tiles stand in a row under a `Gulch` node, a 12 m wash along X behind the plot, centered at (0, −25) m (x −6 m to 6 m, z −26 m to −24 m). Every rock, fissure and clutter piece is at least 3 m from the run's edge (fissure E's center is the nearest).
 - Each tile is sunk 0.4 m, so the channel floor is level with the ground and the banks stand 0.8 m above it. The farm's ground is a flat box, so sinking deeper would bury the channel; standing on the ground would lift the channel floor 0.4 m. This answers the open question in the art doc for now.
 - Open: the run's ends stop at the cut banks, since the pack has no end caps. From the farm's camera distance the run reads more as a low wall than as a wash. Set dressing only: no collision, so the rover drives through it.
+
+## 2026-11-22: Hygrometer on the calibration bench
+
+### Ryan chose
+
+- "Only hygrometer for now"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place from the Environmental Standards pack. Only the chilled-mirror hygrometer is placed; the dry-well calibrator stays unplaced.
+- It sits on the front-left corner of the dome's calibration bench mat at (2.25, 0.9, 0.55) m, turned 180° so its front faces the camera. It fills the 0.3 m strip between the front of the calibration station model (z = 0.4 m) and the front edge of the mat (z = 0.7 m), touching both without passing into either.
+- It is at true size (0.35 m × 0.3 m × 0.15 m). Set dressing only: it does not read humidity, and the bench's calibration still runs as before.
