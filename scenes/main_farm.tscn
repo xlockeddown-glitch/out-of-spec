@@ -13,6 +13,7 @@
 [ext_resource type="Script" path="res://scripts/world/bram_bay.gd" id="11_bram"]
 [ext_resource type="Script" path="res://scripts/world/model_slot.gd" id="12_slot"]
 [ext_resource type="Script" path="res://scripts/world/uplink_beam.gd" id="13_beam"]
+[ext_resource type="MeshLibrary" path="res://assets/voxels/soil_tiles.tres" id="14_soil"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -33,6 +34,18 @@ albedo_color = Color(0.42, 0.5, 0.3, 1)
 
 [sub_resource type="StandardMaterial3D" id="MatRock"]
 albedo_color = Color(0.5, 0.48, 0.45, 1)
+
+[sub_resource type="BoxShape3D" id="RockAShape"]
+size = Vector3(5, 4, 4)
+
+[sub_resource type="BoxShape3D" id="RockBShape"]
+size = Vector3(4, 3.5, 5)
+
+[sub_resource type="BoxShape3D" id="RockCShape"]
+size = Vector3(4, 4, 4)
+
+[sub_resource type="BoxShape3D" id="RockDShape"]
+size = Vector3(3, 3, 3)
 
 [sub_resource type="StandardMaterial3D" id="MatRelay"]
 albedo_color = Color(0.85, 0.87, 0.9, 1)
@@ -121,43 +134,88 @@ size = Vector3(160, 1, 160)
 material = SubResource("MatGround")
 
 [node name="SoilGrid" type="GridMap" parent="WorldView/WorldViewport/World" unique_id=56551322]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
 cell_size = Vector3(2, 0.2, 2)
 collision_layer = 0
 collision_mask = 0
 script = ExtResource("4_grid")
+mesh_library_override = ExtResource("14_soil")
 
 [node name="Rocks" type="Node3D" parent="WorldView/WorldViewport/World" unique_id=573734627]
 
-[node name="RockA" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks" unique_id=1022918678]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -17, 2, -10)
-use_collision = true
+[node name="RockA" type="StaticBody3D" parent="WorldView/WorldViewport/World/Rocks"]
+position = Vector3(-17, 0, -10)
 collision_layer = 5
 collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rocks/RockA"]
+position = Vector3(0, 2, 0)
+shape = SubResource("RockAShape")
+
+[node name="Model" type="Node3D" parent="WorldView/WorldViewport/World/Rocks/RockA"]
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/boulder_a.glb"
+model_scale = 0.2
+
+[node name="Greybox" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks/RockA/Model"]
+position = Vector3(0, 2, 0)
 size = Vector3(5, 4, 4)
 material = SubResource("MatRock")
 
-[node name="RockB" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks" unique_id=1506736533]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9, 1.75, -17)
-use_collision = true
+[node name="RockB" type="StaticBody3D" parent="WorldView/WorldViewport/World/Rocks"]
+position = Vector3(-9, 0, -17)
 collision_layer = 5
 collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rocks/RockB"]
+position = Vector3(0, 1.75, 0)
+shape = SubResource("RockBShape")
+
+[node name="Model" type="Node3D" parent="WorldView/WorldViewport/World/Rocks/RockB"]
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/boulder_b.glb"
+model_scale = 0.2
+
+[node name="Greybox" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks/RockB/Model"]
+position = Vector3(0, 1.75, 0)
 size = Vector3(4, 3.5, 5)
 material = SubResource("MatRock")
 
-[node name="RockC" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks" unique_id=1587308848]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 16, 2, 9)
-use_collision = true
+[node name="RockC" type="StaticBody3D" parent="WorldView/WorldViewport/World/Rocks"]
+position = Vector3(16, 0, 9)
 collision_layer = 5
 collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rocks/RockC"]
+position = Vector3(0, 2, 0)
+shape = SubResource("RockCShape")
+
+[node name="Model" type="Node3D" parent="WorldView/WorldViewport/World/Rocks/RockC"]
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/boulder_c.glb"
+model_scale = 0.2
+
+[node name="Greybox" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks/RockC/Model"]
+position = Vector3(0, 2, 0)
 size = Vector3(4, 4, 4)
 material = SubResource("MatRock")
 
-[node name="RockD" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks" unique_id=845893544]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.5, -16)
-use_collision = true
+[node name="RockD" type="StaticBody3D" parent="WorldView/WorldViewport/World/Rocks"]
+position = Vector3(5, 0, -16)
 collision_layer = 5
 collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rocks/RockD"]
+position = Vector3(0, 1.5, 0)
+shape = SubResource("RockDShape")
+
+[node name="Model" type="Node3D" parent="WorldView/WorldViewport/World/Rocks/RockD"]
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/boulder_d.glb"
+model_scale = 0.2
+
+[node name="Greybox" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rocks/RockD/Model"]
+position = Vector3(0, 1.5, 0)
 size = Vector3(3, 3, 3)
 material = SubResource("MatRock")
 

@@ -13,12 +13,13 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `drop_pod.glb` | Pod hull, nose, hatch (`DropPod/PodModel`) | |
 | `aud1t.glb` | AUD-1T drone (`DropPod/AUD1T/DroneModel`) | Center origin. The game bobs it. |
 | `relay_mast.glb` | Mast and dish (`SatelliteRelay/MastModel`) | Model the spool bay empty; the spool is game-driven. |
+| `boulder_a.glb` … `boulder_d.glb` | Farm boulders (`Rocks/Rock<A–D>/Model`) | 0.2 m voxels, origin at ground level. Each fills its rock's box collider, except that B's model is 3.6 m tall against a 3.5 m collider. Built from Gemini's layer grids (`tools/voxgen/sheets/boulder_a.txt` … `boulder_d.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 
-Soil tiles: build a MeshLibrary whose item IDs match `FarmGrid.Tile` (0 = soil_untilled, 1 = soil_tilled) and assign it to `SoilGrid.mesh_library_override`.
+Soil tiles: `soil_untilled.glb` and `soil_tilled.glb` (0.1 m voxels, centered on the cell; built from Gemini's layer grids in `tools/voxgen/sheets/soil_*.txt`) are packed into `soil_tiles.tres`, a MeshLibrary whose item IDs match `FarmGrid.Tile` (0 = soil_untilled, 1 = soil_tilled). It is assigned to `SoilGrid.mesh_library_override`. After changing either tile, rebuild it with `Godot_v4.7.2-stable_win64_console.exe --headless --path . --script res://tools/voxgen/build_soil_library.gd`.
 
-Rocks: keep `collision_layer = 5` (world + signal_occluder) on whatever replaces the CSG boxes, or LOS stops working.
+Rocks: each rock is a `StaticBody3D` on `collision_layer = 5` (world + signal_occluder) with a box `Shape`, so LOS keeps working whatever the `Model` slot shows. Keep that layer if you replace them.
 
 
 ## Upgrade visuals
