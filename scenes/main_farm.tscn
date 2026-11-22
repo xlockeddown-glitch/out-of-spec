@@ -420,7 +420,7 @@ height = 0.6
 material = SubResource("MatDark")
 
 [node name="CabReadout" type="MeshInstance3D" parent="WorldView/WorldViewport/World/Rover" node_paths=PackedStringArray("model_slot")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 1.55, -0.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.35, 1.55, -0.1)
 cast_shadow = 0
 mesh = SubResource("CabReadoutMesh")
 script = ExtResource("15_readout")

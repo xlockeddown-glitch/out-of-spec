@@ -8,13 +8,12 @@ extends MeshInstance3D
 ## (same rule as the terrarium LED).
 
 const BLINK_HZ: float = 2.5
-const EMISSION_ENERGY: float = 3.0
 
 ## The rover's ModelSlot. Picks which roof the readout sits on.
 @export var model_slot: ModelSlot
 ## Rover-local center on the voxel tractor roof (1.5 m top). Placement choice,
 ## not from a spec: checked visible from the iso camera at all 8 headings.
-@export var model_position: Vector3 = Vector3(0.45, 1.55, -0.2)
+@export var model_position: Vector3 = Vector3(0.35, 1.55, -0.1)
 ## Rover-local center on the greybox cab roof (1.65 m top), used without a model.
 @export var greybox_position: Vector3 = Vector3(0.4, 1.7, 0.1)
 
@@ -24,7 +23,7 @@ var _time: float = 0.0
 
 func _ready() -> void:
 	_mat.emission_enabled = true
-	_mat.emission_energy_multiplier = EMISSION_ENERGY
+	_mat.emission_energy_multiplier = ModelSlot.EMIT_ENERGY  # same glow as the voxel emit_* parts
 	material_override = _mat
 	position = model_position if model_slot != null and model_slot.has_model() else greybox_position
 	_refresh()
