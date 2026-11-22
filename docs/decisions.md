@@ -43,7 +43,7 @@ Agent's notes (flagged for Ryan, not his words):
   - Chet's BNH lab is **Certainty Plus** (Fable);
   - the remote link is **the Gossamer link**, whose antenna needs Silk-Spinner silk (Fable, and fits the morph-per-act rule);
   - the off-planet site is a robot-and-spider greenhouse on Phobos, **the Larder** (Fable);
-  - the colony is **Pavonis Shelf Station**.
+  - the colony is **Pavonis Shelf Station** (Fable).
 - Which morph unlocks which act, which silk the intrinsic standard uses, and the ultimate breed's name are the agent's proposals in `story.md`, marked (proposed).
 - The indenture premise is darker than the canon tone. `story.md` plays it as fine-print comedy, not hardship.
 - The specialist path stays as gameplay (Ryan's earlier call); only its separate ending was dropped.
