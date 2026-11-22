@@ -147,11 +147,11 @@ func _on_audit_completed(report: Dictionary) -> void:
 
 func _show_audit(report: Dictionary) -> void:
 	if report.get("warning", false):
-		_toast("AUDIT DAY %d: WARNING ONLY. Your manager %s before Vance got in. One time only." % [
+		_toast_fresh("AUDIT DAY %d: WARNING ONLY. Your manager %s before Vance got in. One time only." % [
 			report.get("day", 0), report.get("waived_names", "")])
 		return
 	if report.get("passed", true):
-		_toast("AUDIT DAY %d: PASS. Vance is disappointed." % report.get("day", 0))
+		_toast_fresh("AUDIT DAY %d: PASS. Vance is disappointed." % report.get("day", 0))
 		return
 	var failing: PackedStringArray = []
 	for line: Dictionary in report.get("lines", []):
@@ -167,8 +167,15 @@ func _show_audit(report: Dictionary) -> void:
 			failing.append("%s (%s)" % [name_text, ", ".join(why)])
 	if report.get("tire_check", {}).get("violation", false):
 		failing.append("rover tires (AUD-1T)")
-	_toast("AUDIT DAY %d: FINE %s CR. %s. Details on the phone log." % [
+	_toast_fresh("AUDIT DAY %d: FINE %s CR. %s. Details on the phone log." % [
 		report.get("day", 0), SP811.integer(int(report.get("total_fine", 0))), ", ".join(failing)])
+
+
+## The audit summary replaces the morning's phone lines shown in the same
+## frame (they are on the phone log); later lines stack under it.
+func _toast_fresh(text: String) -> void:
+	_toast_left = 0.0
+	_toast(text)
 
 
 func _toast(text: String) -> void:
