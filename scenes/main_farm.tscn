@@ -419,11 +419,12 @@ radius = 0.04
 height = 0.6
 material = SubResource("MatDark")
 
-[node name="CabReadout" type="MeshInstance3D" parent="WorldView/WorldViewport/World/Rover"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.95, -0.05)
+[node name="CabReadout" type="MeshInstance3D" parent="WorldView/WorldViewport/World/Rover" node_paths=PackedStringArray("model_slot")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.45, 1.55, -0.2)
 cast_shadow = 0
 mesh = SubResource("CabReadoutMesh")
 script = ExtResource("15_readout")
+model_slot = NodePath("../VisualRoot")
 
 [node name="Antenna" type="Marker3D" parent="WorldView/WorldViewport/World/Rover" unique_id=752251794]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22, 1.88, 0.38)
