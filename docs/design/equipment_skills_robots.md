@@ -1,6 +1,6 @@
 # Test equipment, player skills and utility robots (design proposal)
 
-Status: **proposal, 2026-11-22.** Nothing here is canon until Ryan approves it and the call is logged in `docs/decisions.md`. This PR changes no code and no data table.
+Status: **proposal, 2026-11-22; Ryan answered all open questions the same day (§6).** Those answers are design decisions for this feature; they still need logging in `docs/decisions.md` when the first slice lands. Numbers marked [PLACEHOLDER] are still open. This PR changes no code and no data table.
 
 Ryan asked for three systems today:
 
@@ -41,7 +41,7 @@ Every drifting sensor in the game today is an angle (steering, dish) or a relati
 
 So most of the new equipment needs **new drifting sensors** to be useful. §1.3 proposes them, each tied to something canon already mentions. Open question Q1 asks how the existing three should be referenced.
 
-**[ASSUMPTION]** My proposal for the existing three: the steering encoder and dish azimuth are calibrated against the jig and the tripod, which become "Tier 0" standards with their own drift. The hygrometer gets a "salt-cell kit" Tier 0 standard. All three Tier 0 standards are additions to Ryan's list and need his OK.
+**Decided by Ryan (2026-11-22):** the existing three are calibrated against two new Tier 0 standards, issued at start with OIRM certificates: a **rotary table** (angle; calibrates the steering encoder and the dish azimuth) and a **humidity generator chamber, Thunder Scientific class** (relative humidity; calibrates the hygrometer). They replace the jig, tripod and salt cell of the first draft. The `steering_encoder_jig` and `field_survey_tripod` props can stay as the fixtures that hold the unit under test **[ASSUMPTION]**. Fictional names, real specs and sources for both are still **[PLACEHOLDER]**; Thunder Scientific is a real trademark, so it gets a fictional maker name like the other seven.
 
 ### 1.2 Names (shortlist for Ryan)
 
@@ -69,15 +69,13 @@ Institute shortlist (§1.7):
 
 ### 1.3 Proposed new drifting sensors
 
-All rates, MPEs and intervals are **[PLACEHOLDER]** and would go in `sensor_drift_config.json` as `null` until Ryan sets them, the same way the alien morphs carry `null`.
+Ryan kept tire pressure, dome pressure, the terrarium thermometer, the relay timebase and the field meter; `soil_moisture_probe` and `drill_torque` are dropped for now. New sensors get realistic MPEs (the existing three keep theirs). All rates, MPEs and intervals are **[PLACEHOLDER]** and would go in `sensor_drift_config.json` as `null` until Ryan sets them, the same way the alien morphs carry `null`.
 
 | Proposed id | Quantity, unit | What it is in the world | Canon or existing hook |
 |---|---|---|---|
 | `rover_tire_pressure` | pressure, kPa | Tire gauge on the rover | AUD-1T checks tire pressure |
 | `dome_pressure` | pressure, kPa | Dome atmosphere gauge | The dome and airlock exist |
 | `terrarium_thermometer` | temperature, °C | Terrarium probe | Species have `ideal_temp_c` and `temp_tolerance_c` |
-| `soil_moisture_probe` | soil moisture, fraction | Hand probe for crops | Crops have `soil_moisture_target` and `tolerance_band`; the prop exists |
-| `drill_torque` | torque, N·m | Rover drill clutch | Depths drills need sub-percent calibration |
 | `relay_timebase` | fractional frequency, dimensionless | Relay mast oscillator | The relay and uplink lag exist |
 | `field_meter_dc` | DC voltage, V | The player's own handheld meter (it is itself a unit under test) | Traceability chain, §1.7 |
 
@@ -90,7 +88,7 @@ Each entry ends with an **accuracy ratio**: the unit under test's MPE divided by
 #### 1. Handheld digital multimeter (Fluke 87V class)
 
 - **In-game name:** Arsia Fieldworks FM-3 Field Meter **[ASSUMPTION]**
-- **Role:** First tool. Checks the electrical side: the soil moisture probe output and the terrarium thermometer readout chain. A rover battery voltage check would fit too, but no such sensor exists today. It is not a primary reference for anything; it is the workhorse that later gets calibrated by the multi-product calibrator.
+- **Role:** First tool. Checks the electrical side: the terrarium thermometer readout chain, and the robots' onboard soil probes (§3). A rover battery voltage check would fit too, but no such sensor exists today. It is not a primary reference for anything; it is the workhorse that later gets calibrated by the multi-product calibrator.
 - **Tier / unlock:** Tier 1. Bram sells it for crystal ore and credits after the first clean audit (§1.7; price **[PLACEHOLDER]**).
 - **Spec [CITED]:** DC voltage ±(0.05 % of reading + 1 count), 18 °C to 28 °C, per the maker's product page and spec sheet. **[VERIFY]** That figure applies to the 6 V to 1000 V ranges; the reviewer recalls the 600 mV range as ±(0.1 % + 1), and the 10 µV resolution only in the high-resolution (4½-digit) mode.
 - **Accuracy ratio (upper bound on TUR):** At 0.05 % it can check any reading chain whose MPE is about 0.2 % or wider at 4:1. This ignores the 1-count term, which dominates near the bottom of a range. As the unit under test, it needs a standard about 4 times better (about 0.012 %), which the multi-product calibrator gives with a wide margin.
@@ -122,10 +120,10 @@ Each entry ends with an **accuracy ratio**: the unit under test's MPE divided by
 #### 5. Torque standard (CDI 5000 class)
 
 - **In-game name:** Turnwright TW-6 Torque Standard **[ASSUMPTION]**
-- **Role:** Calibrates the drill clutch (`drill_torque`), Bram's torque wrench, and the robots' grip torque (§3).
+- **Role:** Calibrates Bram's torque wrench and the robots' grip torque (§3). (Decided: no drill torque sensor for now.)
 - **Tier / unlock:** Tier 2. Bram, once Instrumentation reaches the gate level. Required before the first robot can be commissioned.
-- **Spec [PLACEHOLDER]:** Sources disagree. Two retailer listings give ±0.25 % of indicated value from 10 % to 100 % of full scale; a manual excerpt gives ±0.5 % for a transducer. The range on one listing is very small (in·ozf) up to 2000 ft·lbf, about 2700 N·m. Ryan picks, or the maker's own sheet settles it (Q4).
-- **Accuracy ratio (upper bound on TUR):** At 0.25 %, it calibrates anything with an MPE of 1 % or wider at 4:1. Canon says Depths drills need **sub-percent** tolerance. If the drill MPE is, say, 0.5 %, the ratio is 2:1, so drills in the Depths would push the player to a better torque standard or a guard band. Good tension if Ryan wants it.
+- **Spec [CITED, retailer]:** ±0.25 % of indicated value from 10 % to 100 % of full scale, from two retailer listings; Ryan picked this over the ±0.5 % transducer figure in a manual excerpt. The range on one listing is very small (in·ozf) up to 2000 ft·lbf, about 2700 N·m. Still to check against the maker's own sheet.
+- **Accuracy ratio (upper bound on TUR):** At 0.25 %, it calibrates anything with an MPE of 1 % or wider at 4:1, which covers a torque wrench (commonly specified around ±4 % **[ASSUMPTION]**) and the robot grip.
 
 #### 6. Pressure controller (Mensor CPC8000 class)
 
@@ -147,18 +145,17 @@ Each entry ends with an **accuracy ratio**: the unit under test's MPE divided by
 
 | # | In-game name [ASSUMPTION] | Class | Tier | From | Calibrates | Its own cal comes from |
 |---|---|---|---|---|---|---|
-| 0a | Steering encoder jig | Angle | 0 | Issued at start | Steering encoder | OIRM |
-| 0b | Survey tripod | Angle | 0 | Issued at start | Dish azimuth | OIRM |
-| 0c | Salt-cell kit | Humidity | 0 | Issued at start | Hygrometer | OIRM |
-| 1 | Arsia Fieldworks FM-3 Field Meter | Handheld meter | 1 | Bram | Soil probe, readout chains | #2, or OIRM |
+| 0a | Rotary table (name [PLACEHOLDER]) | Angle | 0 | Issued at start | Steering encoder, dish azimuth, robot joint encoders | OIRM |
+| 0b | Humidity generator chamber, Thunder Scientific class (name [PLACEHOLDER]) | Humidity | 0 | Issued at start | Hygrometer | OIRM |
+| 1 | Arsia Fieldworks FM-3 Field Meter | Handheld meter | 1 | Bram | Thermometer chain, robot soil probes | #2, or OIRM |
 | 7 | Wren & Dufour WD-1 Reference Gauge | Pressure gauge | 1 | Bram | Tire, dome pressure | #6, or OIRM |
-| 5 | Turnwright TW-6 Torque Standard | Torque | 2 | Bram | Drill, wrench, robot grip | OIRM |
+| 5 | Turnwright TW-6 Torque Standard | Torque | 2 | Bram | Wrench, robot grip | OIRM |
 | 2 | Halvorsen-Mbeki HM-3 Multi-Source Calibrator | Electrical source | 2 | Kestrel | #1, thermometer chain | #3, or OIRM |
 | 6 | Hellas Basin Controls HB-700 Pressure Controller | Pressure | 3 | Kestrel or Dr. Lin | #7, dome gauge, robot tanks | OIRM |
 | 3 | Longscale LS-8.5 Reference Meter | Reference meter | 3 | Kestrel | #2 | OIRM |
 | 4 | Qureshi & Hale Rb-2D Rubidium Reference | Frequency | 3 | Old Orin | Relay timebase | Relay lock to OIRM time (LOS) |
 
-The Tier 0 rows are my additions (§1.1), not Ryan's seven. Their specs, intervals and drift are **[PLACEHOLDER]**. Any standard may go to OIRM; the last column lists the in-house route first where there is one.
+The Tier 0 rows are Ryan's additions to the seven (§1.1). Their specs, intervals and drift are **[PLACEHOLDER]**. The colony owns one of each; standards get a starting interval well over the 5 d pod trip, and the player plans around the downtime. Any standard may go to OIRM; the last column lists the in-house route first where there is one.
 
 ### 1.5 TUR in the game
 
@@ -244,7 +241,7 @@ The game can compute this by walking `standard_id` links in the log back to an O
 
 | Tier | Needs |
 |---|---|
-| 0 (jig, tripod, salt cell) | Nothing; issued at start with an OIRM-traceable certificate from the colony's founding stock **[ASSUMPTION]** |
+| 0 (rotary table, humidity chamber) | Nothing; issued at start with an OIRM-traceable certificate from the colony's founding stock **[ASSUMPTION]** |
 | 1 | Instrumentation 1 (the starting level, §2.4); the first clean audit, meaning an audit with no violations at all. Whether an audit saved only by the one-time grace counts is Q19 |
 | 2 | Instrumentation 3; an **OIRM account**, opened by sending any Tier 1 standard for its first OIRM calibration |
 | 3 | Instrumentation 6; at least one Tier 2 standard with a current OIRM certificate; Vance's sign-off as a "traceable lab" after two clean audits in a row |
@@ -265,8 +262,8 @@ Ryan named calibration speed, uncertainty reduction, equipment unlocks and robot
 | `uncertainty` | Uncertainty | The operator's term in every calibration, so TUR rises | Core |
 | `instrumentation` | Instrumentation | Which standards can be bought and used | Core |
 | `robotics` | Robotics | Robot build, job slots and robot count | Core |
-| `husbandry` | Husbandry | Molt and spool handling | Optional **[ASSUMPTION]** |
-| `field_ops` | Field Ops | Driving, tilling, drilling | Optional **[ASSUMPTION]** |
+| `husbandry` | Husbandry | Molt and spool handling | Kept (Ryan, 2026-11-22) |
+| `field_ops` | Field Ops | Driving, tilling, drilling | Kept (Ryan, 2026-11-22) |
 
 ### 2.2 XP sources, all tied to actions that already exist
 
@@ -321,7 +318,7 @@ Two effects need concepts the game doesn't have yet:
 - **Head:** no face. A short mast with a stub antenna (it takes programs over the uplink, like the rover) and one optical silk "eye" fed by a spool.
 - **Chest light:** one status lamp in the band palette, showing the worst band of its own sensors: teal `#38E1C6`, amber `#F5A623`, and red `#FF5A5F` only when a sensor is truly out of tolerance. Outline and shadow `#1D222B`.
 - **Back:** a water tank with a gauge (for the watering job).
-- Hull color: open (Q9). Voxel size 0.2 m, the character class in `docs/decisions.md`.
+- Hull color: **rust-orange scrap** (decided). The eye costs one optical silk spool (decided). Voxel size 0.2 m, the character class in `docs/decisions.md`.
 
 ### 3.2 Build and commissioning
 
@@ -329,7 +326,7 @@ Two effects need concepts the game doesn't have yet:
 2. **Parts** (costs **[PLACEHOLDER]**): frame (crystal ore and credits, Bram); actuator set; **one optical silk spool** for the eye harness. The spool competes with the relay, which is a deliberate trade-off **[ASSUMPTION]**.
 3. **Assembly** in Bram's bay, one day **[PLACEHOLDER]**.
 4. **Commissioning calibration.** A new robot's sensors start "never calibrated", which is already overdue under the 2026-11-21 audit rules. Before the robot takes any job, each sensor must pass a calibration with the right standard:
-   - joint encoders: the steering encoder jig (angle);
+   - joint encoders: the rotary table (angle);
    - grip torque: the torque standard (so the torque standard is required before the first robot);
    - tank pressure gauge: the field pressure gauge or the controller;
    - onboard soil probe: the field meter chain.
@@ -397,7 +394,7 @@ New files would need entries in `DataManager.RECORD_SECTIONS` where they are arr
     "ore_cost": null,
     "credit_cost": null,
     "skill_gate": { "instrumentation": 1 },
-    "calibrates": ["soil_moisture_probe", "terrarium_thermometer"],
+    "calibrates": ["terrarium_thermometer"],
     "spec": { "basis": "pct_of_reading_plus_counts", "value": null, "confidence": null },
     "own_cal_from": ["multi_source_calibrator", "oirm"],
     "_note": "Spec from the maker's sheet once Ryan approves; see docs/design/equipment_skills_robots.md."
@@ -444,35 +441,41 @@ New calibration record fields: `standard_id`, `standard_uncertainty`, `tur`, `ac
 
 Code impact for later PRs (not done here): `GameState.get_sensor()` is a `match` over two ids; it would become a dictionary of sensors so equipment and robots can register theirs. `_on_time_advanced()` and `_run_audit()` also name the sensors one by one and would loop over that dictionary instead. `INSTRUMENT_NAMES` would move into data. `AuditEngine.evaluate()` already takes a sensors dictionary.
 
-## 5. Suggested order
+## 5. Build order (milestone PRs, decided)
 
-1. TUR and standards on the existing three instruments (Tier 0 jig, tripod, salt cell), so the record shape is proven.
-2. Tier 1 equipment and the two pressure sensors (tire, dome).
-3. Skills: calibration, uncertainty, instrumentation.
-4. Tier 2 and 3, OIRM calibration and certificates, recall.
-5. Robots and the robotics skill.
+Ryan chose milestone-sized PRs, worked one at a time in one session, each second-reviewed and merged before the next. Robot concept art waits for milestone 4.
 
-## 6. Open questions for Ryan
+1. **Calibration core.** Sensor registry in `GameState` (replacing the hardcoded ids in `get_sensor()`, `_on_time_advanced()` and `_run_audit()`); the rotary table and humidity chamber as Tier 0 standards on the existing three sensors; the new record fields (`standard_id`, U, TUR, acceptance limit, result); the uncertainty budget, RSS acceptance limit and 2:1 floor; hidden standard error carried into the unit; bench time.
+2. **OIRM and traceability.** Certificates, the drop-pod courier, traceability chains on the bench and audit screens, recall with impact threshold and cascade, the Tier 1 gate on a clean audit.
+3. **Equipment tiers and new sensors.** The seven instruments as data (working names), tire and dome pressure, terrarium thermometer, relay timebase, field meter; Kestrel's uncertified standards; Tier 2 and 3 gates.
+4. **Skills.** All six skills, starting at level 1, XP from existing calls, the level curve.
+5. **Robots.** Trellis build, commissioning, job cards, robot audits and the interlock fine, plus the Neon concept sheet.
 
-1. **Angle and humidity references.** None of the seven covers the game's current sensors. OK to add Tier 0 standards (encoder jig, survey tripod, salt-cell kit), or should the existing three keep zeroing with no reference?
-2. **Names.** Pick from the §1.2 shortlist (instruments and institute), or keep the bold working names. Finalists still need a trademark check before shipping.
-3. **Game MPEs vs real accuracies.** Decided: instruments carry real accuracies. But the game's current MPEs (4.0°, 5.0 %) are far wider than real lab tolerances, so almost every TUR would be huge. Should the new sensors (§1.3) get realistic MPEs too, so TUR choices matter?
-4. **Torque spec.** The sources disagree (±0.25 % of indicated value vs ±0.5 % for a transducer). Which do you want, or should I find the maker's own sheet?
-5. **Spec as uncertainty.** OK to treat a maker's spec stated at 95 % confidence as k = 2, and a spec with no stated confidence as a rectangular distribution (half-width / √3)? (The 8588A states both 95 % and 99 %; the gauge sheets state no confidence level.)
-6. **Bench time.** Calibration is instant today. Should it take game time, so the Calibration skill has something to speed up?
-7. **TUR thresholds.** 4:1 as the "clean" mark and 2:1 as the hard floor? (The first draft said 1:1, which makes the acceptance limit collapse to 0.)
-8. **New sensors.** Which of the seven proposed sensors (§1.3) do you want? Each one adds audit load.
-9. **Robot look.** Hull color, height, and whether the eye really costs a silk spool.
-10. **Robots and audits.** Should Vance audit robot sensors like any instrument, and fine an overridden interlock?
-11. **Optional skills.** Keep Husbandry and Field Ops, or only the four you named?
-12. **OIRM.** OK with the institute in Earth orbit, standards riding Vance's drop pod for one audit cycle, Kestrel's standards arriving uncertified, and the tier gates in §1.7?
-13. **Guard-band method.** The RSS acceptance limit √(MPE² − U²) recommended in §1.5, the simpler MPE − U, or the Z540.3 Method 6 curve?
-14. **Error propagation.** OK for a standard's hidden error to pass into every unit it calibrates (§1.5)? It is realistic and drives the recall, but it is invisible until a recall.
-15. **Starting skill level.** Everyone starts at level 1 so Tier 1 and the first robot are reachable. OK, or start at 0 with a quest that grants level 1?
-16. **Tier 0 standards and timing.** OK for the Tier 0 jig, tripod and salt cell to start with founding-stock OIRM certificates, and for standards to get a starting interval longer than the 5 d pod trip? Should the colony own two of each so one can be away?
-17. **Recall rules.** Impact threshold and cascade as in §1.6? And do Kestrel calibrations become traceable once the standard's first certificate shows it was in tolerance?
-18. **One MPE number.** Specs like ±(0.05 % of reading + 1 count) depend on the reading. Should the game use the spec at a fixed test point as a single MPE, or carry both terms?
-19. **Grace audit.** Does an audit saved by the one-time grace count as "clean" for the Tier 1 gate?
+## 6. Ryan's decisions (2026-11-22)
+
+Every open question was answered. Numbering matches the earlier questions, which the body text still cites as Q1 to Q19.
+
+1. **Angle and humidity references:** a rotary table and a Thunder Scientific class humidity chamber, as Tier 0 standards that replace the jig, tripod and salt cell (§1.1).
+2. **Names:** keep the bold working names in §1.2. Institute: **OIRM**. A trademark check is still needed before shipping.
+3. **MPEs:** realistic MPEs for the new sensors; the existing three keep theirs.
+4. **Torque spec:** ±0.25 % of reading. The torque standard calibrates robot grip and Bram's wrench only.
+5. **Spec to uncertainty:** a spec stated at 95 % is k = 2; a spec with no stated confidence is rectangular (half-width / √3).
+6. **Bench time:** calibration takes game time; the Calibration skill shortens it.
+7. **TUR thresholds:** 4:1 is the clean mark, 2:1 the hard floor.
+8. **New sensors:** tire pressure, dome pressure, terrarium thermometer, relay timebase, field meter. Not soil probe or drill torque.
+9. **Robot look:** rust-orange scrap hull; the eye costs an optical silk spool.
+10. **Robots and audits:** Vance audits robot sensors and fines an overridden interlock.
+11. **Skills:** keep all six, including Husbandry and Field Ops.
+12. **OIRM:** as written in §1.7.
+13. **Guard band:** RSS, A = √(MPE² − U²).
+14. **Error propagation:** yes, hidden from the player until a recall.
+15. **Starting level:** every skill starts at level 1.
+16. **Tier 0 timing:** one of each standard, with a starting interval well over 5 d.
+17. **Recall:** impact threshold plus cascade. Kestrel calibrations made before the first certificate stay untraceable.
+18. **MPE form:** one value computed at a fixed test point per instrument.
+19. **Grace audit:** does not count as clean; Tier 1 needs an audit with zero violations.
+
+Still open: every **[PLACEHOLDER]** number, the fictional names and specs for the two Tier 0 standards, and the **[VERIFY]** items in §1.4.
 
 ## 7. Sources for the [CITED] values
 
