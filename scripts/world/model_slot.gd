@@ -112,4 +112,7 @@ static func apply_emission(root: Node, overrides: Dictionary[String, float] = {}
 			# Emission only: scene lights falling on the part would add to its glow and
 			# shift the hue (amber lamps under a warm light read yellow).
 			glow.albedo_color = Color.BLACK
+			# Black albedo still keeps the default specular highlight, which takes the
+			# light's color; zero it so only the emission shows.
+			glow.metallic_specular = 0.0
 			mesh_instance.set_surface_override_material(i, glow)
