@@ -540,3 +540,15 @@ Agent's notes (flagged for Ryan, not his words):
 - Ryan's answer was to the question of what to place next.
 - The junction stands just outside the plot's front edge, at (−9, 0, 13.2) m, turned so its front faces the camera, as the plot's feeder. It is clear of the drop pod, the fissure and the rover's start. It is at true size (1.2 m × 0.8 m × 1.2 m), which is large for a drip-line valve.
 - Set dressing only: no collision and no play yet. The Pack 3 entry said its place and size wait for an irrigation milestone; this places it, but its size in play and what it does are still left for that milestone.
+
+## 2026-11-22: Water cistern in the farm
+
+### Ryan chose
+
+- "Water cistern"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next.
+- The cistern stands beside the irrigation junction, at (−11.6, 0, 13.2) m, 0.4 m past the plot's front edge by its left corner, with 1.2 m edge to edge between it and the junction, so the two read as the plot's water supply. It is turned so its front outlet points at the junction and its side outlet points at the plot's front edge. Its nearest edge is 2.6 m from fissure C's center.
+- It is at true size (1.6 m × 1.6 m × 1.8 m). Set dressing only: no collision, no pipe drawn to the junction, and no capacity; those wait for an irrigation milestone.
