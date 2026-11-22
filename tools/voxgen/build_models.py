@@ -736,6 +736,18 @@ METROLOGY_LAB = {
 ENV_CHAMBER = {"C1": "#D4DAE0", "C2": "#8D99AE", "M1": "#3B5978", "F1": "#2E3844", "B1": "#D9A13B",
                "S": SHADOW}
 
+# Ryan's Environmental Standards pack (2026-11-22, 0.025 m voxels, desktop scale for the
+# calibration bench): a dry-well temperature calibrator and a chilled-mirror hygrometer. Colors
+# are his generator's own and all match ones above (C1/C2/F1/K1/Y1 the reference meter's, M1 the
+# chamber's, B1 the bench's brass; no glow, blank recessed screens). Built and turned like the
+# field props. Not placed in any scene yet.
+ENV_STANDARDS = {
+    "dry_well_calibrator": {"C1": "#D4DAE0", "C2": "#8D99AE", "F1": "#2E3844", "K1": "#6C7A89",
+                            "Y1": "#E5B53B", "S": SHADOW},
+    "chilled_mirror_hygrometer": {"C1": "#D4DAE0", "C2": "#8D99AE", "M1": "#3B5978",
+                                  "F1": "#2E3844", "B1": "#D9A13B", "S": SHADOW},
+}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop") -> Model:
@@ -780,6 +792,7 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, GULCH_RIM_COLORS, "rock")), 0.2) for n in GULCH_RIM],
     *[((lambda n=n: prop_sheet(n, METROLOGY_LAB[n][0])), METROLOGY_LAB[n][1]) for n in METROLOGY_LAB],
     (lambda: prop_sheet("env_chamber_cart", ENV_CHAMBER), 0.1),
+    *[((lambda n=n: prop_sheet(n, ENV_STANDARDS[n])), 0.025) for n in ENV_STANDARDS],
 ]
 
 
