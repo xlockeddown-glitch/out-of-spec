@@ -619,3 +619,9 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 3, 0, 13)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/harvest_crate.glb"
 model_scale = 0.1
+
+[node name="ShippingPalletModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 1, 0, 13.3)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/shipping_pallet.glb"
+model_scale = 0.1
