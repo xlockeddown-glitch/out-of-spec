@@ -11,7 +11,7 @@ const BLINK_HZ: float = 2.5
 ## Measured, not from a spec: in sunlight on the farm (Filmic tonemap) 0.5 renders
 ## teal, amber and red within about 20 RGB of the palette hex. ModelSlot.EMIT_ENERGY
 ## (1.2) washes teal to #5EFFF2 and amber to yellow #FFDD3B, because the lit
-## albedo adds to the glow here.
+## albedo adds to the glow here. Night (emission only, no sunlit albedo) is not measured.
 const EMISSION_ENERGY: float = 0.5
 
 ## The rover's ModelSlot. Picks which roof the readout sits on.
