@@ -217,5 +217,5 @@ Ryan chose:
 
 Agent's notes (flagged for Ryan, not his words):
 
-- The pace question covered standards only, so the M3a units keep their game pace (the same days to reach the MPE as before, scaled to the new MPEs: tire about 25 days, dome about 17, thermometer about 25). Their real rates are in the data notes.
+- The pace question covered standards only, so the M3a units keep their game pace (the same days to reach the MPE as before, scaled to the new MPEs: tire about 25 days, dome about 17, thermometer about 25). The data notes say the drift is a game pace and compare it with what each datasheet specifies.
 - The tire gauge's 0.69 kPa resolution is a 0.1 psi step; its display still shows one decimal in kPa.

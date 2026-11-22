@@ -51,7 +51,7 @@
       "display_decimals": 1,
       "calibrated_by": "reference_gauge",
       "bench_minutes": 20,
-      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: MPE ±0.5 % of a 100 psi span (3.45 kPa) and 0.1 psi steps (0.69 kPa), from the JACO Elite 100 PSI digital tire gauge. Drift keeps the game pace (MPE in about 25 days; usage drift scaled with the MPE); a real Honeywell ABP 100PG sensor would take about 84 days. AUD-1T's tire checks are the canon hook."
+      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: MPE ±0.5 % of a 100 psi span (3.45 kPa) and 0.1 psi steps (0.69 kPa), from the JACO Elite 100 PSI digital tire gauge. Drift is a game pace (MPE in about 25 days; usage drift scaled with the MPE), much faster than the stability a Honeywell ABP 100PG class sensor is specified for. AUD-1T's tire checks are the canon hook."
     },
     "dome_pressure": {
       "role": "unit",
@@ -65,7 +65,7 @@
       "display_decimals": 2,
       "calibrated_by": "reference_gauge",
       "bench_minutes": 30,
-      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: WIKA CPG1200 digital absolute gauge, 0 kPa to 160 kPa, ±0.25 % of span (0.40 kPa), 0.01 kPa display. Drift keeps the game pace (MPE in about 17 days); the CPG1200's real stability would take over a year. Against the WD-1 the TUR is 3.11:1, under 4:1 on purpose (Ryan, 2026-11-22); the HB-700 (Tier 3) is its proper reference."
+      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: WIKA CPG1200 digital absolute gauge, 0 kPa to 160 kPa, ±0.25 % of span (0.40 kPa), 0.01 kPa display. Drift is a game pace (MPE in about 17 days), much faster than the gauge's specified long-term stability. Against the WD-1 the TUR is 3.11:1, under 4:1 on purpose (Ryan, 2026-11-22); the HB-700 (Tier 3) is its proper reference."
     },
     "terrarium_thermometer": {
       "role": "unit",
@@ -80,7 +80,7 @@
       "calibrated_by": "field_meter_dc",
       "standard_sensitivity": 5.0,
       "bench_minutes": 40,
-      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: Pt100 RTD probe (Vaisala TMP115) on a TMT130-class transmitter, ±0.5 °C overall, 0.1 °C display (Testo 108 class). The FM-3 checks its 0 V to 10 V output, scaled to 0 °C to 50 °C, so 5 °C/V (standard_sensitivity converts the standard's volts into this unit's degrees Celsius). Drift keeps the game pace (MPE in about 25 days); a real WIKA T32 transmitter drifts far slower."
+      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: a Pt100 RTD probe (Vaisala TMP115, ±0.25 °C over this range) on a TMT130-class transmitter; ±0.5 °C is the chosen game MPE, leaving room for the analog output and readout. 0.1 °C display (Testo 108 class). The FM-3 checks its 0 V to 10 V output, scaled to 0 °C to 50 °C, so 5 °C/V (standard_sensitivity converts the standard's volts into this unit's degrees Celsius). Drift is a game pace (MPE in about 25 days)."
     },
     "relay_timebase": {
       "role": "unit",
@@ -94,7 +94,7 @@
       "display_decimals": 2,
       "calibrated_by": "",
       "bench_minutes": 60,
-      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: fractional frequency in units of 10^-6. ±1.0 × 10⁻⁶ first-year limit for a Stratum 3 OCXO (CTS Model 137, ±0.5 × 10⁻⁶ annual aging); 0.01 × 10⁻⁶ readout (Keysight 53230A class counter). Drift keeps the game pace. Its standard, the Rb-2D, comes in M3b; until then it is out of service: it does not drift and is not audited."
+      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: fractional frequency scaled by 10⁻⁶. The game MPE of ±1.0 × 10⁻⁶ and readout step of 0.01 × 10⁻⁶ are proposed limits for a Stratum 3 OCXO (CTS Model 137 class, ±0.5 × 10⁻⁶ annual aging) read on a reciprocal counter (Keysight 53230A class). Drift is a game pace. Its standard, the Rb-2D, comes in M3b; until then it is out of service: it does not drift and is not audited."
     },
     "rotary_table": {
       "role": "standard",
@@ -134,12 +134,13 @@
       "certificate_uncertainty": 0.0007,
       "certificate_k": 2,
       "initial_interval_days": 30,
+      "resolution": 0.001,
       "display_decimals": 3,
       "price_credits": 250,
       "price_ore": 2,
       "maker": "Arsia Fieldworks",
       "certificate_prefix": "AF",
-      "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #1). Researched 2026-11-22: Fluke 87V MAX class 4½-digit handheld, 60 V range in HiRes mode, ±(0.05 % + 10 counts) at 10 V gives 15 mV; certificate 0.7 mV at k = 2 from a Fluke 5560A-class calibrator. Drift takes it to its MPE in about 120 days (Ryan, 2026-11-22); the real meter is specified over two years. Price and interval are game balance [PLACEHOLDER]. It is both the player's handheld and, until the HM-3 (M3b), a standard calibrated only at OIRM."
+      "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #1). Researched 2026-11-22: Fluke 87V MAX class 4½-digit handheld, 60 V range in HiRes mode. At 10 V, 0.05 % of reading is 5 mV and 10 counts are 10 mV, so the MPE is 15 mV; 1 mV resolution. The 0.7 mV certificate uncertainty (k = 2) is an estimated lab budget: a Fluke 5560A-class calibrator adds about 0.072 mV, the rest is resolution and repeatability. Drift takes it to its MPE in about 120 days (Ryan, 2026-11-22); Fluke specifies its accuracy for two years under stated conditions. Price and interval are game balance [PLACEHOLDER]. It is both the player's handheld and, until the HM-3 (M3b), a standard calibrated only at OIRM."
     },
     "reference_gauge": {
       "role": "standard",
@@ -153,12 +154,13 @@
       "certificate_uncertainty": 0.03,
       "certificate_k": 2,
       "initial_interval_days": 30,
+      "resolution": 0.01,
       "display_decimals": 3,
       "price_credits": 400,
       "price_ore": 3,
       "maker": "Wren & Dufour",
       "certificate_prefix": "WD",
-      "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #7). Researched 2026-11-22: WIKA CPG1500 class precision digital test gauge, 0 kPa to 250 kPa, ±0.05 % of span (0.125 kPa) stated at k = 2, so spec_confidence_pct 95; certificate 0.03 kPa at k = 2 from a Mensor CPC8000-class controller. Drift takes it to its MPE in about 120 days (Ryan, 2026-11-22); the real gauge holds its spec for a year. Price and interval are game balance [PLACEHOLDER]."
+      "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #7). Researched 2026-11-22: WIKA CPG1500 class precision digital test gauge, 0 kPa to 250 kPa, ±0.05 % of span (0.125 kPa) with the measuring rate at up to three readings per second; 0.01 kPa display. WIKA states the accuracy at k = 2, which the game enters as spec_confidence_pct 95. The 0.03 kPa certificate uncertainty (k = 2) is an estimated lab budget: a Mensor CPC8000-class controller adds about 0.020 kPa, the rest is readout and repeatability. Drift takes it to its MPE in about 120 days (Ryan, 2026-11-22); WIKA recommends a one-year calibration interval, depending on use. Price and interval are game balance [PLACEHOLDER]."
     },
     "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. Tier 0 standards' daily_drift_rate takes one from zero to its MPE in about 60 days, Tier 1 in about 120 days (Ryan, 2026-11-22), so skipping an OIRM cycle risks a recall. resolution (one digit of the unit under test), bench_minutes and the standards' specs and drift rates are placeholders (docs/design/equipment_skills_robots.md section 1.5). tier 0 (or absent) = owned from the start; tier 1+ = bought, arrives with a maker's certificate traceable to OIRM (section 1.7). A unit is in service (audited, on the bench) only while its calibrated_by standard is owned. standard_sensitivity (default 1) converts the standard's unit into the unit's own. display_decimals sets how many decimals readings show."
   },

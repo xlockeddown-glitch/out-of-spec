@@ -125,7 +125,7 @@ func test_budget_applies_standard_sensitivity() -> String:
 	var problem: String = ""
 	if absf(budget["u_spec"] - expected_spec) > 1.0e-9:
 		problem = "u_spec must be in degrees Celsius: %s, expected %s." % [budget["u_spec"], expected_spec]
-	elif absf(budget["tur"] - 4.803) > 0.01:
+	elif absf(budget["tur"] - 4.801) > 0.01:
 		problem = "Thermometer against FM-3 should be 4.80:1, got %s." % budget["tur"]
 	var dome: Dictionary = CalUncertainty.budget(gs.get_sensor("dome_pressure"), gs.get_sensor(WD1))
 	if problem == "" and (dome["refused"] or dome["clean"] or absf(dome["tur"] - 3.109) > 0.01):
