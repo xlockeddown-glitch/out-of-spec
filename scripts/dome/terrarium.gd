@@ -3,7 +3,8 @@ extends Node3D
 ## Greybox enclosure visuals, driven entirely by GameState:
 ##   - status LED follows the hygrometer band (red blinks when out of tolerance)
 ##   - heat lamp turns harsh amber when out of tolerance
-##   - tarantula: Active -> Pre-Molt (dimmed, curled) -> Molted (exuvia + spool)
+##   - tarantula: Active -> Pre-Molt (dimmed, curled) -> Molted (exuvia + spool;
+##     the spider itself, greybox or voxel model, is hidden until the spool is taken)
 
 const LAMP_WARM := Color(1.0, 0.72, 0.42)
 const LAMP_HARSH := Color(1.0, 0.45, 0.08)
@@ -25,7 +26,7 @@ var _time: float = 0.0
 
 func _ready() -> void:
 	_led_mat.emission_enabled = true
-	_led_mat.emission_energy_multiplier = 3.0
+	_led_mat.emission_energy_multiplier = ModelSlot.EMIT_ENERGY
 	if status_led:
 		status_led.material_override = _led_mat
 	if tarantula:
@@ -58,6 +59,7 @@ func _apply_molt_visuals() -> void:
 	_body_mat.albedo_color = BODY_PRE_MOLT if pre_molt else BODY_ACTIVE
 	if tarantula:
 		tarantula.scale = Vector3(1.0, 0.7, 1.0) if pre_molt else Vector3.ONE
+		tarantula.visible = not molted
 	if exuvia:
 		exuvia.visible = molted
 	if spool_pickup:

@@ -90,7 +90,7 @@ script = ExtResource("1_dome")
 environment = SubResource("Env")
 
 [node name="CeilingLight" type="OmniLight3D" parent="."]
-position = Vector3(0, 4, 1)
+position = Vector3(0.1, 3.45, -0.9)
 light_color = Color(1, 0.85, 0.7, 1)
 light_energy = 1.5
 shadow_enabled = true
@@ -376,6 +376,9 @@ unique_name_in_owner = true
 script = ExtResource("5_slot")
 model_path = "res://assets/voxels/terrarium.glb"
 model_scale = 0.1
+emit_energy_overrides = Dictionary[String, float]({
+"emit_heat_lamp": 0.5
+})
 greybox = [NodePath("../Glass"), NodePath("../Substrate"), NodePath("../HygroPod"), NodePath("../LampHead")]
 
 [node name="SpiderModel" type="Node3D" parent="Terrarium/Tarantula" node_paths=PackedStringArray("greybox")]
@@ -389,6 +392,9 @@ greybox = [NodePath("../Abdomen"), NodePath("../Cephalothorax"), NodePath("../Le
 script = ExtResource("5_slot")
 model_path = "res://assets/voxels/dome_room.glb"
 model_scale = 0.2
+emit_energy_overrides = Dictionary[String, float]({
+"emit_lamps": 0.5
+})
 greybox = [NodePath("../Floor"), NodePath("../BackWall"), NodePath("../LeftWall"), NodePath("../RightWall"), NodePath("../../Airlock/Frame"), NodePath("../../Airlock/Door")]
 
 [node name="LeftBenchModel" type="Node3D" parent="." node_paths=PackedStringArray("greybox")]
