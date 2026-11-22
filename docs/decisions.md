@@ -528,3 +528,15 @@ Agent's notes (flagged for Ryan, not his words):
 - Ryan's answer was to the question of what to place next.
 - The farm already shows the crop models: since the income milestone, `FarmGrid` stands stage 0 to 2 on a growing cell, stage 3 when it is ready, and the wilted model once the soil leaves its band. A render with all five on one row confirms they sit on the soil and read clearly. No scene change was needed, so this only corrects the docs that still called them unplaced.
 - Every crop in `data/crops.json` uses the same sun-pod models. Models per crop are still an open question.
+
+## 2026-11-22: Irrigation junction in the farm
+
+### Ryan chose
+
+- "Irrigation junction"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next.
+- The junction stands just outside the plot's front edge, at (−9, 0, 13.2) m, turned so its front faces the camera, as the plot's feeder. It is clear of the drop pod, the fissure and the rover's start. It is at true size (1.2 m × 0.8 m × 1.2 m), which is large for a drip-line valve.
+- Set dressing only: no collision and no play yet. The Pack 3 entry said its place and size wait for an irrigation milestone; this places it, but its size in play and what it does are still left for that milestone.
