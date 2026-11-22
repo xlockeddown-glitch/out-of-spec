@@ -340,7 +340,7 @@ radius = 1.5
 material = SubResource("MatRelay")
 
 [node name="Beacon" type="OmniLight3D" parent="WorldView/WorldViewport/World/SatelliteRelay/Dish"]
-position = Vector3(-2, 1.5, -2)
+position = Vector3(-2, 1.75, -2)
 light_color = Color(0.3, 0.85, 1, 1)
 omni_range = 25.0
 
@@ -416,7 +416,7 @@ height = 0.6
 material = SubResource("MatDark")
 
 [node name="Antenna" type="Marker3D" parent="WorldView/WorldViewport/World/Rover" unique_id=752251794]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 2.2, 0.8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 1.75, 0.45)
 
 [node name="UplinkBeam" type="MeshInstance3D" parent="WorldView/WorldViewport/World/Rover/Antenna" node_paths=PackedStringArray("rover")]
 script = ExtResource("13_beam")
