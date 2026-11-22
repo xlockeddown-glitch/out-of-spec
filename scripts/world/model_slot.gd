@@ -58,6 +58,18 @@ func has_model() -> bool:
 	return _model != null
 
 
+## Shows or hides a named part of the loaded model (e.g. "emit_fiber"). Returns
+## false if no model is loaded or the part isn't in it.
+func set_part_visible(part_name: String, shown: bool) -> bool:
+	if _model == null:
+		return false
+	var part := _model.find_child(part_name, true, false) as Node3D
+	if part == null:
+		return false
+	part.visible = shown
+	return true
+
+
 func _hide_greybox() -> void:
 	var targets: Array[Node3D] = greybox.duplicate()
 	if targets.is_empty():

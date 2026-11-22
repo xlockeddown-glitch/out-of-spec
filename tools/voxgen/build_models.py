@@ -284,45 +284,68 @@ def aud1t() -> Model:
 
 # ---------------------------------------------------------------- relay
 def relay_mast() -> Model:
-    """Lattice mast at 0.5 m per voxel. Dish centered at 16 m faces the farm (+X +Z); beacon on the spire behind it."""
+    """After Neon's concept sheet: square lattice tower on a concrete plinth, side-
+    mounted dish near the top, beacon cap, caged spool bay low on the tower and a
+    cyan fiber run (emit_fiber, shown only once a spool is installed). 0.5 m voxels.
+    Matches the scene: SpoolBay at (2.0, 3, 0) m, Dish at (2.0, 15.5, 2.0) m,
+    beacon light at (0, 17, 0) m.
+    """
     m = Model("relay_mast")
-    LATTICE, FOOT, DISH = "#526075", "#30343D", "#E1E8F0"
-    feet = [(0.0, -7.0), (-6.0, 4.0), (6.0, 4.0)]
-    for fx, fz in feet:
-        m.box("mast", int(fx) - 1, int(fx) + 1, 0, 1, int(fz) - 1, int(fz) + 1, FOOT)
-    top_y = 24
-    for fx, fz in feet:
-        m.line("mast", (fx, 2, fz), (0, top_y, 0), LATTICE)
-    for y in range(4, top_y, 4):
-        t = (y - 2) / (top_y - 2)
-        pts = [(fx * (1 - t), y, fz * (1 - t)) for fx, fz in feet]
-        for i in range(3):
-            m.line("mast", pts[i], pts[(i + 1) % 3], LATTICE)
-    # spire rises behind the dish (the dish faces +X +Z, toward the farm)
-    m.line("mast", (0, top_y, 0), (-3, top_y + 3, -3), LATTICE, thick=2)
-    m.box("mast", -4, -3, top_y + 3, 36, -4, -3, LATTICE)
-    # dish centered on the Dish marker: (0, 16, 0) m = (0, 32, 0) voxels
-    n = (1.0, 0.5, 1.0)
+    LATTICE, PLINTH, DISH, FLANGE = "#526075", "#5C6067", "#E1E8F0", "#C48F2B"
+    lo, hi, top, bay = -3, 2, 30, 6  # leg columns, tower top, brace panel height
+    # plinth
+    m.box("mast", lo - 2, hi + 2, 0, 0, lo - 2, hi + 2, PLINTH)
+    m.box("mast", lo - 1, hi + 1, 1, 1, lo - 1, hi + 1, PLINTH)
+    # four legs, rings, and one zigzag diagonal per panel (Warren truss look)
+    for x in (lo, hi):
+        for z in (lo, hi):
+            m.box("mast", x, x, 2, top, z, z, LATTICE)
+    for y in range(2, top + 1, bay):
+        for a, b in ((lo, lo), (hi, hi)):
+            m.box("mast", lo, hi, y, y, a, b, LATTICE)
+            m.box("mast", a, b, y, y, lo, hi, LATTICE)
+    for i, y0 in enumerate(range(2, top, bay)):
+        y1 = y0 + bay
+        flip = i % 2 == 1
+        for zf in (lo, hi):
+            m.line("mast", (hi if flip else lo, y0, zf), (lo if flip else hi, y1, zf), LATTICE)
+        for xf in (lo, hi):
+            m.line("mast", (xf, y0, hi if flip else lo), (xf, y1, lo if flip else hi), LATTICE)
+    # cap and beacon stub
+    m.box("mast", lo, hi, top + 1, top + 1, lo, hi, SHADOW)
+    m.box("mast", -1, 0, top + 2, top + 3, -1, 0, LATTICE)
+    # side-mounted dish facing the farm (+X +Z, tipped up), on the Dish marker
+    n = (1.0, 0.45, 1.0)
     ln = math.sqrt(sum(v * v for v in n))
     n = tuple(v / ln for v in n)
-    c = (0.0, 32.0, 0.0)
-    for x in range(-7, 8):
-        for y in range(26, 39):
-            for z in range(-7, 8):
+    c = (4.0, 31.0, 4.0)
+    m.line("mast", (hi, 29, hi), (hi + 1, 30, hi + 1), LATTICE)  # mount arm
+    for x in range(0, 9):
+        for y in range(26, 37):
+            for z in range(0, 9):
                 p = (x + 0.5 - c[0], y + 0.5 - c[1], z + 0.5 - c[2])
                 d = sum(p[i] * n[i] for i in range(3))
                 r2 = sum(v * v for v in p) - d * d
-                if abs(d - 0.02 * r2) <= 0.5 and r2 <= 4.6 ** 2:
-                    m.put("mast", x, y, z, DISH if r2 < 3.8 ** 2 else LATTICE)
-    m.line("mast", c, (c[0] + n[0] * 3, c[1] + n[1] * 3, c[2] + n[2] * 3), SHADOW)
-    m.line("mast", (-3, 32, -3), c, LATTICE)  # dish mount arm from the spire
-    # spool bay: open pocket for the game's spool at (0.8, 3, 0) m = (1.6, 6, 0) voxels
-    for x in (0, 3):
-        m.box("mast", x, x, 4, 8, -2, -2, LATTICE)
-    m.box("mast", 0, 3, 8, 8, -2, 1, LATTICE)
-    m.box("mast", 0, 3, 4, 4, -2, 1, FOOT)
-    m.clear_box(1, 2, 5, 7, -1, 0)
-    m.box("emit_beacon", -4, -3, 37, 37, -4, -3, TEAL)  # built last so nothing overwrites it
+                if abs(d + 0.06 * r2) <= 0.5 and r2 <= 3.2 ** 2:
+                    m.put("mast", x, y, z, DISH)
+    m.line("mast", c, (c[0] + n[0] * 2.5, c[1] + n[1] * 2.5, c[2] + n[2] * 2.5), SHADOW)  # feed horn
+    # spool bay cage on +X, low on the tower; the game's spool sits in the pocket
+    for x in (3, 5):
+        for z in (-2, 1):
+            m.box("mast", x, x, 4, 8, z, z, LATTICE)
+    m.box("mast", 3, 5, 4, 4, -2, 1, SHADOW)   # floor
+    m.box("mast", 3, 5, 8, 8, -2, 1, LATTICE)  # roof
+    m.box("mast", 3, 5, 5, 7, -2, -2, SHADOW)  # back panel
+    for y in (5, 7):  # gold-anodized flange guides either side of the pocket
+        m.put("mast", 5, y, -1, FLANGE)
+        m.put("mast", 5, y, 0, FLANGE)
+    m.clear_box(3, 4, 5, 7, -1, 0)
+    m.put("emit_bay_lamp", 4, 7, -2, AMBER)
+    # fiber run from the bay up beside the +X+Z leg to the dish (shown once a spool is in)
+    m.box("emit_fiber", hi + 1, hi + 1, 9, 29, hi, hi, TEAL)
+    m.line("emit_fiber", (hi + 1, 29, hi), (hi + 2, 30, hi + 1), TEAL)
+    # beacon last so nothing overwrites it: 17 m, where the beacon light sits
+    m.box("emit_beacon", -1, 0, 34, 34, -1, 0, TEAL)
     return m
 
 

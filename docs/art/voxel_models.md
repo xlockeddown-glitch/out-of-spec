@@ -133,19 +133,23 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
 
 ## 6. Relay mast (`relay_mast.glb`)
 
-- **Footprint:** 18 × 18 × 32 voxels = 9 m × 9 m × 16 m, against the greybox's 16 m mast with the dish at 16 m.
-- **Pick: B's silhouette and A's spool bay.**
-  - B's tall lattice is the landmark the uplink beam points at.
-  - A's side bay has gold-anodized flanges `#C48F2B` and silk `#D8F0F2`.
+- **Source: Neon's concept sheet** (Gemini share, 2026-11-21), which replaces the earlier A/B merge for this model.
+- **Shape:** square four-leg lattice tower, 6 × 6 voxels (3 m) with a zigzag brace per 3 m panel, on a two-step concrete plinth. Side-mounted dish near the top faces the farm (+X +Z, tipped up). Beacon on a cap at 17 m.
+- **Footprint:** 11 × 11 × 35 voxels at 0.5 m = 5.5 m × 5.5 m × 17.5 m.
 - **Palette:**
   - lattice `#526075`
-  - footings `#30343D`
+  - plinth `#5C6067`
+  - cap and bay panels `#1D222B`
   - dish `#E1E8F0`
-  - masthead beacon: `emit_beacon`, `#38E1C6`
-- **Changes:**
-  - B used amber as plain paint on the spool flanges; they are gold instead.
-  - B's red diagnostic LED is removed.
-  - The spool itself stays a game-driven node (`SatelliteRelay/SpoolBay`), shown only once a spool is installed. It is a 0.8 m × 0.8 m cylinder centered at (0.8, 3.0, 0) m from the mast origin: about 1.6 voxels to +X and 6 voxels up. Leave an open 2 × 2 × 2 voxel pocket there so the lattice doesn't bury it.
+  - flange guides `#C48F2B`
+- **Lit voxels:**
+  - beacon: `emit_beacon`, `#38E1C6`
+  - spool bay lamp: `emit_bay_lamp`, `#F5A623`
+  - fiber run from the bay up to the dish: `emit_fiber`, `#38E1C6`. The game shows it only once a silk spool is installed (`SatelliteRelay.mast_model`).
+- **Scene markers moved to match the model:**
+  - `SpoolBay` to (2.0, 3.0, 0) m, inside the open pocket of the bay cage
+  - `Dish` (the uplink target) to (2.0, 15.5, 2.0) m, at the dish center
+  - `Beacon` light to 17 m on the tower axis
 
 ## Generated first pass
 
@@ -159,7 +163,7 @@ Where the generated models differ from the footprints above:
 | tractor_wide | 20 × 24 × 14 | 20 × 25 × 22 | same |
 | terrarium | 14 × 10 × 12 | 14 × 10 × 14 | the lamp hood sits at the greybox lamp height, 1.3 m |
 | bram_bay | 24 × 20 × 16 | 26 × 20 × 16 | Bram's raised hammer and the floor vise overhang the slab by 2 voxels; the whole bay sits 0.5 m back to match the greybox |
-| relay_mast | 18 × 18 × 32 | 15 × 14 × 38 | the dish is centered on the 16 m uplink point; the beacon tops a spire behind it at 18.5 m |
+| relay_mast | 11 × 11 × 35 (Neon sheet) | 11 × 11 × 35 | rebuilt from Neon's concept sheet; see section 6 |
 | drop_pod | 12 × 12 × 16 | 12 × 13 × 16 | the hatch seam stands 1 voxel proud on +Z |
 | curlyhair | about 6 × 6 × 3 | 7 × 7 × 3 | legs reach 3 voxels out; abdomen and prosoma are 3 voxels wide (spec: 3 × 4 and 2 × 2) |
 
