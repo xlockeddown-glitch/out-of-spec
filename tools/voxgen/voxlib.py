@@ -113,8 +113,11 @@ class Model:
                 n = (x + normal[0], y + normal[1], z + normal[2])
                 neighbor = occupied.get(n)
                 if neighbor is not None:
-                    # Glass next to solid still hides; solid next to glass stays visible.
-                    if not (neighbor[0] in self.glass_parts and part not in self.glass_parts):
+                    # Hide the face only behind a neighbor that is always there and opaque:
+                    # emit_* parts can be hidden by the game, and glass is see-through.
+                    n_part = neighbor[0]
+                    if n_part == part or (not n_part.startswith("emit_")
+                                          and n_part not in self.glass_parts):
                         continue
                 pos, nor, idx = geo.setdefault(part, {}).setdefault(color, ([], [], []))
                 base = len(pos)

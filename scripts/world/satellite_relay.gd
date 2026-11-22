@@ -10,6 +10,8 @@ extends Node3D
 @export var beacon: OmniLight3D
 ## Shown only while a spool is slotted.
 @export var spool_visual: Node3D
+## Voxel model; its emit_fiber part lights up only while a spool is slotted.
+@export var mast_model: ModelSlot
 @export var beacon_energy_base: float = 1.0
 @export var beacon_energy_upgraded: float = 6.0
 
@@ -28,3 +30,5 @@ func _apply_upgrade(slotted: bool) -> void:
 		beacon.light_energy = beacon_energy_upgraded if slotted else beacon_energy_base
 	if spool_visual:
 		spool_visual.visible = slotted
+	if mast_model:
+		mast_model.set_part_visible("emit_fiber", slotted)

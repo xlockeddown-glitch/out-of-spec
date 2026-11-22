@@ -36,6 +36,8 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
 
 ## 1. Tractor (`tractor.glb`, `tractor_wide.glb`)
 
+Superseded in part by the Neon concept sheet section below: the whip and `emit_antenna` are replaced by the roof dish and `emit_beacon`.
+
 - **Footprint:**
   - standard: 16 × 24 × 14 voxels = 1.6 m × 2.4 m × 1.4 m, matching the collision box
   - wide: 20 × 24 × 14 voxels (+2 voxels each side)
@@ -84,7 +86,7 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
 - **Footprint:** 24 × 20 × 16 voxels = 4.8 m × 4.0 m × 3.2 m, against the 5.6 m × 4.6 m greybox roof. Bram is about 6 × 4 × 9 voxels, roughly 1.8 m tall.
 - **Pick: answer A.**
   - Its jokes are on theme: a digital torque wrench on the pegboard, permanently red and out of calibration, and a cyan diagnostic scope on the bench.
-  - Blue overalls `#2B4C65` stand out against the amber lamp.
+  - Blue overalls `#2B3C65` stand out against the amber lamp.
 - **From B:**
   - Bram's unkempt steel-gray beard, `#5E5855`
   - the sledgehammer raised over a bent suspension arm in a floor vise
@@ -133,19 +135,43 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
 
 ## 6. Relay mast (`relay_mast.glb`)
 
-- **Footprint:** 18 × 18 × 32 voxels = 9 m × 9 m × 16 m, against the greybox's 16 m mast with the dish at 16 m.
-- **Pick: B's silhouette and A's spool bay.**
-  - B's tall lattice is the landmark the uplink beam points at.
-  - A's side bay has gold-anodized flanges `#C48F2B` and silk `#D8F0F2`.
+- **Source: Neon's concept sheet** (Gemini share, 2026-11-21), which replaces the earlier A/B merge for this model.
+- **Shape:** square four-leg lattice tower, 3 m × 3 m, with one zigzag brace per 3 m panel (the top panel is 2 m), on a two-step concrete plinth. Side-mounted dish near the top faces the farm (+X +Z, tipped up). Dark cap at 15.5 m with the beacon on a 1 m stub above it, at 17 m.
+- **Footprint:** 12 × 12 × 35 voxels at 0.5 m = 6 m × 6 m × 17.5 m.
 - **Palette:**
   - lattice `#526075`
-  - footings `#30343D`
+  - plinth `#5C6067`
+  - cap and bay panels `#1D222B`
   - dish `#E1E8F0`
-  - masthead beacon: `emit_beacon`, `#38E1C6`
-- **Changes:**
-  - B used amber as plain paint on the spool flanges; they are gold instead.
-  - B's red diagnostic LED is removed.
-  - The spool itself stays a game-driven node (`SatelliteRelay/SpoolBay`), shown only once a spool is installed. It is a 0.8 m × 0.8 m cylinder centered at (0.8, 3.0, 0) m from the mast origin: about 1.6 voxels to +X and 6 voxels up. Leave an open 2 × 2 × 2 voxel pocket there so the lattice doesn't bury it.
+  - flange guides `#C48F2B`
+- **Lit voxels:**
+  - beacon: `emit_beacon`, `#38E1C6`
+  - spool bay lamp: `emit_bay_lamp`, `#F5A623`
+  - fiber run from the bay up to the dish: `emit_fiber`, `#38E1C6`. The game shows it only once a silk spool is installed (`SatelliteRelay.mast_model`).
+- **Scene markers moved to match the model:**
+  - `SpoolBay` to (2.0, 3.0, 0) m, inside the open pocket of the bay cage
+  - `Dish` (the uplink target) to (2.0, 15.5, 2.0) m, at the dish center
+  - `Beacon` light to 17.25 m on the tower axis, centered on the beacon voxels
+
+## Neon concept sheets (2026-11-21)
+
+Neon (Gemini) drew concept sheets for the tractor, terrarium, Bram's shed, the ore fissure and the relay mast. The generator follows them for those models; where a sheet and an earlier section of this page differ, the sheet wins, except for the changes below.
+
+- **Tractor:**
+  - big rear wheels (1.2 m), small front wheels (0.7 m)
+  - mustard lower panels `#C9962E`, kept well off guard-band amber `#F5A623`
+  - chrome-slatted grille, amber headlights
+  - roof dish and a cyan roof beacon. The uplink dish replaces the whip, and `Rover/Antenna` (the LOS origin and beam start) moved to the dish center, (0.22, 1.88, 0.38) m, the tip of the feed horn.
+  - wide variant: full-length tracks with sprocket, idler and fenders, plus amber roof lights
+- **Terrarium:** glowing amber dome heat lamp on a slate bracket, hollow half-log hide, round water dish, pebbles. The sheet's two cyan LEDs stay one game-driven LED, colored by the hygrometer band.
+- **Bram's shed:**
+  - timber posts and a lean-to corrugated roof
+  - pegboard tool wall, tire stacks, rusty barrels, a workbench with a cyan monitor, two hanging amber lamps
+  - **Change:** the roof covers only the back half of the shed. Bram stands under it; the game camera's angle still shows him.
+  - **Change:** the slab is sunk 0.2 m so it is flush with the ground and the rover drives onto it.
+  - **Change:** tools are painted `#B0392B`, not alert red; the out-of-cal torque wrench is the only `#FF5A5F` red.
+- **Bram:** chibi proportions, navy coveralls, messy brown hair, goggles pushed up, a big pipe wrench. No beard, per the sheet.
+- **Ore fissure:** cracked terracotta flush with the ground, a dark jagged crack with a branch, and clusters of tall pointed crystals growing out of it.
 
 ## Generated first pass
 
@@ -155,13 +181,14 @@ Where the generated models differ from the footprints above:
 
 | Model | Spec | Built | Why |
 |---|---|---|---|
-| tractor | 16 × 24 × 14 | 16 × 25 × 22 | the 9-voxel wheels overhang by 1; the whip reaches 2.2 m |
-| tractor_wide | 20 × 24 × 14 | 20 × 25 × 22 | same |
-| terrarium | 14 × 10 × 12 | 14 × 10 × 14 | the lamp hood sits at the greybox lamp height, 1.3 m |
-| bram_bay | 24 × 20 × 16 | 26 × 20 × 16 | Bram's raised hammer and the floor vise overhang the slab by 2 voxels; the whole bay sits 0.5 m back to match the greybox |
-| relay_mast | 18 × 18 × 32 | 15 × 14 × 38 | the dish is centered on the 16 m uplink point; the beacon tops a spire behind it at 18.5 m |
+| tractor | 16 × 24 × 14 | 16 × 25 × 19 | Neon sheet: 12-voxel rear wheels; the roof dish tops out at 1.9 m; the hitch adds 1 voxel of depth |
+| tractor_wide | 20 × 24 × 14 | 20 × 25 × 19 | same, with full-length tracks |
+| terrarium | 14 × 10 × 12 | 14 × 10 × 15 | the dome lamp and bracket sit above the tank, whose frame tops out at 1.2 m |
+| bram_bay | 24 × 20 × 16 | 25 × 20 × 18 | Neon sheet: lean-to roof peaks at 3.6 m; Bram's wrench pokes 1 voxel past the slab; the bay sits 0.5 m back to match the greybox |
+| relay_mast | 12 × 12 × 35 (Neon sheet) | 12 × 12 × 35 | rebuilt from Neon's concept sheet; see section 6 |
 | drop_pod | 12 × 12 × 16 | 12 × 13 × 16 | the hatch seam stands 1 voxel proud on +Z |
 | curlyhair | about 6 × 6 × 3 | 7 × 7 × 3 | legs reach 3 voxels out; abdomen and prosoma are 3 voxels wide (spec: 3 × 4 and 2 × 2) |
+| ore_fissure | 8 × 8 × 6 | 8 × 8 × 7 | Neon sheet: the main crystal is 5 voxels tall above two sunk layers |
 
 
 ## Export pipeline (for hand-refined models)
