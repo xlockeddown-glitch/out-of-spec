@@ -85,3 +85,15 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 31, 0, 0)
 script = ExtResource("1_slot")
 model_path = "res://assets/voxels/relay_mast.glb"
 model_scale = 0.5
+
+[node name="cal_station" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 40, 0, 0)
+script = ExtResource("1_slot")
+model_path = "res://assets/voxels/cal_station.glb"
+model_scale = 0.1
+
+[node name="dome_bench" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 45, 0, 0)
+script = ExtResource("1_slot")
+model_path = "res://assets/voxels/dome_bench.glb"
+model_scale = 0.1

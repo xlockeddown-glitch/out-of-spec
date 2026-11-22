@@ -384,3 +384,30 @@ script = ExtResource("5_slot")
 model_path = "res://assets/voxels/curlyhair.glb"
 model_scale = 0.1
 greybox = [NodePath("../Abdomen"), NodePath("../Cephalothorax"), NodePath("../Legs")]
+
+[node name="RoomModel" type="Node3D" parent="Room" node_paths=PackedStringArray("greybox")]
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/dome_room.glb"
+model_scale = 0.2
+greybox = [NodePath("../Floor"), NodePath("../BackWall"), NodePath("../LeftWall"), NodePath("../RightWall"), NodePath("../../Airlock/Frame"), NodePath("../../Airlock/Door")]
+
+[node name="LeftBenchModel" type="Node3D" parent="." node_paths=PackedStringArray("greybox")]
+position = Vector3(-3, 0, 0)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/dome_bench.glb"
+model_scale = 0.1
+greybox = [NodePath("../LeftBench")]
+
+[node name="RightBenchModel" type="Node3D" parent="." node_paths=PackedStringArray("greybox")]
+position = Vector3(3, 0, 0)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/dome_bench.glb"
+model_scale = 0.1
+greybox = [NodePath("../RightBench")]
+
+[node name="StationModel" type="Node3D" parent="CalStation" node_paths=PackedStringArray("greybox")]
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/cal_station.glb"
+model_scale = 0.1
+greybox = [NodePath("../Body"), NodePath("../Screen")]
+

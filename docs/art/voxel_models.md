@@ -173,6 +173,18 @@ Neon (Gemini) drew concept sheets for the tractor, terrarium, Bram's shed, the o
 - **Bram:** chibi proportions, navy coveralls, messy brown hair, goggles pushed up, a big pipe wrench. No beard, per the sheet.
 - **Ore fissure:** cracked terracotta flush with the ground, a dark jagged crack with a branch, and clusters of tall pointed crystals growing out of it.
 
+### Second batch of sheets (2026-11-21, evening)
+
+- **Drop-pod:** square hull with chamfered slate corner struts and a scorched lower band, a stepped pyramid nose under a teal beacon, a +Z hatch with an amber outline, and four splayed legs (orange upper, slate lower, orange pads). 18 × 18 × 21 voxels at 0.2 m (3.6 m across the legs, 4.2 m tall).
+- **AUD-1T:** rounded white shell with a dark visor band and ONE cross-shaped amber eye, off-center like the sheet, plus a teal lift ring. 5 × 5 × 5 voxels at 0.2 m, center origin.
+- **Dome interior**, in three new models with slots over the greybox. The clickable areas stay where they were.
+  - `dome_room.glb`: arched ribbed vault (14 m wide, 5.6 m peak, 10 m deep, open toward the camera), a round airlock with a cyan ring (`emit_airlock_ring`), a door panel with teal LEDs, and three amber pendant lamps (`emit_lamps`). 0.2 m voxels.
+  - `dome_bench.glb`: worn steel work table with slate legs and a shelf, used for both benches. 0.1 m voxels.
+  - `cal_station.glb`: reference standard with a cyan screen, a clamp stand holding the hygrometer under test, an encoder test jig, a clipboard and a handheld meter. 0.1 m voxels.
+  - **Change from the sheet:** it had a small red LED on the clamped hygrometer. The model has an empty socket instead, because red is only for something actually out of tolerance and the hygrometer's state is game-driven.
+  - **Change from the sheet:** its green tablet readout is teal, so it stays on the palette.
+  - **Change from the sheet:** the sheet puts the airlock on the left wall; it stays on the back wall to match the scene.
+
 ## Generated first pass
 
 `python tools/voxgen/build_models.py` builds all nine models from this spec. It writes `assets/voxels/*.glb`, which the game loads, and `assets/voxels/source/*.vox`, for refinement in MagicaVoxel. Checked in Godot 4.7.2: the tractor, fissure, bay, terrarium, spider, drop-pod and AUD-1T load at the right scale and facing, and their `emit_*` parts glow. The relay mast (off camera) and `tractor_wide` (needs the trade) were not seen in play.
@@ -186,7 +198,8 @@ Where the generated models differ from the footprints above:
 | terrarium | 14 × 10 × 12 | 14 × 10 × 15 | the dome lamp and bracket sit above the tank, whose frame tops out at 1.2 m |
 | bram_bay | 24 × 20 × 16 | 25 × 20 × 18 | Neon sheet: lean-to roof peaks at 3.6 m; Bram's wrench pokes 1 voxel past the slab; the bay sits 0.5 m back to match the greybox |
 | relay_mast | 12 × 12 × 35 (Neon sheet) | 12 × 12 × 35 | rebuilt from Neon's concept sheet; see section 6 |
-| drop_pod | 12 × 12 × 16 | 12 × 13 × 16 | the hatch seam stands 1 voxel proud on +Z |
+| drop_pod (Neon sheet 2) | 12 × 12 × 16 | 18 × 18 × 21 | splayed legs widen it to 3.6 m; the nose and beacon reach 4.2 m |
+| aud1t (Neon sheet 2) | 4 × 4 × 5 | 5 × 5 × 5 | the cross-shaped eye needs a 3-voxel visor |
 | curlyhair | about 6 × 6 × 3 | 7 × 7 × 3 | legs reach 3 voxels out; abdomen and prosoma are 3 voxels wide (spec: 3 × 4 and 2 × 2) |
 | ore_fissure | 8 × 8 × 6 | 8 × 8 × 7 | Neon sheet: the main crystal is 5 voxels tall above two sunk layers |
 
