@@ -505,3 +505,13 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - The FM-3 lies face up on the mat at the bench's rear right, behind the silk tray, turned a little off square. It is at true size (0.15 m × 0.25 m), so it reads as a small yellow shape from the default camera. Set dressing only; the reference meter is not placed yet.
+
+## 2026-11-22: Reference meter on the chamber cart
+
+### Ryan chose
+
+- Put the LS-8.5 reference meter in the dome next: "Yes, place it".
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The calibration bench has no free room left (cal station, silk tray and field meter), so the reference meter stands on the chamber cart's lid instead, on the free front strip in front of the lid fittings, its front panel toward the camera. It is at true size (0.4 m × 0.35 m × 0.15 m). Set dressing only; it does nothing in play yet.
