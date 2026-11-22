@@ -14,6 +14,6 @@
     "seller": "bram",
     "ore_cost": 6,
     "usage_drift_multiplier": 0.5,
-    "_note": "Bram: 'Bring me six crystal ore and I'll bolt wider treads onto your tractor. Cuts steering drift in half on loose dirt.' Halves usage (per-metre) drift only."
+    "_note": "Bram: 'Bring me six crystal ore and I'll bolt wider treads onto your tractor. Cuts steering drift in half on loose dirt.' Halves usage (per-meter) drift only."
   }
 }

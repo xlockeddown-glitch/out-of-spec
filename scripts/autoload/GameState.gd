@@ -329,7 +329,7 @@ func buy_wide_treads() -> String:
 	steering.usage_drift_rate *= DataManager.get_number(ITEMS_TABLE, "wide_treads/usage_drift_multiplier", 0.5)
 	ore_changed.emit(crystal_ore)
 	upgrades_changed.emit()
-	post_phone("BRAM: Treads are on. Steering drift per metre is cut in half. Don't till any boulders.")
+	post_phone("BRAM: Treads are on. Steering drift per meter is cut in half. Don't till any boulders.")
 	return ""
 
 
