@@ -49,6 +49,7 @@ func _build_visual() -> Node3D:
 				loaded.free()
 		if model != null:
 			model.scale = Vector3.ONE * MODEL_SCALE
+			model.position.y = 0.02  # lift off the ground plane (no z-fighting)
 			ModelSlot.apply_emission(model)
 			return model
 		push_warning("OreFissure: %s is not a scene; using greybox." % MODEL_PATH)

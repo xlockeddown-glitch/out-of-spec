@@ -1,6 +1,6 @@
 # Voxel models (Week 4): merged spec
 
-This spec merges two blind answers to the Week 4 concept-sheet prompt. The source answers, with their full orthographic grids, are in `sources/answer_a.md` and `sources/answer_b.md`; Two more models were asked but returned nothing. Where this page and a source answer disagree, this page wins.
+This spec merges two blind answers to the Week 4 concept-sheet prompt. The source answers, with their full orthographic grids, are in `sources/answer_a.md` and `sources/answer_b.md`; two more models were asked but returned nothing. Where this page and a source answer disagree, this page wins.
 
 **What "pick" means below:** the starting grid to model from. The listed changes override it.
 
@@ -32,7 +32,7 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
   - the rover's cab readout
   - the relay's spool core
 - **Emissive voxels:** put each glowing part in its own MagicaVoxel object named `emit_<part>`, for example `emit_headlights`. `ModelSlot` makes any mesh named `emit_*` glow in its own colors, because MagicaVoxel exports don't carry emission into Godot.
-- **Readability at about 40 m:** keep silhouette features at least 2 voxels thick. Every lit voxel gets at least a 1-voxel `#1D222B` border (from answer A).
+- **Readability at about 40 m:** keep silhouette features at least 2 voxels thick. Where space allows, give lit voxels a 1-voxel `#1D222B` border (from answer A). The generated first pass doesn't yet.
 
 ## 1. Tractor (`tractor.glb`, `tractor_wide.glb`)
 
@@ -50,7 +50,7 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
   - sat-phone unit `#E2E8F0`
   - tires `#101216`
 - **Lit voxels:**
-  - Antenna whip: 1 voxel thick, rising to Z = 22 (2.2 m), tip `emit_antenna`, `#38E1C6`. The uplink beam starts at `Rover/Antenna`, 2.2 m up; the body still tops out at 14 voxels.
+  - Antenna whip: 1 voxel thick, rising to Z = 22 (2.2 m), tip `emit_antenna`, `#38E1C6`. The uplink beam starts at `Rover/Antenna`, 2.2 m up. The cab roof tops out at 14 voxels and the sat-phone unit at 16.
   - Headlamps: `emit_headlights`, `#F5A623`.
 - **Changes:**
   - Removed B's red hitch plug and A's red bypass LED.
@@ -147,9 +147,27 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
   - B's red diagnostic LED is removed.
   - The spool itself stays a game-driven node (`SatelliteRelay/SpoolBay`), shown only once a spool is installed. It is a 0.8 m × 0.8 m cylinder centered at (0.8, 3.0, 0) m from the mast origin: about 1.6 voxels to +X and 6 voxels up. Leave an open 2 × 2 × 2 voxel pocket there so the lattice doesn't bury it.
 
-## Export pipeline (confirm on the first model)
+## Generated first pass
 
-- MagicaVoxel may not export glTF directly (not verified here). If not, export OBJ and convert to `.glb` (for example through Blender), or use a Godot `.vox` import plugin and save the result as a `.tscn`. `ModelSlot` accepts `.glb`, `.gltf` and `.tscn`.
+`python tools/voxgen/build_models.py` builds all nine models from this spec. It writes `assets/voxels/*.glb`, which the game loads, and `assets/voxels/source/*.vox`, for refinement in MagicaVoxel. Checked in Godot 4.7.2: the tractor, fissure, bay, terrarium, spider, drop-pod and AUD-1T load at the right scale and facing, and their `emit_*` parts glow. The relay mast (off camera) and `tractor_wide` (needs the trade) were not seen in play.
+
+Where the generated models differ from the footprints above:
+
+| Model | Spec | Built | Why |
+|---|---|---|---|
+| tractor | 16 × 24 × 14 | 16 × 25 × 22 | the 9-voxel wheels overhang by 1; the whip reaches 2.2 m |
+| tractor_wide | 20 × 24 × 14 | 20 × 25 × 22 | same |
+| terrarium | 14 × 10 × 12 | 14 × 10 × 14 | the lamp hood sits at the greybox lamp height, 1.3 m |
+| bram_bay | 24 × 20 × 16 | 26 × 20 × 16 | Bram's raised hammer and the floor vise overhang the slab by 2 voxels; the whole bay sits 0.5 m back to match the greybox |
+| relay_mast | 18 × 18 × 32 | 15 × 14 × 38 | the dish is centered on the 16 m uplink point; the beacon tops a spire behind it at 18.5 m |
+| drop_pod | 12 × 12 × 16 | 12 × 13 × 16 | the hatch seam stands 1 voxel proud on +Z |
+| curlyhair | about 6 × 6 × 3 | 7 × 7 × 3 | legs reach 3 voxels out; abdomen and prosoma are 3 voxels wide (spec: 3 × 4 and 2 × 2) |
+
+
+## Export pipeline (for hand-refined models)
+
+- Each `.vox` is a single MagicaVoxel model, so part names (`emit_*`, glass) and the center offset are not in it. When refining by hand, split the glowing and glass parts back into named objects before export.
+- The generated `.glb` files skip this step. After refining a `.vox` by hand: MagicaVoxel may not export glTF directly (not verified here). If not, export OBJ and convert to `.glb` (for example through Blender), or use a Godot `.vox` import plugin and save the result as a `.tscn`. `ModelSlot` accepts `.glb`, `.gltf` and `.tscn`.
 - Whatever the route, check three things on the tractor first:
   - **Scale:** 1 unit = 1 voxel, or adjust that slot's `model_scale`.
   - **Facing:** front on −Z in Godot.
