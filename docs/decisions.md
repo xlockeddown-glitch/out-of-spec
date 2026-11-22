@@ -2,6 +2,15 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-22: Standard workflow
+
+- Questions to Ryan are multiple choice with a write-in (Ryan).
+- Design questions offer "Ask other models first": 2 to 4 other models get the same brief, the asking agent moderates their answers and comes back with updated or new choices (Ryan).
+- Send a screenshot now and then when something visible changes, and keep the roadmap questions coming (Ryan). Sending them after each milestone merges is the agents' convention.
+- Ryan's art packs are inspiration and style reference; use them where they fit and cite them when asking for new visuals (Ryan).
+- Agent conventions written down with it (not Ryan's calls): 2 to 4 options per question with the recommendation first, never committing to `main` directly, and merging with `gh pr merge --merge --delete-branch`.
+- The process lives in `docs/workflow.md`.
+
 ## 2026-11-22: Pack 3 models (spider, wilting, irrigation)
 
 Ryan's calls on the three Pack 3 models:
