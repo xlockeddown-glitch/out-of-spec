@@ -187,7 +187,7 @@ func test_contract_offer_run_and_reset() -> String:
 	_calibrate_after_interval(gs)
 	if problem == "" and gs.contract_run != 2:
 		problem = "Two on-time traceable calibrations must count 2, got %d." % gs.contract_run
-	if problem == "" and gs.contract_text() != "OIRM CONTRACT: 2 of %d on time" % needed:
+	if problem == "" and not gs.contract_text().begins_with("OIRM CONTRACT: 2 of %d on time and traceable" % needed):
 		problem = "The phone must show the run, got '%s'." % gs.contract_text()
 	# Calibrating again within the same interval neither counts nor breaks the run.
 	gs.calibrate(UNIT)
@@ -272,14 +272,22 @@ func test_overdue_excused_through_oirm_grace() -> String:
 	var problem: String = ""
 	var per: int = _points(gs, "overdue_points_per_instrument_day")
 	gs.change_credibility(50)
-	var sent: int = DAY - 8
-	var back: int = DAY - 2
+	# GPT's case (cadence 5): away days 6 to 13, unit due day 11. The day-15
+	# audit excuses it until the day-20 audit, so no charge before day 21.
+	var sent: int = 6
+	var back: int = 13
 	var unit: DriftingSensor = gs.get_sensor(UNIT)
-	unit.cal_due_day = DAY - 5  # fell due while the standard was away
+	unit.cal_due_day = 11
 	gs.oirm_trips.append({ "standard_id": UNIT_STANDARD, "sent_day": sent, "return_day": back, "courier": true })
-	var deadline: int = gs.next_audit_day(back)
+	# The latest deadline Vance grants at any audit.
+	var deadline: int = -1
+	for audit: int in range(1, 60):
+		if audit % maxi(int(gs._schedule("cadence_days", 5.0)), 1) == 0:
+			deadline = maxi(deadline, int(gs._excused_units(audit).get(UNIT, -1)))
+	if deadline <= gs.next_audit_day(back):
+		problem = "The test needs a grace that runs past the first audit after the return, got %d." % deadline
 	var before: int = gs.credibility
-	for day: int in range(DAY, deadline + 1):
+	for day: int in range(back + 1, deadline + 1):
 		gs._charge_overdue_credibility(day)
 	if gs.credibility != before:
 		problem = "No charge through the audit after the standard came back (day %d), got %d from %d." % [deadline, gs.credibility, before]
@@ -296,6 +304,30 @@ func test_overdue_excused_through_oirm_grace() -> String:
 	gs.free()
 	GameClock.elapsed_days = saved
 	return problem
+
+
+## A unit that fell due between two trips, with its standard home, gets no
+## grace from the later trip still being away.
+func test_overdue_between_trips_not_excused() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var per: int = _points(gs, "overdue_points_per_instrument_day")
+	gs.change_credibility(50)
+	gs.get_sensor(UNIT).cal_due_day = 12
+	gs.oirm_trips.append({ "standard_id": UNIT_STANDARD, "sent_day": 5, "return_day": 10, "courier": true })
+	gs.oirm_trips.append({ "standard_id": UNIT_STANDARD, "sent_day": 15, "return_day": 20, "courier": true })
+	gs.at_oirm[UNIT_STANDARD] = 20
+	var before: int = gs.credibility
+	gs._charge_overdue_credibility(16)
+	var got: int = gs.credibility
+	var audit_excused: bool = gs._excused_units(16).has(UNIT)
+	gs.free()
+	GameClock.elapsed_days = saved
+	if got != before + per:
+		return "A unit due while its standard was home must be charged, got %d from %d." % [got, before]
+	if audit_excused:
+		return "Vance must not excuse a unit due between trips."
+	return ""
 
 
 ## Buying the HB-700 with no WD-1 puts the dome gauge in service fresh,

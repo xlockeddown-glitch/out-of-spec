@@ -693,16 +693,35 @@ func _excused_units(day: int) -> Dictionary:
 		var due: int = sensor.cal_due_day
 		if not sensor.is_overdue(day):
 			continue
-		for trip: Dictionary in oirm_trips:
-			var back: int = int(trip["return_day"])
-			if at_oirm.has(trip["standard_id"]):
-				back = maxi(back, day)  # late, still away
+		for i: int in oirm_trips.size():
+			var trip: Dictionary = oirm_trips[i]
+			var back: int = _trip_back(i, day)
 			# Due after it left (the player could calibrate on the send day) and before it came back.
 			if trip["standard_id"] == sensor.calibrated_by and int(trip["sent_day"]) < due and due < back \
 					and (due >= day - cadence or back >= day):
 				excused[id] = next_audit_day(maxi(day, back))
 				break
 	return excused
+
+
+## The day trip `index` brought its standard back; for the trip still open
+## (the standard's latest, while it is away) at least `day`, as it is late.
+func _trip_back(index: int, day: int) -> int:
+	var trip: Dictionary = oirm_trips[index]
+	var back: int = int(trip["return_day"])
+	if _trip_is_open(index):
+		back = maxi(back, day)
+	return back
+
+
+func _trip_is_open(index: int) -> bool:
+	var standard_id: String = oirm_trips[index]["standard_id"]
+	if not at_oirm.has(standard_id):
+		return false
+	for later: int in range(index + 1, oirm_trips.size()):
+		if oirm_trips[later]["standard_id"] == standard_id:
+			return false
+	return true
 
 
 ## Sends a standard to OIRM. With the drop pod on the pad it rides the pod
@@ -1222,21 +1241,34 @@ func _charge_overdue_credibility(day: int) -> void:
 	change_credibility(count * int(_cred_number("overdue_points_per_instrument_day", -1.0)))
 
 
-## True while a unit fell due with its standard away at OIRM and the audit
-## that gives it until then (the first after the standard came back) has not
-## yet passed: the same grace Vance gives (_excused_units), counted per morning.
+## True while a unit that fell due with its standard away at OIRM is still
+## within the grace Vance gives at audit (_excused_units): until the latest
+## deadline any audit would grant it, so the daily charge starts only after
+## the audit that would fail it.
 func _excused_until_audit(unit_id: String, day: int) -> bool:
 	var sensor: DriftingSensor = sensors[unit_id]
 	if sensor.role != "unit":
 		return false
 	var due: int = sensor.cal_due_day
-	for trip: Dictionary in oirm_trips:
+	var cadence: int = maxi(int(_schedule("cadence_days", 5.0)), 1)
+	for i: int in oirm_trips.size():
+		var trip: Dictionary = oirm_trips[i]
 		if trip["standard_id"] != sensor.calibrated_by:
 			continue
+		if int(trip["sent_day"]) >= due:
+			continue
+		if _trip_is_open(i):
+			return true  # still away, so Vance still excuses it
 		var back: int = int(trip["return_day"])
-		if at_oirm.has(trip["standard_id"]):
-			back = maxi(back, day)  # late, still away
-		if int(trip["sent_day"]) < due and due < back and day <= next_audit_day(back):
+		if due >= back:
+			continue
+		# Every audit after it fell due that excuses it, as _excused_units does.
+		var deadline: int = -1
+		var audit: int = next_audit_day(due)
+		while audit <= maxi(due + cadence, back):
+			deadline = maxi(deadline, next_audit_day(maxi(audit, back)))
+			audit += cadence
+		if day <= deadline:
 			return true
 	return false
 
@@ -1274,10 +1306,17 @@ func _credibility_after_calibration(record: Dictionary) -> void:
 func contract_text() -> String:
 	match contract_state:
 		"active":
-			return "OIRM CONTRACT: %d of %d on time" % [contract_run, contract_run_needed()]
+			return "OIRM CONTRACT: %d of %d on time and traceable\nRepeats don't count. Reward: %s, %d %% off" % [
+				contract_run, contract_run_needed(),
+				_model_name(contract_standard_id()), contract_discount_pct()]
 		"complete":
-			return "OIRM CONTRACT DONE: %s at Bram's" % get_sensor(contract_standard_id()).short_name.to_upper()
+			return "OIRM CONTRACT DONE: %s at Bram's" % _model_name(contract_standard_id())
 	return ""
+
+
+## The model part of a short name, e.g. "HB-700" from "HB-700 pressure controller".
+func _model_name(instrument_id: String) -> String:
+	return get_sensor(instrument_id).short_name.get_slice(" ", 0)
 
 
 func contract_standard_id() -> String:
@@ -1309,6 +1348,6 @@ func _offer_first_contract() -> void:
 	contract_state = "active"
 	contract_run = 0
 	credibility_changed.emit(credibility)
-	post_phone("OIRM CONTRACT offered: make %d calibrations in a row on time and traceable, and Bram will sell you the %s for %s CR + %d crystal ore (%d %% off)." % [
+	post_phone("OIRM CONTRACT offered: make %d calibrations in a row on time and traceable, and Bram will sell you the %s for %s CR + %d crystal ore (%d %% off). Calibrating a unit again before it has run half its interval doesn't count." % [
 		contract_run_needed(), instrument_name(standard), SP811.integer(_discounted(sensor.price_credits)),
 		sensor.price_ore, contract_discount_pct()])
