@@ -22,6 +22,9 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `crop_stage_1.glb` | Sun-pod crop, growth stage 1: twin-leaf sprout (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/crop_stage_1.txt`). |
 | `crop_stage_2.glb` | Sun-pod crop, growth stage 2: leafy stalk and tight bud (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/crop_stage_2.txt`). |
 | `crop_stage_3.glb` | Sun-pod crop, growth stage 3: mature sun-pod (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/crop_stage_3.txt`). |
+| `crop_stage_wilted.glb` | Wilted, drooped crop (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/crop_stage_wilted.txt`). |
+| `live_tarantula.glb` | Live Curlyhair, a second take on the spider that matches the exuvia (not placed in any scene yet; `curlyhair.glb` is still the one in the terrarium) | 0.1 m voxels, origin at ground level, same footprint as `curlyhair`. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/live_tarantula.txt`). |
+| `irrigation_junction.glb` | Drip-line valve and manifold junction (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/irrigation_junction.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 

@@ -1,0 +1,30 @@
+live_tarantula - 7 x 7 x 3 (live Curlyhair tarantula (matches the exuvia)). From Ryan's Pack 3 generator, 2026-11-22.
+X: 0..6 left to right, Y: 6..0 rear (+Y) to front (-Y), first row = highest Y.
+Palette: B1 = #2B1D16, B2 = #473124, E2 = #D4A359, S = #1D222B
+
+Z = 0
+Y=06  E2 .. B1 B1 B1 .. E2
+Y=05  .. B1 B1 S  B1 B1 ..
+Y=04  E2 B1 .. B1 .. B1 E2
+Y=03  .. .. B1 B1 B1 .. ..
+Y=02  E2 B1 B1 S  B1 B1 E2
+Y=01  .. .. .. .. .. .. ..
+Y=00  E2 B1 .. .. .. B1 E2
+
+Z = 1
+Y=06  .. .. E2 B2 E2 .. ..
+Y=05  .. B1 B2 E2 B2 B1 ..
+Y=04  .. .. .. B1 .. .. ..
+Y=03  .. B1 B1 B1 B1 B1 ..
+Y=02  .. B1 B1 B2 B1 B1 ..
+Y=01  .. B1 B1 B1 B1 B1 ..
+Y=00  .. .. .. .. .. .. ..
+
+Z = 2
+Y=06  .. .. B2 E2 B2 .. ..
+Y=05  .. .. E2 B2 E2 .. ..
+Y=04  .. .. .. .. .. .. ..
+Y=03  .. .. B1 B1 B1 .. ..
+Y=02  .. .. B1 B2 B1 .. ..
+Y=01  .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. ..
