@@ -321,3 +321,16 @@ Agent's notes (flagged for Ryan, not his words):
 
 - Not scheduled yet; both go on the roadmap options after the income milestone, next to the robot helper (the automation path fits it: manual, then a taught helper, then remote).
 - The rogue lab fits the drift already in the game: overdue instruments could cause comic glitches scaled by how far out of tolerance they are (swapped controls, odd phone messages), on top of the credibility cost. Which glitches, and how strong, are Ryan's call.
+
+## 2026-11-22: Ryan's idea, specializing instead of calibrating everything
+
+### Ryan said
+
+- You don't need to calibrate every parameter to succeed. A single route is a harder path than being a jack of all trades, but it works: for example, serving customers only for pressure and torque, or electrical only.
+- You still manage what you use to keep your own site going, but you worry much less about all the standards and everything else.
+- You have to make money in many ways, or be really good at what you do.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Not scheduled yet; it shapes the paid calibration jobs coming at TRUSTED. Jobs could be grouped by discipline (pressure, torque, electrical, ...), so a lab that owns only some disciplines' standards can still earn, at higher stakes per job.
+- Open questions for Ryan: how a specialist is rewarded (better pay, steadier customers, faster credibility in that discipline), and how the site's own instruments outside the specialty get looked after (an outside cal service, Bram, a robot helper).
