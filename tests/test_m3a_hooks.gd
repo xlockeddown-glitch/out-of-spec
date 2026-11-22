@@ -153,6 +153,8 @@ func test_tire_limit_edge_and_compliant_line() -> String:
 	var just_over: Dictionary = AuditEngine.tire_check(-(limit + 0.06))
 	var at_line: String = gs._tire_check_line(at_limit)
 	var over_line: String = gs._tire_check_line(just_over)
+	var tie_lines: Array[String] = [gs._tire_check_line(AuditEngine.tire_check(limit + 0.05)),
+		gs._tire_check_line(AuditEngine.tire_check(-(limit + 0.05)))]
 	gs.free()
 	if at_limit["violation"] or at_limit["fine"] != 0:
 		return "Exactly at the limit must be compliant: %s" % at_limit
@@ -164,6 +166,16 @@ func test_tire_limit_edge_and_compliant_line() -> String:
 			if check["violation"] != (extra > 0.05) or not is_equal_approx(absf(check["offset_kpa"]),
 					snappedf(limit, 0.1) + (0.1 if extra > 0.05 else 0.0)):
 				return "Gauge error %s kPa must round the same way in both directions: %s" % [sign * (limit + extra), check]
+	for sign: float in [1.0, -1.0]:
+		for tie: Array in [[0.05, 0.1], [0.15, 0.2], [0.25, 0.3]]:
+			var check: Dictionary = AuditEngine.tire_check(sign * float(tie[0]))
+			if not is_equal_approx(check["offset_kpa"], -sign * float(tie[1])):
+				return "A %s kPa half step must round away from zero: %s" % [sign * float(tie[0]), check]
+		var at_tie: Dictionary = AuditEngine.tire_check(sign * (limit + 0.05))
+		var tie_line: String = tie_lines[0 if sign > 0.0 else 1]
+		var reads_past: bool = tie_line.contains("%s kPa" % SP811.number(limit + 0.1, 1))
+		if not at_tie["violation"] or not reads_past or not tie_line.contains("(limit %s kPa)" % SP811.number(limit, 1)):
+			return "At the half step past the limit, the line must read past the limit and fine: '%s'" % tie_line
 	if rounds_to_limit["violation"]:
 		return "An offset AUD-1T reports as the limit must be compliant: %s" % rounds_to_limit
 	if not just_over["violation"]:

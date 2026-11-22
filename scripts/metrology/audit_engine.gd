@@ -109,18 +109,25 @@ const TIRE_REPORT_KPA: float = 0.1
 ## reports it to TIRE_REPORT_KPA), limit_kpa, violation and fine. AUD-1T
 ## judges the value it reports, so the phone line and the fine always agree.
 static func tire_check(gauge_error_kpa: float) -> Dictionary:
-	# Whole report steps, rounded by magnitude so both directions round alike;
-	# the limit is rounded the same way it is displayed.
-	var steps: int = roundi(absf(gauge_error_kpa) / TIRE_REPORT_KPA)
-	var limit: float = _cfg("aud1t_tire_limit_kpa", 6.9)
-	var violation: bool = steps > roundi(limit / TIRE_REPORT_KPA)
+	# Offset and limit both become whole report steps, rounded half away from
+	# zero by magnitude, and limit_kpa is returned rounded, so the phone shows
+	# exactly the two numbers AUD-1T compares.
+	var steps: int = _report_steps(absf(gauge_error_kpa))
+	var limit_steps: int = _report_steps(_cfg("aud1t_tire_limit_kpa", 6.9))
+	var violation: bool = steps > limit_steps
 	var offset: float = steps * TIRE_REPORT_KPA * (1.0 if gauge_error_kpa < 0.0 else -1.0)
 	return {
 		"offset_kpa": offset,
-		"limit_kpa": limit,
+		"limit_kpa": limit_steps * TIRE_REPORT_KPA,
 		"violation": violation,
 		"fine": roundi(_cfg("aud1t_tire_credits", 20.0)) if violation else 0,
 	}
+
+
+## A nonnegative kPa value in whole TIRE_REPORT_KPA steps. The 1e-9 nudge
+## keeps decimal half steps such as 0.15 / 0.1 = 1.4999999999999998 rounding up.
+static func _report_steps(kpa: float) -> int:
+	return roundi(kpa / TIRE_REPORT_KPA + 1e-9)
 
 
 static func _cfg(key: String, fallback: float) -> float:
