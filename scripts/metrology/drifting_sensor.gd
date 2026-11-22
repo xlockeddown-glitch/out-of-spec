@@ -70,6 +70,15 @@ var error: float = 0.0:
 		error = clamped
 		error_changed.emit(error, get_band())
 
+## The reference's own error at the last zero: what the instrument was set
+## to read as zero. 0.0 after a zero against a perfect reference (or none).
+var reference_offset: float = 0.0
+## What the player's displays show: the error as the last reference saw it.
+## A standard that was off when this unit was zeroed hides that much error.
+var observed_error: float:
+	get:
+		return error - reference_offset
+
 var _sign: float = 1.0
 var _rng := RandomNumberGenerator.new()
 
@@ -134,6 +143,8 @@ func zero(reference_error: float = 0.0) -> Dictionary:
 	var as_found: float = error - reference_error
 	_sign = _random_sign()
 	var residual: float = _rng.randf_range(-as_left_residual, as_left_residual)
+	# Set before error so error_changed listeners read the new observed value.
+	reference_offset = reference_error
 	error = reference_error + residual
 	var as_left: float = error - reference_error
 	zeroed.emit(as_found, as_left)
@@ -150,6 +161,11 @@ func get_error_ratio() -> float:
 
 func get_band() -> Band:
 	return band_for(error)
+
+
+## Band of the observed error, for displays. Audits and physics use get_band().
+func get_observed_band() -> Band:
+	return band_for(observed_error)
 
 
 ## Band for an arbitrary error value against this instrument's MPE.

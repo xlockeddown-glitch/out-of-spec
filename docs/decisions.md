@@ -89,4 +89,11 @@ Ryan's answers to the equipment, skills and robots design (`docs/design/equipmen
 - The standard's own error is hidden and carried: the bench sees e_unit − e_standard, and after adjustment the unit's true error is e_standard + residual.
 - Bench calibration takes game time (`bench_minutes` per unit, placeholder); a refused calibration takes none.
 - The relay dish azimuth is now a registered unit: drifts, audited, calibrated at the bench.
-- Open for Ryan: the remote ZERO STEERING has no standard (untraceable, judged against the MPE, no bench time). It still adjusts the encoder, but it no longer counts as a calibration: the interval, due day and last calibration day stay unchanged, so only the bench clears an overdue steering encoder. This replaces the 2026-11 rule above that the remote zero counts as a calibration. The manager's one-time grace calibration uses the standard but takes no bench time. Standards drift but are not audited until OIRM certificates (milestone 2).
+- (Superseded by the 2026-11-22 answers below.) The remote ZERO STEERING has no standard (untraceable, judged against the MPE, no bench time). It still adjusts the encoder, but it no longer counts as a calibration: the interval, due day and last calibration day stay unchanged, so only the bench clears an overdue steering encoder. This replaces the 2026-11 rule above that the remote zero counts as a calibration. The manager's one-time grace calibration uses the standard but takes no bench time. Standards drift but are not audited until OIRM certificates (milestone 2).
+
+## 2026-11-22: Ryan's answers on the calibration core (PR #28)
+
+- Remote ZERO STEERING stays, untraceable: it adjusts the encoder but is not a calibration. Only the bench clears an overdue encoder.
+- The manager's one-time grace calibration stays instant (no bench time).
+- The relay dish azimuth stays an audited unit.
+- Displays show the observed error, what the bench last measured, not the true error, so a bad standard can fool the player. This covers the field phone HUD, the cab LED, the dome hygrometer reading and band, and the terrarium LED. Audits (Vance), the molt pause, the heat lamp and the steering pull keep the true error.

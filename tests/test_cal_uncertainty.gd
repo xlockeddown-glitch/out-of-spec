@@ -295,3 +295,31 @@ func test_remote_zero_blocks_the_next_bench_lengthening() -> String:
 	if record["interval_days"] > initial:
 		return "A bench pass right after an untraceable zero must not lengthen the interval."
 	return ""
+
+
+func test_displays_show_the_observed_error() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var unit: DriftingSensor = gs.hygrometer
+	var standard: DriftingSensor = gs.get_sensor(unit.calibrated_by)
+	_set_day(unit.cal_due_day)
+	# A standard off by 1.5 × the unit's MPE: the bench passes the unit, which is
+	# then truly out of tolerance while its display reads in band.
+	standard.max_error = INF  # a standard this far off is past its normal clamp
+	standard.error = unit.mpe * 1.5
+	unit.error = standard.error
+	var record: Dictionary = gs.calibrate(gs.HYGROMETER_ID)
+	var observed: float = unit.observed_error
+	var observed_band: int = unit.get_observed_band()
+	var true_band: int = unit.get_band()
+	unit.error += 0.1  # drift after the calibration shows up in both
+	var drifted: float = unit.observed_error - observed
+	GameClock.elapsed_days = saved
+	gs.free()
+	if absf(observed - record["as_left"]) > EPS:
+		return "Right after a calibration the display must read the as-left (%s), got %s." % [record["as_left"], observed]
+	if observed_band != DriftingSensor.Band.IN_BAND or true_band != DriftingSensor.Band.OUT_OF_TOLERANCE:
+		return "A bad standard must leave the display in band while the unit is truly out of tolerance."
+	if absf(drifted - 0.1) > EPS:
+		return "Drift after the calibration must show on the display."
+	return ""

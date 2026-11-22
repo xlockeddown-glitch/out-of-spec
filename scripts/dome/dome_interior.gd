@@ -56,9 +56,9 @@ func _refresh_status() -> void:
 	var reading: String = "--"
 	var ideal: Variant = GameState.get_dome_species().get("ideal_humidity_pct")
 	if typeof(ideal) == TYPE_FLOAT or typeof(ideal) == TYPE_INT:
-		reading = SP811.number(float(ideal) + hygro.error, 1) + " %"
+		reading = SP811.number(float(ideal) + hygro.observed_error, 1) + " %"
 	_hygro_label.text = "RELATIVE HUMIDITY  %s" % reading
-	var band: int = hygro.get_band()
+	var band: int = hygro.get_observed_band()
 	var today: int = GameClock.get_day_index()
 	var due_text: String = ("CAL OVERDUE (due day %d)" % hygro.cal_due_day if hygro.is_overdue(today)
 		else "cal due day %d" % hygro.cal_due_day)

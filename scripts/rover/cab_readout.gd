@@ -40,7 +40,7 @@ func _process(delta: float) -> void:
 
 
 func _refresh() -> void:
-	var band: int = GameState.steering.get_band() if GameState.steering else DriftingSensor.Band.IN_BAND
+	var band: int = GameState.steering.get_observed_band() if GameState.steering else DriftingSensor.Band.IN_BAND
 	var color: Color = DriftingSensor.band_color(band)
 	var lit: bool = band != DriftingSensor.Band.OUT_OF_TOLERANCE or fmod(_time * BLINK_HZ, 1.0) < 0.5
 	_mat.albedo_color = color
