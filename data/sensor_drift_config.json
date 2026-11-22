@@ -162,6 +162,27 @@
       "certificate_prefix": "WD",
       "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #7). Researched 2026-11-22: WIKA CPG1500 class precision digital test gauge, 0 kPa to 250 kPa, ±0.05 % of span (0.125 kPa) with the measuring rate at up to three readings per second; 0.01 kPa display. WIKA states the accuracy at k = 2, which the game enters as spec_confidence_pct 95. The 0.03 kPa certificate uncertainty (k = 2) is an estimated lab budget: a Mensor CPC8000-class controller adds about 0.020 kPa, the rest is readout and repeatability. Drift takes it to its MPE in about 120 days (Ryan, 2026-11-22); WIKA recommends a one-year calibration interval, depending on use. Price and interval are game balance [PLACEHOLDER]."
     },
+    "pressure_controller": {
+      "role": "standard",
+      "tier": 3,
+      "display_name": "Hellas Basin Controls HB-700 Pressure Controller",
+      "short_name": "HB-700 pressure controller",
+      "error_unit": "kPa",
+      "daily_drift_rate": 0.0000833,
+      "max_permissible_error": 0.01,
+      "spec_confidence_pct": null,
+      "certificate_uncertainty": 0.004,
+      "certificate_k": 2,
+      "initial_interval_days": 30,
+      "resolution": 0.001,
+      "display_decimals": 3,
+      "price_credits": 1600,
+      "price_ore": 4,
+      "maker": "Hellas Basin Controls",
+      "certificate_prefix": "HB",
+      "takes_over": ["dome_pressure"],
+      "_note": "Tier 3 bench pressure controller (spec section 1.4 #6), offered early and at a discount by the first OIRM credibility contract (Ryan, 2026-11-22). Cited class spec: 0.008 % of reading (Mensor CPC8000 IntelliScale), about 0.008 kPa at a 100 kPa dome reading; the 0.01 kPa MPE rounds that up and is [PLACEHOLDER], as are the certificate uncertainty, drift (MPE in about 120 days), price and interval. takes_over: units whose standard becomes this one when it is bought (the dome gauge, which only reaches 3.11:1 against the WD-1). The tire gauge stays on the WD-1 for field calibration."
+    },
     "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. Tier 0 standards' daily_drift_rate takes one from zero to its MPE in about 60 days, Tier 1 in about 120 days (Ryan, 2026-11-22), so skipping an OIRM cycle risks a recall. resolution (one digit of the unit under test), bench_minutes and the standards' specs and drift rates are placeholders (docs/design/equipment_skills_robots.md section 1.5). tier 0 (or absent) = owned from the start; tier 1+ = bought, arrives with a maker's certificate traceable to OIRM (section 1.7). A unit is in service (audited, on the bench) only while its calibrated_by standard is owned. standard_sensitivity (default 1) converts the standard's unit into the unit's own. display_decimals sets how many decimals readings show."
   },
   "guardband": {

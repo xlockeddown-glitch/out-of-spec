@@ -40,6 +40,7 @@ func _ready() -> void:
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.credits_changed.connect(_on_credits_changed)
 	GameState.ore_changed.connect(_on_ore_changed)
+	GameState.credibility_changed.connect(_on_credibility_changed)
 	_rover.ore_mined.connect(_on_ore_mined)
 	_bram_bay.rover_entered.connect(_on_rover_entered_bay)
 	_bram_bay.rover_exited.connect(_on_rover_exited_bay)
@@ -57,6 +58,7 @@ func _ready() -> void:
 	_refresh_relay_hud()
 	_hud.set_credits(GameState.credits)
 	_hud.set_ore(GameState.crystal_ore)
+	_hud.set_credibility(GameState.credibility_text())
 
 
 func _process(_delta: float) -> void:
@@ -136,6 +138,12 @@ func _on_ore_mined(_fissure_id: StringName) -> void:
 	_hud.push_log("Drilled 1 crystal ore. Carrying %d." % GameState.crystal_ore)
 
 
+func _on_credibility_changed(_points: int) -> void:
+	_hud.set_credibility(GameState.credibility_text())
+	if _bram_bay.rover_inside:
+		_refresh_bram()
+
+
 func _on_credits_changed(amount: int) -> void:
 	_hud.set_credits(amount)
 	if _bram_bay.rover_inside:
@@ -204,7 +212,7 @@ func _refresh_bram() -> void:
 				"id": id,
 				"text": ("%s: ON THE COLONY" % sensor.short_name.to_upper()) if owned
 					else "%s %s: %s  [%d]" % [verb, sensor.short_name.to_upper(), GameState.standard_price_text(id).to_upper(), i + 1],
-				"disabled": owned or GameState.credits < sensor.price_credits or GameState.crystal_ore < sensor.price_ore,
+				"disabled": owned or GameState.credits < GameState.standard_price_credits(id) or GameState.crystal_ore < sensor.price_ore,
 			})
 	_hud.show_standards(offers, "" if GameState.tier1_unlocked else "Tier 1 standards: pass one audit clean and Bram will sell them.")
 

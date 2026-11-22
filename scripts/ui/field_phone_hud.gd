@@ -20,6 +20,8 @@ const COLOR_FAIL := DriftingSensor.COLOR_OUT_OF_TOLERANCE
 var _log_lines: PackedStringArray = []
 ## Bram's Tier 1 buttons, built in code under the trade button.
 var _standards_box: VBoxContainer
+## Lab credibility band, a row under the clock, built in code.
+var _credibility_label: Label
 
 @onready var _bars: Array[ColorRect] = [%Bar1, %Bar2, %Bar3, %Bar4]
 @onready var _relay_label: Label = %RelayLabel
@@ -51,6 +53,13 @@ func _ready() -> void:
 	_standards_box.name = "StandardsBox"
 	_bram_panel.add_child(_standards_box)
 	_log_label.text = ""
+	_credibility_label = Label.new()
+	_credibility_label.name = "CredibilityLabel"
+	_credibility_label.add_theme_font_size_override("font_size", 16)
+	_credibility_label.add_theme_color_override("font_color", COLOR_OK)
+	var clock_row: Node = _credits_label.get_parent()
+	clock_row.get_parent().add_child(_credibility_label)
+	clock_row.get_parent().move_child(_credibility_label, clock_row.get_index() + 1)
 
 
 func configure(relay_name: String, mpe_deg: float, acceptance_ratio: float) -> void:
@@ -95,6 +104,11 @@ func set_clock(text: String) -> void:
 func set_credits(credits: int) -> void:
 	_credits_label.text = "%s CR" % SP811.integer(credits)
 	_credits_label.add_theme_color_override("font_color", COLOR_FAIL if credits < 0 else COLOR_WARN)
+
+
+## e.g. "TRUSTED, 40 % to ACCREDITED" from GameState.credibility_text().
+func set_credibility(text: String) -> void:
+	_credibility_label.text = "CRED: %s" % text
 
 
 func set_ore(ore: int) -> void:
