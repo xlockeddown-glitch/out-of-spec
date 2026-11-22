@@ -4,7 +4,7 @@ Short log of calls that shape code and data. Newest first.
 
 ## 2026-11-22: Art requests favor what the game will use
 
-- **Ask Gemini Neon for things we know we will use** (Ryan): the test equipment, the companies and the characters, ahead of open-ended props. Logged in [`workflow.md` §4](workflow.md#4-ryans-art-uploads).
+- Art requests to Gemini Neon should be for things we already know the game will use, such as the test equipment and the companies (Ryan). The agent reads this as also covering the canon characters, and as coming before open-ended props. The process is in [`workflow.md` §4](workflow.md#4-ryans-art-uploads).
 
 ## 2026-11-22: Milestone 3 plan and Tier 0 names
 
