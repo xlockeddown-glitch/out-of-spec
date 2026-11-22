@@ -302,6 +302,8 @@ Agent's notes (flagged for Ryan, not his words):
 - If fines leave the player without enough credits for a seed, Lin fronts it and takes its cost out of that crop's sale. That keeps fines from locking the player out of farming. The rule is the agent's choice.
 - Open balance question for Ryan (from GPT's second review): a player deep in debt with every standard overdue pays fines faster than crops can earn, and OIRM wants credits up front. The paid calibration jobs in the next PR add income; a fine cap or an OIRM payment plan could also help.
 - A clock jump across 06:00 (such as a bench calibration) now splits at the morning, so growth and drift are judged as they stood at 06:00.
+- With no crop under the rover, `[` and `]` set an offset that new plantings start with, so a player who knows the probe's error can correct for it before planting (GPT's third review). The offset is the agent's choice.
+- Soil out of band at 06:00 counts against the new day as well as the old one.
 - The seed chosen when Space is sent is the one planted, even if C changes it while the command is on its way up the link.
 - Biscuit Reed (±18 %), Dust Turnip (±12 %) and Bubble Pods (±10 %) tolerate even the probe's worst drift (capped at ±9 %), so a probe left alone only spoils Suncatch Squash (±8 %) and Lensberry (±5 %). The agent kept that on purpose: the starter crops are forgiving, and the drift starts to matter as the player moves to pricier crops. Ryan may want the bands tightened instead.
 - Paid calibration jobs at TRUSTED come in the next PR.

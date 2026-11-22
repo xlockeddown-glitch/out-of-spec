@@ -96,7 +96,7 @@ func _crop_model_path(cell: Vector3i) -> String:
 	if GameState.is_crop_ready(cell):
 		return CROP_STAGE_MODEL % 3
 	var growth_days: int = maxi(1, int(GameState.crop(planting["crop_id"]).get("growth_days", 1)))
-	return CROP_STAGE_MODEL % clampi(int(planting["days_grown"]) * 3 / growth_days, 0, 2)
+	return CROP_STAGE_MODEL % clampi(floori(float(int(planting["days_grown"]) * 3) / float(growth_days)), 0, 2)
 
 
 ## The voxel model at `path`, or a small green box if it can't load.

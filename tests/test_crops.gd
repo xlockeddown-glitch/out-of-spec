@@ -303,3 +303,40 @@ func test_excursion_marks_crop_at_once() -> String:
 	if not marked or signals[0] != 1:
 		return "An excursion must mark the crop and signal once, marked %s, signals %d." % [marked, signals[0]]
 	return ""
+
+
+## GPT review 3: knowing the probe's error, the player sets the starting set
+## point before planting, so a drifted probe needn't spoil the crop at once.
+func test_planting_offset_corrects_known_error_before_planting() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.seed_crop_id = "lensberry"
+	gs.get_sensor(gs.SOIL_PROBE_ID).error = 6.0
+	gs.adjust_planting_offset(6)
+	var signals: Array[int] = [0]
+	gs.crops_changed.connect(func() -> void: signals[0] += 1)
+	gs.plant_crop(CELL)
+	var out: bool = gs.plantings[CELL].get("out_today", true)
+	var text: String = gs.planting_offset_text()
+	_done(gs)
+	if out:
+		return "A +6 % starting offset must keep Lensberry in band with the probe 6 % high."
+	if signals[0] != 1:
+		return "Planting must signal crops_changed once, saw %d." % signals[0]
+	if text != "New plantings start at their target moisture +6 %.":
+		return "Offset text was '%s'." % text
+	return ""
+
+
+## GPT review 3: soil out of band at 06:00 counts against the new day too.
+func test_out_at_dawn_counts_against_new_day() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.seed_crop_id = "lensberry"
+	gs.plant_crop(CELL)
+	gs.get_sensor(gs.SOIL_PROBE_ID).error = float(gs.crop("lensberry")["tolerance_band"]) * 100.0 + 1.0
+	_grow(gs, 1)
+	var carried: bool = gs.plantings[CELL].get("out_today", false)
+	var days: int = int(gs.plantings[CELL]["out_of_band_days"])
+	_done(gs)
+	if days != 1 or not carried:
+		return "Out at dawn must count the past day and mark the new one, got %d days, marked %s." % [days, carried]
+	return ""

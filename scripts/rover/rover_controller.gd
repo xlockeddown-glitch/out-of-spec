@@ -95,9 +95,9 @@ var _applied_throttle: float = 0.0
 var _applied_steer: float = 0.0
 var _frames: Array[UplinkFrame] = []
 var _commands: Array[UplinkCommand] = []
-## Seed selected when the till key went down; a C pressed before the next
-## physics tick must not change it.
-var _till_seed: String = ""
+## Seeds selected at each till key press since the last physics tick, so a C
+## pressed before the tick can't change them and no press is lost.
+var _till_presses: Array[String] = []
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 
 
@@ -123,7 +123,7 @@ func _exit_tree() -> void:
 
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"rover_till", false):
-		_till_seed = GameState.current_seed()
+		_till_presses.append(GameState.current_seed())
 
 
 func _physics_process(delta: float) -> void:
@@ -136,12 +136,11 @@ func _physics_process(delta: float) -> void:
 
 # --- Public API -------------------------------------------------------------
 
-## Queue a one-shot command. It executes after the current uplink lag.
-func queue_command(command: Command) -> void:
-	var seed_id: String = ""
-	if command == Command.TILL:
-		seed_id = _till_seed if _till_seed != "" else GameState.current_seed()
-		_till_seed = ""
+## Queue a one-shot command. It executes after the current uplink lag. A TILL
+## carries `seed_id`, or the current seed if none is given.
+func queue_command(command: Command, seed_id: String = "") -> void:
+	if command == Command.TILL and seed_id == "":
+		seed_id = GameState.current_seed()
 	_commands.append(UplinkCommand.new(_uplink_clock, command, seed_id))
 
 
@@ -195,8 +194,9 @@ func _sample_local_input() -> void:
 	# +steer = left = +yaw about Y.
 	var steer: float = Input.get_axis(&"rover_steer_right", &"rover_steer_left")
 	_frames.append(UplinkFrame.new(_uplink_clock, throttle, steer))
-	if Input.is_action_just_pressed(&"rover_till"):
-		queue_command(Command.TILL)
+	for seed_id: String in _till_presses:
+		queue_command(Command.TILL, seed_id)
+	_till_presses.clear()
 	if Input.is_action_just_pressed(&"rover_zero_steering"):
 		queue_command(Command.ZERO_STEERING)
 

@@ -112,8 +112,8 @@ func _refresh_relay_hud() -> void:
 
 
 func _on_soil_tilled(cell: Vector3i) -> void:
-	_hud.push_log("Tilled cell (%d, %d). Space again plants %s (%s CR seed); C changes the seed." % [
-		cell.x, cell.z, GameState.crop_name(GameState.current_seed()),
+	_hud.push_log("Tilled cell (%s, %s). Space again plants %s (%s CR seed); C changes the seed, [ and ] its starting set point." % [
+		SP811.integer(cell.x), SP811.integer(cell.z), GameState.crop_name(GameState.current_seed()),
 		SP811.integer(GameState.seed_cost(GameState.current_seed()))])
 
 
@@ -158,10 +158,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			SP811.number(float(GameState.crop(seed).get("soil_moisture_target", 0.0)) * 100.0, 0)])
 	elif _is_key(event, KEY_BRACKETLEFT) or _is_key(event, KEY_BRACKETRIGHT):
 		var cell: Vector3i = _rover.cell_under()
+		var step: int = -1 if _is_key(event, KEY_BRACKETLEFT) else 1
+		get_viewport().set_input_as_handled()
 		if GameState.plantings.has(cell):
-			get_viewport().set_input_as_handled()
-			GameState.adjust_setpoint(cell, -1 if _is_key(event, KEY_BRACKETLEFT) else 1)
+			GameState.adjust_setpoint(cell, step)
 			_hud.push_log(GameState.crop_status_text(cell))
+		else:
+			GameState.adjust_planting_offset(step)
+			_hud.push_log(GameState.planting_offset_text())
 	elif event is InputEventKey and event.pressed and not event.echo and _bram_bay.rover_inside:
 		# [1], [2], ... buy Bram's Tier 1 standards in catalog order.
 		var index: int = (event as InputEventKey).physical_keycode - KEY_1

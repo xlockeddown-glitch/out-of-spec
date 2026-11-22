@@ -157,6 +157,9 @@ var plantings: Dictionary = {}
 var harvest_bin: Array[Dictionary] = []
 ## The crop the next planting uses ("" = the first in data/crops.json).
 var seed_crop_id: String = ""
+## Irrigation offset (in SETPOINT_STEP steps) that new plantings start with,
+## so a player who knows the probe's error can correct for it before planting.
+var planting_offset_steps: int = 0
 
 
 func _ready() -> void:
@@ -1448,12 +1451,12 @@ func plant_crop(cell: Vector3i, crop_id: String = "") -> String:
 		"planted_day": GameClock.get_day_index(),
 		"planted_at": GameClock.elapsed_days,
 		"days_grown": 0,
-		"setpoint": float(crop(crop_id).get("soil_moisture_target", 0.0)),
+		"setpoint": clampf(float(crop(crop_id).get("soil_moisture_target", 0.0)) + planting_offset_steps * SETPOINT_STEP, 0.0, 1.0),
 		"out_of_band_days": 0,
 		"out_today": false,
 		"advance": advance,
 	}
-	_note_soil_excursions()
+	_note_soil_excursions(false)
 	if advance > 0:
 		post_phone("LIN: I'll front you the %s seed and take the %s CR out of what I pay for that crop." % [
 			crop_name(crop_id), SP811.integer(advance)])
@@ -1493,15 +1496,16 @@ func is_soil_in_band(cell: Vector3i) -> bool:
 
 ## Marks each growing crop whose soil is out of its band right now. Runs
 ## whenever the probe drifts or is calibrated and when a set point changes, so
-## an excursion between mornings still counts against that day.
-func _note_soil_excursions() -> void:
+## an excursion between mornings still counts against that day. Signals
+## crops_changed when it marks a crop, unless `notify` is false.
+func _note_soil_excursions(notify: bool = true) -> void:
 	var changed: bool = false
 	for cell: Variant in plantings:
 		var planting: Dictionary = plantings[cell]
 		if not planting.get("out_today", false) and not is_crop_ready(cell) and not is_soil_in_band(cell):
 			planting["out_today"] = true
 			changed = true
-	if changed:
+	if changed and notify:
 		crops_changed.emit()
 
 
@@ -1524,7 +1528,24 @@ func _grow_crops() -> void:
 		var age: float = morning - float(planting.get("planted_at", morning))
 		if age >= float(planting["days_grown"]) + 1.0 - GROWTH_DAY_MIN:
 			planting["days_grown"] = int(planting["days_grown"]) + 1
+	# Soil out of band at 06:00 also counts against the new day, even if it
+	# drifts back in before anything checks again.
+	_note_soil_excursions(false)
 	crops_changed.emit()
+
+
+## Moves the irrigation offset new plantings start with by `steps` × 1 %.
+## Returns the new offset in percent.
+func adjust_planting_offset(steps: int) -> int:
+	planting_offset_steps = clampi(planting_offset_steps + steps, -100, 100)
+	return planting_offset_steps
+
+
+## One line on the offset new plantings start with, for the phone.
+func planting_offset_text() -> String:
+	var sign: String = "+" if planting_offset_steps > 0 else ""
+	return "New plantings start at their target moisture %s%s %%." % [
+		sign, SP811.number(float(planting_offset_steps) * SETPOINT_STEP * 100.0, 0)]
 
 
 ## Moves a cell's irrigation set point by `steps` × 1 %. Returns the new set
@@ -1584,7 +1605,7 @@ func sell_harvest_to_lin() -> int:
 	for entry: Dictionary in harvest_bin:
 		if not entry.get("in_spec", false):
 			off_spec += 1
-		advanced += int(entry.get("advance", 0))
+		advanced += mini(int(entry.get("advance", 0)), crop_sale_price(entry))
 	harvest_bin.clear()
 	add_credits(total)
 	crops_changed.emit()
