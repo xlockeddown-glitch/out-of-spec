@@ -35,9 +35,7 @@ var _limit: float = 0.0
 
 func _ready() -> void:
 	hide()
-	_ids = GameState.unit_ids() + GameState.standard_ids()
-	for id: String in _ids:
-		_instrument_option.add_item(GameState.instrument_name(id, true))
+	_rebuild_list()
 	_instrument_option.item_selected.connect(_on_instrument_selected)
 	_calibrate_button.pressed.connect(_on_calibrate_pressed)
 	_close_button.pressed.connect(close)
@@ -57,10 +55,20 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func open(instrument_id: String = "hygrometer") -> void:
+	_rebuild_list()
 	show()
 	var index: int = maxi(_ids.find(instrument_id), 0)
 	_instrument_option.select(index)
 	_on_instrument_selected(index)
+
+
+## Instruments in service right now: buying a Tier 1 standard from Bram adds
+## it and its units without a scene change.
+func _rebuild_list() -> void:
+	_ids = GameState.unit_ids() + GameState.standard_ids()
+	_instrument_option.clear()
+	for id: String in _ids:
+		_instrument_option.add_item(GameState.instrument_name(id, true))
 
 
 func close() -> void:
