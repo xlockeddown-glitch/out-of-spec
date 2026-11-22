@@ -712,6 +712,20 @@ GULCH_RIM_COLORS = {"P1": PLATEAU[0], "P2": PLATEAU[1], "P3": PLATEAU[2], "P4": 
                     "D1": "#C26B4A", "S": SHADOW}
 GULCH_RIM = ("dry_gulch_straight", "plateau_rim_straight", "plateau_rim_corner")
 
+# Ryan's Metrology Lab Bench & Multimeters pack (2026-11-22): an ESD calibration bench (0.1 m
+# voxels) and two meters at 0.025 m voxels, a new class for bench
+# instruments and hand-held kit. Colors are his
+# generator's own (the bench reuses the cistern's steel and brass; S is SHADOW; no glow, blank
+# screens). Built and turned like the field props. Not placed in any scene yet.
+METROLOGY_LAB = {
+    "lab_calibration_bench": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "E1": "#3A4E5C",
+                               "B1": "#D9A13B", "S": SHADOW}, 0.1),
+    "ref_multimeter_8588a": ({"C1": "#D4DAE0", "C2": "#8D99AE", "F1": "#2E3844", "K1": "#6C7A89",
+                              "Y1": "#E5B53B", "S": SHADOW}, 0.025),
+    "handheld_dmm_289": ({"Y1": "#E5B53B", "Y2": "#B88B22", "F1": "#2E3844", "K1": "#6C7A89",
+                          "S": SHADOW}, 0.025),
+}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop") -> Model:
@@ -754,7 +768,13 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, CLUTTER[n])), 0.2) for n in CLUTTER],
     *[((lambda n=n: prop_sheet(n, LOGISTICS[n])), 0.1) for n in LOGISTICS],
     *[((lambda n=n: prop_sheet(n, GULCH_RIM_COLORS, "rock")), 0.2) for n in GULCH_RIM],
+    *[((lambda n=n: prop_sheet(n, METROLOGY_LAB[n][0])), METROLOGY_LAB[n][1]) for n in METROLOGY_LAB],
 ]
+
+
+def _metres(value: float) -> str:
+    """0.025 -> "0.025", 2.0 -> "2"."""
+    return f"{value:.3f}".rstrip("0").rstrip(".")
 
 
 def main() -> None:
@@ -766,7 +786,7 @@ def main() -> None:
         m.write_vox(OUT / "source" / f"{m.name}.vox")
         w, h, d = m.size()
         print(f"{m.name:13} {w:3} x {h:3} x {d:3} voxels = "
-              f"{w * voxel_m:.1f} m x {h * voxel_m:.1f} m x {d * voxel_m:.1f} m, "
+              f"{_metres(w * voxel_m)} m x {_metres(h * voxel_m)} m x {_metres(d * voxel_m)} m, "
               f"{len(m.voxels):5} voxels, {len(m.colors()):2} colors, {bordered:3} bordered")
 
 
