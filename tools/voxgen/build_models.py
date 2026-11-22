@@ -713,7 +713,8 @@ GULCH_RIM_COLORS = {"P1": PLATEAU[0], "P2": PLATEAU[1], "P3": PLATEAU[2], "P4": 
 GULCH_RIM = ("dry_gulch_straight", "plateau_rim_straight", "plateau_rim_corner")
 
 # Ryan's Metrology Lab Bench & Multimeters pack (2026-11-22): an ESD calibration bench (0.1 m
-# voxels) and two meters at 0.025 m voxels, a new class for hand-held kit. Colors are his
+# voxels) and two meters at 0.025 m voxels, a new class for bench
+# instruments and hand-held kit. Colors are his
 # generator's own (the bench reuses the cistern's steel and brass; S is SHADOW; no glow, blank
 # screens). Built and turned like the field props. Not placed in any scene yet.
 METROLOGY_LAB = {
@@ -771,6 +772,11 @@ MODELS = [
 ]
 
 
+def _metres(value: float) -> str:
+    """0.025 -> "0.025", 2.0 -> "2"."""
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
 def main() -> None:
     (OUT / "source").mkdir(parents=True, exist_ok=True)
     for build, voxel_m in MODELS:
@@ -780,7 +786,7 @@ def main() -> None:
         m.write_vox(OUT / "source" / f"{m.name}.vox")
         w, h, d = m.size()
         print(f"{m.name:13} {w:3} x {h:3} x {d:3} voxels = "
-              f"{w * voxel_m:.3g} m x {h * voxel_m:.3g} m x {d * voxel_m:.3g} m, "
+              f"{_metres(w * voxel_m)} m x {_metres(h * voxel_m)} m x {_metres(d * voxel_m)} m, "
               f"{len(m.voxels):5} voxels, {len(m.colors()):2} colors, {bordered:3} bordered")
 
 
