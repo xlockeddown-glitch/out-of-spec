@@ -65,7 +65,7 @@ radius = 0.3
 size = Vector3(2, 1, 1.4)
 
 [sub_resource type="BoxShape3D" id="AirlockShape"]
-size = Vector3(1.8, 2.8, 0.6)
+size = Vector3(3, 3.1, 0.6)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status"]
 content_margin_left = 20.0
@@ -278,7 +278,7 @@ material = SubResource("MatCyanGlow")
 
 [node name="AirlockClick" type="Area3D" parent="Airlock"]
 unique_name_in_owner = true
-position = Vector3(0, 1.3, 0.2)
+position = Vector3(0, 1.45, 0.2)
 collision_layer = 8
 collision_mask = 0
 script = ExtResource("3_click")

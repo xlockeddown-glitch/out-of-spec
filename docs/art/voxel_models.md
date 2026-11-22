@@ -10,8 +10,8 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
 
   | Class | Voxel size | Models |
   |---|---|---|
-  | Small props and vehicles | 0.1 m | tractor, terrarium, Curlyhair |
-  | Characters and set pieces | 0.2 m | Bram and his bay, ore fissure, drop-pod, AUD-1T |
+  | Small props and vehicles | 0.1 m | tractor, terrarium, Curlyhair, dome benches, cal station |
+  | Characters and set pieces | 0.2 m | Bram and his bay, ore fissure, drop-pod, AUD-1T, dome room |
   | Distant landmark | 0.5 m | relay mast |
 
   The 0.1 m size matches the existing rule in `assets/voxels/README.md`. Answer A proposed 0.25 m for everything; that would make the tractor 3.5 m × 6 m against a 1.6 m × 2.4 m collision box.
@@ -115,6 +115,8 @@ Superseded in part by the Neon concept sheet section below: the whip and `emit_a
 
 ## 5. Drop-pod and AUD-1T (`drop_pod.glb`, `aud1t.glb`)
 
+Superseded by the second batch of Neon sheets (see below): the stepped-nose pod with splayed legs and the cross-eyed AUD-1T.
+
 - **Footprint:**
   - pod: 12 × 12 × 16 voxels = 2.4 m × 2.4 m × 3.2 m, against the greybox's 2 m diameter and 3.4 m height
   - AUD-1T: 4 × 4 × 5 voxels = 0.8 m × 0.8 m × 1.0 m, against the 0.8 m greybox sphere
@@ -187,7 +189,7 @@ Neon (Gemini) drew concept sheets for the tractor, terrarium, Bram's shed, the o
 
 ## Generated first pass
 
-`python tools/voxgen/build_models.py` builds all nine models from this spec. It writes `assets/voxels/*.glb`, which the game loads, and `assets/voxels/source/*.vox`, for refinement in MagicaVoxel. Checked in Godot 4.7.2: the tractor, fissure, bay, terrarium, spider, drop-pod and AUD-1T load at the right scale and facing, and their `emit_*` parts glow. The relay mast (off camera) and `tractor_wide` (needs the trade) were not seen in play.
+`python tools/voxgen/build_models.py` builds all twelve models from this spec. It writes `assets/voxels/*.glb`, which the game loads, and `assets/voxels/source/*.vox`, for refinement in MagicaVoxel. Checked in Godot 4.7.2: the tractor, fissure, bay, terrarium, spider, drop-pod and AUD-1T load at the right scale and facing, and their `emit_*` parts glow. The relay mast (off camera) and `tractor_wide` (needs the trade) were not seen in play.
 
 Where the generated models differ from the footprints above:
 

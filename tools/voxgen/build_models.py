@@ -317,7 +317,6 @@ def drop_pod() -> Model:
     m.box("hull", -4, 3, 2, 2, -4, 3, SCORCH)               # heat-shield base
     for x, z in ((-6, -6), (-6, 4), (4, -6), (4, 4)):        # slate corner struts with caps
         m.box("hull", x, x + 1, 3, 13, z, z + 1, STRUT)
-        m.box("hull", x, x + 1, 13, 13, z, z + 1, STRUT)
     for i, half in enumerate((4.5, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0)):  # stepped pyramid nose
         lo, hi = math.floor(-half), math.ceil(half) - 1
         m.box("hull", lo, hi, 13 + i, 13 + i, lo, hi, ORANGE if i % 2 == 0 else ORANGE2)
@@ -331,13 +330,15 @@ def drop_pod() -> Model:
         m.put("emit_hatch", 2, y, 5, AMBER)
     m.box("hull", -2, 1, 6, 10, 5, 5, ORANGE2)
     m.box("hull", 1, 1, 8, 8, 5, 5, HANDLE)
-    # recessed side panel on -X
+    # raised side panel on -X
     m.box("hull", -6, -6, 6, 10, -2, 1, ORANGE2)
     # four splayed landing legs: orange upper, slate lower, orange foot pads
     for sx in (-1, 1):
         for sz in (-1, 1):
-            top = (sx * 4.5, 7, sz * 4.5)
-            knee = (sx * 6.5, 3, sz * 6.5)
+            # line(thick=2) grows toward +X/+Z, so shift the -X/-Z legs out by one
+            ox, oz = (-1 if sx < 0 else 0), (-1 if sz < 0 else 0)
+            top = (sx * 4.5 + ox, 7, sz * 4.5 + oz)
+            knee = (sx * 6.5 + ox, 3, sz * 6.5 + oz)
             foot = (sx * 7.5, 0, sz * 7.5)
             m.line("hull", top, knee, ORANGE, thick=2)
             m.line("hull", knee, foot, STRUT, thick=2)
@@ -358,6 +359,8 @@ def aud1t() -> Model:
             m.clear(x, -1, z)
     m.box("shell", -1, 1, 2, 2, -1, 1, WHITE2)                # top bevel
     m.box("shell", -2, 2, -1, 1, 2, 2, SHADOW)                # visor band across the front
+    m.clear(-2, -1, 2)                                        # keep the rounded bottom corners
+    m.clear(2, -1, 2)
     for x, y in ((1, 0), (0, 0), (2, 0), (1, 1), (1, -1)):    # the one eye, off-center like the sheet
         m.put("emit_eye", x, y, 2, AMBER)
     m.box("shell", -1, 1, -2, -2, -1, 1, WHITE2)
@@ -420,6 +423,7 @@ def dome_room() -> Model:
         m.disc_y("lamps", lx + 0.5, lz + 0.5, 1.2, 20, "#8C96A6")
         m.disc_y("emit_lamps", lx + 0.5, lz + 0.5, 2.2, 19, AMBER)
         m.disc_y("emit_lamps", lx + 0.5, lz + 0.5, 1.6, 18, AMBER)
+    # (voxel centers land at x = -2.9, 0.1 and 3.1 m: 0.1 m off the bench centers, on purpose)
     return m
 
 
