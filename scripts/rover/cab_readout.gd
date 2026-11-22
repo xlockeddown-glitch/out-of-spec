@@ -8,6 +8,11 @@ extends MeshInstance3D
 ## (same rule as the terrarium LED).
 
 const BLINK_HZ: float = 2.5
+## Measured, not from a spec: in sunlight on the farm (Filmic tonemap) 0.5 renders
+## teal, amber and red within about 20 RGB of the palette hex. ModelSlot.EMIT_ENERGY
+## (1.2) washes teal to #5EFFF2 and amber to yellow #FFDD3B, because the lit
+## albedo adds to the glow here.
+const EMISSION_ENERGY: float = 0.5
 
 ## The rover's ModelSlot. Picks which roof the readout sits on.
 @export var model_slot: ModelSlot
@@ -23,7 +28,7 @@ var _time: float = 0.0
 
 func _ready() -> void:
 	_mat.emission_enabled = true
-	_mat.emission_energy_multiplier = ModelSlot.EMIT_ENERGY  # same glow as the voxel emit_* parts
+	_mat.emission_energy_multiplier = EMISSION_ENERGY
 	material_override = _mat
 	position = model_position if model_slot != null and model_slot.has_model() else greybox_position
 	_refresh()
