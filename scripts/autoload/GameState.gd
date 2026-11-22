@@ -166,6 +166,8 @@ var _board_taken: Array[String] = []
 ## True while the morning runs, so credibility changes then don't rebuild the
 ## board before the audit is in.
 var _morning: bool = false
+## Phone lines from the morning's job cancellations, posted after the audit.
+var _morning_notes: Array[String] = []
 
 ## Income milestone (Ryan, 2026-11-22): crops on tilled cells, auto-irrigated
 ## to a set point as the soil probe reads it, sold to Lin.
@@ -492,6 +494,10 @@ func _on_day_started(day: int) -> void:
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)
 	_morning = false
+	# Cancellations go after the audit's lines so they are not buried by them.
+	for note: String in _morning_notes:
+		post_phone(note)
+	_morning_notes.clear()
 	# After the audit, so the board matches the band the lab ends the morning in.
 	refresh_job_board(day)
 
@@ -1513,7 +1519,7 @@ func accept_job(index: int) -> String:
 	job["accepted_day"] = today
 	job["due_day"] = today + maxi(int(offer.get("due_in_days", 2)), 0)
 	active_jobs.append(job)
-	post_phone("%s accepted: %s for %s. Calibrate it at the bench by day %s for %s CR." % [
+	post_phone("%s accepted: %s for %s. Calibrate it at the bench by day %s with a traceable standard for %s CR." % [
 		job["job_id"], job.get("item", "?"), job.get("customer", "?"),
 		SP811.integer(job["due_day"]), SP811.integer(int(job.get("pay", 0)))])
 	jobs_changed.emit()
@@ -1639,7 +1645,11 @@ func _expire_jobs(day: int) -> void:
 		if not job.get("at_bench", false) and day > int(job["due_day"]) + grace:
 			active_jobs.erase(job)
 			change_credibility(int(_jobs_number("abandoned_job_points", -5.0)))
-			post_phone("%s cancelled: %s took %s elsewhere." % [job["job_id"], job.get("customer", "?"), job.get("item", "?")])
+			var note: String = "%s cancelled: %s took %s elsewhere." % [job["job_id"], job.get("customer", "?"), job.get("item", "?")]
+			if _morning:
+				_morning_notes.append(note)
+			else:
+				post_phone(note)
 			jobs_changed.emit()
 
 

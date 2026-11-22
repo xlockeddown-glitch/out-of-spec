@@ -391,3 +391,35 @@ func test_morning_cancels_a_job_past_its_grace_days() -> String:
 	if not gone:
 		return "The morning after the grace days must cancel the job."
 	return ""
+
+
+func test_audit_morning_cancellation_is_posted_after_the_audit() -> String:
+	var gs: GameStateScript = _make_state()
+	# Accepted on day 3: due day 6, cancelled the morning of day 10, an audit day.
+	GameClock.elapsed_days = 2.0
+	var job_id: String = _take(gs, "lin_soil_probe")
+	var day: int = int(gs.active_job(job_id)["due_day"]) + _cfg(gs, "late_grace_days") + 1
+	GameClock.elapsed_days = float(day - 1)
+	var before: int = gs.phone_log.size()
+	gs._on_day_started(day)
+	var lines: Array[String] = []
+	for line: String in gs.phone_log.slice(before):
+		lines.append(line)
+	var cancel_at: int = -1
+	for i: int in lines.size():
+		if lines[i].begins_with(job_id + " cancelled"):
+			cancel_at = i
+	var audited: bool = false
+	for line: String in lines:
+		audited = audited or line.find("AUD") >= 0 or line.find("udit") >= 0
+	_done(gs)
+	if day % 5 != 0:
+		return "The test must cancel on an audit day, got day %d." % day
+	if cancel_at < 0:
+		return "The cancellation must be on the phone log."
+	if not audited:
+		return "The audit must post its lines that morning, got %s." % [lines]
+	for i: int in range(cancel_at + 1, lines.size()):
+		if not lines[i].begins_with("JOB BOARD"):
+			return "Only the job board may follow the cancellation, got %s." % [lines]
+	return ""

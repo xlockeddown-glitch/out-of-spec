@@ -126,6 +126,10 @@ static func _field(record: Dictionary, key: String, fallback: String) -> String:
 
 func _on_phone_message(text: String) -> void:
 	if _holding_audit:
+		# A cancellation the same morning is added under the audit summary.
+		if not text.begins_with("JOB BOARD:"):
+			_hint_label.text += "\n" + text
+			_toast_left = maxf(_toast_left, _hint_label.text.length() * TOAST_SECONDS_PER_CHAR)
 		return
 	# The board line comes last each morning; a cancellation or dispatch just
 	# shown matters more. It is on the phone log either way.
