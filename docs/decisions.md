@@ -510,8 +510,9 @@ Agent's notes (flagged for Ryan, not his words):
 
 ### Ryan chose
 
-- Put the LS-8.5 reference meter in the dome next: "Yes, place it".
+- "Yes, place it" (the LS-8.5 reference meter).
 
 ### Agent's notes (flagged for Ryan, not his words)
 
+- Ryan's answer was to the offer to put the LS-8.5 reference meter in the dome next.
 - The calibration bench has no free room left (cal station, silk tray and field meter), so the reference meter stands on the chamber cart's lid instead, on the free front strip in front of the lid fittings, its front panel toward the camera. It is at true size (0.4 m × 0.35 m × 0.15 m). Set dressing only; it does nothing in play yet.
