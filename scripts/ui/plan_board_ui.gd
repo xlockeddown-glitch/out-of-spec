@@ -26,7 +26,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_build()
 	hide()
-	GameState.lab_changed.connect(_refresh_if_open)
+	GameState.lab_changed.connect(_on_lab_changed)
 	GameState.jobs_changed.connect(_refresh_if_open)
 	GameState.credits_changed.connect(_refresh_if_open.unbind(1))
 	GameState.ore_changed.connect(_refresh_if_open.unbind(1))
@@ -85,6 +85,15 @@ func _build() -> void:
 	column.add_child(close_button)
 
 
+## The layout changed (a build finished, or the player acted): an old answer
+## on the board no longer holds. The player's own action sets its answer
+## right after this.
+func _on_lab_changed() -> void:
+	if _result_label != null:
+		_result_label.text = ""
+	_refresh_if_open()
+
+
 func _refresh_if_open() -> void:
 	if visible:
 		_refresh()
@@ -92,9 +101,9 @@ func _refresh_if_open() -> void:
 
 func _refresh() -> void:
 	var spaces: int = GameState.lab_spaces()
-	var free: int = GameState.lab_free_spaces()
+	var free_spaces: int = GameState.lab_free_spaces()
 	_size_label.text = "%s: %s space%s, %s free.   You have %s CR and %s crystal ore." % [
-		GameState.lab_size_name(), SP811.integer(spaces), "" if spaces == 1 else "s", SP811.integer(free),
+		GameState.lab_size_name(), SP811.integer(spaces), "" if spaces == 1 else "s", SP811.integer(free_spaces),
 		SP811.integer(GameState.credits), SP811.integer(GameState.crystal_ore)]
 	_build_label.text = GameState.lab_build_text()
 	_build_label.visible = _build_label.text != ""
@@ -133,11 +142,11 @@ func _area_row(discipline: String) -> HBoxContainer:
 	var name_label: Label = _label(text, TEXT if spaces > 0 else DIM, 20)
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(name_label)
-	var fit: Button = _button("FIT OUT +1" if spaces > 0 else "FIT OUT")
+	var fit: Button = _button("FIT OUT ONE MORE" if spaces > 0 else "FIT OUT")
 	fit.tooltip_text = "Give a free space to %s (free of charge)." % discipline
 	fit.pressed.connect(_on_fit_pressed.bind(discipline))
 	row.add_child(fit)
-	var clear: Button = _button("CLEAR 1")
+	var clear: Button = _button("CLEAR ONE")
 	clear.tooltip_text = "Clear one %s space to fit out again: %s." % [discipline, GameState.lab_refit_text()]
 	clear.disabled = spaces <= 0
 	clear.pressed.connect(_on_clear_pressed.bind(discipline))

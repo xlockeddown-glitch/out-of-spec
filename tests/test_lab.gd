@@ -47,7 +47,7 @@ func test_lab_starts_small_with_the_founding_disciplines() -> String:
 	var gs: GameStateScript = _make_state()
 	var size: int = gs.lab_size
 	var areas: Dictionary = gs.lab_areas.duplicate()
-	var free: int = gs.lab_free_spaces()
+	var free_spaces: int = gs.lab_free_spaces()
 	var spaces: int = gs.lab_spaces()
 	_done(gs)
 	if size != 0:
@@ -55,8 +55,8 @@ func test_lab_starts_small_with_the_founding_disciplines() -> String:
 	for discipline: String in ["angle", "humidity", "soil moisture"]:
 		if int(areas.get(discipline, 0)) != 1:
 			return "The founding %s standard needs a space to start, areas %s." % [discipline, areas]
-	if areas.size() != 3 or free != spaces - 3:
-		return "Only the founding disciplines get a space, areas %s, %d free." % [areas, free]
+	if areas.size() != 3 or free_spaces != spaces - 3:
+		return "Only the founding disciplines get a space, areas %s, %d free." % [areas, free_spaces]
 	return ""
 
 
@@ -128,15 +128,41 @@ func test_the_biggest_jobs_need_a_large_area() -> String:
 
 func test_only_the_largest_lab_fits_a_large_area() -> String:
 	var gs: GameStateScript = _make_state()
-	var founding: int = gs.lab_areas.size()
 	var need: int = gs.lab_area_spaces_needed("large")
-	var sizes: Array[Dictionary] = gs.lab_sizes()
+	var limits: Array[int] = []
+	for i: int in gs.lab_sizes().size():
+		gs.lab_size = i
+		limits.append(gs.lab_max_area_spaces())
+	# A medium lab with its areas cleared away still stops short of large.
+	gs.lab_size = 1
+	gs.lab_areas = { "angle": limits[1] }
+	var capped: String = gs.lab_fit_problem("angle")
+	var other: String = gs.lab_fit_problem("pressure")
 	_done(gs)
-	# Keeping the founding areas, a large area fits only in the largest lab.
-	for i: int in sizes.size():
-		var fits: bool = int(sizes[i].get("areas", 0)) >= founding - 1 + need
-		if fits != (i == sizes.size() - 1):
-			return "A large area must fit only in the largest lab; size %d fits: %s." % [i, fits]
+	for i: int in limits.size():
+		if (limits[i] >= need) != (i == limits.size() - 1):
+			return "A large area must fit only in the largest lab; size %d holds %d spaces." % [i, limits[i]]
+	if capped.find("grow the lab") < 0 or other != "":
+		return "Clearing must not skip a lab size, got '%s' / '%s'." % [capped, other]
+	return ""
+
+
+func test_clearing_keeps_room_for_a_big_job_in_progress() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.lab_size = gs.lab_sizes().size() - 1
+	var big: Dictionary = _template(gs, "dome1_cabin_transducer")
+	var gs_need: int = gs.lab_area_spaces_needed("large")
+	gs.lab_areas["pressure"] = gs_need
+	gs.active_jobs.append(big)
+	var refit: Vector2i = gs._lab_refit_cost()
+	gs.credits = refit.x
+	gs.crystal_ore = refit.y
+	var problem: String = gs.clear_lab_area("pressure")
+	var kept: int = gs.lab_space("pressure")
+	gs.active_jobs.clear()
+	_done(gs)
+	if problem.find("needs this area") < 0 or kept != gs_need:
+		return "A large job in progress must keep its large area, got '%s', %d spaces." % [problem, kept]
 	return ""
 
 
@@ -157,7 +183,7 @@ func test_growing_costs_credits_and_ore_and_takes_days() -> String:
 	var early_size: int = gs.lab_size
 	gs._finish_lab_build(done_day)
 	var size: int = gs.lab_size
-	var free: int = gs.lab_free_spaces()
+	var free_spaces: int = gs.lab_free_spaces()
 	var spaces: int = gs.lab_spaces()
 	var busy: bool = not gs.lab_build.is_empty()
 	_done(gs)
@@ -169,8 +195,8 @@ func test_growing_costs_credits_and_ore_and_takes_days() -> String:
 		return "Only one build at a time, got '%s'." % again
 	if early_size != 0 or size != 1 or busy:
 		return "The new size must be ready the morning of its done day, %d then %d." % [early_size, size]
-	if free != spaces - 3:
-		return "The new spaces must be free to fit out, %d of %d free." % [free, spaces]
+	if free_spaces != spaces - 3:
+		return "The new spaces must be free to fit out, %d of %d free." % [free_spaces, spaces]
 	return ""
 
 
@@ -204,9 +230,9 @@ func test_fitting_out_uses_free_spaces() -> String:
 	var gs: GameStateScript = _make_state()
 	var none_free: String = gs.fit_lab_area("pressure")
 	var grew: String = _grow(gs)
-	var free: int = gs.lab_free_spaces()
+	var free_spaces: int = gs.lab_free_spaces()
 	var fits: Array[String] = []
-	for i: int in free:
+	for i: int in free_spaces:
 		fits.append(gs.fit_lab_area("pressure" if i == 0 else "angle"))
 	var over: String = gs.fit_lab_area("pressure")
 	var unknown: String = gs.lab_fit_problem("astrology")
@@ -215,9 +241,9 @@ func test_fitting_out_uses_free_spaces() -> String:
 	_done(gs)
 	if none_free.find("No free space") < 0 or grew != "":
 		return "A full small lab has no space to fit out, got '%s' / '%s'." % [none_free, grew]
-	if free < 2 or fits.count("") != free:
-		return "Each free space must fit out, %d free: %s." % [free, fits]
-	if pressure != 1 or angle != free:
+	if free_spaces < 2 or fits.count("") != free_spaces:
+		return "Each free space must fit out, %d free: %s." % [free_spaces, fits]
+	if pressure != 1 or angle != free_spaces:
 		return "A free space can start a discipline or grow one, pressure %d angle %d." % [pressure, angle]
 	if over.find("No free space") < 0 or unknown.find("No jobs") < 0:
 		return "Fitting needs a free space and a job discipline, got '%s' / '%s'." % [over, unknown]

@@ -1804,6 +1804,33 @@ func lab_area_spaces_needed(size_id: String) -> int:
 	return 1
 
 
+## The most spaces one area may have at the lab's size: the lab's largest
+## area size reaches up to just below the next area size. Growing the lab is
+## what opens the bigger areas, so clearing other areas can't skip a size.
+func lab_max_area_spaces() -> int:
+	var largest: String = str(lab_size_record().get("largest_area", ""))
+	var limit: int = lab_spaces()
+	if largest == "":
+		return limit
+	var need: int = lab_area_spaces_needed(largest)
+	for entry: Dictionary in _lab_list("area_sizes"):
+		var spaces: int = int(entry.get("spaces", 0))
+		if spaces > need:
+			limit = mini(limit, spaces - 1)
+	return maxi(limit, 1)
+
+
+## The most spaces any one job of `discipline` in progress needs its area to keep.
+func _lab_spaces_in_use(discipline: String) -> int:
+	var keep: int = 0
+	for job: Dictionary in active_jobs:
+		if str(job.get("discipline", "")) != discipline:
+			continue
+		var size_id: String = str(job.get("area", ""))
+		keep = maxi(keep, lab_area_spaces_needed(size_id) if size_id != "" else 1)
+	return keep
+
+
 ## Accepted jobs of `discipline` (at the bench or waiting).
 func jobs_in_progress(discipline: String) -> int:
 	var count: int = 0
@@ -1895,6 +1922,10 @@ func lab_fit_problem(discipline: String) -> String:
 		return "No jobs come in for %s." % discipline
 	if lab_free_spaces() <= 0:
 		return "No free space: grow the lab or clear a space first."
+	var limit: int = lab_max_area_spaces()
+	if lab_space(discipline) >= limit:
+		return "The %s holds areas of up to %s space%s: grow the lab for a bigger %s area." % [
+			lab_size_name().to_lower(), SP811.integer(limit), "" if limit == 1 else "s", discipline]
 	return ""
 
 
@@ -1936,6 +1967,8 @@ func lab_clear_problem(discipline: String) -> String:
 		return "The lab has no %s area." % discipline
 	if jobs_in_progress(discipline) >= spaces:
 		return "Every %s space has a job in progress: finish one first." % discipline
+	if _lab_spaces_in_use(discipline) >= spaces:
+		return "A %s job in progress needs this area at its size: finish it first." % discipline
 	var cost: Vector2i = _lab_refit_cost()
 	return _lab_afford_problem(cost.x, cost.y)
 
@@ -1966,9 +1999,9 @@ func _finish_lab_build(day: int) -> void:
 	lab_build = {}
 	if build.get("kind", "") == "grow":
 		lab_size = clampi(int(build.get("size", 0)), 0, maxi(lab_sizes().size() - 1, 0))
-		var free: int = lab_free_spaces()
+		var free_spaces: int = lab_free_spaces()
 		post_phone("LAB: the %s is ready. %s free space%s to fit out at the dome plan board." % [
-			lab_size_name().to_lower(), SP811.integer(free), "" if free == 1 else "s"])
+			lab_size_name().to_lower(), SP811.integer(free_spaces), "" if free_spaces == 1 else "s"])
 	else:
 		post_phone("LAB: the %s space is cleared. Fit it out at the dome plan board." % build.get("discipline", "?"))
 	lab_changed.emit()

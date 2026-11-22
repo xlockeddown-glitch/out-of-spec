@@ -57,9 +57,9 @@
   },
   "lab": {
     "sizes": [
-      { "id": "small", "name": "Small lab", "areas": 3 },
-      { "id": "medium", "name": "Medium lab", "areas": 5, "credits": 600, "ore": 4, "build_days": 2 },
-      { "id": "large", "name": "Large lab", "areas": 8, "credits": 1500, "ore": 8, "build_days": 3 }
+      { "id": "small", "name": "Small lab", "areas": 3, "largest_area": "small" },
+      { "id": "medium", "name": "Medium lab", "areas": 5, "largest_area": "medium", "credits": 600, "ore": 4, "build_days": 2 },
+      { "id": "large", "name": "Large lab", "areas": 8, "largest_area": "large", "credits": 1500, "ore": 8, "build_days": 3 }
     ],
     "area_sizes": [
       { "id": "small", "spaces": 1 },

@@ -41,15 +41,17 @@ static func space_x(index: int, count: int) -> float:
 func rebuild() -> void:
 	for child: Node in get_children():
 		child.queue_free()
-	# What each space shows, in order: areas, a space being cleared, free
+	# What each space shows, in order: areas (a space being cleared beside its own), free
 	# spaces, then the spaces a growing lab is adding.
+	# The space being cleared stays where it was, beside its old area.
 	var slots: Array[Dictionary] = []
+	var refit: String = str(GameState.lab_build.get("discipline", "")) if GameState.lab_build.get("kind", "") == "refit" else ""
 	for discipline: Variant in GameState.job_disciplines():
 		var spaces: int = GameState.lab_space(str(discipline))
 		for i: int in spaces:
 			slots.append({ "kind": "area", "discipline": str(discipline), "first": i == 0, "spaces": spaces })
-	if GameState.lab_build.get("kind", "") == "refit":
-		slots.append({ "kind": "refit" })
+		if refit != "" and str(discipline) == refit:
+			slots.append({ "kind": "refit" })
 	for i: int in GameState.lab_free_spaces():
 		slots.append({ "kind": "free" })
 	if GameState.lab_build.get("kind", "") == "grow":
