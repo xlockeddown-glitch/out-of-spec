@@ -23,6 +23,7 @@ const DATA_FILES: Dictionary = {
 	&"tarantula_species": "res://data/tarantula_species.json",
 	&"crops": "res://data/crops.json",
 	&"sensor_drift_config": "res://data/sensor_drift_config.json",
+	&"day_night": "res://data/day_night.json",
 	&"dialogue_dispatches": "res://data/dialogue_dispatches.json",
 	&"items": "res://data/items.json",
 	&"economy": "res://data/economy.json",
@@ -44,6 +45,7 @@ const RECORD_SECTIONS: Dictionary = {
 		"audit_fines": ["title", "credit_penalty"],
 	},
 	&"sensor_drift_config": {},
+	&"day_night": {},
 	&"items": {},
 	&"economy": {},
 }
