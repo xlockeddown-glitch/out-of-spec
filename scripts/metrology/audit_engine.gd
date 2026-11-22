@@ -109,9 +109,12 @@ const TIRE_REPORT_KPA: float = 0.1
 ## reports it to TIRE_REPORT_KPA), limit_kpa, violation and fine. AUD-1T
 ## judges the value it reports, so the phone line and the fine always agree.
 static func tire_check(gauge_error_kpa: float) -> Dictionary:
-	var offset: float = snappedf(-gauge_error_kpa, TIRE_REPORT_KPA)
+	# Whole report steps, rounded by magnitude so both directions round alike;
+	# the limit is rounded the same way it is displayed.
+	var steps: int = roundi(absf(gauge_error_kpa) / TIRE_REPORT_KPA)
 	var limit: float = _cfg("aud1t_tire_limit_kpa", 6.9)
-	var violation: bool = absf(offset) > limit + TIRE_REPORT_KPA * 0.5
+	var violation: bool = steps > roundi(limit / TIRE_REPORT_KPA)
+	var offset: float = steps * TIRE_REPORT_KPA * (1.0 if gauge_error_kpa < 0.0 else -1.0)
 	return {
 		"offset_kpa": offset,
 		"limit_kpa": limit,

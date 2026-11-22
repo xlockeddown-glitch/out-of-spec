@@ -64,7 +64,7 @@ func test_tire_check_offset_and_limit() -> String:
 		return "sensor_drift_config needs a positive compliance_fine/aud1t_tire_limit_kpa."
 	var inside: Dictionary = AuditEngine.tire_check(limit * 0.5)
 	var outside: Dictionary = AuditEngine.tire_check(-limit * 1.5)
-	if not is_equal_approx(inside["offset_kpa"], snappedf(-limit * 0.5, AuditEngine.TIRE_REPORT_KPA)):
+	if not is_equal_approx(inside["offset_kpa"], -roundi(limit * 0.5 / AuditEngine.TIRE_REPORT_KPA) * AuditEngine.TIRE_REPORT_KPA):
 		return "Tires filled to a gauge reading high must sit low by the error: %s" % inside
 	if inside["violation"] or inside["fine"] != 0:
 		return "Inside the limit must not fine: %s" % inside
@@ -158,6 +158,12 @@ func test_tire_limit_edge_and_compliant_line() -> String:
 		return "Exactly at the limit must be compliant: %s" % at_limit
 	if not at_line.ends_with(". Compliant."):
 		return "A compliant check must say so, got '%s'." % at_line
+	for sign: float in [1.0, -1.0]:
+		for extra: float in [0.04, 0.0501, 0.06]:
+			var check: Dictionary = AuditEngine.tire_check(sign * (limit + extra))
+			if check["violation"] != (extra > 0.05) or not is_equal_approx(absf(check["offset_kpa"]),
+					snappedf(limit, 0.1) + (0.1 if extra > 0.05 else 0.0)):
+				return "Gauge error %s kPa must round the same way in both directions: %s" % [sign * (limit + extra), check]
 	if rounds_to_limit["violation"]:
 		return "An offset AUD-1T reports as the limit must be compliant: %s" % rounds_to_limit
 	if not just_over["violation"]:
