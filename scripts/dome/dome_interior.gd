@@ -125,8 +125,13 @@ static func _field(record: Dictionary, key: String, fallback: String) -> String:
 
 
 func _on_phone_message(text: String) -> void:
-	if not _holding_audit:
-		_toast(text)
+	if _holding_audit:
+		return
+	# The board line comes last each morning; a cancellation or dispatch just
+	# shown matters more. It is on the phone log either way.
+	if text.begins_with("JOB BOARD:") and _toast_left > 0.0:
+		return
+	_toast(text)
 
 
 func _on_audit_completed(report: Dictionary) -> void:

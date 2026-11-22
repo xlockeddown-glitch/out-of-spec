@@ -256,6 +256,9 @@ func _on_calibrate_pressed() -> void:
 		_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(
 			DriftingSensor.Band.IN_BAND if clean else DriftingSensor.Band.GUARDBAND if result.get("ok", false)
 			else DriftingSensor.Band.OUT_OF_TOLERANCE))
+		if result.get("ok", false):
+			# Done: keep the pay and credibility shown, not "no longer active".
+			_current_id = ""
 		return
 	if _is_standard(_current_id):
 		var sent: Dictionary = GameState.send_to_oirm(_current_id)

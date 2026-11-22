@@ -370,3 +370,24 @@ func test_job_at_the_bench_survives_the_morning() -> String:
 	if reposted:
 		return "A job finished after dawn must not be offered again on promotion."
 	return ""
+
+
+func test_morning_cancels_a_job_past_its_grace_days() -> String:
+	var gs: GameStateScript = _make_state()
+	GameClock.elapsed_days = 1.0
+	var job_id: String = _take(gs, "lin_soil_probe")
+	var due: int = int(gs.active_job(job_id)["due_day"])
+	var grace: int = _cfg(gs, "late_grace_days")
+	# Just before the morning after the last grace day (day 9, not an audit day).
+	GameClock.elapsed_days = float(due + grace) - 1.0 / 1440.0
+	GameClock.day_started.connect(gs._on_day_started)
+	GameClock.advance(2.0 / 1440.0)
+	GameClock.day_started.disconnect(gs._on_day_started)
+	var day: int = GameClock.get_day_index()
+	var gone: bool = gs.active_job(job_id).is_empty()
+	_done(gs)
+	if day != due + grace + 1:
+		return "The test must cross into day %d, got %d." % [due + grace + 1, day]
+	if not gone:
+		return "The morning after the grace days must cancel the job."
+	return ""
