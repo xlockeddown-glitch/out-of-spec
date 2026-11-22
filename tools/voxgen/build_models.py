@@ -542,11 +542,84 @@ def relay_mast() -> Model:
     return m
 
 
+# ---------------------------------------------------------------- boulders
+# No concept sheet yet (Next item 3). First pass from canon ("surface boulders" on the
+# Terracotta Plateau) in the fissure's plateau palette, sized to the greybox boxes.
+PLATEAU = ("#A8422B", "#8E3522", "#6E2617", "#5E2214")  # clay, clay 2, rust crust, crack
+
+
+def boulder(name: str, w: int, h: int, d: int, seed: int) -> Model:
+    """w x h x d voxels at 0.2 m, origin at ground level on the footprint center.
+    A boxy, weathered block that fills the greybox collision box (the collider stays
+    a box), with banded strata, a dusty cap and a few cracks. One extra voxel layer
+    sinks below the ground so the base doesn't show a seam."""
+    import random
+    rng = random.Random(seed)
+    m = Model(name, offset=(-w / 2.0, -1.0, -d / 2.0))
+    clay, clay2, crust, crack = PLATEAU
+    cx, cz = (w - 1) / 2.0, (d - 1) / 2.0
+    top = h  # rows 0..h; row 0 is sunk
+    for x in range(w):
+        for z in range(d):
+            for y in range(top + 1):
+                nx, nz = abs(x - cx) / (w / 2.0), abs(z - cz) / (d / 2.0)
+                ny = y / (top + 0.5)
+                # superellipse footprint that narrows toward the top: boxy but not a box
+                shrink = 1.0 - 0.35 * max(0.0, ny - 0.55) / 0.45
+                r = (nx ** 4 + nz ** 4) ** 0.25 / max(shrink, 0.01)
+                if r > 1.0 - 0.06 * rng.random():
+                    continue
+                band = (y // 3 + (1 if (x + z) % 7 == 0 else 0)) % 2
+                m.put("rock", x, y, z, clay if band == 0 else clay2)
+    # dusty rust crust on the exposed top faces
+    for (x, y, z) in list(m.voxels):
+        if (x, y + 1, z) not in m.voxels and y > 1:
+            m.put("rock", x, y, z, crust if rng.random() < 0.55 else clay)
+    # a few vertical cracks on the sides
+    for _ in range(max(2, w // 6)):
+        x, z = rng.randrange(w), rng.randrange(d)
+        for y in range(1, top - rng.randrange(2, 5)):
+            if (x, y, z) in m.voxels:
+                m.put("rock", x, y, z, crack)
+    return m
+
+
+# ---------------------------------------------------------------- soil tiles
+# GridMap items for FarmGrid.Tile (0 = untilled, 1 = tilled), built into
+# assets/voxels/soil_tiles.tres by tools/voxgen/build_soil_library.gd. 19 x 2 x 19
+# voxels at 0.1 m = 1.9 m x 0.2 m x 1.9 m in a 2 m x 0.2 m x 2 m cell, centered on
+# the cell (voxel rows -1 and 0). Base colors are the greybox tile colors.
+def soil_tile(tilled: bool) -> Model:
+    import random
+    rng = random.Random(11 if tilled else 7)
+    m = Model("soil_tilled" if tilled else "soil_untilled", offset=(-9.5, 0.0, -9.5))
+    if tilled:
+        crest, trough, base = ("#3D2919", "#2E1F13", "#33231A")
+    else:
+        base = "#785A3D"
+        dry, dark = "#866648", "#6A4F35"
+    for x in range(19):
+        for z in range(19):
+            if tilled:
+                m.put("soil", x, -1, z, trough if z % 3 == 0 else base)
+                if z % 3 != 0:  # furrow ridges run along X; every third row is a trough
+                    m.put("soil", x, 0, z, crest if rng.random() < 0.8 else trough)
+            else:
+                m.put("soil", x, -1, z, base)
+                roll = rng.random()
+                m.put("soil", x, 0, z, dry if roll < 0.2 else dark if roll < 0.35 else base)
+    return m
+
+
 MODELS = [
     (lambda: tractor(False), 0.1), (lambda: tractor(True), 0.1),
     (terrarium, 0.1), (curlyhair, 0.1), (bram_bay, 0.2), (ore_fissure, 0.2),
     (drop_pod, 0.2), (aud1t, 0.2), (relay_mast, 0.5),
     (dome_room, 0.2), (dome_bench, 0.1), (cal_station, 0.1),
+    # boulders match the greybox boxes: RockA 5 x 4 x 4 m, B 4 x 3.5 x 5 m, C 4 m cube, D 3 m cube
+    (lambda: boulder("boulder_a", 25, 20, 20, 1), 0.2), (lambda: boulder("boulder_b", 20, 18, 25, 2), 0.2),
+    (lambda: boulder("boulder_c", 20, 20, 20, 3), 0.2), (lambda: boulder("boulder_d", 15, 15, 15, 4), 0.2),
+    (lambda: soil_tile(False), 0.1), (lambda: soil_tile(True), 0.1),
 ]
 
 

@@ -227,3 +227,12 @@ Where the generated models differ from the footprints above:
 
 - **Tractor hull color.** The greybox's orange (`#E68C1F`) and answer A's gold (`#D99B26`) both sit too close to guard-band amber. I picked B's `#C85A2A`; say if you want something else.
 - **Material values are unverified.** The Strength, Power and Flux numbers in the source answers aren't checked against MagicaVoxel's material panel. The game ignores them: glow comes from the `emit_*` naming.
+
+## Boulders and soil tiles (first pass, no concept sheet)
+
+No concept sheet or source answer covers these; spec not found. The generated first pass uses only what the project already fixes:
+
+- **Boulders** (`boulder_a`–`boulder_d`, 0.2 m): canon puts surface boulders on the Terracotta Plateau, so they use the ore fissure's plateau palette (`#A8422B`, `#8E3522`, `#6E2617`, crack `#5E2214`). Each matches its greybox box (A 5 m × 4 m × 4 m, B 4 m × 3.5 m × 5 m, C 4 m cube, D 3 m cube) because the collider stays that box. No glow.
+- **Soil tiles** (`soil_untilled`, `soil_tilled`, 0.1 m): 1.9 m × 0.2 m × 1.9 m in the 2 m cell, in the greybox tile browns. Tilled is darker, with furrows along X.
+
+Replace these once there is a concept sheet.
