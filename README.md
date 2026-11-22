@@ -46,7 +46,7 @@ Before pushing: open the project in Godot 4.7 with no errors in Output, and run 
 
 ## Windows export
 
-Use Godot 4.7.2 Standard and install its matching export templates via **Editor > Manage Export Templates**. From the project root, with the Godot executable on your PATH:
+Use Godot 4.7.2 Standard and install its matching export templates via **Editor > Manage Export Templates**. From the project root, with the Godot executable on your PATH (on Windows, use the `_console.exe` build so each command waits and reports errors):
 
 ```powershell
 New-Item -ItemType Directory -Force build | Out-Null
