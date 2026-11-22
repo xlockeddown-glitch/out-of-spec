@@ -336,35 +336,37 @@ func test_accept_checks_band_and_a_standard_here() -> String:
 
 
 func test_job_at_the_bench_survives_the_morning() -> String:
-	var gs: GameStateScript = _make_state()
+	# 58 points: the clean finish (+2) promotes the lab to Accredited.
+	var gs: GameStateScript = _make_state(58)
 	GameClock.elapsed_days = 1.0
 	var job_id: String = _take(gs, "lin_soil_probe")
 	var due: int = int(gs.active_job(job_id)["due_day"])
-	# Ten minutes before the cancel cutoff morning, with a 5 min job.
-	var grace: int = _cfg(gs, "late_grace_days")
-	gs.active_job(job_id)["bench_minutes"] = 5
-	GameClock.elapsed_days = float(due + grace) - 10.0 / 1440.0
+	# Started 10 min before dawn of day 4 (not an audit day), still on time.
+	GameClock.elapsed_days = float(due - 2) - 10.0 / 1440.0
+	var at_dawn: Dictionary = { "kept": false, "offered": true }
+	var on_morning: Callable = func(_day: int) -> void:
+		at_dawn["kept"] = not gs.active_job(job_id).is_empty()
+		at_dawn["offered"] = false
+		for job: Dictionary in gs.job_board:
+			at_dawn["offered"] = at_dawn["offered"] or job["id"] == "lin_soil_probe"
+	GameClock.day_started.connect(gs._on_day_started)
+	GameClock.day_started.connect(on_morning)
 	var finished: Dictionary = gs.complete_job(job_id)
-	# A job still at the bench when its morning comes is not cancelled or reposted.
-	# The late finish cost credibility; back to Trusted for the second job.
-	gs.credibility = 30
-	gs.job_board.clear()
-	gs.job_board.append(_template(gs, "lin_soil_probe"))
-	var why: String = gs.accept_job(0)
-	if why != "":
-		_done(gs)
-		return "Second accept refused: " + why
-	var second: String = str(gs.active_jobs[-1]["job_id"])
-	gs.active_job(second)["at_bench"] = true
-	gs._expire_jobs(999)
-	gs.refresh_job_board(999)
-	var kept: bool = not gs.active_job(second).is_empty()
-	var reposted: bool = false
+	GameClock.day_started.disconnect(on_morning)
+	GameClock.day_started.disconnect(gs._on_day_started)
+	var band: String = gs.credibility_band()
+	# Today's three offers rotate, so also check the job is held off today's
+	# board whatever the rotation picks.
+	var reposted: bool = "lin_soil_probe" not in gs._board_taken
 	for job: Dictionary in gs.job_board:
 		reposted = reposted or job["id"] == "lin_soil_probe"
 	_done(gs)
-	if not finished.get("ok", false):
-		return "Work that ends before the cutoff must be paid, got %s." % finished
-	if not kept or reposted:
-		return "A job at the bench must not be cancelled or offered again (id '%s', kept %s, reposted %s)." % [second, kept, reposted]
+	if not finished.get("ok", false) or not finished.get("on_time", false):
+		return "Work that ends on time across dawn must be paid in full, got %s." % finished
+	if not at_dawn["kept"] or at_dawn["offered"]:
+		return "A job at the bench at dawn must stay active and off the board, got %s." % at_dawn
+	if band != "Accredited":
+		return "58 points plus a clean job must reach Accredited, got %s." % band
+	if reposted:
+		return "A job finished after dawn must not be offered again on promotion."
 	return ""

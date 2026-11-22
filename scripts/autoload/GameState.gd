@@ -1576,6 +1576,8 @@ func complete_job(job_id: String) -> Dictionary:
 	if minutes > 0.0:
 		GameClock.advance(minutes / 1440.0)
 	active_jobs.erase(job)
+	# Taken today: a promotion from this payout must not offer it again.
+	_board_taken.append(str(job.get("id", "")))
 	var today: int = GameClock.get_day_index()
 	var on_time: bool = today <= int(job["due_day"])
 	var offered: int = int(job.get("pay", 0))

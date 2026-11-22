@@ -25,6 +25,8 @@ const TOAST_SECONDS_PER_CHAR: float = 0.04
 @onready var _hint_label: Label = %HintLabel
 
 var _toast_left: float = 0.0
+## True while the audit summary is showing; phone lines don't replace it.
+var _holding_audit: bool = false
 
 
 func _ready() -> void:
@@ -34,7 +36,7 @@ func _ready() -> void:
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)
 	GameState.calibration_recorded.connect(_on_calibration_recorded)
-	GameState.phone_message.connect(_toast)
+	GameState.phone_message.connect(_on_phone_message)
 	# An audit posts several phone lines in one frame; this fires after them,
 	# so the toast ends on a summary that names the failing instruments.
 	GameState.audit_completed.connect(_on_audit_completed)
@@ -48,6 +50,7 @@ func _process(delta: float) -> void:
 	if _toast_left > 0.0:
 		_toast_left -= delta
 	else:
+		_holding_audit = false
 		var hovered: Clickable = Clickable.hovered
 		_hint_label.text = hovered.hint if hovered and hovered.hint != "" else DEFAULT_HINT
 
@@ -121,7 +124,17 @@ static func _field(record: Dictionary, key: String, fallback: String) -> String:
 	return fallback if value == null else str(value)
 
 
+func _on_phone_message(text: String) -> void:
+	if not _holding_audit:
+		_toast(text)
+
+
 func _on_audit_completed(report: Dictionary) -> void:
+	_show_audit(report)
+	_holding_audit = true
+
+
+func _show_audit(report: Dictionary) -> void:
 	if report.get("warning", false):
 		_toast("AUDIT DAY %d: WARNING ONLY. Your manager %s before Vance got in. One time only." % [
 			report.get("day", 0), report.get("waived_names", "")])
