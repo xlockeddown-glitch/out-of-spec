@@ -9,8 +9,14 @@ signal enter_dome_pressed
 signal trade_pressed
 ## A Tier 1 standard's buy button (milestone 3a).
 signal buy_standard_pressed(standard_id: String)
+## An ACCEPT button on the job board (paid calibration jobs).
+signal accept_job_pressed(index: int)
 
 const MAX_LOG_LINES: int = 8
+## Tallest the job list grows before it scrolls, px.
+const JOBS_MAX_HEIGHT: float = 86.0
+## The dispatch log always keeps room for this many lines, px.
+const LOG_MIN_HEIGHT: float = 80.0
 const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
 const COLOR_BAR_OFF := Color(0.14, 0.22, 0.2)
 const COLOR_OK := DriftingSensor.COLOR_IN_BAND
@@ -22,6 +28,10 @@ var _log_lines: PackedStringArray = []
 var _standards_box: VBoxContainer
 ## Lab credibility band, a row under the clock, built in code.
 var _credibility_label: Label
+## Accepted jobs and today's offers, under the credibility row.
+var _jobs_box: VBoxContainer
+## Holds _jobs_box; scrolls when the jobs are taller than JOBS_MAX_HEIGHT.
+var _jobs_scroll: ScrollContainer
 
 @onready var _bars: Array[ColorRect] = [%Bar1, %Bar2, %Bar3, %Bar4]
 @onready var _relay_label: Label = %RelayLabel
@@ -53,13 +63,26 @@ func _ready() -> void:
 	_standards_box.name = "StandardsBox"
 	_bram_panel.add_child(_standards_box)
 	_log_label.text = ""
+	_log_label.custom_minimum_size.y = LOG_MIN_HEIGHT
 	_credibility_label = Label.new()
 	_credibility_label.name = "CredibilityLabel"
 	_credibility_label.add_theme_font_size_override("font_size", 16)
 	_credibility_label.add_theme_color_override("font_color", COLOR_OK)
+	# A long contract line wraps rather than widening the phone off the screen.
+	_credibility_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var clock_row: Node = _credits_label.get_parent()
 	clock_row.get_parent().add_child(_credibility_label)
 	clock_row.get_parent().move_child(_credibility_label, clock_row.get_index() + 1)
+	_jobs_box = VBoxContainer.new()
+	_jobs_box.name = "JobsBox"
+	_jobs_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_jobs_scroll = ScrollContainer.new()
+	_jobs_scroll.name = "JobsScroll"
+	_jobs_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_jobs_scroll.add_child(_jobs_box)
+	clock_row.get_parent().add_child(_jobs_scroll)
+	clock_row.get_parent().move_child(_jobs_scroll, _credibility_label.get_index() + 1)
+	_jobs_box.minimum_size_changed.connect(_fit_jobs_scroll)
 
 
 func configure(relay_name: String, mpe_deg: float, acceptance_ratio: float) -> void:
@@ -119,6 +142,10 @@ func set_ore(ore: int) -> void:
 ## Bram's panel while the rover is parked in his bay.
 func show_bram(line: String, cost: int, ore: int, owned: bool) -> void:
 	_bram_panel.visible = true
+	# The job list steps aside for his shop so the dispatch log stays on screen.
+	_jobs_scroll.visible = false
+	# His stock needs the room; the log gives way as it did before jobs.
+	_log_label.custom_minimum_size.y = 0.0
 	_bram_label.text = "BRAM: " + line
 	if owned:
 		_trade_button.text = "WIDE TREADS FITTED"
@@ -155,8 +182,44 @@ func show_standards(offers: Array[Dictionary], note: String) -> void:
 		_standards_box.add_child(button)
 
 
+## Accepted jobs as lines, today's offers as ACCEPT buttons. Each offer is
+## { "text", "disabled" }; `note` shows when there are no offers.
+func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: String) -> void:
+	for child: Node in _jobs_box.get_children():
+		_jobs_box.remove_child(child)
+		child.queue_free()
+	var lines: PackedStringArray = active.duplicate()
+	if offers.is_empty() and note != "":
+		lines.append(note)
+	if not lines.is_empty():
+		var label := Label.new()
+		label.text = "\n".join(lines)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.add_theme_font_size_override("font_size", 14)
+		label.add_theme_color_override("font_color", COLOR_OK)
+		_jobs_box.add_child(label)
+	for i: int in offers.size():
+		var button := Button.new()
+		button.text = "ACCEPT " + str(offers[i]["text"])
+		button.disabled = bool(offers[i]["disabled"])
+		button.tooltip_text = str(offers[i].get("tooltip", ""))
+		button.focus_mode = Control.FOCUS_NONE
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.add_theme_font_size_override("font_size", 13)
+		var index: int = i
+		button.pressed.connect(func() -> void: accept_job_pressed.emit(index))
+		_jobs_box.add_child(button)
+
+
+## As tall as the job list, up to JOBS_MAX_HEIGHT; it scrolls beyond that.
+func _fit_jobs_scroll() -> void:
+	_jobs_scroll.custom_minimum_size.y = minf(_jobs_box.get_combined_minimum_size().y, JOBS_MAX_HEIGHT)
+
+
 func hide_bram() -> void:
 	_bram_panel.visible = false
+	_jobs_scroll.visible = true
+	_log_label.custom_minimum_size.y = LOG_MIN_HEIGHT
 
 
 func push_log(line: String) -> void:

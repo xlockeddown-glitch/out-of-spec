@@ -48,6 +48,13 @@ func _ready() -> void:
 	_cal_pad.rover_entered.connect(_on_rover_entered_cal_pad)
 	_hud.trade_pressed.connect(_try_trade)
 	_hud.buy_standard_pressed.connect(_try_buy_standard)
+	_hud.accept_job_pressed.connect(_try_accept_job)
+	GameState.jobs_changed.connect(_refresh_jobs_hud)
+	# Buying or sending away a standard, or a band change, changes which
+	# offers can be accepted.
+	GameState.upgrades_changed.connect(_refresh_jobs_hud)
+	GameState.oirm_changed.connect(_refresh_jobs_hud)
+	GameState.credibility_changed.connect(_refresh_jobs_hud.unbind(1))
 
 	# Replay the persistent phone log first, so fresh SYS lines land on top of it.
 	for line: String in GameState.phone_log.slice(-LOG_REPLAY_LINES):
@@ -60,6 +67,7 @@ func _ready() -> void:
 	_hud.set_credits(GameState.credits)
 	_hud.set_ore(GameState.crystal_ore)
 	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text())
+	_refresh_jobs_hud()
 
 
 func _process(_delta: float) -> void:
@@ -190,6 +198,24 @@ func _sell_to_lin() -> void:
 		_hud.push_log("LIN: Nothing in your bin. Bring me crops, and keep that spider away from my stall.")
 		return
 	GameState.sell_harvest_to_lin()
+
+
+func _refresh_jobs_hud() -> void:
+	var active: PackedStringArray = []
+	for job: Dictionary in GameState.active_jobs:
+		active.append(GameState.active_job_text(job))
+	var offers: Array[Dictionary] = []
+	for job: Dictionary in GameState.job_board:
+		var problem: String = GameState.job_accept_problem(job)
+		offers.append({ "text": GameState.job_offer_text(job) + (" (%s)" % problem if problem != "" else ""),
+			"disabled": problem != "", "tooltip": problem })
+	_hud.show_jobs(active, offers, GameState.job_board_note())
+
+
+func _try_accept_job(index: int) -> void:
+	var problem: String = GameState.accept_job(index)
+	if problem != "":
+		_hud.push_log("JOB NOT ACCEPTED: " + problem)
 
 
 func _on_ore_mined(_fissure_id: StringName) -> void:

@@ -25,6 +25,10 @@ const TOAST_SECONDS_PER_CHAR: float = 0.04
 @onready var _hint_label: Label = %HintLabel
 
 var _toast_left: float = 0.0
+## Frame the last toast was shown; another the same frame is added under it.
+var _toast_frame: int = -1
+## True while the audit summary is showing; phone lines don't replace it.
+var _holding_audit: bool = false
 
 
 func _ready() -> void:
@@ -34,7 +38,7 @@ func _ready() -> void:
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)
 	GameState.calibration_recorded.connect(_on_calibration_recorded)
-	GameState.phone_message.connect(_toast)
+	GameState.phone_message.connect(_on_phone_message)
 	# An audit posts several phone lines in one frame; this fires after them,
 	# so the toast ends on a summary that names the failing instruments.
 	GameState.audit_completed.connect(_on_audit_completed)
@@ -48,6 +52,7 @@ func _process(delta: float) -> void:
 	if _toast_left > 0.0:
 		_toast_left -= delta
 	else:
+		_holding_audit = false
 		var hovered: Clickable = Clickable.hovered
 		_hint_label.text = hovered.hint if hovered and hovered.hint != "" else DEFAULT_HINT
 
@@ -121,13 +126,35 @@ static func _field(record: Dictionary, key: String, fallback: String) -> String:
 	return fallback if value == null else str(value)
 
 
+func _on_phone_message(text: String) -> void:
+	if _holding_audit:
+		if Engine.get_process_frames() == _toast_frame:
+			# A cancellation the same morning stacks under the audit summary.
+			if not text.begins_with("JOB BOARD:"):
+				_toast(text)
+			return
+		# Later messages (the player acting) replace it as usual.
+		_holding_audit = false
+		_toast_left = 0.0
+	# The board line comes last each morning; a cancellation or dispatch just
+	# shown matters more. It is on the phone log either way.
+	if text.begins_with("JOB BOARD:") and _toast_left > 0.0:
+		return
+	_toast(text)
+
+
 func _on_audit_completed(report: Dictionary) -> void:
+	_show_audit(report)
+	_holding_audit = true
+
+
+func _show_audit(report: Dictionary) -> void:
 	if report.get("warning", false):
-		_toast("AUDIT DAY %d: WARNING ONLY. Your manager %s before Vance got in. One time only." % [
+		_toast_fresh("AUDIT DAY %d: WARNING ONLY. Your manager %s before Vance got in. One time only." % [
 			report.get("day", 0), report.get("waived_names", "")])
 		return
 	if report.get("passed", true):
-		_toast("AUDIT DAY %d: PASS. Vance is disappointed." % report.get("day", 0))
+		_toast_fresh("AUDIT DAY %d: PASS. Vance is disappointed." % report.get("day", 0))
 		return
 	var failing: PackedStringArray = []
 	for line: Dictionary in report.get("lines", []):
@@ -143,10 +170,25 @@ func _on_audit_completed(report: Dictionary) -> void:
 			failing.append("%s (%s)" % [name_text, ", ".join(why)])
 	if report.get("tire_check", {}).get("violation", false):
 		failing.append("rover tires (AUD-1T)")
-	_toast("AUDIT DAY %d: FINE %s CR. %s. Details on the phone log." % [
+	_toast_fresh("AUDIT DAY %d: FINE %s CR. %s. Details on the phone log." % [
 		report.get("day", 0), SP811.integer(int(report.get("total_fine", 0))), ", ".join(failing)])
 
 
+## The audit summary replaces the morning's phone lines shown in the same
+## frame (they are on the phone log); later lines stack under it.
+func _toast_fresh(text: String) -> void:
+	_toast_left = 0.0
+	_toast(text)
+
+
 func _toast(text: String) -> void:
-	_hint_label.text = text
-	_toast_left = maxf(TOAST_SECONDS, text.length() * TOAST_SECONDS_PER_CHAR)
+	# Two messages in one frame (a dawn cancellation, then the bench result
+	# after the same time jump) both stay on screen.
+	var frame: int = Engine.get_process_frames()
+	if frame == _toast_frame and _toast_left > 0.0:
+		_hint_label.text += "
+" + text
+	else:
+		_hint_label.text = text
+	_toast_frame = frame
+	_toast_left = maxf(TOAST_SECONDS, _hint_label.text.length() * TOAST_SECONDS_PER_CHAR)
