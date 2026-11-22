@@ -679,6 +679,19 @@ PACK3 = {
 }
 
 
+# Ryan's Plateau Clutter pack (2026-11-22): 0.2 m voxels (like the boulders), origin at the
+# footprint center on the ground, palettes as given in his generator script (S is SHADOW; the
+# cobbles' P1..P4 and the stump's dust P1 are the boulders' PLATEAU colors). Built and turned
+# like the field props. Not placed in any scene yet.
+CLUTTER = {
+    "mesa_scrub_bush": {"B1": "#5A3E2B", "B2": "#3D2919", "F1": "#6D7A4C", "F2": "#8A9663",
+                        "F3": "#4E5936", "S": SHADOW},
+    "scatter_pebbles_cluster": {"P1": PLATEAU[0], "P2": PLATEAU[1], "P3": PLATEAU[2],
+                                "P4": PLATEAU[3], "S": SHADOW},
+    "mesa_dry_stump": {"P1": PLATEAU[0], "W1": "#8C7A65", "W2": "#6B5B4A", "W3": "#A89782",
+                       "S": SHADOW},
+}
+
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop") -> Model:
     """cells: {(x, y, z): token} in sheet axes (X right, Y back, Z up). Sheet (x, y, z) goes
@@ -717,6 +730,7 @@ MODELS = [
     (lambda: prop_sheet("field_survey_tripod"), 0.1),
     *[((lambda n=n: prop_sheet(f"crop_stage_{n}", CROP_SUNPOD, "crop")), 0.1) for n in range(4)],
     *[((lambda n=n: prop_sheet(n, *PACK3[n])), 0.1) for n in PACK3],
+    *[((lambda n=n: prop_sheet(n, CLUTTER[n])), 0.2) for n in CLUTTER],
 ]
 
 
