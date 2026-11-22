@@ -15,8 +15,10 @@ Ryan's answers to the open questions (2026-11-22):
 - **Skills (milestone 4): both.** Each player has their own skills, and the farm has shared ones too. Milestone 4 decides which skill goes where.
 - **Credits:** one shared farm wallet. Vance fines the farm, OIRM bills the farm, and everyone spends from the same pot.
 - **Rovers:** the farm starts with one shared rover and can buy more as it grows. Each rover's steering sensor is its own instrument to keep calibrated.
-- **Save:** the farm lives in the host's save and exists only while the host plays. A guest's personal skills travel with the guest.
+- **Save:** the farm lives in the host's save and exists only while the host plays. A guest's personal skills travel with the guest (where and how they are stored is decided in milestone 4).
 - **Time:** the day ends only when every player is in bed. Waiting out time (for example at the bench) works only in solo play.
+
+Still open, for the co-op milestone: there is no bed or sleep yet (today `GameClock` rolls the day over at 06:00 on its own), so what happens at 06:00 when someone is still up is not decided; a bench calibration jumps the shared clock today (`calibrate_at_bench`), and how it costs time in co-op is not decided; and who can pause in co-op is not decided.
 
 ## 2026-11-22: PR checks, second review and merging
 
