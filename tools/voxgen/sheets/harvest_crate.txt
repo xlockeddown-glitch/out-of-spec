@@ -1,0 +1,63 @@
+harvest_crate - 10 x 8 x 6 (safety-orange crate packed with sun-pods). From Ryan's Farm Logistics generator (0.1 m voxels), 2026-11-22.
+X: 0..9 left to right, Y: 7..0 rear (+Y) to front (-Y), first row = highest Y.
+Palette: O1 = #E85D25, O2 = #B54414, M3 = #2E3844, C1 = #D9A13B, C2 = #F2C96B, S = #1D222B
+
+Z = 0
+Y=07  M3 M3 O2 O2 O2 O2 O2 O2 M3 M3
+Y=06  M3 M3 O2 O2 O2 O2 O2 O2 M3 M3
+Y=05  S  S  O2 O2 O2 O2 O2 O2 S  S
+Y=04  S  S  O2 O2 O2 O2 O2 O2 S  S
+Y=03  S  S  O2 O2 O2 O2 O2 O2 S  S
+Y=02  S  S  O2 O2 O2 O2 O2 O2 S  S
+Y=01  M3 M3 O2 O2 O2 O2 O2 O2 M3 M3
+Y=00  M3 M3 O2 O2 O2 O2 O2 O2 M3 M3
+
+Z = 1
+Y=07  M3 M3 O1 O1 O1 O1 O1 O1 M3 M3
+Y=06  M3 M3 S  S  S  S  S  S  M3 M3
+Y=05  O1 S  S  S  S  S  S  S  S  O1
+Y=04  O1 S  S  S  S  S  S  S  S  O1
+Y=03  O1 S  S  S  S  S  S  S  S  O1
+Y=02  O1 S  S  S  S  S  S  S  S  O1
+Y=01  M3 M3 S  S  S  S  S  S  M3 M3
+Y=00  M3 M3 O1 O1 O1 O1 O1 O1 M3 M3
+
+Z = 2
+Y=07  M3 M3 O2 O2 O2 O2 O2 O2 M3 M3
+Y=06  M3 M3 S  S  S  S  S  S  M3 M3
+Y=05  O2 S  S  S  S  S  S  S  S  O2
+Y=04  O2 S  S  S  S  S  S  S  S  O2
+Y=03  O2 S  S  S  S  S  S  S  S  O2
+Y=02  O2 S  S  S  S  S  S  S  S  O2
+Y=01  M3 M3 S  S  S  S  S  S  M3 M3
+Y=00  M3 M3 O2 O2 O2 O2 O2 O2 M3 M3
+
+Z = 3
+Y=07  M3 M3 O1 O1 O1 O1 O1 O1 M3 M3
+Y=06  M3 M3 S  S  S  S  S  S  M3 M3
+Y=05  O1 C1 C1 C1 C1 C1 C1 C1 C1 O1
+Y=04  O1 C1 C1 C1 C1 C1 C1 C1 C1 O1
+Y=03  O1 C1 C1 C1 C1 C1 C1 C1 C1 O1
+Y=02  O1 C1 C1 C1 C1 C1 C1 C1 C1 O1
+Y=01  M3 M3 S  S  S  S  S  S  M3 M3
+Y=00  M3 M3 O1 O1 O1 O1 O1 O1 M3 M3
+
+Z = 4
+Y=07  M3 M3 O1 O1 O1 O1 O1 O1 M3 M3
+Y=06  M3 M3 C1 C1 C1 S  C1 C1 M3 M3
+Y=05  O1 C1 C1 C1 C1 S  C1 C1 C1 O1
+Y=04  S  C1 C1 C1 C1 S  C1 C1 C1 S
+Y=03  S  C1 C1 C1 C1 S  C1 C1 C1 S
+Y=02  O1 C1 C1 C1 C1 S  C1 C1 C1 O1
+Y=01  M3 M3 C1 C1 C1 S  C1 C1 M3 M3
+Y=00  M3 M3 O1 O1 O1 O1 O1 O1 M3 M3
+
+Z = 5
+Y=07  .. .. .. .. .. .. .. .. .. ..
+Y=06  .. .. .. .. .. .. .. .. .. ..
+Y=05  .. .. C2 C1 .. .. C1 C2 .. ..
+Y=04  .. .. C2 C2 .. .. C2 C2 .. ..
+Y=03  .. .. C2 C2 .. .. C2 C2 .. ..
+Y=02  .. .. C1 C2 .. .. C2 C1 .. ..
+Y=01  .. .. .. .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. .. .. .. ..

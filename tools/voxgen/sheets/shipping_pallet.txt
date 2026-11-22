@@ -1,0 +1,45 @@
+shipping_pallet - 14 x 12 x 3 (slatted pallet with corner steel shoes). From Ryan's Farm Logistics generator (0.1 m voxels), 2026-11-22.
+X: 0..13 left to right, Y: 11..0 rear (+Y) to front (-Y), first row = highest Y.
+Palette: W1 = #8C6742, W2 = #6B4D30, M3 = #2E3844, S = #1D222B
+
+Z = 0
+Y=11  M3 M3 .. .. .. .. W2 W2 .. .. .. .. M3 M3
+Y=10  M3 M3 .. .. .. .. W2 W2 .. .. .. .. M3 M3
+Y=09  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=08  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=07  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=06  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=05  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=04  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=03  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=02  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=01  M3 M3 .. .. .. .. W2 W2 .. .. .. .. M3 M3
+Y=00  M3 M3 .. .. .. .. W2 W2 .. .. .. .. M3 M3
+
+Z = 1
+Y=11  M3 M3 .. .. .. .. W2 W2 .. .. .. .. M3 M3
+Y=10  M3 M3 .. .. .. .. W2 W2 .. .. .. .. M3 M3
+Y=09  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=08  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=07  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=06  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=05  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=04  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=03  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=02  W2 W2 .. .. .. .. W2 W2 .. .. .. .. W2 W2
+Y=01  M3 M3 .. .. .. .. W2 W2 .. .. .. .. M3 M3
+Y=00  M3 M3 .. .. .. .. W2 W2 .. .. .. .. M3 M3
+
+Z = 2
+Y=11  M3 M3 W1 W1 W1 W1 W2 W2 W1 W1 W1 W1 M3 M3
+Y=10  M3 M3 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 M3 M3
+Y=09  .. .. .. .. .. .. .. .. .. .. .. .. .. ..
+Y=08  W1 W1 W1 W1 W1 W1 W2 W2 W1 W1 W1 W1 W1 W1
+Y=07  S  W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 S
+Y=06  .. .. .. .. .. .. .. .. .. .. .. .. .. ..
+Y=05  .. .. .. .. .. .. .. .. .. .. .. .. .. ..
+Y=04  W1 W1 W1 W1 W1 W1 W2 W2 W1 W1 W1 W1 W1 W1
+Y=03  S  W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 S
+Y=02  .. .. .. .. .. .. .. .. .. .. .. .. .. ..
+Y=01  M3 M3 W1 W1 W1 W1 W2 W2 W1 W1 W1 W1 M3 M3
+Y=00  M3 M3 W1 W1 W1 W1 W1 W1 W1 W1 W1 W1 M3 M3
