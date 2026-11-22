@@ -587,18 +587,21 @@ def boulder_sheet(name: str, sheet: str) -> Model:
 def token_sheet(sheet: str) -> dict[int, list[list[str]]]:
     """Reads a token layer grid from tools/voxgen/sheets/: "Z = n" headers are layers
     bottom up; each "Y=NN  t t t ..." row lists one token per X (".." = empty), first
-    row = highest Y. Anything after "<-" is a comment. Returns {z: rows}."""
+    row = highest Y. "Z = a..b" repeats one grid on layers a to b. Anything after "<-"
+    is a comment. Returns {z: rows}."""
     import re
     layers: dict[int, list[list[str]]] = {}
-    current = -1
+    current: list[list[str]] | None = None
     for line in (Path(__file__).parent / "sheets" / sheet).read_text(encoding="utf-8").splitlines():
-        header = re.match(r"Z\s*=\s*(\d+)", line)
+        header = re.match(r"Z\s*=\s*(\d+)(?:\.\.(\d+))?", line)
         row = re.match(r"Y=\d+\s+(.*)", line)
         if header:
-            current = int(header.group(1))
-            layers[current] = []
-        elif row and current >= 0:
-            layers[current].append(row.group(1).split("<-")[0].split())
+            first = int(header.group(1))
+            current = []
+            for z in range(first, int(header.group(2) or first) + 1):
+                layers[z] = current
+        elif row and current is not None:
+            current.append(row.group(1).split("<-")[0].split())
     w, d = len(layers[0][0]), len(layers[0])
     for z, rows in layers.items():
         assert len(rows) == d and all(len(r) == w for r in rows), f"{sheet}: Z={z} is not {w} x {d}"
@@ -638,6 +641,57 @@ def tarantula_exuvia() -> Model:
     return m
 
 
+# ---------------------------------------------------------------- field props
+# Gemini's field calibration & survey props pack (2026-11-21): 0.1 m voxels, origin at the
+# footprint center on the ground, palettes as given in the spec. Like the exuvia, each is
+# turned 180 degrees from the sheet so its front (sheet Y=0, -Y) faces -z.
+FIELD_PROPS = {
+    "soil_moisture_probe": {"P1": "#3A3F47", "P2": "#8A94A0", "P3": "#D9534F", "P4": "#E8ECEF"},
+    "steering_encoder_jig": {"J1": "#2B303A", "J2": "#5C6B73", "J3": "#E0A96D", "J4": "#7BB661"},
+    "field_survey_tripod": {"T1": "#C47D2B", "T2": "#4A4E57", "T3": "#D1D5DB", "T4": "#3B82F6"},
+}
+
+
+def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int) -> Model:
+    """cells: {(x, y, z): token} in sheet axes (X right, Y back, Z up). Sheet (x, y, z) goes
+    to Godot (w-1-x, z, y), so sheet Y=0 (the front) lands at -z after the offset."""
+    m = Model(name, offset=(-w / 2.0, 0.0, -d / 2.0))
+    for (x, y, z), token in cells.items():
+        m.put("prop", w - 1 - x, z, y, FIELD_PROPS[name][token])
+    return m
+
+
+def prop_sheet(name: str) -> Model:
+    """Built voxel for voxel from Gemini's layer grid in sheets/<name>.txt."""
+    layers = token_sheet(f"{name}.txt")
+    w, d = len(layers[0][0]), len(layers[0])
+    cells = {(x, d - 1 - row_i, z): cell
+             for z, rows in layers.items() for row_i, row in enumerate(rows)
+             for x, cell in enumerate(row) if cell != ".."}
+    return front_to_minus_z(name, cells, w, d)
+
+
+def field_survey_tripod() -> Model:
+    """7 x 7 x 14. Gemini's spec gives the legs (Z=1..7) only in words and the hub/head
+    layers as 3 of 7 rows, so the voxels are the ones in Gemini's own exporter
+    (magicavoxel_exporter.py, create_field_survey_tripod), copied here as (x, y, z)."""
+    cells: dict[tuple[int, int, int], str] = {}
+    for foot in [(3, 6, 0), (0, 0, 0), (6, 0, 0)]:
+        cells[foot] = "T2"
+    for leg in [(3, 6, 1), (3, 5, 2), (3, 5, 3), (3, 4, 4), (3, 4, 5), (3, 4, 6), (3, 3, 7),  # rear
+                (0, 0, 1), (1, 1, 2), (1, 1, 3), (2, 2, 4), (2, 2, 5), (2, 2, 6),              # front left
+                (6, 0, 1), (5, 1, 2), (5, 1, 3), (4, 2, 4), (4, 2, 5), (4, 2, 6)]:             # front right
+        cells[leg] = "T1"
+    for x in range(2, 5):
+        for y in range(2, 5):
+            cells[(x, y, 8)] = "T2"                                   # hub
+            for z in (12, 13):                                        # target head
+                cells[(x, y, z)] = "T4" if (x, y, z) == (3, 3, 13) else "T3"
+    for z in (9, 10, 11):
+        cells[(3, 3, z)] = "T3"                                       # center post
+    return front_to_minus_z("field_survey_tripod", cells, 7, 7)
+
+
 MODELS = [
     (lambda: tractor(False), 0.1), (lambda: tractor(True), 0.1),
     (terrarium, 0.1), (curlyhair, 0.1), (bram_bay, 0.2), (ore_fissure, 0.2),
@@ -651,6 +705,9 @@ MODELS = [
     (lambda: boulder_sheet("boulder_d", "boulder_d.txt"), 0.2),
     (lambda: soil_sheet(False), 0.1), (lambda: soil_sheet(True), 0.1),
     (tarantula_exuvia, 0.1),
+    (lambda: prop_sheet("soil_moisture_probe"), 0.1),
+    (lambda: prop_sheet("steering_encoder_jig"), 0.1),
+    (field_survey_tripod, 0.1),
 ]
 
 

@@ -1,0 +1,28 @@
+soil_moisture_probe — 3 × 3 × 10 (X: 0..2 left→right, Y: 2..0 rear → front -Y), from Gemini's field props spec
+Palette: P1 #3A3F47 slate dark, P2 #8A94A0 galvanized steel, P3 #D9534F safety red, P4 #E8ECEF dial off-white
+X:    00 01 02
+
+Z = 0..3 (Dual Metal Probe Spikes)
+Y=2  .. .. ..
+Y=1  P2 .. P2   <- Left and right steel spikes
+Y=0  .. .. ..
+
+Z = 4 (Probe Junction Base)
+Y=2  P1 P1 P1
+Y=1  P1 P1 P1
+Y=0  P1 P1 P1
+
+Z = 5..6 (Sensor Main Casing + Analog Dial Face at Y=0)
+Y=2  P1 P1 P1
+Y=1  P1 P1 P1
+Y=0  P3 P4 P3   <- Red bezel with off-white dial face at front (-Y)
+
+Z = 7 (Upper Stem Transition)
+Y=2  .. .. ..
+Y=1  .. P2 ..   <- Galvanized stem shaft
+Y=0  .. .. ..
+
+Z = 8..9 (T-Handle Grip)
+Y=2  .. .. ..
+Y=1  P3 P3 P3   <- 3-wide ergonomic safety red handle
+Y=0  .. .. ..
