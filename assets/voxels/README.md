@@ -9,7 +9,7 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `tractor_wide.glb` | Tractor after Bram's wide treads | Same origin as `tractor.glb`; swapped in when the treads are bought. |
 | `ore_fissure.glb` | Crystal ore fissure greybox (`OreFissure`) | 1.6 m across; hidden while mined. |
 | `terrarium.glb` | Tank, substrate, hygrometer pod, lamp hood (`Terrarium/TankModel`) | Leave the hygrometer LED out; the game drives it. |
-| `curlyhair.glb` | Earlier spider model, replaced in the terrarium by `live_tarantula.glb` (kept for reference; not placed in any scene) | Center origin. Separate so molt visuals can be added. |
+| `curlyhair.glb` | Earlier spider model, replaced in the terrarium by `live_tarantula.glb` (not placed in the game; still in the dev model gallery) | Center origin. |
 | `drop_pod.glb` | Pod hull, nose, hatch (`DropPod/PodModel`) | |
 | `aud1t.glb` | AUD-1T drone (`DropPod/AUD1T/DroneModel`) | Center origin. The game bobs it. |
 | `relay_mast.glb` | Mast and dish (`SatelliteRelay/MastModel`) | Model the spool bay empty; the spool is game-driven. |
