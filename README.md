@@ -46,7 +46,17 @@ Tests: `godot --headless --path . --script res://tests/run_tests.gd` (on Windows
 
 `DataManager` loads each file in `data/` as-is. Arrays of `{ "id": ... }` objects are indexed by id (`get_record`, `get_records`); everything else is read by path (`get_value("instruments/hygrometer/max_permissible_error")`). Add new record sections to `RECORD_SECTIONS` in `scripts/autoload/DataManager.gd`.
 
-Exporting: add `data/*.json` to Export > Resources > "Filters to export non-resource files".
+## Windows export
+
+Use Godot 4.7.2 Standard and install its matching export templates via **Editor > Manage Export Templates**. From the project root, with the Godot executable on your PATH (on Windows, use the `_console.exe` build so each command waits and reports errors):
+
+```powershell
+New-Item -ItemType Directory -Force build | Out-Null
+godot --headless --import
+godot --headless --export-release "Windows Desktop"
+```
+
+Run `build/OutOfSpec.exe`. The Windows x86_64 preset embeds the game pack and includes the runtime JSON tables. For the [18-minute playtest](docs/playtest.md), use `--export-debug` in place of `--export-release` to enable the F9 morning skip. Both commands write to the same output path.
 
 ## Vertical slice plan
 

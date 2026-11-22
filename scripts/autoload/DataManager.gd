@@ -11,9 +11,9 @@ extends Node
 ##
 ## Treat returned Dictionaries/Arrays as read-only; they are the cached data.
 ##
-## EXPORT NOTE: .json is not a Godot resource. Add `data/*.json` to
-## Export > Resources > "Filters to export non-resource files", or the
-## exported build will ship without its data.
+## EXPORT NOTE: .json is not a Godot resource. export_presets.cfg includes
+## `data/*.json` under "Filters to export non-resource files"; keep it there
+## in any new preset, or the exported build will ship without its data.
 
 signal data_loaded(all_ok: bool)
 signal table_failed(table: StringName, reason: String)
