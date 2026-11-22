@@ -23,6 +23,8 @@ signal credibility_changed(points: int)
 signal crops_changed
 ## The job board or the accepted jobs changed (paid calibration jobs).
 signal jobs_changed
+## The lab grew, a build started or finished, or an area changed.
+signal lab_changed
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -163,6 +165,17 @@ var _next_job_number: int = 1
 var _board_day: int = -1
 var _board_band: int = -1
 var _board_taken: Array[String] = []
+
+## Upgradeable lab (Ryan, 2026-11-22): an index into economy lab/sizes, the
+## spaces given to each discipline (its area), and the build under way:
+## {} or { kind "grow" (size) or "refit" (discipline), done_day }.
+var lab_size: int = 0
+var lab_areas: Dictionary = {}
+var lab_build: Dictionary = {}
+## Where each space sits along the dome wall: a discipline, "" (free) or
+## LAB_REFIT_SLOT. Only the dome floor reads it; lab_areas holds the counts.
+var lab_layout: Array[String] = []
+const LAB_REFIT_SLOT: String = "#refit"
 ## True while the morning runs, so credibility changes then don't rebuild the
 ## board before the audit is in.
 var _morning: bool = false
@@ -236,6 +249,7 @@ func build_registry() -> void:
 	steering = sensors.get(STEERING_ID)
 	hygrometer = sensors.get(HYGROMETER_ID)
 	_issue_founding_certificates()
+	reset_lab()
 	if steering == null or hygrometer == null:
 		push_error("GameState: %s needs %s and %s." % [DRIFT_TABLE, STEERING_ID, HYGROMETER_ID])
 
@@ -486,6 +500,7 @@ func _on_day_started(day: int) -> void:
 	_post_morning_dispatch(day)
 	# Courier returns land in the morning, before an audit that day.
 	_receive_oirm_returns(day)
+	_finish_lab_build(day)
 	_morning = true
 	_charge_overdue_credibility(day)
 	_expire_jobs(day)
@@ -1491,9 +1506,9 @@ func job_accept_problem(job: Dictionary) -> String:
 	var band_name: String = str(job.get("min_band", ""))
 	if _band_index_named(band_name) > credibility_band_index():
 		return "Needs %s credibility." % band_name.to_upper()
-	var max_active: int = maxi(int(_jobs_number("max_active", 2.0)), 1)
-	if active_jobs.size() >= max_active:
-		return "You already have %s jobs to finish." % SP811.integer(active_jobs.size())
+	var area_problem: String = job_area_problem(job)
+	if area_problem != "":
+		return area_problem
 	if job_standards(job).is_empty():
 		var tier: int = int(job.get("min_tier", 0))
 		return "Needs your own %s standard%s." % [job.get("discipline", "?"),
@@ -1708,6 +1723,380 @@ func job_board_note() -> String:
 	if credibility_band_index() < _band_index_named(open_band):
 		return "JOB BOARD opens at %s." % open_band.to_upper()
 	return "JOB BOARD: no new jobs today."
+
+
+# --- Upgradeable lab (Ryan, 2026-11-22) --------------------------------------
+
+func _lab_number(key: String, fallback: float) -> float:
+	return DataManager.get_number(ECONOMY_TABLE, "lab/" + key, fallback)
+
+
+func _lab_list(key: String) -> Array[Dictionary]:
+	var list: Array[Dictionary] = []
+	var raw: Variant = DataManager.get_value(ECONOMY_TABLE, "lab/" + key, [])
+	if typeof(raw) == TYPE_ARRAY:
+		for entry: Variant in raw:
+			if typeof(entry) == TYPE_DICTIONARY:
+				list.append(entry)
+	return list
+
+
+## Lab sizes, smallest first.
+func lab_sizes() -> Array[Dictionary]:
+	return _lab_list("sizes")
+
+
+## The record of size `index` (the lab's own size by default).
+func lab_size_record(index: int = -1) -> Dictionary:
+	var sizes: Array[Dictionary] = lab_sizes()
+	if sizes.is_empty():
+		return {}
+	return sizes[clampi(lab_size if index < 0 else index, 0, sizes.size() - 1)]
+
+
+func lab_size_name(index: int = -1) -> String:
+	return str(lab_size_record(index).get("name", "Lab"))
+
+
+## The next size up, or {} at the largest.
+func lab_next_size() -> Dictionary:
+	var sizes: Array[Dictionary] = lab_sizes()
+	return sizes[lab_size + 1] if lab_size + 1 < sizes.size() else {}
+
+
+## Spaces the lab has at its size.
+func lab_spaces() -> int:
+	return maxi(int(lab_size_record().get("areas", 0)), 0)
+
+
+## Spaces given to disciplines, plus one being cleared.
+func lab_used_spaces() -> int:
+	var used: int = 0
+	for discipline: Variant in lab_areas:
+		used += int(lab_areas[discipline])
+	if lab_build.get("kind", "") == "refit":
+		used += 1
+	return used
+
+
+func lab_free_spaces() -> int:
+	return maxi(lab_spaces() - lab_used_spaces(), 0)
+
+
+## Spaces given to `discipline`: its area, and how many of its jobs fit at once.
+func lab_space(discipline: String) -> int:
+	return int(lab_areas.get(discipline, 0))
+
+
+## The biggest area size ("small", "medium", "large") `spaces` reach, or "".
+func lab_area_size(spaces: int) -> String:
+	var best: String = ""
+	var best_need: int = 0
+	for entry: Dictionary in _lab_list("area_sizes"):
+		var need: int = int(entry.get("spaces", 0))
+		if spaces >= need and need >= best_need:
+			best = str(entry.get("id", ""))
+			best_need = need
+	return best
+
+
+## Spaces an area of size `size_id` needs (1 if it isn't listed).
+func lab_area_spaces_needed(size_id: String) -> int:
+	for entry: Dictionary in _lab_list("area_sizes"):
+		if str(entry.get("id", "")) == size_id:
+			return maxi(int(entry.get("spaces", 1)), 1)
+	return 1
+
+
+## The most spaces one area may have at the lab's size: the lab's largest
+## area size reaches up to just below the next area size. Growing the lab is
+## what opens the bigger areas, so clearing other areas can't skip a size.
+func lab_max_area_spaces(index: int = -1) -> int:
+	var record: Dictionary = lab_size_record(index)
+	var largest: String = str(record.get("largest_area", ""))
+	var limit: int = maxi(int(record.get("areas", 0)), 0)
+	if largest == "":
+		return limit
+	var need: int = lab_area_spaces_needed(largest)
+	for entry: Dictionary in _lab_list("area_sizes"):
+		var spaces: int = int(entry.get("spaces", 0))
+		if spaces > need:
+			limit = mini(limit, spaces - 1)
+	return maxi(limit, 1)
+
+
+## ", in the large lab" when the lab is too small for an area of `need`
+## spaces, naming the smallest lab size that holds one; else "".
+func _lab_size_for_area_text(need: int) -> String:
+	if lab_max_area_spaces() >= need:
+		return ""
+	for i: int in lab_sizes().size():
+		if lab_max_area_spaces(i) >= need:
+			return ", in the %s" % lab_size_name(i).to_lower()
+	return ""
+
+
+## The most spaces any one job of `discipline` in progress needs its area to keep.
+func _lab_spaces_in_use(discipline: String) -> int:
+	var keep: int = 0
+	for job: Dictionary in active_jobs:
+		if str(job.get("discipline", "")) != discipline:
+			continue
+		var size_id: String = str(job.get("area", ""))
+		keep = maxi(keep, lab_area_spaces_needed(size_id) if size_id != "" else 1)
+	return keep
+
+
+## Accepted jobs of `discipline` (at the bench or waiting).
+func jobs_in_progress(discipline: String) -> int:
+	var count: int = 0
+	for job: Dictionary in active_jobs:
+		if str(job.get("discipline", "")) == discipline:
+			count += 1
+	return count
+
+
+## Why the lab has no room for `job` now, or "".
+func job_area_problem(job: Dictionary) -> String:
+	var discipline: String = str(job.get("discipline", ""))
+	var spaces: int = lab_space(discipline)
+	var size_id: String = str(job.get("area", ""))
+	var need: int = lab_area_spaces_needed(size_id) if size_id != "" else 1
+	if spaces <= 0 and need <= 1:
+		return "Needs a %s area in the lab: plan one at the dome plan board." % discipline
+	if spaces < need:
+		return "Needs a %s %s area (%s spaces%s); yours has %s." % [size_id.to_upper(), discipline,
+			SP811.integer(need), _lab_size_for_area_text(need), SP811.integer(spaces)]
+	var busy: int = jobs_in_progress(discipline)
+	if busy >= spaces:
+		return "Your %s area is full: %s job%s in progress." % [discipline, SP811.integer(busy), "" if busy == 1 else "s"]
+	return ""
+
+
+## "600 CR + 4 crystal ore"
+func lab_cost_text(cost_credits: int, cost_ore: int) -> String:
+	var text: String = "%s CR" % SP811.integer(cost_credits)
+	if cost_ore > 0:
+		text += " + %s crystal ore" % SP811.integer(cost_ore)
+	return text
+
+
+func _lab_afford_problem(cost_credits: int, cost_ore: int) -> String:
+	if credits < cost_credits or crystal_ore < cost_ore:
+		return "Costs %s; you have %s CR and %s crystal ore." % [lab_cost_text(cost_credits, cost_ore),
+			SP811.integer(credits), SP811.integer(crystal_ore)]
+	return ""
+
+
+func _lab_pay(cost_credits: int, cost_ore: int) -> void:
+	add_credits(-cost_credits)
+	crystal_ore -= cost_ore
+	ore_changed.emit(crystal_ore)
+
+
+## The build under way, e.g. "The medium lab is being built: ready the
+## morning of day 9.", or "".
+func lab_build_text() -> String:
+	if lab_build.is_empty():
+		return ""
+	var ready_day: String = SP811.integer(int(lab_build.get("done_day", 0)))
+	if lab_build.get("kind", "") == "grow":
+		return "The %s is being built: ready the morning of day %s." % [
+			lab_size_name(int(lab_build.get("size", 0))).to_lower(), ready_day]
+	return "A %s space is being cleared: free the morning of day %s." % [lab_build.get("discipline", "?"), ready_day]
+
+
+## Why the lab can't grow to the next size now, or "".
+func lab_grow_problem() -> String:
+	if not lab_build.is_empty():
+		return lab_build_text()
+	var next: Dictionary = lab_next_size()
+	if next.is_empty():
+		return "The lab is already at its largest."
+	return _lab_afford_problem(int(next.get("credits", 0)), int(next.get("ore", 0)))
+
+
+## Pays for the next size and starts building it. The new spaces are ready
+## the morning build_days later; the lab's areas keep working meanwhile.
+## Returns "" or why it can't start.
+func start_lab_grow() -> String:
+	var problem: String = lab_grow_problem()
+	if problem != "":
+		return problem
+	var next: Dictionary = lab_next_size()
+	_lab_pay(int(next.get("credits", 0)), int(next.get("ore", 0)))
+	var days: int = maxi(int(next.get("build_days", 1)), 1)
+	lab_build = { "kind": "grow", "size": lab_size + 1, "done_day": GameClock.get_day_index() + days }
+	post_phone("LAB: %s Your areas keep working meanwhile." % lab_build_text())
+	lab_changed.emit()
+	return ""
+
+
+## Why a free space can't be fitted out for `discipline` now, or "".
+func lab_fit_problem(discipline: String) -> String:
+	if not job_disciplines().has(discipline):
+		return "No jobs come in for %s." % discipline
+	if lab_free_spaces() <= 0:
+		return "No free space: grow the lab or clear a space first."
+	var limit: int = lab_max_area_spaces()
+	if lab_space(discipline) >= limit:
+		return "The %s holds areas of up to %s space%s: grow the lab for a bigger %s area." % [
+			lab_size_name().to_lower(), SP811.integer(limit), "" if limit == 1 else "s", discipline]
+	return ""
+
+
+## Gives a free space to `discipline` (free of charge). Returns "" or why not.
+func fit_lab_area(discipline: String) -> String:
+	var problem: String = lab_fit_problem(discipline)
+	if problem != "":
+		return problem
+	lab_areas[discipline] = lab_space(discipline) + 1
+	var spaces: int = lab_space(discipline)
+	var plural: String = "" if spaces == 1 else "s"
+	post_phone("LAB: the %s area has %s space%s (%s): up to %s job%s at once." % [discipline,
+		SP811.integer(spaces), plural, lab_area_size(spaces).to_upper(), SP811.integer(spaces), plural])
+	lab_changed.emit()
+	return ""
+
+
+func _lab_refit_cost() -> Vector2i:
+	return Vector2i(maxi(int(_lab_number("refit_credits", 0.0)), 0), maxi(int(_lab_number("refit_ore", 0.0)), 0))
+
+
+func _lab_refit_days() -> int:
+	return maxi(int(_lab_number("refit_days", 1.0)), 1)
+
+
+## "200 CR + 1 crystal ore, 1 day"
+func lab_refit_text() -> String:
+	var cost: Vector2i = _lab_refit_cost()
+	var days: int = _lab_refit_days()
+	return "%s, %s day%s" % [lab_cost_text(cost.x, cost.y), SP811.integer(days), "" if days == 1 else "s"]
+
+
+## Why a space of `discipline` can't be cleared now, or "".
+func lab_clear_problem(discipline: String) -> String:
+	if not lab_build.is_empty():
+		return lab_build_text()
+	var spaces: int = lab_space(discipline)
+	if spaces <= 0:
+		return "The lab has no %s area." % discipline
+	if jobs_in_progress(discipline) >= spaces:
+		return "Every %s space has a job in progress: finish one first." % discipline
+	if _lab_spaces_in_use(discipline) >= spaces:
+		return "A %s job in progress needs this area at its size: finish it first." % discipline
+	var cost: Vector2i = _lab_refit_cost()
+	return _lab_afford_problem(cost.x, cost.y)
+
+
+## Takes one space from `discipline` to fit out for another later. It costs
+## refit credits and ore and is down for refit_days. Returns "" or why not.
+func clear_lab_area(discipline: String) -> String:
+	var problem: String = lab_clear_problem(discipline)
+	if problem != "":
+		return problem
+	var cost: Vector2i = _lab_refit_cost()
+	_lab_pay(cost.x, cost.y)
+	_sync_lab_layout()
+	var at: int = lab_layout.rfind(discipline)
+	if at >= 0:
+		lab_layout[at] = LAB_REFIT_SLOT
+	if lab_space(discipline) <= 1:
+		lab_areas.erase(discipline)
+	else:
+		lab_areas[discipline] = lab_space(discipline) - 1
+	lab_build = { "kind": "refit", "discipline": discipline, "done_day": GameClock.get_day_index() + _lab_refit_days() }
+	post_phone("LAB: %s" % lab_build_text())
+	lab_changed.emit()
+	return ""
+
+
+## Each morning: a build that is due finishes.
+func _finish_lab_build(day: int) -> void:
+	if lab_build.is_empty() or day < int(lab_build.get("done_day", 0)):
+		return
+	var build: Dictionary = lab_build
+	lab_build = {}
+	if build.get("kind", "") == "grow":
+		lab_size = clampi(int(build.get("size", 0)), 0, maxi(lab_sizes().size() - 1, 0))
+		var free_spaces: int = lab_free_spaces()
+		post_phone("LAB: the %s is ready. %s free space%s to fit out at the dome plan board." % [
+			lab_size_name().to_lower(), SP811.integer(free_spaces), "" if free_spaces == 1 else "s"])
+	else:
+		post_phone("LAB: the %s space is cleared. Fit it out at the dome plan board." % build.get("discipline", "?"))
+	lab_changed.emit()
+
+
+## The lab starts small, with a space for each discipline the founding
+## standards cover (Agent's proposal, flagged for Ryan: nothing is taken away).
+func reset_lab() -> void:
+	lab_size = 0
+	lab_build = {}
+	lab_areas = {}
+	lab_layout = []
+	var disciplines: Dictionary = job_disciplines()
+	for discipline: Variant in disciplines:
+		var listed: Variant = disciplines[discipline]
+		if typeof(listed) != TYPE_ARRAY:
+			continue
+		for id: Variant in listed:
+			if owned_standards.has(str(id)):
+				lab_areas[str(discipline)] = 1
+				break
+	lab_changed.emit()
+
+
+## The lab's spaces in wall order (see lab_layout), kept in step with
+## lab_areas: each space keeps its place, a cleared space frees where it
+## stood, and a new space goes beside its area if it can.
+func lab_layout_slots() -> Array[String]:
+	_sync_lab_layout()
+	return lab_layout.duplicate()
+
+
+func _sync_lab_layout() -> void:
+	var spaces: int = lab_spaces()
+	if lab_layout.size() > spaces:
+		lab_layout.resize(spaces)
+	while lab_layout.size() < spaces:
+		lab_layout.append("")
+	var refitting: bool = lab_build.get("kind", "") == "refit"
+	var have_refit: bool = false
+	var counts: Dictionary = {}
+	for i: int in lab_layout.size():
+		var slot: String = lab_layout[i]
+		if slot == LAB_REFIT_SLOT:
+			if refitting and not have_refit:
+				have_refit = true
+			else:
+				lab_layout[i] = ""
+		elif slot != "":
+			var have: int = int(counts.get(slot, 0))
+			if have >= lab_space(slot):
+				lab_layout[i] = ""
+			else:
+				counts[slot] = have + 1
+	if refitting and not have_refit:
+		var spot: int = lab_layout.find("")
+		if spot >= 0:
+			lab_layout[spot] = LAB_REFIT_SLOT
+	for discipline: Variant in job_disciplines():
+		var area_id: String = str(discipline)
+		for i: int in maxi(lab_space(area_id) - int(counts.get(area_id, 0)), 0):
+			var spot: int = _lab_free_slot_beside(area_id)
+			if spot < 0:
+				break
+			lab_layout[spot] = area_id
+
+
+## A free slot next to `discipline`'s area, else the first free slot, or −1.
+func _lab_free_slot_beside(discipline: String) -> int:
+	for i: int in lab_layout.size():
+		if lab_layout[i] != "":
+			continue
+		if (i > 0 and lab_layout[i - 1] == discipline) or (i + 1 < lab_layout.size() and lab_layout[i + 1] == discipline):
+			return i
+	return lab_layout.find("")
 
 
 # --- Crops and Lin (income milestone) ----------------------------------------

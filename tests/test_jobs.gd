@@ -15,6 +15,11 @@ func _make_state(points: int = 30) -> GameStateScript:
 	gs.reset_credibility()
 	gs.credibility = points
 	gs.credits = 0
+	# A large lab with a large area for every discipline, so the lab's own
+	# limits (tests/test_lab.gd) stay out of these tests.
+	gs.lab_size = gs.lab_sizes().size() - 1
+	for discipline: Variant in gs.job_disciplines():
+		gs.lab_areas[str(discipline)] = gs.lab_area_spaces_needed("large")
 	gs.set_meta(&"saved_clock", GameClock.elapsed_days)
 	GameClock.elapsed_days = 0.0
 	return gs
@@ -268,7 +273,7 @@ func test_abandoned_job_is_cancelled_after_grace() -> String:
 
 func test_accepted_offer_leaves_the_board_and_caps_active() -> String:
 	var gs: GameStateScript = _make_state()
-	var max_active: int = _cfg(gs, "max_active")
+	var max_active: int = gs.lab_space("soil moisture")
 	gs.refresh_job_board(1)
 	var size: int = gs.job_board.size()
 	var first_id: String = str(gs.job_board[0]["id"])
@@ -292,7 +297,7 @@ func test_accepted_offer_leaves_the_board_and_caps_active() -> String:
 		return "Jobs up to the cap must be accepted, got '%s'." % refused_early
 	if problem != "" or left != size - 1 or still_offered:
 		return "An accepted offer must leave the board, problem '%s', %d -> %d." % [problem, size, left]
-	if over.find("already have") < 0:
+	if over.find("area is full") < 0:
 		return "No more than %d jobs may be active, got '%s'." % [max_active, over]
 	return ""
 
