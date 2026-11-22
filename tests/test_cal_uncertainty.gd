@@ -275,3 +275,23 @@ func test_bench_time_advances_the_clock() -> String:
 	if record.get("bench_minutes", -1.0) != unit.bench_minutes:
 		return "The record must carry bench_minutes: %s" % record
 	return ""
+
+
+func test_remote_zero_blocks_the_next_bench_lengthening() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var unit: DriftingSensor = gs.steering
+	var standard: DriftingSensor = gs.get_sensor(unit.calibrated_by)
+	var initial: int = unit.cal_interval_days
+	_set_day(unit.cal_due_day)
+	standard.error = 0.0
+	unit.error = unit.mpe * 2.0
+	gs.calibrate(gs.STEERING_ID, "You", false)  # remote zero hides the FAIL
+	var record: Dictionary = gs.calibrate(gs.STEERING_ID)  # on-time bench pass
+	GameClock.elapsed_days = saved
+	gs.free()
+	if record["result"] == CalUncertainty.FAIL:
+		return "The setup must give a bench pass after the zero."
+	if record["interval_days"] > initial:
+		return "A bench pass right after an untraceable zero must not lengthen the interval."
+	return ""

@@ -68,6 +68,10 @@ var _spool_species: Array[StringName] = []
 var cal_log: Array[Dictionary] = []
 ## Instrument id -> most recent record (convenience view of cal_log).
 var last_cal_records: Dictionary = {}
+## Instrument id -> true when an untraceable zero was logged since its last
+## traceable calibration. The next bench pass then can't lengthen the interval,
+## so a remote zero can't hide a FAIL from the interval logic.
+var _untraceable_since_cal: Dictionary = {}
 
 ## Credits (MegaCorp scrip). Fines come out of this; can go negative.
 var credits: int = 0
@@ -241,6 +245,11 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 	var previous_interval: int = sensor.cal_interval_days
 	var days_in_service: int = today - sensor.last_cal_day if sensor.last_cal_day >= 0 else previous_interval
 	var enough_service: bool = days_in_service >= ceili(previous_interval / 2.0)
+	if not traceable:
+		_untraceable_since_cal[instrument_id] = true
+	elif _untraceable_since_cal.has(instrument_id):
+		enough_service = false
+		_untraceable_since_cal.erase(instrument_id)
 	if traceable:
 		if result == CalUncertainty.FAIL:
 			sensor.cal_interval_days = maxi(int(_interval_cfg("min_days", 2.0)),
