@@ -20,6 +20,10 @@ OUT = ROOT / "assets" / "voxels"
 
 # Semantic palette (docs/art/voxel_models.md)
 TEAL, AMBER, RED, SHADOW = "#38E1C6", "#F5A623", "#FF5A5F", "#1D222B"
+# Answer A: small lit details (eyes, LEDs, small lamps) get a 1-voxel #1D222B
+# border. Ryan's cutoff: emit_* parts of at most 9 voxels. Today's lit parts are
+# 1-9 or 22+ voxels, so any value from 9 to 21 borders the same parts.
+BORDER_MAX_PART_VOXELS = 9
 
 
 # ---------------------------------------------------------------- tractor
@@ -263,6 +267,8 @@ def bram_bay() -> Model:
     # pipe wrench held across the body
     m.line("bram", (bx - 2, 3, bz + 2), (bx + 2, 5, bz + 2), REDTOOL)
     m.box("bram", bx + 2, bx + 3, 5, 6, bz + 2, bz + 2, TOOL)
+    # keep the lit-part border off Bram and the red tool beside the torque wrench
+    m.border_protect |= {("bram", None), ("props", REDTOOL)}
     return m
 
 
@@ -539,6 +545,8 @@ def relay_mast() -> Model:
     m.line("emit_fiber", (hi + 1, 29, hi), (hi + 1, 30, hi + 1), TEAL)
     # beacon last so nothing overwrites it: 17 m, where the beacon light sits
     m.box("emit_beacon", -1, 0, 34, 34, -1, 0, TEAL)
+    m.hidden_parts.add("emit_fiber")  # hidden until a spool is slotted: no border
+    m.border_protect.add(("mast", FLANGE))  # keep all four gold flange guides gold
     return m
 
 
@@ -704,7 +712,7 @@ def main() -> None:
     (OUT / "source").mkdir(parents=True, exist_ok=True)
     for build, voxel_m in MODELS:
         m = build()
-        bordered = m.border_lit(SHADOW)  # answer A: lit voxels get a #1D222B border
+        bordered = m.border_lit(SHADOW, BORDER_MAX_PART_VOXELS)
         m.write_glb(OUT / f"{m.name}.glb")
         m.write_vox(OUT / "source" / f"{m.name}.vox")
         w, h, d = m.size()

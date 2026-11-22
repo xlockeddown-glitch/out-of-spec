@@ -45,6 +45,10 @@ class Model:
         self.offset = offset  # added to every vertex (center-origin models use -0.5)
         self.voxels: dict[tuple[int, int, int], tuple[str, str]] = {}  # pos -> (part, hex)
         self.glass_parts: set[str] = set()
+        # border_lit skips these: emit_* parts the game hides at times, and
+        # (part, color) pairs it must never recolor (color None = whole part).
+        self.hidden_parts: set[str] = set()
+        self.border_protect: set[tuple[str, str | None]] = set()
 
     # --- building -------------------------------------------------------
     def put(self, part: str, x: int, y: int, z: int, color: str) -> None:
@@ -91,21 +95,37 @@ class Model:
                 for dz in range(thick):
                     self.put(part, math.floor(p[0]) + dx, math.floor(p[1]), math.floor(p[2]) + dz, color)
 
-    def border_lit(self, color: str) -> int:
-        """Give lit (emit_*) voxels a 1-voxel border in `color`, where space allows.
+    def border_lit(self, color: str, max_part_voxels: int) -> int:
+        """Give small lit (emit_*) parts a 1-voxel border in `color`, where space allows.
 
-        Recolors the visible, non-lit, non-glass voxels in each lit voxel's
-        26-neighborhood; it never adds or removes voxels, so silhouettes are
-        unchanged. A lit voxel with no solid neighbors (a free-standing beacon)
-        gets no border. Returns the number of voxels whose color changed
+        Only emit_* parts of at most `max_part_voxels` voxels (counted per part
+        name, across the whole model) are bordered, so eyes, LEDs and small
+        lamps get one and big lamps, crystals and rings do not. Parts in
+        `hidden_parts` get no border, since the game hides them at times.
+        Voxels matching `border_protect` are never recolored.
+
+        Recolors the visible, non-lit, non-glass voxels in each bordered lit
+        voxel's 26-neighborhood; it never adds or removes voxels, so silhouettes
+        are unchanged. A lit voxel with no solid neighbors (a free-standing
+        beacon) gets no border. Returns the number of voxels whose color changed
         (border voxels that already had `color` are not counted).
 
         Limits: exposure is not directional, so a 1-voxel wall behind a lit
         voxel shows the border on its far side too; an `emit_*` neighbor counts
         as solid, so a voxel whose only open face touches a hideable lit part
         (e.g. `emit_fiber`) is not bordered. The pass has no notion of separate
-        objects: a prop or character voxel beside a lit voxel is recolored too.
+        objects: a prop or character voxel beside a lit voxel is recolored too
+        unless `border_protect` names it.
         """
+        sizes: dict[str, int] = {}
+        for part, _ in self.voxels.values():
+            if part.startswith("emit_"):
+                sizes[part] = sizes.get(part, 0) + 1
+        bordered = {p for p, n in sizes.items() if n <= max_part_voxels and p not in self.hidden_parts}
+
+        def protected(part: str, hex_color: str) -> bool:
+            return (part, None) in self.border_protect or (part, hex_color.upper()) in self.border_protect
+
         def lit(pos: tuple[int, int, int]) -> bool:
             v = self.voxels.get(pos)
             return v is not None and v[0].startswith("emit_")
@@ -120,14 +140,14 @@ class Model:
 
         targets: set[tuple[int, int, int]] = set()
         for (x, y, z), (part, _) in self.voxels.items():
-            if not part.startswith("emit_"):
+            if part not in bordered:
                 continue
             for dx in (-1, 0, 1):
                 for dy in (-1, 0, 1):
                     for dz in (-1, 0, 1):
                         n = (x + dx, y + dy, z + dz)
                         v = self.voxels.get(n)
-                        if v is None or lit(n) or v[0] in self.glass_parts:
+                        if v is None or lit(n) or v[0] in self.glass_parts or protected(*v):
                             continue
                         if exposed(n):
                             targets.add(n)
