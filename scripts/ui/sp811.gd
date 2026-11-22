@@ -32,7 +32,9 @@ static func integer(value: int) -> String:
 static func _snap(value: float, decimals: int) -> float:
 	var step: float = pow(10.0, -decimals)
 	var rounded: float = snappedf(value, step)
-	return 0.0 if is_zero_approx(rounded) else rounded
+	# Compare against half a step, not is_zero_approx(): its fixed 1e-5 epsilon
+	# would zero real values at 5+ decimals (−0.000 004 printed as +0.000 000).
+	return 0.0 if absf(rounded) < step * 0.5 else rounded
 
 
 static func _group(text: String) -> String:
