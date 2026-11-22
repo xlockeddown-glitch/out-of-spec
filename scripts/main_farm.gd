@@ -13,8 +13,15 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
 @onready var _airlock: Clickable = %Airlock
 @onready var _bram_bay: BramBay = %BramBay
+## Ryan, 2026-11-22: "Pad by the airlock". Park here and press E to calibrate
+## the tire gauge against the WD-1 without going into the dome.
+@onready var _cal_pad: ParkingPad = %FieldCalPad
 
 var _bram_line: String = ""
+## Ryan (2026-11-22): buying a standard takes two presses. The first press
+## (key or button) arms the offer and shows the price; a second press on the
+## same offer buys it. Leaving the bay or pressing another offer re-arms.
+var _armed_standard: String = ""
 
 
 func _ready() -> void:
@@ -35,7 +42,8 @@ func _ready() -> void:
 	GameState.ore_changed.connect(_on_ore_changed)
 	_rover.ore_mined.connect(_on_ore_mined)
 	_bram_bay.rover_entered.connect(_on_rover_entered_bay)
-	_bram_bay.rover_exited.connect(_hud.hide_bram)
+	_bram_bay.rover_exited.connect(_on_rover_exited_bay)
+	_cal_pad.rover_entered.connect(_on_rover_entered_cal_pad)
 	_hud.trade_pressed.connect(_try_trade)
 	_hud.buy_standard_pressed.connect(_try_buy_standard)
 
@@ -109,7 +117,10 @@ func _on_till_rejected(reason: String) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"interact") and _bram_bay.rover_inside:
+	if event.is_action_pressed(&"interact") and _cal_pad.rover_inside:
+		get_viewport().set_input_as_handled()
+		_try_field_cal()
+	elif event.is_action_pressed(&"interact") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_trade()
 	elif event is InputEventKey and event.pressed and not event.echo and _bram_bay.rover_inside:
@@ -137,7 +148,35 @@ func _on_ore_changed(ore: int) -> void:
 		_refresh_bram()
 
 
+func _on_rover_entered_cal_pad() -> void:
+	if GameState.is_in_service(GameState.TIRE_ID):
+		_hud.push_log("FIELD CAL PAD: press E to calibrate the tire gauge against the WD-1.")
+	else:
+		_hud.push_log("FIELD CAL PAD: the tire gauge needs the WD-1 reference gauge. Bram sells it.")
+
+
+func _try_field_cal() -> void:
+	var sensor: DriftingSensor = GameState.get_sensor(GameState.TIRE_ID)
+	var record: Dictionary = GameState.calibrate_at_bench(GameState.TIRE_ID)
+	if record.is_empty():
+		return
+	if record.get("refused", false):
+		_hud.push_log("FIELD CAL REFUSED: " + str(record["reason"]))
+		return
+	var verdict: String = ("NOT TRACEABLE (standard overdue)" if record.get("standard_overdue", false)
+		else str(record["result"]).to_upper())
+	_hud.push_log("FIELD CAL %s  As-found %s  As-left %s  Due day %d  (%d min)" % [
+		verdict, sensor.format_value(record["as_found"]), sensor.format_value(record["as_left"]),
+		record["due_day"], roundi(record.get("bench_minutes", 0.0))])
+
+
+func _on_rover_exited_bay() -> void:
+	_armed_standard = ""
+	_hud.hide_bram()
+
+
 func _on_rover_entered_bay() -> void:
+	_armed_standard = ""
 	var cost: int = GameState.treads_ore_cost()
 	if GameState.has_wide_treads:
 		_bram_line = GameState.bram_line("greetings")
@@ -157,10 +196,11 @@ func _refresh_bram() -> void:
 			var id: String = catalog[i]
 			var sensor: DriftingSensor = GameState.get_sensor(id)
 			var owned: bool = GameState.owned_standards.has(id)
+			var verb: String = "CONFIRM: BUY" if id == _armed_standard else "BUY"
 			offers.append({
 				"id": id,
 				"text": ("%s: ON THE COLONY" % sensor.short_name.to_upper()) if owned
-					else "BUY %s: %s  [%d]" % [sensor.short_name.to_upper(), GameState.standard_price_text(id).to_upper(), i + 1],
+					else "%s %s: %s  [%d]" % [verb, sensor.short_name.to_upper(), GameState.standard_price_text(id).to_upper(), i + 1],
 				"disabled": owned or GameState.credits < sensor.price_credits or GameState.crystal_ore < sensor.price_ore,
 			})
 	_hud.show_standards(offers, "" if GameState.tier1_unlocked else "Tier 1 standards: pass one audit clean and Bram will sell them.")
@@ -169,7 +209,17 @@ func _refresh_bram() -> void:
 func _try_buy_standard(standard_id: String) -> void:
 	if not _bram_bay.rover_inside:
 		return
-	var problem: String = GameState.buy_standard(standard_id)
+	var problem: String = GameState.standard_purchase_problem(standard_id)
+	if problem.is_empty() and _armed_standard != standard_id:
+		# First press: show the price and wait for a second press.
+		_armed_standard = standard_id
+		_bram_line = "The %s is %s. Press again to buy it." % [
+			GameState.get_sensor(standard_id).short_name, GameState.standard_price_text(standard_id)]
+		_refresh_bram()
+		return
+	_armed_standard = ""
+	if problem.is_empty():
+		problem = GameState.buy_standard(standard_id)
 	if problem.is_empty():
 		_bram_line = "Handle it like it's worth more than your tractor. It nearly is."
 	else:
@@ -180,6 +230,7 @@ func _try_buy_standard(standard_id: String) -> void:
 func _try_trade() -> void:
 	if not _bram_bay.rover_inside or GameState.has_wide_treads:
 		return
+	_armed_standard = ""
 	var problem: String = GameState.buy_wide_treads()
 	if problem.is_empty():
 		_bram_line = "Fresh treads, wide stance. Try not to till a boulder with them."

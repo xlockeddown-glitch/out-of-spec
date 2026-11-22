@@ -16,6 +16,10 @@ extends RefCounted
 ##     = suspect_cal_credits.
 ##   - Excused (overdue only because the standard it needs was at OIRM when it
 ##     fell due) = not a violation at that audit. Out of tolerance still is.
+##   - AUD-1T tire check (Ryan, 2026-11-22): the rover tires are filled to
+##     what the tire gauge reads, so they sit at minus its true error. Past
+##     aud1t_tire_limit_kpa = aud1t_tire_credits, a flat petty fine on top of
+##     the gauge's own line. No repeat surcharge.
 ##   - Repeat offences reset after a fully clean audit (GameState).
 ##   - Calibration records since the last audit are listed on the report
 ##     (traceability). They don't change the fine; Week 4 Vance may care.
@@ -94,6 +98,21 @@ static func fine_for(error_ratio: float, out_of_tolerance: bool, overdue: bool, 
 		fine += _cfg("overdue_credits", 50.0)
 	fine += minf(_cfg("repeat_surcharge_credits", 25.0) * prior_offences, _cfg("max_repeat_surcharge_credits", 100.0))
 	return roundi(minf(fine, _cfg("max_fine_credits", 350.0)))
+
+
+## AUD-1T's tire measurement for a tire gauge whose true error is
+## gauge_error_kpa. Returns offset_kpa (tires minus set point), limit_kpa,
+## violation and fine.
+static func tire_check(gauge_error_kpa: float) -> Dictionary:
+	var offset: float = -gauge_error_kpa
+	var limit: float = _cfg("aud1t_tire_limit_kpa", 6.9)
+	var violation: bool = absf(offset) > limit
+	return {
+		"offset_kpa": offset,
+		"limit_kpa": limit,
+		"violation": violation,
+		"fine": roundi(_cfg("aud1t_tire_credits", 20.0)) if violation else 0,
+	}
 
 
 static func _cfg(key: String, fallback: float) -> float:

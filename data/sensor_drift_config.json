@@ -186,7 +186,9 @@
     "max_fine_credits": 350,
     "overdue_credits": 50,
     "suspect_cal_credits": 75,
-    "_note": "suspect_cal_credits: a unit whose calibration was made suspect by a recall and not redone before the audit (milestone 2). Placeholder."
+    "aud1t_tire_limit_kpa": 6.9,
+    "aud1t_tire_credits": 20,
+    "_note": "suspect_cal_credits: a unit whose calibration was made suspect by a recall and not redone before the audit (milestone 2). Placeholder. aud1t_tire_*: AUD-1T measures the rover tires on audit day (Ryan, 2026-11-22: 'AUD-1T's own line'); tires are filled to what the tire gauge reads, so they sit off the set point by minus the gauge's true error. [PLACEHOLDER] limit 6.9 kPa (1 psi, about 2 x the gauge MPE) and 20 CR petty fine are the agent's picks, not researched; tune in playtest."
   },
   "oirm": {
     "fee_credits": 150,
