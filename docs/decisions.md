@@ -418,6 +418,17 @@ Agent's notes (flagged for Ryan, not his words):
 - A job not done within 3 days after its due day is cancelled ("took it elsewhere") at a credibility cost, so accepted jobs cannot sit forever. At most 2 jobs active at once.
 - Untraceable means the standard used was overdue for calibration. A standard away at OIRM cannot be used at all.
 - The board shows 3 offers each morning (built after that morning's audit), rotating through the eligible jobs by day, so the same day always gives the same board (no randomness yet). A job accepted today is not offered again today, even if the lab changes band. A band change during the day rebuilds the board; a lab that drops below a job's band cannot accept it.
-- A job can only be accepted while a qualifying standard is here, not away at OIRM.
+- A job can only be accepted while a qualifying standard is here (not away at OIRM) and in date (traceable).
 - Lateness is judged when the bench work ends, and the bench refuses work that would end after the customer cancels.
 - Calibrating a job takes bench time (30 min to 90 min of game time); there is no as-found reading or adjustment for customer items yet. That could come later if Ryan wants the bench work itself to be played.
+
+## 2026-11-22: Next milestone after paid jobs
+
+### Ryan chose
+
+- Next milestone: the upgradeable lab.
+- Automation path: later, after the lab (and robot helper) exist.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Paid jobs (PR 49) merged after ten GPT review passes. Lab upgrade sizes, costs and what each area enables still need Ryan's answers before building.
