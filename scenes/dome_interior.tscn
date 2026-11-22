@@ -1,9 +1,10 @@
-[gd_scene load_steps=20 format=3]
+[gd_scene load_steps=21 format=3]
 
 [ext_resource type="Script" path="res://scripts/dome/dome_interior.gd" id="1_dome"]
 [ext_resource type="Script" path="res://scripts/dome/terrarium.gd" id="2_terr"]
 [ext_resource type="Script" path="res://scripts/world/clickable.gd" id="3_click"]
 [ext_resource type="PackedScene" path="res://ui/cal_bench_ui.tscn" id="4_bench"]
+[ext_resource type="Script" path="res://scripts/world/model_slot.gd" id="5_slot"]
 
 [sub_resource type="Environment" id="Env"]
 background_mode = 1
@@ -370,3 +371,15 @@ autowrap_mode = 3
 
 [node name="CalBenchUI" parent="UI" instance=ExtResource("4_bench")]
 unique_name_in_owner = true
+
+[node name="TankModel" type="Node3D" parent="Terrarium" node_paths=PackedStringArray("greybox")]
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/terrarium.glb"
+model_scale = 0.1
+greybox = [NodePath("../Glass"), NodePath("../Substrate"), NodePath("../HygroPod"), NodePath("../LampHead")]
+
+[node name="SpiderModel" type="Node3D" parent="Terrarium/Tarantula" node_paths=PackedStringArray("greybox")]
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/curlyhair.glb"
+model_scale = 0.1
+greybox = [NodePath("../Abdomen"), NodePath("../Cephalothorax"), NodePath("../Legs")]

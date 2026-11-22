@@ -61,3 +61,12 @@ Resolving conflicts between `docs/design/out_of_spec_week_2_dome_calibration_clo
 - Both push the same direction. Zeroing resets to 0, logs as-found, and re-rolls the direction.
 - Status: |error| / MPE <= `guardband.green` ratio (0.80) is in tolerance; <= 1.0 is guard band; > 1.0 is out of spec.
 - Implemented once in `scripts/metrology/drifting_sensor.gd` (`DriftingSensor`, renamed from `DriftModel`) so the rover, hygrometers, and the relay dish share it. Instances live in `GameState`.
+
+## Voxel models (Week 4)
+
+- Concept sheets came from two blind model answers (A 8/10, B 6/10), merged in `docs/art/voxel_models.md`.
+- Voxel size by class: 0.1 m props and vehicles, 0.2 m characters and set pieces, 0.5 m distant landmark.
+- Only the semantic colours glow; red only where something is out of tolerance. State LEDs stay game-driven.
+- Glowing parts are separate MagicaVoxel objects named `emit_*`.
+- Tractor hull `#C85A2A` (pending Ryan's confirmation).
+
