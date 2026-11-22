@@ -194,9 +194,16 @@ Choices made in building these (flagged for Ryan):
 
 ## 2026-11-22: Ryan's answers after milestone 3a (PR #42)
 
-- **Next up: M3a hooks.** Give the new sensors jobs before adding more equipment: the terrarium thermometer feeds the molt, AUD-1T checks tire pressure, and the tire gauge gets a field calibration spot. M3b (Rb-2D, HM-3) and the save system come after.
-- **The dome stays at 2.84:1 on purpose.** Against the WD-1 the bench allows it but it is never a clean 4:1 calibration; the HB-700 (Tier 3) fixes that.
-- **Buying a standard takes two presses.** The first press (key or button) shows the price; the second buys. Applies to Bram's Tier 1 standards.
-- **Numbers: research first, then tune.** Every [PLACEHOLDER] for the M3a sensors and standards (MPEs, drift rates, prices, the 15 °C per volt thermometer scale) starts from real datasheet classes, cited in the data notes, then gets tuned for feel in playtest.
+Ryan chose:
 
-Agent's reading (flagged for Ryan): real datasheets give MPEs, drift and scale factors; credit and ore prices have no real-world source, so they will be set from game balance and tuned in playtest.
+- **Next up: M3a hooks.** The terrarium thermometer feeds the molt, AUD-1T checks tire pressure, and the tire gauge gets a field calibration spot.
+- **Keep the dome at 2.84:1 TUR on purpose.**
+- **Buying a standard takes two presses.**
+- **Numbers:** "Research real specs to start but playtest and tune for feel from there."
+
+Agent's notes (flagged for Ryan, not his words):
+
+- M3b (Rb-2D, HM-3) and the save system were the other options offered; they come after the hooks unless Ryan says otherwise.
+- The dome against the WD-1 is allowed by the bench but never counts as a clean 4:1 calibration; the HB-700 (Tier 3) is what fixes that.
+- Two presses means the first press (key or button) shows the price and the second buys. It applies to Bram's Tier 1 standards.
+- Research covers the [PLACEHOLDER] MPEs, resolutions, drift rates and the thermometer's 15 °C/V scale, with sources cited in the data notes. Credit and ore prices have no real-world source, so they are set from game balance and tuned in playtest.
