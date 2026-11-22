@@ -1,4 +1,4 @@
-handheld_dmm_289 - 6 x 10 x 4 (handheld digital multimeter). From Ryan's Metrology Lab Bench & Multimeters generator (0.025 m voxels), 2026-11-22.
+field_meter_fm3 - 6 x 10 x 4 (handheld digital multimeter, the Arsia Fieldworks FM-3 Field Meter). From Ryan's Metrology Lab Bench & Multimeters generator (0.025 m voxels), 2026-11-22.
 X: 0..5 left to right, Y: 9..0 rear (+Y) to front (-Y), first row = highest Y.
 Palette: Y1 = #E5B53B, Y2 = #B88B22, F1 = #2E3844, K1 = #6C7A89, S = #1D222B
 
