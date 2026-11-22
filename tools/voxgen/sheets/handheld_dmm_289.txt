@@ -1,0 +1,51 @@
+handheld_dmm_289 - 6 x 10 x 4 (handheld digital multimeter). From Ryan's Metrology Lab Bench & Multimeters generator (0.025 m voxels), 2026-11-22.
+X: 0..5 left to right, Y: 9..0 rear (+Y) to front (-Y), first row = highest Y.
+Palette: Y1 = #E5B53B, Y2 = #B88B22, F1 = #2E3844, K1 = #6C7A89, S = #1D222B
+
+Z = 0
+Y=09  .. Y2 Y2 Y2 Y2 ..
+Y=08  Y2 Y2 Y2 Y2 Y2 Y2
+Y=07  Y2 Y2 Y2 Y2 Y2 Y2
+Y=06  Y2 Y2 Y2 Y2 Y2 Y2
+Y=05  Y2 Y2 Y2 Y2 Y2 Y2
+Y=04  Y2 Y2 Y2 Y2 Y2 Y2
+Y=03  Y2 Y2 Y2 Y2 Y2 Y2
+Y=02  Y2 Y2 Y2 Y2 Y2 Y2
+Y=01  Y2 Y2 Y2 Y2 Y2 Y2
+Y=00  .. Y2 Y2 Y2 Y2 ..
+
+Z = 1
+Y=09  .. Y1 Y1 Y1 Y1 ..
+Y=08  Y1 Y1 Y1 Y1 Y1 Y1
+Y=07  Y1 Y1 Y1 Y1 Y1 Y1
+Y=06  Y2 Y1 Y1 Y1 Y1 Y2
+Y=05  Y1 Y1 Y1 Y1 Y1 Y1
+Y=04  Y2 Y1 Y1 Y1 Y1 Y2
+Y=03  Y1 Y1 Y1 Y1 Y1 Y1
+Y=02  Y2 Y1 Y1 Y1 Y1 Y2
+Y=01  Y1 Y1 Y1 Y1 Y1 Y1
+Y=00  .. Y1 Y1 Y1 Y1 ..
+
+Z = 2
+Y=09  .. Y1 Y1 Y1 Y1 ..
+Y=08  Y1 S  S  S  S  Y1
+Y=07  Y1 S  S  S  S  Y1
+Y=06  Y1 S  S  S  S  Y1
+Y=05  Y1 K1 F1 F1 K1 Y1
+Y=04  Y1 F1 F1 F1 F1 Y1
+Y=03  Y1 F1 F1 F1 F1 Y1
+Y=02  Y1 F1 F1 F1 F1 Y1
+Y=01  Y1 S  K1 S  S  Y1
+Y=00  .. Y1 Y1 Y1 Y1 ..
+
+Z = 3
+Y=09  .. Y1 Y1 Y1 Y1 ..
+Y=08  Y1 .. .. .. .. Y1
+Y=07  Y1 .. .. .. .. Y1
+Y=06  Y1 .. .. .. .. Y1
+Y=05  .. .. .. .. .. ..
+Y=04  .. .. K1 F1 .. ..
+Y=03  .. .. F1 K1 .. ..
+Y=02  .. .. .. .. .. ..
+Y=01  .. .. .. .. .. ..
+Y=00  .. Y1 Y1 Y1 Y1 ..

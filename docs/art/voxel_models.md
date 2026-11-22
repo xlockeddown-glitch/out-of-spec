@@ -12,6 +12,7 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
   |---|---|---|
   | Small props and vehicles | 0.1 m | tractor, terrarium, Curlyhair, dome benches, cal station |
   | Characters and set pieces | 0.2 m | Bram and his bay, ore fissure, drop-pod, AUD-1T, dome room |
+  | Hand-held kit | 0.025 m | Ryan's reference and handheld multimeters |
   | Distant landmark | 0.5 m | relay mast |
 
   The 0.1 m size matches the existing rule in `assets/voxels/README.md`. Answer A proposed 0.25 m for everything; that would make the tractor 3.5 m × 6 m against a 1.6 m × 2.4 m collision box.
@@ -272,3 +273,8 @@ Where the generated models differ from the footprints above:
   - **Plateau rim corner** (`plateau_rim_corner`): 10 × 10 × 10 voxels (2.0 m × 2.0 m × 2.0 m), 554 voxels. An outer 90° headland: the cliff faces both −Z and +X, with the same steps and bands as the straight rim and a dust apron along both faces (the outermost corner voxel is empty). The top at 2.0 m covers a 6 × 6 voxel block on the −X, +Z side, except a one-voxel notch where the crack reaches the top. A crack (5 S voxels) runs up the corner from Z = 4 to Z = 8. Its −X edge joins a straight rim placed the same way; its +Z edge joins a straight rim turned so its cliff faces +X. Inner (concave) corners and end caps are not in the pack.
 
   No renders came with this pack. None of the tiles is placed in a scene yet, and how they meet the farm's flat ground (2.0 m below the rim top, 1.2 m below the gulch banks) is open.
+- **Metrology Lab Bench & Multimeters** (Ryan's generator script, concept images and a Gemini grid of the bench, 2026-11-22). Built and turned like Pack 3 by `prop_sheet()` from `tools/voxgen/sheets/<name>.txt` (converted from the script's grids without running it), part `prop`, palettes as given; S is the shadow `#1D222B`. His locked palettes have no glow and no red, and the screen bays are blank. Each sheet's size and voxel count match the .vox files in his zip. None is placed in a scene yet. The bench is 2.0 m wide, wider than one 1.15 m lab space, so where it stands is open.
+  - **Calibration bench** (`lab_calibration_bench`): 20 × 14 × 10 voxels at **0.1 m** (2.0 m × 1.4 m × 1.0 m tall), 1338 voxels. The cistern's steel: M1 `#4A607A`, M2 `#6C7A89`, M3 `#2E3844`; E1 ESD mat `#3A4E5C`; B1 brass `#D9A13B` (feet, a ground lug and a terminal); S shadow. Brass feet at Z = 0, frame, shelf and drawer at Z = 1..6, the tabletop at Z = 7, the ESD mat with a brass lug and a cable trough at Z = 8, and a backsplash rail with a brass terminal at Z = 9. The mat top is 0.9 m above the ground.
+  - **Reference multimeter** (`ref_multimeter_8588a`): 16 × 14 × 6 voxels at **0.025 m** (0.4 m × 0.35 m × 0.15 m), 1164 voxels. C1 light case `#D4DAE0`, C2 case grey `#8D99AE`, F1 front panel `#2E3844`, K1 keys `#6C7A89`, Y1 accent yellow `#E5B53B` (a model color, near but not the UI amber), S shadow (the blank display bay and vents).
+  - **Handheld multimeter** (`handheld_dmm_289`): 6 × 10 × 4 voxels at **0.025 m** (0.15 m × 0.25 m × 0.1 m), 186 voxels, lying face up. Y1 holster yellow `#E5B53B`, Y2 dark yellow `#B88B22`, F1 face `#2E3844`, K1 dial and keys `#6C7A89`, S shadow (the blank screen). The face sits one voxel below the holster rim.
+  - Ryan's names refer to real meter models (8588A, 289); whether to keep them is open.
