@@ -721,9 +721,9 @@ METROLOGY_LAB = {
     "lab_calibration_bench": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "E1": "#3A4E5C",
                                "B1": "#D9A13B", "S": SHADOW}, 0.1),
     "ref_meter_ls85": ({"C1": "#D4DAE0", "C2": "#8D99AE", "F1": "#2E3844", "K1": "#6C7A89",
-                              "Y1": "#E5B53B", "S": SHADOW}, 0.025),
+                        "Y1": "#E5B53B", "S": SHADOW}, 0.025),
     "field_meter_fm3": ({"Y1": "#E5B53B", "Y2": "#B88B22", "F1": "#2E3844", "K1": "#6C7A89",
-                          "S": SHADOW}, 0.025),
+                         "S": SHADOW}, 0.025),
 }
 
 # Ryan's Environmental Chamber pack (2026-11-22, 0.1 m voxels): an environmental chamber
