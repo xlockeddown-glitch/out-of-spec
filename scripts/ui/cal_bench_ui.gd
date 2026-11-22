@@ -6,7 +6,7 @@ extends Control
 ## its standard, the As-Found is judged pass / indeterminate / fail against
 ## the acceptance limit and MPE, and the bench time passes on the clock.
 ## Standards are listed too (milestone 2): they can't be calibrated here, only
-## sent to OIRM on the drop pod, so the button becomes SEND TO OIRM. Each
+## sent to OIRM (drop pod, or courier on other days), so the button becomes SEND. Each
 ## instrument shows its traceability chain under the standard line.
 
 signal closed
@@ -110,7 +110,7 @@ func _on_instrument_selected(index: int) -> void:
 		_found_band.remove_theme_color_override("font_color")
 		_found_meter.show_needle = false
 		_calibrate_button.disabled = true
-		_result_label.text = "%s is at OIRM until the day %d drop pod. %s" % [
+		_result_label.text = "%s is at OIRM until day %d. %s" % [
 			GameState.instrument_name(standard_id, true), GameState.at_oirm[standard_id], _result_label.text]
 
 
@@ -131,19 +131,19 @@ func _show_standard(sensor: DriftingSensor) -> void:
 	_found_band.text = "NO REFERENCE ON SITE"
 	_found_band.remove_theme_color_override("font_color")
 	_left_band.text = ""
-	_calibrate_button.text = "SEND TO OIRM (%s CR)" % SP811.integer(GameState.oirm_fee())
+	var courier_fee: int = GameState.oirm_fee() + GameState.oirm_courier_surcharge()
+	_calibrate_button.text = ("SEND TO OIRM (%s CR)" % SP811.integer(GameState.oirm_fee()) if GameState.drop_pod_present
+		else "SEND BY COURIER (%s CR)" % SP811.integer(courier_fee))
 	_result_label.remove_theme_color_override("font_color")
 	var today: int = GameClock.get_day_index()
+	_calibrate_button.disabled = GameState.at_oirm.has(_current_id)
 	if GameState.at_oirm.has(_current_id):
-		_calibrate_button.disabled = true
-		_result_label.text = "At OIRM. Back on the day %d drop pod." % GameState.at_oirm[_current_id]
+		_result_label.text = "At OIRM. Back on day %d." % GameState.at_oirm[_current_id]
 	elif not GameState.drop_pod_present:
-		_calibrate_button.disabled = true
-		_result_label.text = "Calibrated only at OIRM. Send it on the drop pod next audit day (day %d). %s" % [
-			GameState.next_audit_day(today),
-			_due_text(sensor, today)]
+		_result_label.text = "No drop pod today. By courier it is back on day %d (fee + %s CR surcharge), or wait for the day %d pod (fee only). %s" % [
+			today + GameState.oirm_courier_days(), SP811.integer(GameState.oirm_courier_surcharge()),
+			GameState.next_audit_day(today), _due_text(sensor, today)]
 	else:
-		_calibrate_button.disabled = false
 		_result_label.text = "Drop pod on the pad. While it is away nothing can be calibrated against this standard. %s" % _due_text(sensor, today)
 
 
