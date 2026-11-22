@@ -125,14 +125,14 @@ func test_budget_applies_standard_sensitivity() -> String:
 	var problem: String = ""
 	if absf(budget["u_spec"] - expected_spec) > 1.0e-9:
 		problem = "u_spec must be in degrees Celsius: %s, expected %s." % [budget["u_spec"], expected_spec]
-	elif absf(budget["tur"] - 5.949) > 0.01:
-		problem = "Thermometer against FM-3 should be 5.95:1, got %s." % budget["tur"]
+	elif absf(budget["tur"] - 4.801) > 0.01:
+		problem = "Thermometer against FM-3 should be 4.80:1, got %s." % budget["tur"]
 	var dome: Dictionary = CalUncertainty.budget(gs.get_sensor("dome_pressure"), gs.get_sensor(WD1))
-	if problem == "" and (dome["refused"] or dome["clean"] or absf(dome["tur"] - 2.843) > 0.01):
-		problem = "Dome against WD-1 must be 2.84:1, under 4:1 on purpose, got %s." % dome["tur"]
+	if problem == "" and (dome["refused"] or dome["clean"] or absf(dome["tur"] - 3.109) > 0.01):
+		problem = "Dome against WD-1 must be 3.11:1, under 4:1 on purpose, got %s." % dome["tur"]
 	var tire: Dictionary = CalUncertainty.budget(gs.get_sensor("rover_tire_pressure"), gs.get_sensor(WD1))
-	if problem == "" and absf(tire["tur"] - 10.81) > 0.01:
-		problem = "Tire gauge against WD-1 should be 10.8:1, got %s." % tire["tur"]
+	if problem == "" and absf(tire["tur"] - 8.242) > 0.01:
+		problem = "Tire gauge against WD-1 should be 8.24:1, got %s." % tire["tur"]
 	gs.free()
 	return problem
 
@@ -150,33 +150,33 @@ func test_calibration_and_recall_carry_sensitivity() -> String:
 	unit.error = 0.3
 	var record: Dictionary = gs.calibrate(THERMO)
 	if record.get("refused", false) or absf(record["as_found"] - (0.3 - 0.01 * unit.standard_sensitivity)) > 1.0e-6:
-		problem = "As-found must subtract the FM-3 error times 15: %s" % record
+		problem = "As-found must subtract the FM-3 error times 5: %s" % record
 	elif not record["traceable"]:
 		problem = "A calibration against a new FM-3 must be traceable."
-	# A clean zero, then the FM-3 turns out to have been 0.033 V off: 0.495 °C, past the
-	# 0.493 °C acceptance limit but inside the 0.5 °C MPE.
+	# A clean zero, then the FM-3 turns out to have been 0.099 V off: 0.495 °C, past the
+	# 0.489 °C acceptance limit but inside the 0.5 °C MPE.
 	fm.error = 0.0
 	unit.error = 0.0
 	gs.calibrate(THERMO)
-	var flagged: Array[Dictionary] = gs.recall(FM3, 0.033, 3)
+	var flagged: Array[Dictionary] = gs.recall(FM3, 0.099, 3)
 	var hit: bool = false
 	for r: Dictionary in flagged:
 		if r["instrument_id"] == THERMO and r["as_found"] == 0.0:
 			hit = r["suspect_result"] == CalUncertainty.INDETERMINATE
 	if problem == "" and not hit:
-		problem = "Recall must re-judge 0.033 V as 0.495 °C (indeterminate): %s" % [flagged]
-	# The sign matters: as-found +0.3 °C with the FM-3 at −0.02 V corrects to
-	# 0.0 °C (still a pass); at +0.02 V it corrects to +0.6 °C (a fail).
+		problem = "Recall must re-judge 0.099 V as 0.495 °C (indeterminate): %s" % [flagged]
+	# The sign matters: as-found +0.3 °C with the FM-3 at −0.06 V corrects to
+	# 0.0 °C (still a pass); at +0.06 V it corrects to +0.6 °C (a fail).
 	_set_day(4)
 	fm.error = 0.0
 	unit.error = 0.3
 	gs.calibrate(THERMO)
-	var low: Array[Dictionary] = gs.recall(FM3, -0.02, 4)
+	var low: Array[Dictionary] = gs.recall(FM3, -0.06, 4)
 	if problem == "" and not low.is_empty():
 		problem = "A standard error that cancels the as-found must not flag: %s" % [low]
-	var high: Array[Dictionary] = gs.recall(FM3, 0.02, 4)
+	var high: Array[Dictionary] = gs.recall(FM3, 0.06, 4)
 	if problem == "" and (high.size() != 1 or high[0]["suspect_result"] != CalUncertainty.FAIL):
-		problem = "+0.02 V must turn +0.3 °C into a fail: %s" % [high]
+		problem = "+0.06 V must turn +0.3 °C into a fail: %s" % [high]
 	gs.free()
 	GameClock.elapsed_days = saved
 	return problem
@@ -206,5 +206,19 @@ func test_new_display_formats() -> String:
 		problem = "Tire readings need one decimal: %s" % gs.get_sensor("rover_tire_pressure").format_value(0.4)
 	if problem == "" and gs.get_sensor("rover_tire_pressure").format_value(0.4, 3) != "+0.400 kPa":
 		problem = "A caller asking for more digits must get them: %s" % gs.get_sensor("rover_tire_pressure").format_value(0.4, 3)
+	gs.free()
+	return problem
+
+
+## Ryan, 2026-11-22: Tier 1 standards reach their MPE in about 120 days,
+## between Tier 0's 60-day game pace and the real one-to-two-year rates.
+func test_tier1_drift_reaches_mpe_in_about_120_days() -> String:
+	var gs: GameStateScript = _make_state()
+	var problem: String = ""
+	for id: String in [FM3, WD1]:
+		var sensor: DriftingSensor = gs.get_sensor(id)
+		var days: float = sensor.mpe / sensor.daily_drift_rate
+		if days < 110.0 or days > 130.0:
+			problem = "%s reaches its MPE in %.1f days, want about 120." % [id, days]
 	gs.free()
 	return problem
