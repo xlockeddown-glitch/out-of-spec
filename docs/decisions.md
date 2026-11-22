@@ -564,3 +564,16 @@ Agent's notes (flagged for Ryan, not his words):
 - Ryan's answer was to the question of what to place next.
 - Two of each piece (scrub bush, cobble cluster, dry stump) stand in the farm under a `Clutter` node, at true size (0.2 m voxels), each turned a different way. They are spread around the plot in the open ground between the boulders, fissures and buildings, each center at least 5 m from theirs, so the plot's surroundings read as plateau without crowding it.
 - Set dressing only: no collision, so the rover drives through them. A sparse first pass; a denser scatter further out, and whether any of them should block the rover, are still open.
+
+## 2026-11-22: Harvest crate in the farm
+
+### Ryan chose
+
+- "Harvest crate"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next.
+- The crate stands at (3, 0, 13) m, just past the plot's front edge (its near side is 0.6 m out), turned so its front faces the camera, as if a harvest were being packed. The airlock is about 5 m away and the drop pod's spot about 6 m.
+- It is at true size (1.0 m × 0.8 m × 0.6 m). Set dressing only: no collision, and harvests do not go into it; no capacity is specified.
+- The voxel README also said the survey tripod was not placed in any scene; it is (`FieldCalPad/Tripod`), so that row is fixed too.
