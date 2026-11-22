@@ -258,3 +258,22 @@ Agent's notes (flagged for Ryan, not his words):
 - "Used overdue" suggests credibility drops more for using an overdue instrument than for merely letting it lapse. Today audit lines record what is overdue at inspection and calibration records flag an overdue standard used for an adjustment; scoring other use of overdue instruments would need new tracking. Weights are [PLACEHOLDER].
 - An intrinsic standard takes its value from an inherent, reproducible physical property (VIM 5.10), for example a Josephson voltage standard or a cesium fountain primary frequency standard; it typically undergoes periodic verification. A game-design proposal: an intrinsic standard could end a chain at the lab instead of at OIRM. Which quantities get one is open.
 - The shape of a contract and the credibility thresholds need Ryan's answers before the credibility milestone is built. The individual auditor names can wait for the OIRM milestone.
+
+## 2026-11-22: Credibility milestone answers
+
+### Ryan chose
+
+- **Score feeds: "Audits + overdue".** A passed audit raises credibility and a failed one lowers it. Each day an instrument sits overdue costs a little, and using an overdue standard for an adjustment costs more.
+- **First contract: "Discounted standard".** At the first threshold, OIRM offers a lower-uncertainty reference standard at a discount, in return for a run of on-time calibrations.
+- **Display: "Rating band".** The phone shows a named band, with the next threshold hinted.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Band names, point values, thresholds, the discount and the length of the on-time run are all [PLACEHOLDER] until Ryan sets them.
+- Starting values (all in `data/economy.json`, all [PLACEHOLDER]): start at 10 of 100 points; bands PROVISIONAL (0), TRUSTED (30), ACCREDITED (60); a clean audit +10, a grace-period warning −5, a failed audit −10; −1 per overdue instrument per day; −5 for a calibration against an overdue standard.
+- The contract standard is the HB-700 pressure controller (Tier 3 in design doc section 1.4 #6). It fixes the dome gauge's 3.11:1 TUR against the WD-1. Once bought it takes over the dome gauge, which keeps its due day if it was already in service against the WD-1 (otherwise it goes into service fresh, like any new unit); the tire gauge stays on the WD-1.
+- The offer comes at TRUSTED: 5 on-time, traceable calibrations in a row, then Bram sells the HB-700 at 50 % off (credits only; the ore cost stays). A late or untraceable calibration restarts the run. A repeat calibration before half its interval has passed since its last traceable calibration neither counts nor restarts it (an untraceable adjustment in between does not reset that clock). The Manager's calibrations don't count toward it.
+- The overdue charge skips standards away at OIRM, and units that fell due while their standard was away, until the first audit after the standard comes back (the same grace Vance gives at audit).
+- The phone shows the band under the clock, e.g. "CRED: PROVISIONAL, 33 % to TRUSTED", and the open contract on a second line ("OIRM CONTRACT: 2 of 5 on time", then "OIRM CONTRACT DONE: HB-700 at Bram's").
+- **Known economy limit:** the discounted HB-700 costs 800 CR, more than the 500 CR start, and this build has no income (every credit change is a fine, fee or purchase). So the contract can be earned but not yet redeemed in a normal playthrough. It needs the crop/harvest income or an economy decision from Ryan; even Tier 1 standards are tight today.
+- There is no save system yet, so credibility and the contract reset with a new game.

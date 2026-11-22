@@ -1,4 +1,25 @@
 {
   "starting_credits": 500,
+  "credibility": {
+    "start_points": 10,
+    "max_points": 100,
+    "clean_audit_points": 10,
+    "warning_audit_points": -5,
+    "failed_audit_points": -10,
+    "overdue_points_per_instrument_day": -1,
+    "overdue_standard_used_points": -5,
+    "bands": [
+      { "name": "Provisional", "min_points": 0 },
+      { "name": "Trusted", "min_points": 30 },
+      { "name": "Accredited", "min_points": 60 }
+    ],
+    "first_contract": {
+      "offer_band": "Trusted",
+      "standard_id": "pressure_controller",
+      "on_time_calibrations": 5,
+      "discount_pct": 50
+    },
+    "_note": "Ryan, 2026-11-22: audits and overdue instruments feed credibility; the phone shows a named band with the next one hinted; the first contract offers a lower-uncertainty standard at a discount for a run of on-time calibrations. Every number and band name here is [PLACEHOLDER]. Points stay between 0 and max_points. The discount applies to credits, not ore."
+  },
   "_note": "Placeholder balance until crops sell (Week 4+). Audit fines come out of this."
 }

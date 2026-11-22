@@ -18,6 +18,7 @@ signal fissures_changed
 signal upgrades_changed
 ## A standard left on, or came back from, the OIRM drop pod (milestone 2).
 signal oirm_changed
+signal credibility_changed(points: int)
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -128,6 +129,16 @@ var has_rover_transform: bool = false
 ## Vector3i -> true for every tilled soil cell.
 var tilled_cells: Dictionary = {}
 
+## Lab credibility (Ryan, 2026-11-22): audits and overdue instruments move it;
+## the phone shows its band. See data/economy.json "credibility".
+var credibility: int = 0
+## Highest band index reached so far, so a band is announced once.
+var _best_band: int = 0
+## First OIRM contract: "" (not offered), "active" (counting the run),
+## "complete" (its standard is for sale) or "fulfilled" (bought).
+var contract_state: String = ""
+var contract_run: int = 0
+
 
 func _ready() -> void:
 	build_registry()
@@ -139,6 +150,7 @@ func _ready() -> void:
 	GameClock.day_started.connect(_on_day_started)
 	GameClock.day_started.connect(_on_day_started_regrow.unbind(1))
 	credits = int(DataManager.get_number(ECONOMY_TABLE, "starting_credits", 0.0))
+	reset_credibility()
 	_post_morning_dispatch(1)  # day 1 is already under way at boot
 
 
@@ -380,6 +392,7 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 	cal_log.append(record)
 	last_cal_records[instrument_id] = record
 	calibration_recorded.emit(record)
+	_credibility_after_calibration(record)
 	return record
 
 
@@ -427,6 +440,7 @@ func _on_day_started(day: int) -> void:
 	_post_morning_dispatch(day)
 	# Courier returns land in the morning, before an audit that day.
 	_receive_oirm_returns(day)
+	_charge_overdue_credibility(day)
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)
@@ -527,6 +541,7 @@ func _run_audit(day: int) -> void:
 		var footer: String = fines.pick_random().get("snarky_footer", "") if not fines.is_empty() else ""
 		post_phone("TOTAL FINE %s CR. Balance %s CR. %s" % [SP811.integer(report["total_fine"]), SP811.integer(credits), footer])
 	_update_clean_audit_gate(report)
+	_credibility_after_audit(report)
 	audit_log.append(report)
 	audit_completed.emit(report)
 
@@ -678,16 +693,35 @@ func _excused_units(day: int) -> Dictionary:
 		var due: int = sensor.cal_due_day
 		if not sensor.is_overdue(day):
 			continue
-		for trip: Dictionary in oirm_trips:
-			var back: int = int(trip["return_day"])
-			if at_oirm.has(trip["standard_id"]):
-				back = maxi(back, day)  # late, still away
+		for i: int in oirm_trips.size():
+			var trip: Dictionary = oirm_trips[i]
+			var back: int = _trip_back(i, day)
 			# Due after it left (the player could calibrate on the send day) and before it came back.
 			if trip["standard_id"] == sensor.calibrated_by and int(trip["sent_day"]) < due and due < back \
 					and (due >= day - cadence or back >= day):
 				excused[id] = next_audit_day(maxi(day, back))
 				break
 	return excused
+
+
+## The day trip `index` brought its standard back; for the trip still open
+## (the standard's latest, while it is away) at least `day`, as it is late.
+func _trip_back(index: int, day: int) -> int:
+	var trip: Dictionary = oirm_trips[index]
+	var back: int = int(trip["return_day"])
+	if _trip_is_open(index):
+		back = maxi(back, day)
+	return back
+
+
+func _trip_is_open(index: int) -> bool:
+	var standard_id: String = oirm_trips[index]["standard_id"]
+	if not at_oirm.has(standard_id):
+		return false
+	for later: int in range(index + 1, oirm_trips.size()):
+		if oirm_trips[later]["standard_id"] == standard_id:
+			return false
+	return true
 
 
 ## Sends a standard to OIRM. With the drop pod on the pad it rides the pod
@@ -889,9 +923,29 @@ func add_tire_usage(meters: float) -> void:
 func bram_catalog() -> Array[String]:
 	var ids: Array[String] = []
 	for id: String in all_standard_ids():
-		if (sensors[id] as DriftingSensor).tier == 1:
+		if (sensors[id] as DriftingSensor).tier == 1 or _is_contract_stock(id):
 			ids.append(id)
 	return ids
+
+
+## The contract standard Bram can sell once the contract is complete (and
+## keeps listing as on the colony after it is bought).
+func _is_contract_stock(standard_id: String) -> bool:
+	return standard_id == contract_standard_id() and contract_state in ["complete", "fulfilled"]
+
+
+## Bram's price in credits, after the contract discount once it applies.
+func standard_price_credits(standard_id: String) -> int:
+	var sensor: DriftingSensor = get_sensor(standard_id)
+	if sensor == null:
+		return 0
+	if _is_contract_stock(standard_id):
+		return _discounted(sensor.price_credits)
+	return sensor.price_credits
+
+
+func _discounted(price: int) -> int:
+	return price * (100 - contract_discount_pct()) / 100
 
 
 ## "250 CR + 2 crystal ore" for a standard's price.
@@ -899,19 +953,19 @@ func standard_price_text(standard_id: String) -> String:
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	if sensor == null:
 		return ""
-	return "%s CR + %d crystal ore" % [SP811.integer(sensor.price_credits), sensor.price_ore]
+	return "%s CR + %d crystal ore" % [SP811.integer(standard_price_credits(standard_id)), sensor.price_ore]
 
 
 ## Why Bram can't sell this standard right now, or "" if he can.
 func standard_purchase_problem(standard_id: String) -> String:
 	var sensor: DriftingSensor = get_sensor(standard_id)
-	if sensor == null or sensor.role != "standard" or sensor.tier != 1:
+	if sensor == null or sensor.role != "standard" or not (sensor.tier == 1 or _is_contract_stock(standard_id)):
 		return "Bram doesn't stock that."
 	if owned_standards.has(standard_id):
 		return "The %s is already on the colony." % sensor.short_name
 	if not tier1_unlocked:
 		return "Tier 1 equipment needs a clean audit on file first."
-	if credits < sensor.price_credits or crystal_ore < sensor.price_ore:
+	if credits < standard_price_credits(standard_id) or crystal_ore < sensor.price_ore:
 		return "Costs %s; you have %s CR and %d crystal ore." % [
 			standard_price_text(standard_id), SP811.integer(credits), crystal_ore]
 	return ""
@@ -926,7 +980,7 @@ func buy_standard(standard_id: String) -> String:
 	if problem != "":
 		return problem
 	var sensor: DriftingSensor = get_sensor(standard_id)
-	add_credits(-sensor.price_credits)
+	add_credits(-standard_price_credits(standard_id))
 	crystal_ore -= sensor.price_ore
 	ore_changed.emit(crystal_ore)
 	var today: int = GameClock.get_day_index()
@@ -941,9 +995,21 @@ func buy_standard(standard_id: String) -> String:
 	var issuer: String = sensor.maker if sensor.maker != "" else "the maker"
 	var cert: Dictionary = _issue_certificate(standard_id, today, null, zeroed["as_left"], false, issuer, prefix)
 	var units: PackedStringArray = []
+	# A unit this standard takes over was already in service: it moves to the
+	# new standard but keeps its due day.
+	var taken: Array[String] = []
+	var takes_over: Variant = DataManager.get_value(DRIFT_TABLE, "instruments/%s/takes_over" % standard_id, [])
+	if typeof(takes_over) == TYPE_ARRAY:
+		for unit_id: Variant in takes_over:
+			var unit: DriftingSensor = get_sensor(str(unit_id))
+			if unit != null and unit.role == "unit" and unit.calibrated_by != standard_id:
+				var was_in_service: bool = is_in_service(str(unit_id))
+				unit.calibrated_by = standard_id
+				if was_in_service:
+					taken.append(str(unit_id))
 	for id: String in all_unit_ids():
 		var unit: DriftingSensor = sensors[id]
-		if unit.calibrated_by != standard_id:
+		if unit.calibrated_by != standard_id or id in taken:
 			continue
 		unit.cal_due_day = today + unit.cal_interval_days
 		# Put in service today: the first calibration is not interval evidence.
@@ -953,7 +1019,15 @@ func buy_standard(standard_id: String) -> String:
 		sensor.short_name, cert["id"], issuer, cert["due_day"]]
 	if not units.is_empty():
 		text += " Calibrate the %s against it before Vance's next visit." % " and the ".join(units)
+	if not taken.is_empty():
+		var taken_names: PackedStringArray = []
+		for id: String in taken:
+			taken_names.append(_mid_sentence(instrument_name(id)))
+		text += " The %s now calibrates against it." % " and the ".join(taken_names)
 	post_phone(text)
+	if standard_id == contract_standard_id() and contract_state == "complete":
+		contract_state = "fulfilled"
+		credibility_changed.emit(credibility)
 	upgrades_changed.emit()
 	oirm_changed.emit()
 	return ""
@@ -1074,3 +1148,217 @@ func get_relay_lag_multiplier() -> float:
 
 func get_dome_species() -> Dictionary:
 	return DataManager.get_record(SPECIES_TABLE, dome_species_id)
+
+
+# --- Credibility and contracts (Ryan, 2026-11-22) -------------------------------
+
+func _cred_number(key: String, fallback: float) -> float:
+	return DataManager.get_number(ECONOMY_TABLE, "credibility/" + key, fallback)
+
+
+func _cred_bands() -> Array[Dictionary]:
+	var bands: Array[Dictionary] = []
+	var raw: Variant = DataManager.get_value(ECONOMY_TABLE, "credibility/bands", [])
+	if typeof(raw) == TYPE_ARRAY:
+		for band: Variant in raw:
+			if typeof(band) == TYPE_DICTIONARY:
+				bands.append(band)
+	if bands.is_empty():
+		bands.append({ "name": "Provisional", "min_points": 0 })
+	return bands
+
+
+## Starting credibility, with no contract.
+func reset_credibility() -> void:
+	credibility = int(_cred_number("start_points", 10.0))
+	_best_band = credibility_band_index()
+	contract_state = ""
+	contract_run = 0
+
+
+func credibility_band_index(points: int = -1) -> int:
+	if points < 0:
+		points = credibility
+	var bands: Array[Dictionary] = _cred_bands()
+	var index: int = 0
+	for i: int in bands.size():
+		if points >= int(bands[i].get("min_points", 0)):
+			index = i
+	return index
+
+
+func credibility_band() -> String:
+	return str(_cred_bands()[credibility_band_index()].get("name", ""))
+
+
+## "TRUSTED, 40 % to ACCREDITED", or just the band at the top.
+func credibility_text() -> String:
+	var bands: Array[Dictionary] = _cred_bands()
+	var index: int = credibility_band_index()
+	var text: String = str(bands[index].get("name", "")).to_upper()
+	if index + 1 < bands.size():
+		var low: int = int(bands[index].get("min_points", 0))
+		var high: int = int(bands[index + 1].get("min_points", 0))
+		var pct: int = clampi(floori(100.0 * (credibility - low) / maxf(high - low, 1.0)), 0, 99)
+		text += ", %d %% to %s" % [pct, str(bands[index + 1].get("name", "")).to_upper()]
+	return text
+
+
+## Moves credibility by `points` (kept between 0 and the maximum), announces a
+## new best band, and offers the first contract once its band is reached.
+func change_credibility(points: int) -> void:
+	if points == 0:
+		return
+	credibility = clampi(credibility + points, 0, int(_cred_number("max_points", 100.0)))
+	credibility_changed.emit(credibility)
+	var index: int = credibility_band_index()
+	if index > _best_band:
+		_best_band = index
+		post_phone("OIRM: Lab credibility raised to %s." % credibility_band().to_upper())
+	if contract_state == "" and index >= _contract_offer_band_index():
+		_offer_first_contract()
+
+
+func _credibility_after_audit(report: Dictionary) -> void:
+	if report.get("warning", false):
+		change_credibility(int(_cred_number("warning_audit_points", -5.0)))
+	elif report["passed"]:
+		change_credibility(int(_cred_number("clean_audit_points", 10.0)))
+	else:
+		change_credibility(int(_cred_number("failed_audit_points", -10.0)))
+
+
+## Each morning, every instrument on the colony that is overdue costs a
+## little: units in service and standards here (not at OIRM), except units
+## excused because their standard was away when they fell due.
+func _charge_overdue_credibility(day: int) -> void:
+	var count: int = 0
+	for id: String in unit_ids() + standard_ids():
+		if at_oirm.has(id) or _excused_until_audit(id, day):
+			continue
+		if (sensors[id] as DriftingSensor).is_overdue(day):
+			count += 1
+	change_credibility(count * int(_cred_number("overdue_points_per_instrument_day", -1.0)))
+
+
+## True while a unit that fell due with its standard away at OIRM is still
+## within the grace Vance gives at audit (_excused_units): until the latest
+## deadline any audit would grant it, so the daily charge starts only after
+## the audit that would fail it.
+func _excused_until_audit(unit_id: String, day: int) -> bool:
+	var sensor: DriftingSensor = sensors[unit_id]
+	if sensor.role != "unit":
+		return false
+	var due: int = sensor.cal_due_day
+	var cadence: int = maxi(int(_schedule("cadence_days", 5.0)), 1)
+	for i: int in oirm_trips.size():
+		var trip: Dictionary = oirm_trips[i]
+		if trip["standard_id"] != sensor.calibrated_by:
+			continue
+		if int(trip["sent_day"]) >= due:
+			continue
+		if _trip_is_open(i):
+			return true  # still away, so Vance still excuses it
+		var back: int = int(trip["return_day"])
+		if due >= back:
+			continue
+		# Every audit after it fell due that excuses it, as _excused_units does.
+		var deadline: int = -1
+		var audit: int = next_audit_day(due)
+		while audit <= maxi(due + cadence, back):
+			deadline = maxi(deadline, next_audit_day(maxi(audit, back)))
+			audit += cadence
+		if day <= deadline:
+			return true
+	return false
+
+
+## Using an overdue standard costs more. The contract counts a run of on-time,
+## traceable calibrations by the player; a late or untraceable one restarts it.
+func _credibility_after_calibration(record: Dictionary) -> void:
+	if record.get("standard_overdue", false):
+		change_credibility(int(_cred_number("overdue_standard_used_points", -5.0)))
+	if contract_state != "active" or record.get("performed_by", "") == "Manager":
+		return
+	var needed: int = contract_run_needed()
+	var good: bool = record.get("on_time", false) and record.get("traceable", false)
+	# A repeat before the unit has run half its interval since its last
+	# traceable calibration neither counts nor breaks the run. (Unlike
+	# interval_evidence, an untraceable adjustment in between doesn't block it.)
+	var interval: int = int(record.get("previous_interval_days", 0))
+	if good and int(record.get("days_in_service", 0)) < ceili(interval / 2.0):
+		return
+	if good:
+		contract_run += 1
+		if contract_run >= needed:
+			contract_state = "complete"
+			var standard: String = contract_standard_id()
+			post_phone("OIRM CONTRACT complete: %d on-time calibrations in a row. Bram can sell you the %s for %s (%d %% off)." % [
+				needed, instrument_name(standard), standard_price_text(standard), contract_discount_pct()])
+			upgrades_changed.emit()
+		else:
+			post_phone("OIRM CONTRACT: %d of %d on-time calibrations in a row." % [contract_run, needed])
+		credibility_changed.emit(credibility)
+	elif contract_run > 0:
+		contract_run = 0
+		post_phone("OIRM CONTRACT: run restarted (%s). 0 of %d." % [
+			"late calibration" if not record.get("on_time", false) else "not traceable", needed])
+		credibility_changed.emit(credibility)
+
+
+## The open contract objective for the phone, "" when there is none.
+func contract_text() -> String:
+	match contract_state:
+		"active":
+			var standard: String = contract_standard_id()
+			return "OIRM CONTRACT: %d of %d in a row, on time, traceable\nA unit counts again once half its interval has passed\nReward: %s for %s" % [
+				contract_run, contract_run_needed(),
+				_model_name(standard), _contract_price_text(standard)]
+		"complete":
+			return "OIRM CONTRACT DONE: %s at Bram's" % _model_name(contract_standard_id())
+	return ""
+
+
+## The model part of a short name, e.g. "HB-700" from "HB-700 pressure controller".
+func _model_name(instrument_id: String) -> String:
+	return get_sensor(instrument_id).short_name.get_slice(" ", 0)
+
+
+## The contract price, e.g. "800 CR + 4 crystal ore", even before it is earned.
+func _contract_price_text(standard_id: String) -> String:
+	var sensor: DriftingSensor = get_sensor(standard_id)
+	return "%s CR + %d crystal ore" % [SP811.integer(_discounted(sensor.price_credits)), sensor.price_ore]
+
+
+func contract_standard_id() -> String:
+	return str(DataManager.get_value(ECONOMY_TABLE, "credibility/first_contract/standard_id", ""))
+
+
+func contract_run_needed() -> int:
+	return maxi(int(_cred_number("first_contract/on_time_calibrations", 5.0)), 1)
+
+
+func contract_discount_pct() -> int:
+	return clampi(int(_cred_number("first_contract/discount_pct", 50.0)), 0, 100)
+
+
+func _contract_offer_band_index() -> int:
+	var band_name: String = str(DataManager.get_value(ECONOMY_TABLE, "credibility/first_contract/offer_band", ""))
+	var bands: Array[Dictionary] = _cred_bands()
+	for i: int in bands.size():
+		if str(bands[i].get("name", "")) == band_name:
+			return i
+	return bands.size()  # unknown band: never offered
+
+
+func _offer_first_contract() -> void:
+	var standard: String = contract_standard_id()
+	var sensor: DriftingSensor = get_sensor(standard)
+	if sensor == null:
+		return
+	contract_state = "active"
+	contract_run = 0
+	credibility_changed.emit(credibility)
+	post_phone("OIRM CONTRACT offered: make %d calibrations in a row on time and traceable, and Bram will sell you the %s for %s CR + %d crystal ore (%d %% off). Calibrating a unit again before it has run half its interval doesn't count." % [
+		contract_run_needed(), instrument_name(standard), SP811.integer(_discounted(sensor.price_credits)),
+		sensor.price_ore, contract_discount_pct()])
