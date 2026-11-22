@@ -4,7 +4,9 @@ extends Node3D
 ##   - status LED follows the hygrometer band (red blinks when out of tolerance)
 ##   - heat lamp turns harsh amber when out of tolerance
 ##   - tarantula: Active -> Pre-Molt (dimmed and squashed, greybox or voxel model)
-##     -> Molted (exuvia + spool; the spider itself is hidden until the spool is taken)
+##     -> Molted (exuvia + spool; the spider itself is hidden)
+##     -> the exuvia stays GameState.EXUVIA_LINGER_DAYS after pickup, and the
+##        spider stays hidden (in its burrow) until it goes
 
 const LAMP_WARM := Color(1.0, 0.72, 0.42)
 const LAMP_HARSH := Color(1.0, 0.45, 0.08)
@@ -46,6 +48,7 @@ func _ready() -> void:
 				(child as GeometryInstance3D).material_override = _body_mat
 	_apply_molt_visuals()
 	GameState.molt_changed.connect(_on_molt_changed)
+	GameClock.day_started.connect(_on_day_started)
 
 
 func _process(delta: float) -> void:
@@ -63,19 +66,24 @@ func _on_molt_changed(_progress: float, _stage: int) -> void:
 	_apply_molt_visuals()
 
 
+func _on_day_started(_day: int) -> void:
+	_apply_molt_visuals()  # a lingering exuvia goes in the morning
+
+
 func _apply_molt_visuals() -> void:
 	var stage: int = GameState.molt_stage
 	var pre_molt: bool = stage == GameState.MoltStage.PRE_MOLT
 	var molted: bool = stage == GameState.MoltStage.MOLTED
+	var husk: bool = GameState.is_exuvia_visible()
 	_body_mat.albedo_color = BODY_PRE_MOLT if pre_molt else BODY_ACTIVE
 	if tarantula:
 		tarantula.scale = Vector3(1.0, 0.7, 1.0) if pre_molt else Vector3.ONE
-		tarantula.visible = not molted
+		tarantula.visible = not husk
 		# The voxel model's meshes (MeshInstance3D); the greybox CSG parts use _body_mat.
 		for node: Node in tarantula.find_children("*", "MeshInstance3D", true, false):
 			(node as MeshInstance3D).material_overlay = _dim_mat if pre_molt else null
 	if exuvia:
-		exuvia.visible = molted
+		exuvia.visible = husk
 	if spool_pickup:
 		spool_pickup.visible = molted
 		spool_pickup.enabled = molted
