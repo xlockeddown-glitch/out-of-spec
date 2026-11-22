@@ -41,19 +41,20 @@ static func space_x(index: int, count: int) -> float:
 func rebuild() -> void:
 	for child: Node in get_children():
 		child.queue_free()
-	# What each space shows, in order: areas (a space being cleared beside its own), free
-	# spaces, then the spaces a growing lab is adding.
-	# The space being cleared stays where it was, beside its old area.
+	# What each space shows: an area, a free pad or a space being cleared,
+	# then the spaces a growing lab is adding.
+	# Each space keeps its place on the wall (GameState.lab_layout_slots).
 	var slots: Array[Dictionary] = []
-	var refit: String = str(GameState.lab_build.get("discipline", "")) if GameState.lab_build.get("kind", "") == "refit" else ""
-	for discipline: Variant in GameState.job_disciplines():
-		var spaces: int = GameState.lab_space(str(discipline))
-		for i: int in spaces:
-			slots.append({ "kind": "area", "discipline": str(discipline), "first": i == 0, "spaces": spaces })
-		if refit != "" and str(discipline) == refit:
+	var layout: Array[String] = GameState.lab_layout_slots()
+	for i: int in layout.size():
+		var slot: String = layout[i]
+		if slot == "":
+			slots.append({ "kind": "free" })
+		elif slot == GameState.LAB_REFIT_SLOT:
 			slots.append({ "kind": "refit" })
-	for i: int in GameState.lab_free_spaces():
-		slots.append({ "kind": "free" })
+		else:
+			slots.append({ "kind": "area", "discipline": slot, "first": i == 0 or layout[i - 1] != slot,
+				"spaces": GameState.lab_space(slot) })
 	if GameState.lab_build.get("kind", "") == "grow":
 		var target: Dictionary = GameState.lab_size_record(int(GameState.lab_build.get("size", 0)))
 		for i: int in maxi(int(target.get("areas", 0)) - GameState.lab_spaces(), 0):

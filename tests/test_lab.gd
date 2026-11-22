@@ -282,6 +282,30 @@ func test_clearing_a_space_costs_and_has_downtime() -> String:
 	return ""
 
 
+func test_spaces_keep_their_place_on_the_wall() -> String:
+	var gs: GameStateScript = _make_state()
+	var before: Array[String] = gs.lab_layout_slots()
+	var refit: Vector2i = gs._lab_refit_cost()
+	gs.credits = refit.x
+	gs.crystal_ore = refit.y
+	var spot: int = before.find("angle")
+	gs.clear_lab_area("angle")
+	var during: Array[String] = gs.lab_layout_slots()
+	gs._finish_lab_build(int(gs.lab_build["done_day"]))
+	var after: Array[String] = gs.lab_layout_slots()
+	gs.fit_lab_area("pressure")
+	var refitted: Array[String] = gs.lab_layout_slots()
+	_done(gs)
+	for i: int in before.size():
+		if i == spot:
+			continue
+		if during[i] != before[i] or after[i] != before[i] or refitted[i] != before[i]:
+			return "The other spaces must not move, %s then %s, %s, %s." % [before, during, after, refitted]
+	if during[spot] != gs.LAB_REFIT_SLOT or after[spot] != "" or refitted[spot] != "pressure":
+		return "The cleared space must clear, free and refit where it stood, %s, %s, %s." % [during, after, refitted]
+	return ""
+
+
 func test_the_morning_finishes_a_build_before_the_board() -> String:
 	var gs: GameStateScript = _make_state()
 	var next: Dictionary = gs.lab_next_size()

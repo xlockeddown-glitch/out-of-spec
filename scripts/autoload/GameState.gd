@@ -172,6 +172,10 @@ var _board_taken: Array[String] = []
 var lab_size: int = 0
 var lab_areas: Dictionary = {}
 var lab_build: Dictionary = {}
+## Where each space sits along the dome wall: a discipline, "" (free) or
+## LAB_REFIT_SLOT. Only the dome floor reads it; lab_areas holds the counts.
+var lab_layout: Array[String] = []
+const LAB_REFIT_SLOT: String = "#refit"
 ## True while the morning runs, so credibility changes then don't rebuild the
 ## board before the audit is in.
 var _morning: bool = false
@@ -1993,6 +1997,10 @@ func clear_lab_area(discipline: String) -> String:
 		return problem
 	var cost: Vector2i = _lab_refit_cost()
 	_lab_pay(cost.x, cost.y)
+	_sync_lab_layout()
+	var at: int = lab_layout.rfind(discipline)
+	if at >= 0:
+		lab_layout[at] = LAB_REFIT_SLOT
 	if lab_space(discipline) <= 1:
 		lab_areas.erase(discipline)
 	else:
@@ -2025,6 +2033,7 @@ func reset_lab() -> void:
 	lab_size = 0
 	lab_build = {}
 	lab_areas = {}
+	lab_layout = []
 	var disciplines: Dictionary = job_disciplines()
 	for discipline: Variant in disciplines:
 		var listed: Variant = disciplines[discipline]
@@ -2035,6 +2044,59 @@ func reset_lab() -> void:
 				lab_areas[str(discipline)] = 1
 				break
 	lab_changed.emit()
+
+
+## The lab's spaces in wall order (see lab_layout), kept in step with
+## lab_areas: each space keeps its place, a cleared space frees where it
+## stood, and a new space goes beside its area if it can.
+func lab_layout_slots() -> Array[String]:
+	_sync_lab_layout()
+	return lab_layout.duplicate()
+
+
+func _sync_lab_layout() -> void:
+	var spaces: int = lab_spaces()
+	if lab_layout.size() > spaces:
+		lab_layout.resize(spaces)
+	while lab_layout.size() < spaces:
+		lab_layout.append("")
+	var refitting: bool = lab_build.get("kind", "") == "refit"
+	var have_refit: bool = false
+	var counts: Dictionary = {}
+	for i: int in lab_layout.size():
+		var slot: String = lab_layout[i]
+		if slot == LAB_REFIT_SLOT:
+			if refitting and not have_refit:
+				have_refit = true
+			else:
+				lab_layout[i] = ""
+		elif slot != "":
+			var have: int = int(counts.get(slot, 0))
+			if have >= lab_space(slot):
+				lab_layout[i] = ""
+			else:
+				counts[slot] = have + 1
+	if refitting and not have_refit:
+		var spot: int = lab_layout.find("")
+		if spot >= 0:
+			lab_layout[spot] = LAB_REFIT_SLOT
+	for discipline: Variant in job_disciplines():
+		var area_id: String = str(discipline)
+		for i: int in maxi(lab_space(area_id) - int(counts.get(area_id, 0)), 0):
+			var spot: int = _lab_free_slot_beside(area_id)
+			if spot < 0:
+				break
+			lab_layout[spot] = area_id
+
+
+## A free slot next to `discipline`'s area, else the first free slot, or −1.
+func _lab_free_slot_beside(discipline: String) -> int:
+	for i: int in lab_layout.size():
+		if lab_layout[i] != "":
+			continue
+		if (i > 0 and lab_layout[i - 1] == discipline) or (i + 1 < lab_layout.size() and lab_layout[i + 1] == discipline):
+			return i
+	return lab_layout.find("")
 
 
 # --- Crops and Lin (income milestone) ----------------------------------------

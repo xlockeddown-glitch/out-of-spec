@@ -122,12 +122,23 @@ func _refresh() -> void:
 			GameState.lab_cost_text(int(next.get("credits", 0)), int(next.get("ore", 0))),
 			SP811.integer(days), "" if days == 1 else "s"]
 		_grow_button.disabled = false
+	# The rows are rebuilt, so the button that had keyboard focus gets it back.
+	var focus_key: String = ""
+	var focused: Control = get_viewport().gui_get_focus_owner() if is_inside_tree() else null
+	if focused != null and focused.has_meta(&"focus_key"):
+		focus_key = str(focused.get_meta(&"focus_key"))
 	for child: Node in _areas_box.get_children():
+		_areas_box.remove_child(child)
 		child.queue_free()
 	var disciplines: Array = GameState.job_disciplines().keys()
 	disciplines.sort()
 	for discipline: Variant in disciplines:
 		_areas_box.add_child(_area_row(str(discipline)))
+	if focus_key != "":
+		for row: Node in _areas_box.get_children():
+			for button: Node in row.get_children():
+				if button.has_meta(&"focus_key") and str(button.get_meta(&"focus_key")) == focus_key:
+					(button as Control).grab_focus()
 
 
 func _area_row(discipline: String) -> HBoxContainer:
@@ -145,11 +156,13 @@ func _area_row(discipline: String) -> HBoxContainer:
 	row.add_child(name_label)
 	var fit: Button = _button("FIT OUT ONE MORE" if spaces > 0 else "FIT OUT")
 	fit.tooltip_text = "Give a free space to %s (free of charge)." % discipline
+	fit.set_meta(&"focus_key", "fit:" + discipline)
 	fit.pressed.connect(_on_fit_pressed.bind(discipline))
 	row.add_child(fit)
 	var clear: Button = _button("CLEAR ONE")
 	clear.tooltip_text = "Clear one %s space to fit out again: %s." % [discipline, GameState.lab_refit_text()]
 	clear.disabled = spaces <= 0
+	clear.set_meta(&"focus_key", "clear:" + discipline)
 	clear.pressed.connect(_on_clear_pressed.bind(discipline))
 	row.add_child(clear)
 	return row
