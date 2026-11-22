@@ -14,7 +14,8 @@ const BLINK_HZ: float = 2.5
 
 @export var status_led: GeometryInstance3D
 @export var heat_lamp: OmniLight3D
-## Every GeometryInstance3D child of this node gets the shared body material.
+## Every GeometryInstance3D child of this node gets the shared body material;
+## the voxel model's meshes get the pre-molt dim overlay instead.
 @export var tarantula: Node3D
 @export var exuvia: Node3D
 @export var spool_pickup: Clickable
@@ -22,7 +23,8 @@ const BLINK_HZ: float = 2.5
 var _led_mat := StandardMaterial3D.new()
 var _body_mat := StandardMaterial3D.new()
 ## Dims the voxel spider in pre-molt by the same per-channel ratio the greybox
-## body goes through (BODY_PRE_MOLT / BODY_ACTIVE), so both read equally dim.
+## body goes through (BODY_PRE_MOLT / BODY_ACTIVE, taken in linear light because
+## the multiply blend works on linear values), so both read equally dim.
 var _dim_mat := StandardMaterial3D.new()
 var _time: float = 0.0
 
@@ -31,8 +33,10 @@ func _ready() -> void:
 	_led_mat.emission_enabled = true
 	_dim_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_dim_mat.blend_mode = BaseMaterial3D.BLEND_MODE_MUL
-	_dim_mat.albedo_color = Color(BODY_PRE_MOLT.r / BODY_ACTIVE.r,
-		BODY_PRE_MOLT.g / BODY_ACTIVE.g, BODY_PRE_MOLT.b / BODY_ACTIVE.b)
+	var active_lin := BODY_ACTIVE.srgb_to_linear()
+	var pre_molt_lin := BODY_PRE_MOLT.srgb_to_linear()
+	_dim_mat.albedo_color = Color(pre_molt_lin.r / active_lin.r,
+		pre_molt_lin.g / active_lin.g, pre_molt_lin.b / active_lin.b).linear_to_srgb()
 	_led_mat.emission_energy_multiplier = ModelSlot.EMIT_ENERGY
 	if status_led:
 		status_led.material_override = _led_mat
