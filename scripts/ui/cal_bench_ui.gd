@@ -45,6 +45,7 @@ func _ready() -> void:
 	GameState.drop_pod_changed.connect(_on_pod_or_oirm_changed.unbind(1))
 	GameState.oirm_changed.connect(_on_pod_or_oirm_changed)
 	GameState.jobs_changed.connect(_on_jobs_changed)
+	GameClock.time_advanced.connect(_on_time_advanced.unbind(1))
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -102,6 +103,16 @@ func _on_jobs_changed() -> void:
 			_on_instrument_selected(index)
 		else:
 			_show_job({})
+
+
+## A shown job can become impossible as the clock runs (the cancel cutoff
+## gets too close): redraw it when its button would change.
+func _on_time_advanced() -> void:
+	if not visible or not _current_id.begins_with(JOB_PREFIX):
+		return
+	var job: Dictionary = GameState.active_job(_current_id.trim_prefix(JOB_PREFIX))
+	if not job.is_empty() and (GameState.job_bench_problem(job) != "") != _calibrate_button.disabled:
+		_show_job(job)
 
 
 func _is_standard(instrument_id: String) -> bool:
@@ -194,6 +205,7 @@ func _show_job(job: Dictionary) -> void:
 	if job.is_empty():
 		_mpe_label.text = "This job is no longer active."
 		_standard_label.text = ""
+		_result_label.text = ""
 		_calibrate_button.disabled = true
 		return
 	_mpe_label.text = "%s: %s (%s)" % [job.get("customer", "?"), job.get("item", "?"), job.get("discipline", "?")]

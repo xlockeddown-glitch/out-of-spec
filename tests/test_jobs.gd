@@ -126,6 +126,8 @@ func test_clean_job_pays_in_full_with_a_bonus() -> String:
 
 func test_late_is_judged_when_the_bench_work_ends() -> String:
 	var gs: GameStateScript = _make_state()
+	# Accepted on day 2, so the late case's morning is not an audit day.
+	GameClock.elapsed_days = 1.0
 	var job_id: String = _take(gs, "lin_soil_probe")
 	var due: int = int(gs.active_job(job_id)["due_day"])
 	# Midday on the due day: on time.
@@ -272,14 +274,23 @@ func test_accepted_offer_leaves_the_board_and_caps_active() -> String:
 	var still_offered: bool = false
 	for job: Dictionary in gs.job_board:
 		still_offered = still_offered or job["id"] == first_id
-	for i: int in max_active - 1:
-		gs.accept_job(0)
-	var over: String = gs.accept_job(0) if not gs.job_board.is_empty() else "board empty"
+	gs.active_jobs.clear()
+	gs.job_board.clear()
+	for i: int in max_active + 1:
+		gs.job_board.append(_template(gs, "lin_soil_probe"))
+	var refused_early: String = ""
+	for i: int in max_active:
+		var why: String = gs.accept_job(0)
+		if why != "":
+			refused_early = why
+	var over: String = gs.accept_job(0)
 	_done(gs)
+	if refused_early != "":
+		return "Jobs up to the cap must be accepted, got '%s'." % refused_early
 	if problem != "" or left != size - 1 or still_offered:
 		return "An accepted offer must leave the board, problem '%s', %d -> %d." % [problem, size, left]
-	if over == "":
-		return "No more than %d jobs may be active." % max_active
+	if over.find("already have") < 0:
+		return "No more than %d jobs may be active, got '%s'." % [max_active, over]
 	return ""
 
 
@@ -315,10 +326,45 @@ func test_accept_checks_band_and_a_standard_here() -> String:
 	var away: String = gs.accept_job(0)
 	gs.at_oirm.erase("rotary_table")
 	gs.change_credibility(-5)
-	var dropped: String = gs.job_accept_problem(_template(gs, "relay_inclinometer"))
+	var dropped: String = gs.accept_job(0)
 	_done(gs)
 	if away.find("OIRM") < 0:
 		return "A job must not be accepted while its only standard is at OIRM, got '%s'." % away
 	if dropped.find("TRUSTED") < 0:
 		return "A lab that fell to Provisional must not accept a Trusted job, got '%s'." % dropped
+	return ""
+
+
+func test_job_at_the_bench_survives_the_morning() -> String:
+	var gs: GameStateScript = _make_state()
+	GameClock.elapsed_days = 1.0
+	var job_id: String = _take(gs, "lin_soil_probe")
+	var due: int = int(gs.active_job(job_id)["due_day"])
+	# Ten minutes before the cancel cutoff morning, with a 5 min job.
+	var grace: int = _cfg(gs, "late_grace_days")
+	gs.active_job(job_id)["bench_minutes"] = 5
+	GameClock.elapsed_days = float(due + grace) - 10.0 / 1440.0
+	var finished: Dictionary = gs.complete_job(job_id)
+	# A job still at the bench when its morning comes is not cancelled or reposted.
+	# The late finish cost credibility; back to Trusted for the second job.
+	gs.credibility = 30
+	gs.job_board.clear()
+	gs.job_board.append(_template(gs, "lin_soil_probe"))
+	var why: String = gs.accept_job(0)
+	if why != "":
+		_done(gs)
+		return "Second accept refused: " + why
+	var second: String = str(gs.active_jobs[-1]["job_id"])
+	gs.active_job(second)["at_bench"] = true
+	gs._expire_jobs(999)
+	gs.refresh_job_board(999)
+	var kept: bool = not gs.active_job(second).is_empty()
+	var reposted: bool = false
+	for job: Dictionary in gs.job_board:
+		reposted = reposted or job["id"] == "lin_soil_probe"
+	_done(gs)
+	if not finished.get("ok", false):
+		return "Work that ends before the cutoff must be paid, got %s." % finished
+	if not kept or reposted:
+		return "A job at the bench must not be cancelled or offered again (id '%s', kept %s, reposted %s)." % [second, kept, reposted]
 	return ""

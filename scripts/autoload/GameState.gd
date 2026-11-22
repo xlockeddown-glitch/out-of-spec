@@ -1569,12 +1569,13 @@ func complete_job(job_id: String) -> Dictionary:
 		return { "ok": false, "reason": problem }
 	var standard_id: String = job_bench_standard(job)
 	var traceable: bool = not get_sensor(standard_id).is_overdue(GameClock.get_day_index())
-	# Off the active list first, so mornings during the bench time don't
-	# cancel it; then the work takes its time.
-	active_jobs.erase(job)
+	# The work takes its time. The job stays active, marked at the bench, so a
+	# morning during it neither cancels it nor offers it again.
 	var minutes: float = float(job.get("bench_minutes", 0.0))
+	job["at_bench"] = true
 	if minutes > 0.0:
 		GameClock.advance(minutes / 1440.0)
+	active_jobs.erase(job)
 	var today: int = GameClock.get_day_index()
 	var on_time: bool = today <= int(job["due_day"])
 	var offered: int = int(job.get("pay", 0))
@@ -1633,7 +1634,7 @@ func job_result_text(result: Dictionary) -> String:
 func _expire_jobs(day: int) -> void:
 	var grace: int = maxi(int(_jobs_number("late_grace_days", 3.0)), 0)
 	for job: Dictionary in active_jobs.duplicate():
-		if day > int(job["due_day"]) + grace:
+		if not job.get("at_bench", false) and day > int(job["due_day"]) + grace:
 			active_jobs.erase(job)
 			change_credibility(int(_jobs_number("abandoned_job_points", -5.0)))
 			post_phone("%s cancelled: %s took %s elsewhere." % [job["job_id"], job.get("customer", "?"), job.get("item", "?")])
