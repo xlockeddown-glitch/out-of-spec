@@ -37,9 +37,11 @@ func swap_model(path: String) -> bool:
 	if scene == null:
 		push_warning("ModelSlot %s: %s is not a scene." % [name, path])
 		return false
-	var instance := scene.instantiate() as Node3D
+	var root: Node = scene.instantiate()
+	var instance := root as Node3D
 	if instance == null:
 		push_warning("ModelSlot %s: %s has no 3D root." % [name, path])
+		root.free()
 		return false
 	if _model:
 		_model.queue_free()
@@ -83,8 +85,11 @@ static func apply_emission(root: Node) -> void:
 			glow.emission_enabled = true
 			glow.emission_energy_multiplier = EMIT_ENERGY
 			if glow.albedo_texture:
+				# Palette texture: glow = texture color (MULTIPLY, not the default ADD,
+				# which would wash it to white).
 				glow.emission = Color.WHITE
 				glow.emission_texture = glow.albedo_texture
+				glow.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
 			else:
 				glow.emission = glow.albedo_color
 			mesh_instance.set_surface_override_material(i, glow)

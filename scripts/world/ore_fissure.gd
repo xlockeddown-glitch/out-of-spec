@@ -43,7 +43,10 @@ func _build_visual() -> Node3D:
 		var scene := load(MODEL_PATH) as PackedScene
 		var model: Node3D = null
 		if scene != null:
-			model = scene.instantiate() as Node3D
+			var root: Node = scene.instantiate()
+			model = root as Node3D
+			if model == null:
+				root.free()
 		if model != null:
 			model.scale = Vector3.ONE * MODEL_SCALE
 			ModelSlot.apply_emission(model)

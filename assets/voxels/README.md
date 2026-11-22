@@ -9,9 +9,9 @@ MagicaVoxel exports (.glb preferred, or .gltf) go here. Use these exact file nam
 | `tractor_wide.glb` | Tractor after Bram's wide treads | Same origin as `tractor.glb`; swapped in when the treads are bought. |
 | `ore_fissure.glb` | Crystal ore fissure greybox (`OreFissure`) | 1.6 m across; hidden while mined. |
 | `terrarium.glb` | Tank, substrate, hygrometer pod, lamp hood (`Terrarium/TankModel`) | Leave the hygrometer LED out; the game drives it. |
-| `curlyhair.glb` | Spider greybox (`Terrarium/Tarantula/SpiderModel`) | Separate so molting can hide it. |
+| `curlyhair.glb` | Spider greybox (`Terrarium/Tarantula/SpiderModel`) | Center origin. Separate so molt visuals can be added. |
 | `drop_pod.glb` | Pod hull, nose, hatch (`DropPod/PodModel`) | |
-| `aud1t.glb` | AUD-1T drone (`DropPod/AUD1T/DroneModel`) | The game bobs it. |
+| `aud1t.glb` | AUD-1T drone (`DropPod/AUD1T/DroneModel`) | Center origin. The game bobs it. |
 | `relay_mast.glb` | Mast and dish (`SatelliteRelay/MastModel`) | Model the spool bay empty; the spool is game-driven. |
 
 Each slot's `model_scale` sets the voxel size (0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
