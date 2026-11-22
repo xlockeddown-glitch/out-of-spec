@@ -35,9 +35,7 @@ var _limit: float = 0.0
 
 func _ready() -> void:
 	hide()
-	_ids = GameState.unit_ids() + GameState.standard_ids()
-	for id: String in _ids:
-		_instrument_option.add_item(GameState.instrument_name(id, true))
+	_rebuild_list()
 	_instrument_option.item_selected.connect(_on_instrument_selected)
 	_calibrate_button.pressed.connect(_on_calibrate_pressed)
 	_close_button.pressed.connect(close)
@@ -57,10 +55,20 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func open(instrument_id: String = "hygrometer") -> void:
+	_rebuild_list()
 	show()
 	var index: int = maxi(_ids.find(instrument_id), 0)
 	_instrument_option.select(index)
 	_on_instrument_selected(index)
+
+
+## Instruments in service right now: buying a Tier 1 standard from Bram adds
+## it and its units without a scene change.
+func _rebuild_list() -> void:
+	_ids = GameState.unit_ids() + GameState.standard_ids()
+	_instrument_option.clear()
+	for id: String in _ids:
+		_instrument_option.add_item(GameState.instrument_name(id, true))
 
 
 func close() -> void:
@@ -93,7 +101,7 @@ func _on_instrument_selected(index: int) -> void:
 	for meter: BandMeter in [_found_meter, _left_meter]:
 		meter.mpe = sensor.mpe
 		meter.acceptance_ratio = _limit / sensor.mpe if sensor.mpe > 0.0 else 1.0
-	_mpe_label.text = "%s   MPE ±%s" % [sensor.quantity_name().capitalize(), _unsigned(sensor, sensor.mpe)]
+	_mpe_label.text = "%s   MPE ±%s" % [sensor.quantity_title(), _unsigned(sensor, sensor.mpe)]
 	_standard_label.text = _standard_text(_current_id) + "\n" + _chain_text(_current_id)
 	# What the bench would read: the unit's error seen through the standard's.
 	var standard: DriftingSensor = GameState.get_sensor(_budget.get("standard_id", ""))
@@ -124,7 +132,7 @@ func _show_standard(sensor: DriftingSensor) -> void:
 		meter.acceptance_ratio = 1.0
 		meter.show_needle = false
 	_mpe_label.text = "%s   MPE ±%s   (reference standard)" % [
-		sensor.quantity_name().capitalize(), _unsigned_precise(sensor, sensor.mpe)]
+		sensor.quantity_title(), _unsigned_precise(sensor, sensor.mpe)]
 	_standard_label.text = _certificate_text(_current_id) + "\n" + _chain_text(_current_id)
 	for label: Label in [_found_value, _left_value]:
 		label.text = "--"
@@ -156,9 +164,10 @@ func _due_text(sensor: DriftingSensor, today: int) -> String:
 func _certificate_text(instrument_id: String) -> String:
 	var cert: Dictionary = GameState.certificates.get(instrument_id, {})
 	if cert.is_empty():
-		return "No OIRM certificate."
+		return "No certificate."
 	var sensor: DriftingSensor = GameState.get_sensor(instrument_id)
-	var found: String = ("founding stock, no as-found on file" if cert["as_found"] == null
+	var found: String = (("founding stock, no as-found on file" if cert.get("founding", false)
+			else "new from %s, no as-found on file" % cert.get("issuer", "the maker")) if cert["as_found"] == null
 		else "as-found %s (%s)" % [sensor.format_value(float(cert["as_found"]), 3),
 			"in tolerance" if cert["as_found_in_tolerance"] else "OUT OF TOLERANCE"])
 	return "Certificate %s, day %d: %s, U ±%s (k = %s)" % [

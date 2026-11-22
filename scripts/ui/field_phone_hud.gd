@@ -7,6 +7,8 @@ signal zero_steering_pressed
 signal slot_spool_pressed
 signal enter_dome_pressed
 signal trade_pressed
+## A Tier 1 standard's buy button (milestone 3a).
+signal buy_standard_pressed(standard_id: String)
 
 const MAX_LOG_LINES: int = 8
 const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
@@ -16,6 +18,8 @@ const COLOR_WARN := DriftingSensor.COLOR_GUARDBAND
 const COLOR_FAIL := DriftingSensor.COLOR_OUT_OF_TOLERANCE
 
 var _log_lines: PackedStringArray = []
+## Bram's Tier 1 buttons, built in code under the trade button.
+var _standards_box: VBoxContainer
 
 @onready var _bars: Array[ColorRect] = [%Bar1, %Bar2, %Bar3, %Bar4]
 @onready var _relay_label: Label = %RelayLabel
@@ -43,6 +47,9 @@ func _ready() -> void:
 	_slot_spool_button.pressed.connect(func() -> void: slot_spool_pressed.emit())
 	_dome_button.pressed.connect(func() -> void: enter_dome_pressed.emit())
 	_trade_button.pressed.connect(func() -> void: trade_pressed.emit())
+	_standards_box = VBoxContainer.new()
+	_standards_box.name = "StandardsBox"
+	_bram_panel.add_child(_standards_box)
 	_log_label.text = ""
 
 
@@ -104,6 +111,33 @@ func show_bram(line: String, cost: int, ore: int, owned: bool) -> void:
 	else:
 		_trade_button.text = "TRADE %d ORE: WIDE TREADS  [E]" % cost
 		_trade_button.disabled = ore < cost
+
+
+## Bram's Tier 1 stock. Each offer is { "id", "text", "disabled" }; `note`
+## shows instead of buttons when there are none (still locked).
+func show_standards(offers: Array[Dictionary], note: String) -> void:
+	for child: Node in _standards_box.get_children():
+		_standards_box.remove_child(child)
+		child.queue_free()
+	if offers.is_empty():
+		if note != "":
+			var label := Label.new()
+			label.text = note
+			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			label.add_theme_font_size_override("font_size", 14)
+			label.add_theme_color_override("font_color", Color(0.4, 0.7, 0.45))
+			_standards_box.add_child(label)
+		return
+	for offer: Dictionary in offers:
+		var button := Button.new()
+		button.text = str(offer["text"])
+		button.disabled = bool(offer["disabled"])
+		button.focus_mode = Control.FOCUS_NONE
+		button.custom_minimum_size = Vector2(0, 40)
+		button.add_theme_font_size_override("font_size", 15)
+		var id: String = str(offer["id"])
+		button.pressed.connect(func() -> void: buy_standard_pressed.emit(id))
+		_standards_box.add_child(button)
 
 
 func hide_bram() -> void:

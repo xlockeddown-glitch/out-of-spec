@@ -221,7 +221,9 @@ func _drive(delta: float) -> void:
 	var before: Vector3 = global_position
 	move_and_slide()
 	# Horizontal displacement actually achieved; pushing into a rock adds no drift.
-	steering.add_usage(Vector2(global_position.x - before.x, global_position.z - before.z).length())
+	var driven: float = Vector2(global_position.x - before.x, global_position.z - before.z).length()
+	steering.add_usage(driven)
+	GameState.add_tire_usage(driven)
 
 
 func _zero_steering() -> void:

@@ -31,10 +31,13 @@ static func resolution_to_standard(resolution: float) -> float:
 
 
 ## Full budget for calibrating `unit` against `standard`.
-## u_op and u_robot are standard uncertainties in the unit's unit.
+## u_op and u_robot are standard uncertainties in the unit's unit. The
+## standard's terms are converted into the unit's unit through
+## `unit.standard_sensitivity` (section 1.5: a different quantity in the chain).
 static func budget(unit: DriftingSensor, standard: DriftingSensor, u_op: float = 0.0, u_robot: float = 0.0) -> Dictionary:
-	var u_spec: float = spec_to_standard(standard.mpe, standard.spec_confidence_pct)
-	var u_cert: float = (standard.certificate_uncertainty / standard.certificate_k
+	var sensitivity: float = absf(unit.standard_sensitivity)
+	var u_spec: float = spec_to_standard(standard.mpe, standard.spec_confidence_pct) * sensitivity
+	var u_cert: float = (standard.certificate_uncertainty / standard.certificate_k * sensitivity
 		if standard.certificate_k > 0.0 else 0.0)
 	var u_res: float = resolution_to_standard(unit.resolution)
 	var k: float = coverage_factor()
