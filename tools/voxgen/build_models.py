@@ -726,6 +726,13 @@ METROLOGY_LAB = {
                           "S": SHADOW}, 0.025),
 }
 
+# Ryan's Environmental Chamber pack (2026-11-22, 0.1 m voxels): a humidity and temperature
+# chamber on a rolling cart. Colors are his generator's own (C1/C2 the reference meter's case,
+# F1/B1/S the bench's; no glow, a blank recessed screen). Built and turned like the field props.
+# Not placed in any scene yet.
+ENV_CHAMBER = {"C1": "#D4DAE0", "C2": "#8D99AE", "M1": "#3B5978", "F1": "#2E3844", "B1": "#D9A13B",
+               "S": SHADOW}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop") -> Model:
@@ -769,6 +776,7 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, LOGISTICS[n])), 0.1) for n in LOGISTICS],
     *[((lambda n=n: prop_sheet(n, GULCH_RIM_COLORS, "rock")), 0.2) for n in GULCH_RIM],
     *[((lambda n=n: prop_sheet(n, METROLOGY_LAB[n][0])), METROLOGY_LAB[n][1]) for n in METROLOGY_LAB],
+    (lambda: prop_sheet("env_chamber_cart", ENV_CHAMBER), 0.1),
 ]
 
 
