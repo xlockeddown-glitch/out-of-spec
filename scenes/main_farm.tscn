@@ -275,6 +275,7 @@ shape = SubResource("BayShape")
 [node name="Visual" type="Node3D" parent="WorldView/WorldViewport/World/BramBay"]
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/bram_bay.glb"
+model_scale = 0.2
 
 [node name="Roof" type="CSGBox3D" parent="WorldView/WorldViewport/World/BramBay/Visual"]
 position = Vector3(0, 3.2, -0.5)
@@ -366,6 +367,7 @@ shape = SubResource("RoverShape")
 [node name="VisualRoot" type="Node3D" parent="WorldView/WorldViewport/World/Rover" unique_id=1748996152]
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/tractor.glb"
+model_scale = 0.1
 
 [node name="Chassis" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot" unique_id=1978092636]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
@@ -423,3 +425,21 @@ rover = NodePath("../..")
 
 [node name="FieldPhoneHUD" parent="HUDLayer" unique_id=1260413487 instance=ExtResource("6_hud")]
 unique_name_in_owner = true
+
+[node name="PodModel" type="Node3D" parent="WorldView/WorldViewport/World/DropPod" node_paths=PackedStringArray("greybox")]
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/drop_pod.glb"
+model_scale = 0.2
+greybox = [NodePath("../Hull"), NodePath("../Nose"), NodePath("../Hatch")]
+
+[node name="DroneModel" type="Node3D" parent="WorldView/WorldViewport/World/DropPod/AUD1T" node_paths=PackedStringArray("greybox")]
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/aud1t.glb"
+model_scale = 0.2
+greybox = [NodePath("../Body"), NodePath("../Eye")]
+
+[node name="MastModel" type="Node3D" parent="WorldView/WorldViewport/World/SatelliteRelay" node_paths=PackedStringArray("greybox")]
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/relay_mast.glb"
+model_scale = 0.5
+greybox = [NodePath("../Mast"), NodePath("../Dish/DishMesh")]

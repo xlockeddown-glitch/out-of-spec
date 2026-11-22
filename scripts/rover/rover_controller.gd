@@ -53,6 +53,8 @@ class UplinkCommand:
 ## Greybox wheels (VisualRoot children named Wheel*) widen with Bram's treads.
 @export var wheel_width_m: float = 0.3
 @export var wide_wheel_width_m: float = 0.55
+## Voxel model swapped in once Bram fits the treads (needs tractor.glb loaded too).
+@export_file("*.glb", "*.gltf", "*.tscn") var wide_tread_model_path: String = "res://assets/voxels/tractor_wide.glb"
 
 @export_group("Drive")
 @export var max_speed_mps: float = 6.0
@@ -270,6 +272,9 @@ func _apply_upgrades() -> void:
 	var visual: Node = get_node_or_null("VisualRoot")
 	if visual == null:
 		return
+	var slot := visual as ModelSlot
+	if GameState.has_wide_treads and slot and slot.has_model() and slot.model_path != wide_tread_model_path:
+		slot.swap_model(wide_tread_model_path)
 	for child: Node in visual.get_children():
 		if child is CSGCylinder3D and child.name.begins_with("Wheel"):
 			(child as CSGCylinder3D).height = width

@@ -7,6 +7,8 @@ extends Node3D
 
 const MODEL_PATH: String = "res://assets/voxels/ore_fissure.glb"
 const MINE_RADIUS_M: float = 2.0
+## One voxel = 0.2 m (docs/art/voxel_models.md): 8 voxels across = 1.6 m.
+const MODEL_SCALE: float = 0.2
 
 @export var fissure_id: StringName = &""
 
@@ -39,8 +41,16 @@ func _refresh() -> void:
 func _build_visual() -> Node3D:
 	if ResourceLoader.exists(MODEL_PATH):
 		var scene := load(MODEL_PATH) as PackedScene
+		var model: Node3D = null
 		if scene != null:
-			return scene.instantiate()
+			var loaded: Node = scene.instantiate()
+			model = loaded as Node3D
+			if model == null:
+				loaded.free()
+		if model != null:
+			model.scale = Vector3.ONE * MODEL_SCALE
+			ModelSlot.apply_emission(model)
+			return model
 		push_warning("OreFissure: %s is not a scene; using greybox." % MODEL_PATH)
 	var root := Node3D.new()
 	var mat := StandardMaterial3D.new()
