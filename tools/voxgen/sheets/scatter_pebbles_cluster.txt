@@ -1,0 +1,33 @@
+scatter_pebbles_cluster - 10 x 8 x 3 (three flat-topped sandstone cobbles). From Ryan's Plateau Clutter generator (0.2 m voxels), 2026-11-22.
+X: 0..9 left to right, Y: 7..0 rear (+Y) to front (-Y), first row = highest Y.
+Palette: P1 = #A8422B, P2 = #8E3522, P3 = #6E2617, P4 = #5E2214, S = #1D222B
+
+Z = 0
+Y=07  .. P1 P1 P1 .. .. P1 P1 P1 ..
+Y=06  P1 P1 P1 P1 P1 .. P1 P1 P1 ..
+Y=05  P1 P1 P1 P1 P1 .. P1 P1 P1 ..
+Y=04  P1 P1 P1 P1 P1 .. .. .. .. ..
+Y=03  P1 P1 P1 P1 P1 .. .. P1 P1 P1
+Y=02  .. P1 P1 P1 .. .. P1 P1 P1 P1
+Y=01  .. .. .. .. .. .. P1 P1 P1 P1
+Y=00  .. .. .. .. .. .. P1 P1 P1 ..
+
+Z = 1
+Y=07  .. P2 P2 P2 .. .. P4 P4 P4 ..
+Y=06  P2 P2 P2 P2 P2 .. P4 P4 P4 ..
+Y=05  P2 P2 P2 P2 P2 .. P3 P4 P4 ..
+Y=04  P2 P2 P2 P2 P2 .. .. .. .. ..
+Y=03  P2 P2 S  P2 P2 .. .. P3 P2 P2
+Y=02  .. P2 P3 P2 .. .. P2 P2 P2 P2
+Y=01  .. .. .. .. .. .. P2 P2 P2 P2
+Y=00  .. .. .. .. .. .. P2 P2 P2 ..
+
+Z = 2
+Y=07  .. .. .. .. .. .. .. .. .. ..
+Y=06  .. P4 P4 P4 .. .. .. .. .. ..
+Y=05  .. P4 P4 P4 .. .. .. .. .. ..
+Y=04  .. P4 P4 P4 .. .. .. .. .. ..
+Y=03  .. P4 P4 P4 .. .. .. .. .. ..
+Y=02  .. .. .. .. .. .. .. P4 P4 ..
+Y=01  .. .. .. .. .. .. .. P4 P4 ..
+Y=00  .. .. .. .. .. .. .. .. .. ..

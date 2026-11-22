@@ -25,6 +25,9 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `crop_stage_wilted.glb` | Wilted, over-watered crop (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/crop_stage_wilted.txt`). |
 | `live_tarantula.glb` | Live Curlyhair, matching the exuvia (`Terrarium/Tarantula/SpiderModel`; replaced `curlyhair.glb` on 2026-11-22) | 0.1 m voxels, origin at ground level, same footprint as `curlyhair`. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/live_tarantula.txt`). |
 | `irrigation_junction.glb` | Drip-line valve and manifold junction (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/irrigation_junction.txt`). |
+| `mesa_scrub_bush.glb` | Wind-bent sage scrub, 2.0 m across and 1.6 m tall (not placed in any scene yet) | 0.2 m voxels, origin at ground level. Built from Ryan's Plateau Clutter grid (`tools/voxgen/sheets/mesa_scrub_bush.txt`). |
+| `scatter_pebbles_cluster.glb` | Three flat-topped plateau cobbles, 2.0 m × 1.6 m (not placed in any scene yet) | 0.2 m voxels, origin at ground level. Built from Ryan's Plateau Clutter grid (`tools/voxgen/sheets/scatter_pebbles_cluster.txt`). |
+| `mesa_dry_stump.glb` | Sun-bleached dry stump on red dust, 1.2 m tall (not placed in any scene yet) | 0.2 m voxels, origin at ground level. Built from Ryan's Plateau Clutter grid (`tools/voxgen/sheets/mesa_dry_stump.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 
