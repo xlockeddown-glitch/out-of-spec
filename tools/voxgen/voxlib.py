@@ -97,7 +97,14 @@ class Model:
         Recolors the visible, non-lit, non-glass voxels in each lit voxel's
         26-neighborhood; it never adds or removes voxels, so silhouettes are
         unchanged. A lit voxel with no solid neighbors (a free-standing beacon)
-        gets no border. Returns the number of voxels recolored.
+        gets no border. Returns the number of voxels whose color changed
+        (border voxels that already had `color` are not counted).
+
+        Limits: exposure is not directional, so a 1-voxel wall behind a lit
+        voxel shows the border on its far side too; an `emit_*` neighbor counts
+        as solid, so a voxel whose only open face touches a hideable lit part
+        (e.g. `emit_fiber`) is not bordered. The pass has no notion of separate
+        objects: a prop or character voxel beside a lit voxel is recolored too.
         """
         def lit(pos: tuple[int, int, int]) -> bool:
             v = self.voxels.get(pos)
@@ -124,9 +131,13 @@ class Model:
                             continue
                         if exposed(n):
                             targets.add(n)
+        changed = 0
         for n in targets:
-            self.voxels[n] = (self.voxels[n][0], color.upper())
-        return len(targets)
+            part, old = self.voxels[n]
+            if old.upper() != color.upper():
+                changed += 1
+            self.voxels[n] = (part, color.upper())
+        return changed
 
     # --- stats ----------------------------------------------------------
     def bounds(self) -> tuple[tuple[int, int, int], tuple[int, int, int]]:
