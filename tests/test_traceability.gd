@@ -53,16 +53,13 @@ func test_oirm_courier_round_trip() -> String:
 	var table: DriftingSensor = gs.get_sensor(gs.steering.calibrated_by)
 	var cadence: int = _cadence()
 	var problem: String = ""
-	_set_day(cadence - 1)
-	if gs.send_to_oirm(table.instrument_id)["ok"]:
-		problem = "Sending must need the drop pod on the pad."
 	_set_day(cadence)
 	_all_in_band(gs)
 	gs._run_audit(cadence)
 	var credits_before: int = gs.credits
 	var sent: Dictionary = gs.send_to_oirm(table.instrument_id)
-	if problem == "" and not sent["ok"]:
-		problem = "Send with the pod present must work: %s" % sent["reason"]
+	if not sent["ok"] or sent["courier"]:
+		problem = "Send with the pod present must ride the pod: %s" % sent
 	elif problem == "" and gs.credits != credits_before - gs.oirm_fee():
 		problem = "The OIRM fee must be charged."
 	elif problem == "" and sent["return_day"] != cadence * 2:
@@ -85,6 +82,171 @@ func test_oirm_courier_round_trip() -> String:
 		problem = "The return must restart the standard's interval."
 	elif problem == "" and not gs.suspect_units.is_empty():
 		problem = "An in-tolerance as-found must not recall anything."
+	GameClock.elapsed_days = saved
+	gs.free()
+	return problem
+
+
+## Off audit day a standard goes by courier: fee plus surcharge, back a fixed
+## number of days later, interval restarting from the return (Ryan, 2026-11-22).
+func test_oirm_courier_off_day() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var table: DriftingSensor = gs.get_sensor(gs.steering.calibrated_by)
+	var send_day: int = 2
+	var back: int = send_day + gs.oirm_courier_days()
+	var problem: String = ""
+	_set_day(send_day)
+	gs.drop_pod_present = false
+	var credits_before: int = gs.credits
+	var sent: Dictionary = gs.send_to_oirm(table.instrument_id)
+	if not sent["ok"] or not sent["courier"]:
+		problem = "Without the pod a standard must go by courier: %s" % sent
+	elif gs.credits != credits_before - gs.oirm_fee() - gs.oirm_courier_surcharge():
+		problem = "The courier must charge the fee plus the surcharge."
+	elif gs.oirm_fee() + gs.oirm_courier_surcharge() != 300:
+		problem = "Fee plus surcharge must total 300 CR, got %d." % (gs.oirm_fee() + gs.oirm_courier_surcharge())
+	elif sent["return_day"] != back:
+		problem = "Courier must return on day %d, got %s." % [back, sent["return_day"]]
+	elif gs.send_to_oirm(table.instrument_id)["ok"]:
+		problem = "A standard already away can't be sent again."
+	elif not gs.calibrate(gs.STEERING_ID).get("refused", false):
+		problem = "The bench must refuse while its standard is with the courier."
+	_set_day(back - 1)
+	gs._receive_oirm_returns(back - 1)
+	if problem == "" and not gs.at_oirm.has(table.instrument_id):
+		problem = "The standard must not be back early."
+	_set_day(back)
+	gs._on_day_started(back)
+	var cert: Dictionary = gs.certificates[table.instrument_id]
+	if problem == "" and (gs.at_oirm.has(table.instrument_id) or cert["day"] != back):
+		problem = "The courier must bring it back certified on day %d: %s" % [back, cert]
+	elif problem == "" and table.cal_due_day != back + table.cal_interval_days:
+		problem = "The interval must restart from the return day."
+	elif problem == "" and gs.calibrate(gs.STEERING_ID).get("refused", false):
+		problem = "The bench must work again once the standard is back."
+	GameClock.elapsed_days = saved
+	gs.free()
+	return problem
+
+
+## A courier return that lands on an audit day is certified before Vance
+## inspects, so the standard is audited with its new certificate.
+func test_courier_return_on_audit_day() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var cadence: int = _cadence()
+	var audit_day: int = cadence * 2
+	var send_day: int = audit_day - gs.oirm_courier_days()
+	var table_id: String = gs.steering.calibrated_by
+	var problem: String = ""
+	_all_in_band(gs)
+	for id: String in gs.unit_ids():
+		gs.get_sensor(id).cal_due_day = audit_day * 4
+	_set_day(send_day)
+	gs.drop_pod_present = false
+	var sent: Dictionary = gs.send_to_oirm(table_id)
+	if not sent["ok"] or sent["return_day"] != audit_day:
+		problem = "Setup: courier must return on the audit day: %s" % sent
+	_set_day(audit_day)
+	gs._on_day_started(audit_day)
+	var lines: Dictionary = _lines_by_id(gs.audit_log[-1])
+	if problem == "" and gs.certificates[table_id]["day"] != audit_day:
+		problem = "The standard must be certified the morning it returns."
+	elif problem == "" and not lines.has(table_id):
+		problem = "A standard back that morning must be audited."
+	elif problem == "" and lines[table_id]["violation"]:
+		problem = "A freshly certified standard must pass: %s" % lines[table_id]
+	GameClock.elapsed_days = saved
+	gs.free()
+	return problem
+
+
+## Each standard drifts from zero to its MPE in about 60 days (Ryan,
+## 2026-11-22; the rates are placeholders).
+func test_standard_drift_reaches_mpe_in_about_60_days() -> String:
+	var gs: GameStateScript = _make_state()
+	var problem: String = ""
+	for id: String in gs.standard_ids():
+		var sensor: DriftingSensor = gs.get_sensor(id)
+		var days: float = sensor.mpe / sensor.daily_drift_rate
+		if days < 55.0 or days > 65.0:
+			problem = "%s reaches its MPE in %.1f days, want about 60." % [id, days]
+	gs.free()
+	return problem
+
+
+## A unit that falls due while its standard is at OIRM is excused at the first
+## audit where it is overdue, not a violation and not blocking Tier 1. If it
+## is not calibrated by the next audit it is an ordinary overdue there.
+func test_unit_due_while_standard_away_is_excused_once() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var cadence: int = _cadence()
+	var table_id: String = gs.steering.calibrated_by
+	var problem: String = ""
+	_all_in_band(gs)
+	for id: String in gs.unit_ids():
+		gs.get_sensor(id).cal_due_day = cadence * 10
+	_set_day(1)
+	gs.drop_pod_present = false
+	gs.send_to_oirm(table_id)
+	gs.steering.cal_due_day = 2  # falls due while the table is away
+	_set_day(cadence)
+	gs._run_audit(cadence)
+	var line: Dictionary = _lines_by_id(gs.audit_log[-1])[gs.STEERING_ID]
+	if not (line["overdue"] and line["excused"]) or line["violation"] or line["fine"] != 0:
+		problem = "An excused unit must be no violation and no fine: %s" % line
+	elif not gs.audit_log[-1]["passed"] or not gs.tier1_unlocked:
+		problem = "An excused unit must not block a clean audit or Tier 1."
+	_set_day(1 + gs.oirm_courier_days())
+	gs._on_day_started(1 + gs.oirm_courier_days())  # the table comes back
+	# Another unit due while its own standard is home is not excused.
+	gs.hygrometer.cal_due_day = cadence + 1
+	_set_day(cadence * 2)
+	gs._run_audit(cadence * 2)
+	var lines: Dictionary = _lines_by_id(gs.audit_log[-1])
+	if problem == "" and (lines[gs.STEERING_ID]["excused"] or not lines[gs.STEERING_ID]["violation"]):
+		problem = "Not calibrated by the next audit, it must be an ordinary overdue: %s" % lines[gs.STEERING_ID]
+	elif problem == "" and (lines[gs.HYGROMETER_ID]["excused"] or not lines[gs.HYGROMETER_ID]["violation"]):
+		problem = "A unit whose standard is home must not be excused: %s" % lines[gs.HYGROMETER_ID]
+	GameClock.elapsed_days = saved
+	gs.free()
+	return problem
+
+
+## A courier trip outlasts the audit cadence: a unit stays excused while its
+## standard is away and at the audit the morning it comes back, then has until
+## the next audit.
+func test_excused_while_courier_outlasts_cadence() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var cadence: int = _cadence()
+	var table_id: String = gs.steering.calibrated_by
+	var send_day: int = cadence * 3 - 2
+	var back: int = send_day + gs.oirm_courier_days()
+	var problem: String = ""
+	_all_in_band(gs)
+	for id: String in gs.unit_ids():
+		gs.get_sensor(id).cal_due_day = cadence * 20
+	_set_day(send_day)
+	gs.drop_pod_present = false
+	gs.send_to_oirm(table_id)
+	gs.steering.cal_due_day = send_day + 1
+	var first_audit: int = gs.next_audit_day(send_day)
+	var excused_through: int = gs.next_audit_day(back - 1)
+	for day: int in range(send_day + 1, excused_through + cadence + 1):
+		_set_day(day)
+		gs._on_day_started(day)
+		if day % cadence != 0 or problem != "":
+			continue
+		var line: Dictionary = _lines_by_id(gs.audit_log[-1])[gs.STEERING_ID]
+		if day <= excused_through and not line["excused"]:
+			problem = "Day %d audit: still excused while away or back only that morning (back day %d): %s" % [day, back, line]
+		elif day > excused_through and (line["excused"] or not line["violation"]):
+			problem = "Day %d audit: past the grace it is an ordinary overdue: %s" % [day, line]
+	if problem == "" and excused_through <= first_audit:
+		problem = "Setup: the trip must span more than one audit."
 	GameClock.elapsed_days = saved
 	gs.free()
 	return problem
@@ -322,7 +484,7 @@ func test_first_clean_audit_unlocks_tier1() -> String:
 
 
 ## Smoke test of the bench overlay: standards are listed, and selecting one
-## swaps the calibrate button for SEND TO OIRM and shows its certificate.
+## swaps the calibrate button for SEND (pod or courier) and shows its certificate.
 func test_bench_lists_standards_with_send_button() -> String:
 	var root: Window = (Engine.get_main_loop() as SceneTree).root
 	var bench: CalBenchUI = (load("res://ui/cal_bench_ui.tscn") as PackedScene).instantiate()
@@ -332,12 +494,13 @@ func test_bench_lists_standards_with_send_button() -> String:
 	bench.open(standard_id)
 	var button: Button = bench.get_node("%CalibrateButton")
 	var standard_label: Label = bench.get_node("%StandardLabel")
-	if not button.text.begins_with("SEND TO OIRM"):
-		problem = "A standard must offer SEND TO OIRM, got %s." % button.text
+	var want: String = "SEND TO OIRM" if GameState.drop_pod_present else "SEND BY COURIER"
+	if not button.text.begins_with(want):
+		problem = "A standard must offer %s, got %s." % [want, button.text]
 	elif not standard_label.text.contains("OIRM-"):
 		problem = "A standard must show its certificate: %s" % standard_label.text
-	elif button.disabled != not GameState.drop_pod_present:
-		problem = "SEND TO OIRM must be enabled only while the drop pod is on the pad."
+	elif button.disabled != GameState.at_oirm.has(standard_id):
+		problem = "SEND must be enabled unless the standard is already away."
 	bench.open(GameState.STEERING_ID)
 	if problem == "" and (button.text != CalBenchUI.CALIBRATE_TEXT or not standard_label.text.contains("Chain")):
 		problem = "A unit must show the calibrate button and its chain: %s / %s" % [button.text, standard_label.text]

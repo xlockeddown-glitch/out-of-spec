@@ -80,8 +80,11 @@ var _untraceable_since_cal: Dictionary = {}
 var certificates: Dictionary = {}
 ## Every certificate issued, oldest first, founding stock included.
 var certificate_log: Array[Dictionary] = []
-## standard_id -> the audit day it comes back on the drop pod.
+## standard_id -> the day it comes back (next audit pod, or courier).
 var at_oirm: Dictionary = {}
+## Every trip to OIRM: { standard_id, sent_day, return_day, courier }. Used to
+## excuse units that fell due while their standard was away.
+var oirm_trips: Array[Dictionary] = []
 ## Unit id -> day a recall made its calibration suspect. A traceable
 ## recalibration clears it; Vance fines what is left at the audit.
 var suspect_units: Dictionary = {}
@@ -251,7 +254,7 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 			"refused": true,
 			"standard_id": budget["standard_id"],
 			"tur": budget["tur"],
-			"reason": "%s is at OIRM until the day %d drop pod." % [
+			"reason": "%s is at OIRM until day %d." % [
 				instrument_name(budget["standard_id"], true), at_oirm[budget["standard_id"]]],
 		}
 	var standard: DriftingSensor = get_sensor(budget["standard_id"]) if not budget.is_empty() else null
@@ -372,6 +375,8 @@ func add_credits(amount: int) -> void:
 
 func _on_day_started(day: int) -> void:
 	_post_morning_dispatch(day)
+	# Courier returns land in the morning, before an audit that day.
+	_receive_oirm_returns(day)
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)
@@ -393,6 +398,7 @@ func _run_audit(day: int) -> void:
 	since.assign(cal_log.slice(_cal_index_at_last_audit))
 	_cal_index_at_last_audit = cal_log.size()
 	# Standards on this pod come back (and are certified) before Vance inspects.
+	# _on_day_started already did this in play; keep it for direct calls (tests).
 	_receive_oirm_returns(day)
 	# Units and standards; a standard away at OIRM is not here to inspect.
 	var audited: Dictionary = {}
@@ -404,7 +410,8 @@ func _run_audit(day: int) -> void:
 	for id: Variant in suspect_units:
 		if int(suspect_units[id]) < day:
 			fineable_suspects[id] = suspect_units[id]
-	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since, fineable_suspects)
+	var excused: Dictionary = _excused_units(day)
+	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since, fineable_suspects, excused)
 
 	if not report["passed"] and not audit_grace_used:
 		_apply_audit_grace(report)
@@ -432,6 +439,8 @@ func _run_audit(day: int) -> void:
 				sensor.format_value(line["as_found"]), SP811.number(line["ratio"], 3), DriftingSensor.band_label(line["band"])])
 		if line["overdue"]:
 			label += ", OVERDUE (due day %d)" % line["due_day"]
+		if line.get("excused", false):
+			label += ", EXCUSED (its standard was at OIRM when it fell due; calibrate before the day %d audit)" % excused[line["instrument_id"]]
 		if line.get("suspect", false):
 			label += ", SUSPECT CAL (recalled, not redone)"
 		if line.get("waived", false):
@@ -515,6 +524,7 @@ func _issue_founding_certificates() -> void:
 	certificates.clear()
 	certificate_log.clear()
 	at_oirm.clear()
+	oirm_trips.clear()
 	suspect_units.clear()
 	_next_certificate_number = 1
 	for id: String in standard_ids():
@@ -555,26 +565,69 @@ func oirm_fee() -> int:
 	return int(DataManager.get_number(DRIFT_TABLE, "oirm/fee_credits", 150.0))
 
 
-## Puts a standard on the drop pod to OIRM. Needs the pod on the ground and
-## the fee. Returns { "ok": bool, "reason": String, "return_day": int }.
+func oirm_courier_surcharge() -> int:
+	return int(DataManager.get_number(DRIFT_TABLE, "oirm/courier_surcharge_credits", 150.0))
+
+
+func oirm_courier_days() -> int:
+	return maxi(int(DataManager.get_number(DRIFT_TABLE, "oirm/courier_return_days", 7.0)), 1)
+
+
+## Units overdue at this audit only because the standard they need was at OIRM
+## when they fell due (Ryan, 2026-11-22). Excused at the first audit where they
+## are overdue, and at any audit while the standard is still away or only came
+## back that morning (a courier trip is longer than the audit cadence). After
+## that they need a traceable calibration by the next audit.
+## Returns instrument_id -> the audit day by which it must be calibrated.
+func _excused_units(day: int) -> Dictionary:
+	var excused: Dictionary = {}
+	var cadence: int = maxi(int(_schedule("cadence_days", 5.0)), 1)
+	for id: String in unit_ids():
+		var sensor: DriftingSensor = sensors[id]
+		var due: int = sensor.cal_due_day
+		if not sensor.is_overdue(day):
+			continue
+		for trip: Dictionary in oirm_trips:
+			var back: int = int(trip["return_day"])
+			if at_oirm.has(trip["standard_id"]):
+				back = maxi(back, day)  # late, still away
+			# Due after it left (the player could calibrate on the send day) and before it came back.
+			if trip["standard_id"] == sensor.calibrated_by and int(trip["sent_day"]) < due and due < back \
+					and (due >= day - cadence or back >= day):
+				excused[id] = next_audit_day(maxi(day, back))
+				break
+	return excused
+
+
+## Sends a standard to OIRM. With the drop pod on the pad it rides the pod
+## for the fee and comes back on the next audit pod. On any other day it goes
+## by courier for the fee plus a surcharge and comes back a fixed number of
+## days later. Returns { "ok", "reason", "return_day", "courier", "fee" }.
 func send_to_oirm(standard_id: String) -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	if sensor == null or sensor.role != "standard":
 		return { "ok": false, "reason": "Only reference standards go to OIRM." }
 	if at_oirm.has(standard_id):
-		return { "ok": false, "reason": "Already at OIRM until the day %d drop pod." % at_oirm[standard_id] }
-	if not drop_pod_present:
-		return { "ok": false, "reason": "No drop pod on the pad. It lands on audit mornings." }
-	var fee: int = oirm_fee()
+		return { "ok": false, "reason": "Already at OIRM until day %d." % at_oirm[standard_id] }
+	# No pod on the pad: it goes by courier for a surcharge (Ryan, 2026-11-22).
+	var courier: bool = not drop_pod_present
+	var fee: int = oirm_fee() + (oirm_courier_surcharge() if courier else 0)
 	if credits < fee:
 		return { "ok": false, "reason": "OIRM charges %s CR; balance %s CR." % [SP811.integer(fee), SP811.integer(credits)] }
 	add_credits(-fee)
-	var return_day: int = next_audit_day(GameClock.get_day_index())
+	var today: int = GameClock.get_day_index()
+	var return_day: int = today + oirm_courier_days() if courier else next_audit_day(today)
 	at_oirm[standard_id] = return_day
-	post_phone("OIRM: %s loaded on the drop pod. Fee %s CR. Back on the day %d pod; nothing can be calibrated against it until then." % [
-		instrument_name(standard_id, true), SP811.integer(fee), return_day])
+	oirm_trips.append({ "standard_id": standard_id, "sent_day": today, "return_day": return_day, "courier": courier })
+	if courier:
+		post_phone("OIRM: %s collected by courier. Fee %s CR (%s CR + %s CR courier). Back on day %d; nothing can be calibrated against it until then." % [
+			instrument_name(standard_id, true), SP811.integer(fee), SP811.integer(oirm_fee()),
+			SP811.integer(oirm_courier_surcharge()), return_day])
+	else:
+		post_phone("OIRM: %s loaded on the drop pod. Fee %s CR. Back on the day %d pod; nothing can be calibrated against it until then." % [
+			instrument_name(standard_id, true), SP811.integer(fee), return_day])
 	oirm_changed.emit()
-	return { "ok": true, "reason": "", "return_day": return_day }
+	return { "ok": true, "reason": "", "return_day": return_day, "courier": courier, "fee": fee }
 
 
 func _receive_oirm_returns(day: int) -> void:
@@ -593,6 +646,11 @@ func oirm_calibrate(standard_id: String, day: int) -> Dictionary:
 	var zeroed: Dictionary = sensor.zero(0.0)
 	sensor.cal_due_day = day + sensor.cal_interval_days
 	sensor.last_cal_day = day
+	# Close the trip on the day it actually came back, in case it was late.
+	for i: int in range(oirm_trips.size() - 1, -1, -1):
+		if oirm_trips[i]["standard_id"] == standard_id:
+			oirm_trips[i]["return_day"] = day
+			break
 	var cert: Dictionary = _issue_certificate(standard_id, day, zeroed["as_found"], zeroed["as_left"], false)
 	post_phone("OIRM: %s returned with certificate %s. As-found %s (%s). Due day %d." % [
 		instrument_name(standard_id, true), cert["id"], sensor.format_value(zeroed["as_found"], 3),

@@ -42,7 +42,7 @@
       "display_name": "Rotary Table",
       "short_name": "Rotary table",
       "error_unit": "degrees",
-      "daily_drift_rate": 0.0005,
+      "daily_drift_rate": 0.00083,
       "max_permissible_error": 0.05,
       "spec_confidence_pct": null,
       "certificate_uncertainty": 0.02,
@@ -55,7 +55,7 @@
       "display_name": "Humidity Generator Chamber",
       "short_name": "Humidity chamber",
       "error_unit": "percentage_points_rh",
-      "daily_drift_rate": 0.005,
+      "daily_drift_rate": 0.0083,
       "max_permissible_error": 0.5,
       "spec_confidence_pct": null,
       "certificate_uncertainty": 0.3,
@@ -63,7 +63,7 @@
       "initial_interval_days": 30,
       "_note": "Tier 0 humidity standard, two-pressure generator class (Ryan, 2026-11-22). Working name; the fictional maker name and every number here are game placeholders, not from a datasheet."
     },
-    "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. resolution (one digit of the unit under test), bench_minutes and the standards' specs are placeholders (docs/design/equipment_skills_robots.md section 1.5)."
+    "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. Standards' daily_drift_rate takes one from zero to its MPE in about 60 days (Ryan, 2026-11-22), so skipping an OIRM cycle risks a recall. resolution (one digit of the unit under test), bench_minutes and the standards' specs and drift rates are placeholders (docs/design/equipment_skills_robots.md section 1.5)."
   },
   "guardband": {
     "green": {
@@ -91,7 +91,9 @@
   },
   "oirm": {
     "fee_credits": 150,
-    "_note": "Orbital Institute of Reference Measures (working name). A standard rides Vance's drop pod after an audit and returns on the next one with a certificate. Fee is a placeholder (docs/design/equipment_skills_robots.md section 1.7)."
+    "courier_surcharge_credits": 150,
+    "courier_return_days": 7,
+    "_note": "Orbital Institute of Reference Measures (working name). A standard rides Vance's drop pod after an audit and returns on the next one with a certificate. On any other day it can go by courier for the fee plus courier_surcharge_credits and returns courier_return_days later (Ryan, 2026-11-22). Fee, surcharge and days are placeholders (docs/design/equipment_skills_robots.md section 1.7)."
   },
   "audit_schedule": {
     "cadence_days": 5,

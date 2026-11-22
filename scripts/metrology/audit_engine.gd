@@ -14,6 +14,8 @@ extends RefCounted
 ##     once, cap the instrument's total at max_fine_credits, round to whole credits.
 ##   - Suspect (a recall flagged the unit's calibration and it was not redone)
 ##     = suspect_cal_credits.
+##   - Excused (overdue only because the standard it needs was at OIRM when it
+##     fell due) = not a violation at that audit. Out of tolerance still is.
 ##   - Repeat offences reset after a fully clean audit (GameState).
 ##   - Calibration records since the last audit are listed on the report
 ##     (traceability). They don't change the fine; Week 4 Vance may care.
@@ -26,8 +28,9 @@ const CONFIG_TABLE: StringName = &"sensor_drift_config"
 ## cal_records: calibration records since the last audit
 ## suspect_ids: instrument_id -> recall day, for calibrations a recall made
 ## suspect that have not been redone
+## excused_ids: instrument_id -> true, units whose standard was at OIRM when they fell due
 static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, cal_records: Array[Dictionary],
-		suspect_ids: Dictionary = {}) -> Dictionary:
+		suspect_ids: Dictionary = {}, excused_ids: Dictionary = {}) -> Dictionary:
 	var lines: Array[Dictionary] = []
 	var total_fine: int = 0
 	var any_violation: bool = false
@@ -42,10 +45,11 @@ static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, 
 		var repeats: int = int(prior_offences.get(instrument_id, 0))
 		var out_of_tolerance: bool = band == DriftingSensor.Band.OUT_OF_TOLERANCE
 		var overdue: bool = sensor.is_overdue(day)
+		var excused: bool = overdue and excused_ids.has(instrument_id)
 		var suspect: bool = suspect_ids.has(instrument_id)
-		var violation: bool = out_of_tolerance or overdue or suspect
+		var violation: bool = out_of_tolerance or (overdue and not excused) or suspect
 		any_violation = any_violation or violation
-		var fine: int = fine_for(ratio, out_of_tolerance, overdue, repeats, suspect) if violation else 0
+		var fine: int = fine_for(ratio, out_of_tolerance, overdue and not excused, repeats, suspect) if violation else 0
 		total_fine += fine
 		lines.append({
 			"instrument_id": instrument_id,
@@ -58,6 +62,7 @@ static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, 
 			"band": band,
 			"out_of_tolerance": out_of_tolerance,
 			"overdue": overdue,
+			"excused": excused,
 			"suspect": suspect,
 			"due_day": sensor.cal_due_day,
 			"violation": violation,
