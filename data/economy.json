@@ -27,7 +27,6 @@
   },
   "jobs": {
     "board_size": 3,
-    "max_active": 2,
     "late_pay_cut_pct": 50,
     "untraceable_pay_cut_pct": 75,
     "late_grace_days": 3,
@@ -50,11 +49,27 @@
       { "id": "relay_inclinometer", "customer": "Relay crew", "item": "an antenna inclinometer", "discipline": "angle", "min_band": "Trusted", "min_tier": 0, "pay": 130, "due_in_days": 2, "bench_minutes": 60 },
       { "id": "dome2_oven_thermometer", "customer": "Dome 2 kitchen", "item": "an oven thermometer", "discipline": "temperature", "min_band": "Trusted", "min_tier": 1, "pay": 110, "due_in_days": 2, "bench_minutes": 40 },
       { "id": "talus_voltmeter", "customer": "Rover crew Talus", "item": "a battery voltmeter", "discipline": "electrical", "min_band": "Trusted", "min_tier": 1, "pay": 120, "due_in_days": 2, "bench_minutes": 30 },
-      { "id": "dome1_cabin_transducer", "customer": "Dome 1 life support", "item": "a cabin pressure transducer (tight tolerance)", "discipline": "pressure", "min_band": "Accredited", "min_tier": 3, "pay": 400, "due_in_days": 3, "bench_minutes": 90 },
-      { "id": "survey_theodolite", "customer": "Survey team", "item": "a theodolite (tight tolerance)", "discipline": "angle", "min_band": "Accredited", "min_tier": 0, "pay": 350, "due_in_days": 3, "bench_minutes": 90 },
-      { "id": "medbay_incubator", "customer": "Medical bay", "item": "an incubator thermometer (tight tolerance)", "discipline": "temperature", "min_band": "Accredited", "min_tier": 1, "pay": 320, "due_in_days": 2, "bench_minutes": 60 }
+      { "id": "dome1_cabin_transducer", "customer": "Dome 1 life support", "item": "a cabin pressure transducer (tight tolerance)", "discipline": "pressure", "min_band": "Accredited", "min_tier": 3, "pay": 400, "due_in_days": 3, "bench_minutes": 90, "area": "large" },
+      { "id": "survey_theodolite", "customer": "Survey team", "item": "a theodolite (tight tolerance)", "discipline": "angle", "min_band": "Accredited", "min_tier": 0, "pay": 350, "due_in_days": 3, "bench_minutes": 90, "area": "large" },
+      { "id": "medbay_incubator", "customer": "Medical bay", "item": "an incubator thermometer (tight tolerance)", "discipline": "temperature", "min_band": "Accredited", "min_tier": 1, "pay": 320, "due_in_days": 2, "bench_minutes": 60, "area": "medium" }
     ],
-    "_note": "Paid calibration jobs (Ryan, 2026-11-22): customers post jobs to the phone board each morning once the lab is Trusted; Accredited adds tighter-tolerance, better-paying jobs. A job needs an owned standard of its discipline at min_tier or better, not at OIRM and traceable (in date) when the job is accepted. Late (after due_day) or untraceable (standard overdue) work pays less and costs credibility; a clean, on-time job earns a small bonus. A job not done by due_day + late_grace_days is cancelled and costs abandoned_job_points. Every customer, number and discipline mapping here is [PLACEHOLDER]."
+    "_note": "Paid calibration jobs (Ryan, 2026-11-22): customers post jobs to the phone board each morning once the lab is Trusted; Accredited adds tighter-tolerance, better-paying jobs. A job needs an owned standard of its discipline at min_tier or better, not at OIRM and traceable (in date) when the job is accepted, and a lab area of its discipline with room (see lab). A job with \"area\" needs an area at least that size. Late (after due_day) or untraceable (standard overdue) work pays less and costs credibility; a clean, on-time job earns a small bonus. A job not done by due_day + late_grace_days is cancelled and costs abandoned_job_points. Every customer, number and discipline mapping here is [PLACEHOLDER]."
+  },
+  "lab": {
+    "sizes": [
+      { "id": "small", "name": "Small lab", "areas": 3 },
+      { "id": "medium", "name": "Medium lab", "areas": 5, "credits": 600, "ore": 4, "build_days": 2 },
+      { "id": "large", "name": "Large lab", "areas": 8, "credits": 1500, "ore": 8, "build_days": 3 }
+    ],
+    "area_sizes": [
+      { "id": "small", "spaces": 1 },
+      { "id": "medium", "spaces": 2 },
+      { "id": "large", "spaces": 4 }
+    ],
+    "refit_credits": 200,
+    "refit_ore": 1,
+    "refit_days": 1,
+    "_note": "Upgradeable lab (Ryan, 2026-11-22). The lab has a number of spaces for its size; each space is given to a discipline at the dome plan board. A discipline's spaces are its area: it can have that many jobs in progress at once, and its size (area_sizes, by spaces) decides which jobs fit. Growing to the next size costs credits and crystal ore and finishes build_days later, in the morning; the new spaces are then fitted out for free. Clearing a space for another discipline costs refit_credits and refit_ore and the space is down for refit_days. The lab starts small with a space for each discipline the founding standards cover. Every number here is [PLACEHOLDER]."
   },
   "_note": "Starting balance [PLACEHOLDER]. Crops sold to Lin add credits; audit fines, OIRM fees and purchases take them away."
 }

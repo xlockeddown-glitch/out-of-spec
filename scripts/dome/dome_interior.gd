@@ -2,7 +2,7 @@ extends Node3D
 ## Composition root for the dome interior: wires clickables to GameState,
 ## the bench UI, and the scene switcher, and refreshes the status panel.
 
-const DEFAULT_HINT: String = "Click the bench to calibrate  ·  Airlock or Tab: back to farm"
+const DEFAULT_HINT: String = "Click the bench to calibrate  ·  Plan board: grow the lab  ·  Airlock or Tab: back to farm"
 const TOAST_SECONDS: float = 3.0
 ## Long messages (dispatches, audit lines) stay up longer.
 const TOAST_SECONDS_PER_CHAR: float = 0.04
@@ -12,6 +12,8 @@ const TOAST_SECONDS_PER_CHAR: float = 0.04
 @onready var _terrarium_click: Clickable = %TerrariumClick
 @onready var _spool: Clickable = %SpoolPickup
 @onready var _bench_ui: CalBenchUI = %CalBenchUI
+@onready var _plan_board: Clickable = %PlanBoardClick
+@onready var _plan_board_ui: PlanBoardUI = %PlanBoardUI
 
 @onready var _clock_label: Label = %ClockLabel
 @onready var _species_label: Label = %SpeciesLabel
@@ -34,6 +36,7 @@ var _holding_audit: bool = false
 func _ready() -> void:
 	get_viewport().physics_object_picking = true
 	_bench.clicked.connect(_bench_ui.open)
+	_plan_board.clicked.connect(_plan_board_ui.open)
 	_airlock.clicked.connect(func() -> void: SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE))
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)
