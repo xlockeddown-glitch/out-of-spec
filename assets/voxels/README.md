@@ -13,7 +13,7 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `drop_pod.glb` | Pod hull, nose, hatch (`DropPod/PodModel`) | |
 | `aud1t.glb` | AUD-1T drone (`DropPod/AUD1T/DroneModel`) | Center origin. The game bobs it. |
 | `relay_mast.glb` | Mast and dish (`SatelliteRelay/MastModel`) | Model the spool bay empty; the spool is game-driven. |
-| `boulder_a.glb` … `boulder_d.glb` | Farm boulders (`Rocks/Rock<A–D>/Model`) | 0.2 m voxels, origin at ground level. Each fills its rock's box collider. Built from Gemini's layer grids (`tools/voxgen/sheets/boulder_a.txt` … `boulder_d.txt`). |
+| `boulder_a.glb` … `boulder_d.glb` | Farm boulders (`Rocks/Rock<A–D>/Model`) | 0.2 m voxels, origin at ground level. Each fills its rock's box collider, except that B's model is 3.6 m tall against a 3.5 m collider. Built from Gemini's layer grids (`tools/voxgen/sheets/boulder_a.txt` … `boulder_d.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 
