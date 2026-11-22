@@ -704,6 +704,14 @@ LOGISTICS = {
     "shipping_pallet": {"W1": "#8C6742", "W2": "#6B4D30", "M3": "#2E3844", "S": SHADOW},
 }
 
+# Ryan's Dry Gulch & Plateau Rim terrain pack (2026-11-22, 0.2 m voxels): 10 x 10 tiles for a
+# 2.0 m grid cell. One palette for all three: P1..P4 are the boulders' PLATEAU colors, D1 his
+# dust. Built and turned like the field props (origin at the cell center), part "rock" like the
+# boulders. Not placed in any scene yet.
+GULCH_RIM_COLORS = {"P1": PLATEAU[0], "P2": PLATEAU[1], "P3": PLATEAU[2], "P4": PLATEAU[3],
+                    "D1": "#C26B4A", "S": SHADOW}
+GULCH_RIM = ("dry_gulch_straight", "plateau_rim_straight", "plateau_rim_corner")
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop") -> Model:
@@ -745,6 +753,7 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, *PACK3[n])), 0.1) for n in PACK3],
     *[((lambda n=n: prop_sheet(n, CLUTTER[n])), 0.2) for n in CLUTTER],
     *[((lambda n=n: prop_sheet(n, LOGISTICS[n])), 0.1) for n in LOGISTICS],
+    *[((lambda n=n: prop_sheet(n, GULCH_RIM_COLORS, "rock")), 0.2) for n in GULCH_RIM],
 ]
 
 
