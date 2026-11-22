@@ -4,7 +4,7 @@ extends Node3D
 ##   - status LED follows the hygrometer band (red blinks when out of tolerance)
 ##   - heat lamp turns harsh amber when out of tolerance
 ##   - tarantula: Active -> Pre-Molt (dimmed and squashed, greybox or voxel model)
-##     -> Molted (exuvia + spool; the spider itself is hidden until the spool is taken)
+##     -> Molted (exuvia + spool; the spider itself is hidden)
 ##     -> the exuvia stays GameState.EXUVIA_LINGER_DAYS after pickup, and the
 ##        spider stays hidden (in its burrow) until it goes
 
