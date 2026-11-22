@@ -19,7 +19,7 @@ Read this before you start, and again before you open or merge a PR. It keeps lo
   - Don't assume there is one player. Anything that belongs to a person (position, held item, skills) should be easy to key by a player id later. Check the open questions before adding more per-farm singletons like `credits` or `rover_transform`.
   - Keep randomness in seeded `RandomNumberGenerator`s owned by the simulation, never the global `randf()`, `shuffle()` or `pick_random()`.
   - Drive the simulation from `GameClock` (`time_advanced`, `day_started`), not `_process` delta.
-  - Known exceptions, to fix in the co-op milestone: `rover_controller.gd` (saves `GameState.rover_transform`, adds steering usage directly), `farm_grid.gd` (writes `GameState.tilled_cells`), the global-RNG `shuffle()` and `pick_random()` calls in `GameState.gd`, the unseeded `randomize()` in `drifting_sensor.gd`, molt timing on real seconds, and `calibrate()`'s default `performed_by` of "You".
+  - Known exceptions, to fix in the co-op milestone: `rover_controller.gd` (saves `GameState.rover_transform`, adds steering usage directly), `farm_grid.gd` (writes `GameState.tilled_cells`), the global-RNG `shuffle()` and `pick_random()` calls in `GameState.gd`, the unseeded `randomize()` in `drifting_sensor.gd`, molt timing on real seconds, the hard-coded "You" for `performed_by` in `calibrate()` and its rover caller, and the `DriftingSensor` objects held in `GameState` (they need a to/from-dictionary form).
 - **Ask when unsure.** Design calls, names and numbers are Ryan's to make. If reviewers disagree, ask Ryan.
 
 ### Shortcuts by task
