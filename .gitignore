@@ -12,3 +12,6 @@ Claude outputs/
 
 # Python
 __pycache__/
+
+# Local Windows exports
+/build/
