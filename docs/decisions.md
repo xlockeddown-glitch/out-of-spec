@@ -612,5 +612,5 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - Ryan's answer was to the question of what to place from the Environmental Standards pack. Only the chilled-mirror hygrometer is placed; the dry-well calibrator stays unplaced.
-- It sits on the front-left corner of the dome's calibration bench mat at (2.25, 0.9, 0.48) m, turned 180° so its front faces the camera. It clears the calibration station's body, and its top (1.05 m) is level with the bottom of the station's screen.
+- It sits on the front-left corner of the dome's calibration bench mat at (2.25, 0.9, 0.55) m, turned 180° so its front faces the camera. It fills the 0.3 m strip between the front of the calibration station model (z = 0.4 m) and the front edge of the mat (z = 0.7 m), touching both without passing into either.
 - It is at true size (0.35 m × 0.3 m × 0.15 m). Set dressing only: it does not read humidity, and the bench's calibration still runs as before.

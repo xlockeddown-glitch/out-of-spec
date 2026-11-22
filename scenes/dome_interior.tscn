@@ -503,7 +503,7 @@ model_path = "res://assets/voxels/field_meter_fm3.glb"
 model_scale = 0.025
 
 [node name="HygrometerModel" type="Node3D" parent="."]
-transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 2.25, 0.9, 0.48)
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 2.25, 0.9, 0.55)
 script = ExtResource("5_slot")
 model_path = "res://assets/voxels/chilled_mirror_hygrometer.glb"
 model_scale = 0.025
