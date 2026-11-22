@@ -72,25 +72,25 @@
       "id": "disp_12",
       "sender": "Orbital Compliance",
       "severity": "warning",
-      "text": "The rover is inside tolerance but outside our guard band for acceptance. It may remain parked in the space marked 'Technically Fine.'"
+      "text": "The rover is inside tolerance but outside our guard-banded acceptance limit. It may remain parked in the space marked 'Technically Fine.'"
     },
     {
       "id": "disp_13",
       "sender": "Audit Division",
       "severity": "info",
-      "text": "Encoder error logged at −0.48° as found and 0.00° as left. Inspector Vance has asked that the turnip rows be given the same opportunity to correct themselves."
+      "text": "Encoder error logged at −0.48° as found and +0.12° as left. Inspector Vance has asked that the turnip rows be given the same chance to correct themselves."
     },
     {
       "id": "disp_14",
       "sender": "Metrology Governance",
       "severity": "warning",
-      "text": "Your weigh bench uncertainty budget lists resolution and repeatability. Please add the ventilation fan you switched off only while the auditor was watching."
+      "text": "Your bench hygrometer's uncertainty budget lists the reference standard, resolution and repeatability. Please add the fan you switched off for the auditor."
     },
     {
       "id": "disp_15",
       "sender": "Supply Chain",
       "severity": "warning",
-      "text": "One calibration certificate is missing from your reference weight's traceability chain. We can trace the invoice all the way to Orbit."
+      "text": "One calibration certificate is missing from your reference hygrometer's traceability chain. We can trace the invoice all the way to Orbit."
     },
     {
       "id": "disp_16",
@@ -102,13 +102,13 @@
       "id": "disp_17",
       "sender": "Bio-Security Bot",
       "severity": "info",
-      "text": "Curlyhair molt logged as a second resident. Please submit a departure time for whichever spider is empty."
+      "text": "Tarantula molt logged as a second resident. Please submit a departure time for whichever spider is empty."
     },
     {
       "id": "disp_18",
       "sender": "Telemetry Ops",
       "severity": "alert",
-      "text": "Uplink delay reached 450 ms behind the basalt arch. If you already sent reverse, give it a moment before sending reverse with feeling."
+      "text": "Uplink delay climbed behind the boulder again. If you already sent reverse, give it a moment before sending reverse with feeling."
     },
     {
       "id": "disp_19",
@@ -126,7 +126,7 @@
       "id": "disp_21",
       "sender": "Telemetry Ops",
       "severity": "info",
-      "text": "Cobalt Sentinel silk cleared the morning packet backlog. Your rover has now received all seven copies of 'please ignore my last command.'"
+      "text": "Optical silk cleared the morning packet backlog. Your rover has now received all seven copies of 'please ignore my last command.'"
     },
     {
       "id": "disp_22",
