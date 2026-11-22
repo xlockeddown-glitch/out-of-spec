@@ -58,7 +58,7 @@ func _ready() -> void:
 	_refresh_relay_hud()
 	_hud.set_credits(GameState.credits)
 	_hud.set_ore(GameState.crystal_ore)
-	_hud.set_credibility(GameState.credibility_text())
+	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text())
 
 
 func _process(_delta: float) -> void:
@@ -139,7 +139,7 @@ func _on_ore_mined(_fissure_id: StringName) -> void:
 
 
 func _on_credibility_changed(_points: int) -> void:
-	_hud.set_credibility(GameState.credibility_text())
+	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text())
 	if _bram_bay.rover_inside:
 		_refresh_bram()
 

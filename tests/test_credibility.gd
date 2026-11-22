@@ -42,6 +42,16 @@ func _phone_has(gs: GameStateScript, prefix: String) -> bool:
 	return false
 
 
+## Calibrates UNIT as if it had run a full interval since its last
+## calibration, so the result counts as interval evidence.
+func _calibrate_after_interval(gs: GameStateScript, performed_by: String = "") -> Dictionary:
+	var unit: DriftingSensor = gs.get_sensor(UNIT)
+	unit.last_cal_day = DAY - unit.cal_interval_days
+	if performed_by == "":
+		return gs.calibrate(UNIT)
+	return gs.calibrate(UNIT, performed_by)
+
+
 ## Raises credibility to the contract's offer band, which offers the contract.
 func _reach_offer(gs: GameStateScript) -> void:
 	var bands: Array[Dictionary] = gs._cred_bands()
@@ -141,6 +151,7 @@ func test_overdue_standard_used_costs_more() -> String:
 
 
 func test_band_text() -> String:
+	var saved: float = GameClock.elapsed_days
 	var gs: GameStateScript = _make_state()
 	var bands: Array[Dictionary] = gs._cred_bands()
 	var problem: String = ""
@@ -156,6 +167,7 @@ func test_band_text() -> String:
 	if problem == "" and gs.credibility_text() != str(bands[-1]["name"]).to_upper():
 		problem = "The top band shows its name alone, got '%s'." % gs.credibility_text()
 	gs.free()
+	GameClock.elapsed_days = saved
 	return problem
 
 
@@ -171,19 +183,25 @@ func test_contract_offer_run_and_reset() -> String:
 		problem = "Reaching a new band must be announced on the phone."
 	if problem == "" and not _phone_has(gs, "OIRM CONTRACT offered"):
 		problem = "The offer must be posted on the phone."
-	gs.calibrate(UNIT)
-	gs.calibrate(UNIT)
+	_calibrate_after_interval(gs)
+	_calibrate_after_interval(gs)
 	if problem == "" and gs.contract_run != 2:
 		problem = "Two on-time traceable calibrations must count 2, got %d." % gs.contract_run
-	gs.calibrate(UNIT, "Manager")
+	if problem == "" and gs.contract_text() != "OIRM CONTRACT: 2 of %d on time" % needed:
+		problem = "The phone must show the run, got '%s'." % gs.contract_text()
+	# Calibrating again within the same interval neither counts nor breaks the run.
+	gs.calibrate(UNIT)
+	if problem == "" and gs.contract_run != 2:
+		problem = "A repeat within the interval must not count, got %d." % gs.contract_run
+	_calibrate_after_interval(gs, "Manager")
 	if problem == "" and gs.contract_run != 2:
 		problem = "The Manager's calibration must not count toward the run, got %d." % gs.contract_run
 	gs.get_sensor(UNIT).cal_due_day = DAY - 1
-	gs.calibrate(UNIT)
+	_calibrate_after_interval(gs)
 	if problem == "" and (gs.contract_run != 0 or not _phone_has(gs, "OIRM CONTRACT: run restarted (late calibration)")):
 		problem = "A late calibration must restart the run, got %d." % gs.contract_run
 	for i: int in needed:
-		gs.calibrate(UNIT)
+		_calibrate_after_interval(gs)
 	if problem == "" and gs.contract_state != "complete":
 		problem = "%d on-time calibrations in a row must complete the contract, state '%s'." % [needed, gs.contract_state]
 	if problem == "" and not gs.bram_catalog().has(HB700):
@@ -225,6 +243,79 @@ func test_contract_standard_discount_and_takeover() -> String:
 	var tur: float = float(gs.calibration_budget(DOME).get("tur", 0.0))
 	if problem == "" and tur < 4.0:
 		problem = "Against the HB-700 the dome gauge's TUR must reach 4:1, got %s." % tur
+	gs.free()
+	GameClock.elapsed_days = saved
+	return problem
+
+
+func test_contract_untraceable_restarts_run() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	_reach_offer(gs)
+	_calibrate_after_interval(gs)
+	gs.get_sensor(UNIT_STANDARD).cal_due_day = DAY - 1  # on time, but against an overdue standard
+	_calibrate_after_interval(gs)
+	var run: int = gs.contract_run
+	var restarted: bool = _phone_has(gs, "OIRM CONTRACT: run restarted (not traceable)")
+	gs.free()
+	GameClock.elapsed_days = saved
+	if run != 0 or not restarted:
+		return "An on-time calibration that is not traceable must restart the run, got %d." % run
+	return ""
+
+
+## A unit that fell due while its standard was at OIRM is not charged until
+## the audit after the standard came back has passed (Vance's grace).
+func test_overdue_excused_through_oirm_grace() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var problem: String = ""
+	var per: int = _points(gs, "overdue_points_per_instrument_day")
+	gs.change_credibility(50)
+	var sent: int = DAY - 8
+	var back: int = DAY - 2
+	var unit: DriftingSensor = gs.get_sensor(UNIT)
+	unit.cal_due_day = DAY - 5  # fell due while the standard was away
+	gs.oirm_trips.append({ "standard_id": UNIT_STANDARD, "sent_day": sent, "return_day": back, "courier": true })
+	var deadline: int = gs.next_audit_day(back)
+	var before: int = gs.credibility
+	for day: int in range(DAY, deadline + 1):
+		gs._charge_overdue_credibility(day)
+	if gs.credibility != before:
+		problem = "No charge through the audit after the standard came back (day %d), got %d from %d." % [deadline, gs.credibility, before]
+	before = gs.credibility
+	gs._charge_overdue_credibility(deadline + 1)
+	if problem == "" and gs.credibility != before + per:
+		problem = "The morning after that audit the unit must be charged, got %d from %d." % [gs.credibility, before]
+	# A unit that fell due before the trip is not excused.
+	unit.cal_due_day = sent - 1
+	before = gs.credibility
+	gs._charge_overdue_credibility(DAY)
+	if problem == "" and gs.credibility != before + per:
+		problem = "A unit due before the trip must be charged, got %d from %d." % [gs.credibility, before]
+	gs.free()
+	GameClock.elapsed_days = saved
+	return problem
+
+
+## Buying the HB-700 with no WD-1 puts the dome gauge in service fresh,
+## not already overdue.
+func test_contract_standard_without_wd1() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var problem: String = ""
+	var dome: DriftingSensor = gs.get_sensor(DOME)
+	dome.cal_due_day = 0
+	gs.contract_state = "complete"
+	if gs.is_in_service(DOME):
+		problem = "The test needs the dome gauge out of service before the purchase."
+	if problem == "" and gs.buy_standard(HB700) != "":
+		problem = "Could not buy the HB-700: %s" % gs.standard_purchase_problem(HB700)
+	var today: int = GameClock.get_day_index()
+	if problem == "" and (not gs.is_in_service(DOME) or dome.calibrated_by != HB700):
+		problem = "The dome gauge must go into service against the HB-700."
+	if problem == "" and (dome.cal_due_day <= today or dome.is_overdue(today)):
+		problem = "The dome gauge must start in date, due day %d on day %d." % [dome.cal_due_day, today]
 	gs.free()
 	GameClock.elapsed_days = saved
 	return problem

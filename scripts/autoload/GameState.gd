@@ -984,8 +984,10 @@ func buy_standard(standard_id: String) -> String:
 		for unit_id: Variant in takes_over:
 			var unit: DriftingSensor = get_sensor(str(unit_id))
 			if unit != null and unit.role == "unit" and unit.calibrated_by != standard_id:
+				var was_in_service: bool = is_in_service(str(unit_id))
 				unit.calibrated_by = standard_id
-				taken.append(str(unit_id))
+				if was_in_service:
+					taken.append(str(unit_id))
 	for id: String in all_unit_ids():
 		var unit: DriftingSensor = sensors[id]
 		if unit.calibrated_by != standard_id or id in taken:
@@ -1006,6 +1008,7 @@ func buy_standard(standard_id: String) -> String:
 	post_phone(text)
 	if standard_id == contract_standard_id() and contract_state == "complete":
 		contract_state = "fulfilled"
+		credibility_changed.emit(credibility)
 	upgrades_changed.emit()
 	oirm_changed.emit()
 	return ""
@@ -1210,14 +1213,32 @@ func _credibility_after_audit(report: Dictionary) -> void:
 ## little: units in service and standards here (not at OIRM), except units
 ## excused because their standard was away when they fell due.
 func _charge_overdue_credibility(day: int) -> void:
-	var excused: Dictionary = _excused_units(day)
 	var count: int = 0
 	for id: String in unit_ids() + standard_ids():
-		if at_oirm.has(id) or excused.has(id):
+		if at_oirm.has(id) or _excused_until_audit(id, day):
 			continue
 		if (sensors[id] as DriftingSensor).is_overdue(day):
 			count += 1
 	change_credibility(count * int(_cred_number("overdue_points_per_instrument_day", -1.0)))
+
+
+## True while a unit fell due with its standard away at OIRM and the audit
+## that gives it until then (the first after the standard came back) has not
+## yet passed: the same grace Vance gives (_excused_units), counted per morning.
+func _excused_until_audit(unit_id: String, day: int) -> bool:
+	var sensor: DriftingSensor = sensors[unit_id]
+	if sensor.role != "unit":
+		return false
+	var due: int = sensor.cal_due_day
+	for trip: Dictionary in oirm_trips:
+		if trip["standard_id"] != sensor.calibrated_by:
+			continue
+		var back: int = int(trip["return_day"])
+		if at_oirm.has(trip["standard_id"]):
+			back = maxi(back, day)  # late, still away
+		if int(trip["sent_day"]) < due and due < back and day <= next_audit_day(back):
+			return true
+	return false
 
 
 ## Using an overdue standard costs more. The contract counts a run of on-time,
@@ -1228,7 +1249,10 @@ func _credibility_after_calibration(record: Dictionary) -> void:
 	if contract_state != "active" or record.get("performed_by", "") == "Manager":
 		return
 	var needed: int = contract_run_needed()
-	if record.get("on_time", false) and record.get("traceable", false):
+	var good: bool = record.get("on_time", false) and record.get("traceable", false)
+	if good and not record.get("interval_evidence", false):
+		return  # a repeat within the same interval: neither counts nor breaks the run
+	if good:
 		contract_run += 1
 		if contract_run >= needed:
 			contract_state = "complete"
@@ -1238,10 +1262,22 @@ func _credibility_after_calibration(record: Dictionary) -> void:
 			upgrades_changed.emit()
 		else:
 			post_phone("OIRM CONTRACT: %d of %d on-time calibrations in a row." % [contract_run, needed])
+		credibility_changed.emit(credibility)
 	elif contract_run > 0:
 		contract_run = 0
 		post_phone("OIRM CONTRACT: run restarted (%s). 0 of %d." % [
 			"late calibration" if not record.get("on_time", false) else "not traceable", needed])
+		credibility_changed.emit(credibility)
+
+
+## The open contract objective for the phone, "" when there is none.
+func contract_text() -> String:
+	match contract_state:
+		"active":
+			return "OIRM CONTRACT: %d of %d on time" % [contract_run, contract_run_needed()]
+		"complete":
+			return "OIRM CONTRACT DONE: %s at Bram's" % get_sensor(contract_standard_id()).short_name.to_upper()
+	return ""
 
 
 func contract_standard_id() -> String:
@@ -1272,6 +1308,7 @@ func _offer_first_contract() -> void:
 		return
 	contract_state = "active"
 	contract_run = 0
+	credibility_changed.emit(credibility)
 	post_phone("OIRM CONTRACT offered: make %d calibrations in a row on time and traceable, and Bram will sell you the %s for %s CR + %d crystal ore (%d %% off)." % [
 		contract_run_needed(), instrument_name(standard), SP811.integer(_discounted(sensor.price_credits)),
 		sensor.price_ore, contract_discount_pct()])

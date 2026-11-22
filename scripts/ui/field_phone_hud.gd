@@ -106,9 +106,10 @@ func set_credits(credits: int) -> void:
 	_credits_label.add_theme_color_override("font_color", COLOR_FAIL if credits < 0 else COLOR_WARN)
 
 
-## e.g. "TRUSTED, 40 % to ACCREDITED" from GameState.credibility_text().
-func set_credibility(text: String) -> void:
-	_credibility_label.text = "CRED: %s" % text
+## e.g. "TRUSTED, 40 % to ACCREDITED" from GameState.credibility_text(), and
+## the open contract objective (GameState.contract_text()) on a second line.
+func set_credibility(text: String, contract: String = "") -> void:
+	_credibility_label.text = "CRED: %s" % text + ("" if contract == "" else "\n" + contract)
 
 
 func set_ore(ore: int) -> void:
