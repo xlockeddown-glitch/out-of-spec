@@ -569,3 +569,9 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -9, 0, 13.2)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/irrigation_junction.glb"
 model_scale = 0.1
+
+[node name="WaterCisternModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.6, 0, 13.2)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/water_cistern.glb"
+model_scale = 0.1
