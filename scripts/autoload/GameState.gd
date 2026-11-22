@@ -24,6 +24,7 @@ enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 const STEERING_ID: String = "rover_steering_encoder"
 const HYGROMETER_ID: String = "hygrometer"
 const TIRE_ID: String = "rover_tire_pressure"
+const THERMOMETER_ID: String = "terrarium_thermometer"
 const SPECIES_TABLE: StringName = &"tarantula_species"
 const ITEMS_TABLE: StringName = &"items"
 const ECONOMY_TABLE: StringName = &"economy"
@@ -461,6 +462,13 @@ func _run_audit(day: int) -> void:
 			fineable_suspects[id] = suspect_units[id]
 	var excused: Dictionary = _excused_units(day)
 	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since, fineable_suspects, excused)
+	# AUD-1T measures the rover tires once the WD-1 has the tire gauge in service.
+	if is_in_service(TIRE_ID):
+		var tire: Dictionary = AuditEngine.tire_check(get_sensor(TIRE_ID).error)
+		report["tire_check"] = tire
+		if tire["violation"]:
+			report["passed"] = false
+			report["total_fine"] = int(report["total_fine"]) + int(tire["fine"])
 
 	if not report["passed"] and not audit_grace_used:
 		_apply_audit_grace(report)
@@ -503,6 +511,9 @@ func _run_audit(day: int) -> void:
 	for id: String in unit_ids():
 		var chain: Dictionary = traceability_chain(id)
 		post_phone(("Chain: %s" if chain["traceable"] else "Chain BROKEN: %s") % chain["text"])
+	# Last before the verdict, so the HUD's short log still shows it.
+	if report.has("tire_check"):
+		post_phone(_tire_check_line(report["tire_check"]))
 	if report.get("warning", false):
 		post_phone("MANAGER: Caught it before Vance got in: %s. One-time favor. Don't make it a habit." % report["waived_names"])
 		post_phone("VANCE: Warning issued. Next time it's a fine.")
@@ -518,6 +529,19 @@ func _run_audit(day: int) -> void:
 	_update_clean_audit_gate(report)
 	audit_log.append(report)
 	audit_completed.emit(report)
+
+
+## "AUD-1T: Rover tires 7.2 kPa below set point (limit 6.9 kPa). PETTY FINE 20 CR"
+func _tire_check_line(tire: Dictionary) -> String:
+	var offset: float = tire["offset_kpa"]
+	var where: String = ("at set point" if is_zero_approx(offset)
+		else "%s kPa %s set point" % [SP811.number(absf(offset), 1), "below" if offset < 0.0 else "above"])
+	var text: String = "AUD-1T: Rover tires %s (limit %s kPa)" % [where, SP811.number(tire["limit_kpa"], 1)]
+	if tire.get("waived", false):
+		return text + ". WAIVED (one-time warning)"
+	if tire["violation"]:
+		return text + ". PETTY FINE %s CR" % SP811.integer(tire["fine"])
+	return text + ". Compliant."
 
 
 ## Tier 1 needs one audit with zero violations; a grace warning is not clean
@@ -554,6 +578,11 @@ func _apply_audit_grace(report: Dictionary) -> void:
 				excused.append(_mid_sentence(instrument_name(line["instrument_id"])))
 			else:
 				names.append(_mid_sentence(instrument_name(line["instrument_id"])))
+	var tire: Dictionary = report.get("tire_check", {})
+	var tires_topped: bool = tire.get("violation", false)
+	if tires_topped:
+		tire["fine"] = 0
+		tire["waived"] = true
 	report["total_fine"] = 0
 	report["warning"] = true
 	# "recalibrated the steering encoder and talked Vance out of the lapsed certificate on the PX-1 rotary table"
@@ -562,6 +591,8 @@ func _apply_audit_grace(report: Dictionary) -> void:
 		done.append("recalibrated the " + " and the ".join(names))
 	if not excused.is_empty():
 		done.append("talked Vance out of the lapsed certificate on the " + " and the ".join(excused))
+	if tires_topped:
+		done.append("reset the rover tires")
 	report["waived_names"] = " and ".join(done)
 
 
@@ -871,11 +902,8 @@ func standard_price_text(standard_id: String) -> String:
 	return "%s CR + %d crystal ore" % [SP811.integer(sensor.price_credits), sensor.price_ore]
 
 
-## Buys a Tier 1 standard from Bram (section 1.7). Returns "" on success, or
-## the reason it can't happen. It arrives with a maker's certificate traceable
-## to OIRM, valid for its first interval, and puts the units it calibrates in
-## service (due one interval from today, with no calibration on record yet).
-func buy_standard(standard_id: String) -> String:
+## Why Bram can't sell this standard right now, or "" if he can.
+func standard_purchase_problem(standard_id: String) -> String:
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	if sensor == null or sensor.role != "standard" or sensor.tier != 1:
 		return "Bram doesn't stock that."
@@ -886,6 +914,18 @@ func buy_standard(standard_id: String) -> String:
 	if credits < sensor.price_credits or crystal_ore < sensor.price_ore:
 		return "Costs %s; you have %s CR and %d crystal ore." % [
 			standard_price_text(standard_id), SP811.integer(credits), crystal_ore]
+	return ""
+
+
+## Buys a Tier 1 standard from Bram (section 1.7). Returns "" on success, or
+## the reason it can't happen. It arrives with a maker's certificate traceable
+## to OIRM, valid for its first interval, and puts the units it calibrates in
+## service (due one interval from today, with no calibration on record yet).
+func buy_standard(standard_id: String) -> String:
+	var problem: String = standard_purchase_problem(standard_id)
+	if problem != "":
+		return problem
+	var sensor: DriftingSensor = get_sensor(standard_id)
 	add_credits(-sensor.price_credits)
 	crystal_ore -= sensor.price_ore
 	ore_changed.emit(crystal_ore)
@@ -940,9 +980,28 @@ func _schedule(key: String, fallback: float) -> float:
 
 # --- Molt & silk ----------------------------------------------------------------
 
-## Molt only advances while the hygrometer is within MPE (green or amber).
+## Molt only advances while the hygrometer is within MPE (green or amber),
+## and, once the FM-3 puts it in service, the terrarium thermometer too
+## (Ryan, 2026-11-22: "Like humidity"). Both use the true error, not the display.
 func is_molt_paused() -> bool:
-	return hygrometer.get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE
+	return not molt_pause_causes().is_empty()
+
+
+## The quantities holding the molt back, in display order: "temperature",
+## "relative humidity". Empty while the molt can advance.
+func molt_pause_causes() -> PackedStringArray:
+	var causes: PackedStringArray = []
+	if is_in_service(THERMOMETER_ID) 			and get_sensor(THERMOMETER_ID).get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE:
+		causes.append("temperature")
+	if hygrometer.get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE:
+		causes.append("humidity")
+	return causes
+
+
+## "temperature and humidity out of range", or "" while the molt can advance.
+func molt_pause_reason() -> String:
+	var causes: PackedStringArray = molt_pause_causes()
+	return "" if causes.is_empty() else " and ".join(causes) + " out of range"
 
 
 func is_spool_ready() -> bool:

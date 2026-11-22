@@ -59,7 +59,7 @@ func _process(delta: float) -> void:
 	_led_mat.albedo_color = color
 	_led_mat.emission = color if lit else Color.BLACK
 	if heat_lamp:
-		var climate_bad: bool = GameState.hygrometer.get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE
+		var climate_bad: bool = GameState.is_molt_paused()
 		heat_lamp.light_color = LAMP_HARSH if climate_bad else LAMP_WARM
 
 

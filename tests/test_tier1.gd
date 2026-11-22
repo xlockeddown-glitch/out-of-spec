@@ -222,3 +222,21 @@ func test_tier1_drift_reaches_mpe_in_about_120_days() -> String:
 			problem = "%s reaches its MPE in %.1f days, want about 120." % [id, days]
 	gs.free()
 	return problem
+
+
+## Ryan, 2026-11-22: buying takes two presses. The farm's first press asks
+## standard_purchase_problem(), which must say the same as buy_standard()
+## and charge nothing, so a first press never spends.
+func test_purchase_check_matches_buy_and_charges_nothing() -> String:
+	var gs: GameStateScript = _make_state()
+	var problem: String = ""
+	var first: String = gs.standard_purchase_problem(FM3)
+	if first == "" or first != gs.buy_standard(FM3):
+		problem = "Locked: the check and the purchase must give the same reason, got '%s'." % first
+	gs.tier1_unlocked = true
+	if problem == "" and gs.standard_purchase_problem(FM3) != "":
+		problem = "Unlocked and affordable: the check must pass, got '%s'." % gs.standard_purchase_problem(FM3)
+	elif problem == "" and (gs.credits != 10000 or gs.crystal_ore != 10 or gs.owned_standards.has(FM3)):
+		problem = "The check must not charge or deliver anything."
+	gs.free()
+	return problem

@@ -16,6 +16,10 @@ extends RefCounted
 ##     = suspect_cal_credits.
 ##   - Excused (overdue only because the standard it needs was at OIRM when it
 ##     fell due) = not a violation at that audit. Out of tolerance still is.
+##   - AUD-1T tire check (Ryan, 2026-11-22): the rover tires are filled to
+##     what the tire gauge reads, so they sit at minus its true error. Past
+##     aud1t_tire_limit_kpa = aud1t_tire_credits, a flat petty fine on top of
+##     the gauge's own line. No repeat surcharge.
 ##   - Repeat offences reset after a fully clean audit (GameState).
 ##   - Calibration records since the last audit are listed on the report
 ##     (traceability). They don't change the fine; Week 4 Vance may care.
@@ -94,6 +98,36 @@ static func fine_for(error_ratio: float, out_of_tolerance: bool, overdue: bool, 
 		fine += _cfg("overdue_credits", 50.0)
 	fine += minf(_cfg("repeat_surcharge_credits", 25.0) * prior_offences, _cfg("max_repeat_surcharge_credits", 100.0))
 	return roundi(minf(fine, _cfg("max_fine_credits", 350.0)))
+
+
+## AUD-1T reports tire offsets to 0.1 kPa [PLACEHOLDER: game choice].
+const TIRE_REPORT_KPA: float = 0.1
+
+
+## AUD-1T's tire measurement for a tire gauge whose true error is
+## gauge_error_kpa. Returns offset_kpa (tires minus set point, as AUD-1T
+## reports it to TIRE_REPORT_KPA), limit_kpa, violation and fine. AUD-1T
+## judges the value it reports, so the phone line and the fine always agree.
+static func tire_check(gauge_error_kpa: float) -> Dictionary:
+	# Offset and limit both become whole report steps, rounded half away from
+	# zero by magnitude, and limit_kpa is returned rounded, so the phone shows
+	# exactly the two numbers AUD-1T compares.
+	var steps: int = _report_steps(absf(gauge_error_kpa))
+	var limit_steps: int = _report_steps(_cfg("aud1t_tire_limit_kpa", 6.9))
+	var violation: bool = steps > limit_steps
+	var offset: float = steps * TIRE_REPORT_KPA * (1.0 if gauge_error_kpa < 0.0 else -1.0)
+	return {
+		"offset_kpa": offset,
+		"limit_kpa": limit_steps * TIRE_REPORT_KPA,
+		"violation": violation,
+		"fine": roundi(_cfg("aud1t_tire_credits", 20.0)) if violation else 0,
+	}
+
+
+## A nonnegative kPa value in whole TIRE_REPORT_KPA steps. The 1e-9 nudge
+## keeps decimal half steps such as 0.15 / 0.1 = 1.4999999999999998 rounding up.
+static func _report_steps(kpa: float) -> int:
+	return roundi(kpa / TIRE_REPORT_KPA + 1e-9)
 
 
 static func _cfg(key: String, fallback: float) -> float:

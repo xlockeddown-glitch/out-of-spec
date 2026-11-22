@@ -15,6 +15,7 @@
 [ext_resource type="Script" path="res://scripts/world/uplink_beam.gd" id="13_beam"]
 [ext_resource type="MeshLibrary" path="res://assets/voxels/soil_tiles.tres" id="14_soil"]
 [ext_resource type="Script" path="res://scripts/rover/cab_readout.gd" id="15_readout"]
+[ext_resource type="Script" path="res://scripts/world/parking_pad.gd" id="16_pad"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -76,6 +77,13 @@ albedo_color = Color(0, 0, 0, 1)
 emission_enabled = true
 emission = Color(0.9608, 0.651, 0.1373, 1)
 emission_energy_multiplier = 0.5
+
+[sub_resource type="BoxShape3D" id="CalPadShape"]
+size = Vector3(4, 3, 4)
+
+[sub_resource type="StandardMaterial3D" id="MatCalPad"]
+albedo_color = Color(0.1137, 0.1333, 0.1686, 1)
+roughness = 0.9
 
 [sub_resource type="BoxShape3D" id="BayShape"]
 size = Vector3(5, 3, 5)
@@ -245,6 +253,48 @@ material = SubResource("MatRelay")
 position = Vector3(0, 1.25, 0.12)
 size = Vector3(1.8, 2.3, 0.15)
 material = SubResource("MatCyanGlow")
+
+[node name="FieldCalPad" type="Area3D" parent="WorldView/WorldViewport/World"]
+unique_name_in_owner = true
+position = Vector3(13.5, 0, 15)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("16_pad")
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/FieldCalPad"]
+position = Vector3(0, 1.5, 0)
+shape = SubResource("CalPadShape")
+
+[node name="Slab" type="CSGBox3D" parent="WorldView/WorldViewport/World/FieldCalPad"]
+position = Vector3(0, 0.02, 0)
+size = Vector3(4, 0.04, 4)
+material = SubResource("MatCalPad")
+
+[node name="EdgeN" type="CSGBox3D" parent="WorldView/WorldViewport/World/FieldCalPad"]
+position = Vector3(0, 0.05, -1.9)
+size = Vector3(4, 0.03, 0.2)
+material = SubResource("MatCyanGlow")
+
+[node name="EdgeS" type="CSGBox3D" parent="WorldView/WorldViewport/World/FieldCalPad"]
+position = Vector3(0, 0.05, 1.9)
+size = Vector3(4, 0.03, 0.2)
+material = SubResource("MatCyanGlow")
+
+[node name="EdgeW" type="CSGBox3D" parent="WorldView/WorldViewport/World/FieldCalPad"]
+position = Vector3(-1.9, 0.05, 0)
+size = Vector3(0.2, 0.03, 3.6)
+material = SubResource("MatCyanGlow")
+
+[node name="EdgeE" type="CSGBox3D" parent="WorldView/WorldViewport/World/FieldCalPad"]
+position = Vector3(1.9, 0.05, 0)
+size = Vector3(0.2, 0.03, 3.6)
+material = SubResource("MatCyanGlow")
+
+[node name="Tripod" type="Node3D" parent="WorldView/WorldViewport/World/FieldCalPad"]
+position = Vector3(2.6, 0, -2.6)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/field_survey_tripod.glb"
+model_scale = 0.1
 
 [node name="DropPod" type="Node3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("drone")]
 visible = false

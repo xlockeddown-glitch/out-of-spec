@@ -17,6 +17,8 @@ const TOAST_SECONDS_PER_CHAR: float = 0.04
 @onready var _species_label: Label = %SpeciesLabel
 @onready var _hygro_label: Label = %HygroLabel
 @onready var _hygro_band_label: Label = %HygroBandLabel
+@onready var _temp_label: Label = %TempLabel
+@onready var _temp_band_label: Label = %TempBandLabel
 @onready var _molt_label: Label = %MoltLabel
 @onready var _molt_bar: ProgressBar = %MoltBar
 @onready var _silk_label: Label = %SilkLabel
@@ -52,36 +54,50 @@ func _process(delta: float) -> void:
 
 func _refresh_status() -> void:
 	_clock_label.text = "%s   %s CR" % [GameClock.format_now(), SP811.integer(GameState.credits)]
-	var hygro: DriftingSensor = GameState.hygrometer
-	var reading: String = "--"
-	var ideal: Variant = GameState.get_dome_species().get("ideal_humidity_pct")
-	if typeof(ideal) == TYPE_FLOAT or typeof(ideal) == TYPE_INT:
-		reading = SP811.number(float(ideal) + hygro.observed_error, 1) + " %"
-	_hygro_label.text = "RELATIVE HUMIDITY  %s" % reading
-	var band: int = hygro.get_observed_band()
-	var today: int = GameClock.get_day_index()
-	var due_text: String = ("CAL OVERDUE (due day %d)" % hygro.cal_due_day if hygro.is_overdue(today)
-		else "cal due day %d" % hygro.cal_due_day)
-	_hygro_band_label.text = "%s  ·  %s" % [DriftingSensor.band_label(band), due_text]
-	_hygro_band_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
+	var species: Dictionary = GameState.get_dome_species()
+	_show_reading(GameState.hygrometer, species.get("ideal_humidity_pct"), " %",
+		"RELATIVE HUMIDITY", _hygro_label, _hygro_band_label)
+	# The thermometer reads once the FM-3 is on the colony to calibrate it.
+	var thermo_on: bool = GameState.is_in_service(GameState.THERMOMETER_ID)
+	_temp_label.visible = thermo_on
+	_temp_band_label.visible = thermo_on
+	if thermo_on:
+		_show_reading(GameState.get_sensor(GameState.THERMOMETER_ID), species.get("ideal_temp_c"), " °C",
+			"TEMPERATURE", _temp_label, _temp_band_label)
 
 	_molt_bar.value = GameState.molt_progress
 	match GameState.molt_stage:
 		GameState.MoltStage.MOLTED:
 			_molt_label.text = "MOLTED: optical silk spool ready"
-		GameState.MoltStage.PRE_MOLT:
-			_molt_label.text = "PRE-MOLT  %d %%" % roundi(GameState.molt_progress * 100.0)
 		_:
-			_molt_label.text = ("MOLT PAUSED: humidity out of range" if GameState.is_molt_paused()
-				else "MOLT  %d %%" % roundi(GameState.molt_progress * 100.0))
+			var stage: String = "PRE-MOLT" if GameState.molt_stage == GameState.MoltStage.PRE_MOLT else "MOLT"
+			_molt_label.text = (stage + " PAUSED: " + GameState.molt_pause_reason() if GameState.is_molt_paused()
+				else "%s  %d %%" % [stage, roundi(GameState.molt_progress * 100.0)])
 	_silk_label.text = "SILK SPOOLS %d   RELAY: %s" % [
 		GameState.optical_silk_spools, "OPTICAL SILK" if GameState.relay_slotted else "STOCK"]
 
 
+## Writes "<TITLE>  <ideal + observed error>" and its band and due day. The
+## display shows what the instrument reads; the molt goes by the true error.
+func _show_reading(sensor: DriftingSensor, ideal: Variant, unit: String, title: String,
+		value_label: Label, band_label: Label) -> void:
+	var reading: String = "--"
+	if typeof(ideal) == TYPE_FLOAT or typeof(ideal) == TYPE_INT:
+		reading = SP811.number(float(ideal) + sensor.observed_error, 1) + unit
+	value_label.text = "%s  %s" % [title, reading]
+	var band: int = sensor.get_observed_band()
+	var due_text: String = ("CAL OVERDUE (due day %d)" % sensor.cal_due_day if sensor.is_overdue(GameClock.get_day_index())
+		else "cal due day %d" % sensor.cal_due_day)
+	band_label.text = "%s  ·  %s" % [DriftingSensor.band_label(band), due_text]
+	band_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
+
+
 func _on_terrarium_clicked() -> void:
 	var species: Dictionary = GameState.get_dome_species()
-	_toast("%s: ideal %s °C, relative humidity %s %%. Keep the hygrometer within MPE to progress the molt." % [
-		_field(species, "common_name", "?"), _field(species, "ideal_temp_c", "?"), _field(species, "ideal_humidity_pct", "?")])
+	var which: String = ("the thermometer and hygrometer" if GameState.is_in_service(GameState.THERMOMETER_ID)
+		else "the hygrometer")
+	_toast("%s: ideal %s °C, relative humidity %s %%. Keep %s within MPE to progress the molt." % [
+		_field(species, "common_name", "?"), _field(species, "ideal_temp_c", "?"), _field(species, "ideal_humidity_pct", "?"), which])
 
 
 func _on_spool_clicked() -> void:
@@ -90,8 +106,12 @@ func _on_spool_clicked() -> void:
 
 
 func _on_calibration_recorded(record: Dictionary) -> void:
-	if record.get("instrument_id", "") == GameState.HYGROMETER_ID and not record.get("as_found_in_tolerance", true):
-		_toast("Hygrometer back in tolerance. Molt resumes.")
+	var id: String = record.get("instrument_id", "")
+	if (id == GameState.HYGROMETER_ID or id == GameState.THERMOMETER_ID) 			and not record.get("as_found_in_tolerance", true):
+		var what: String = "Hygrometer" if id == GameState.HYGROMETER_ID else "Thermometer"
+		_toast("%s back in tolerance. %s" % [what,
+			"Molt resumes." if not GameState.is_molt_paused()
+			else "Molt still paused: " + GameState.molt_pause_reason() + "."])
 
 
 ## Dictionary.get() only falls back when the key is missing; alien morphs carry
@@ -121,6 +141,8 @@ func _on_audit_completed(report: Dictionary) -> void:
 			if line.get("suspect", false):
 				why.append("suspect calibration")
 			failing.append("%s (%s)" % [name_text, ", ".join(why)])
+	if report.get("tire_check", {}).get("violation", false):
+		failing.append("rover tires (AUD-1T)")
 	_toast("AUDIT DAY %d: FINE %s CR. %s. Details on the phone log." % [
 		report.get("day", 0), SP811.integer(int(report.get("total_fine", 0))), ", ".join(failing)])
 

@@ -138,6 +138,11 @@ func get_drift_band() -> DriftingSensor.Band:
 	return steering.get_observed_band()
 
 
+## True once the rover has braked to a standstill (the field cal pad needs it).
+func is_stopped() -> bool:
+	return absf(_speed_mps) < 0.05
+
+
 ## Re-emit current state, e.g. right after a HUD connects.
 func broadcast_state() -> void:
 	uplink_changed.emit(has_line_of_sight, link_quality, get_current_lag())
