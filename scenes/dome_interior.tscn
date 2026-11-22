@@ -495,6 +495,13 @@ model_path = "res://assets/voxels/lab_calibration_bench.glb"
 model_scale = 0.1
 greybox = [NodePath("../RightBench")]
 
+[node name="FieldMeterModel" type="Node3D" parent="."]
+position = Vector3(3.7, 0.9, -0.2)
+rotation = Vector3(0, 3.4, 0)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/field_meter_fm3.glb"
+model_scale = 0.025
+
 [node name="EnvChamberCartModel" type="Node3D" parent="."]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 5.2, 0, 0)
 script = ExtResource("5_slot")

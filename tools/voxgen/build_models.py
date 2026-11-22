@@ -716,8 +716,8 @@ GULCH_RIM = ("dry_gulch_straight", "plateau_rim_straight", "plateau_rim_corner")
 # voxels) and two meters at 0.025 m voxels, a new class for bench
 # instruments and hand-held kit. Colors are his
 # generator's own (the bench reuses the cistern's steel and brass; S is SHADOW; no glow, blank
-# screens). Built and turned like the field props. The bench stands in the dome; the meters
-# are not placed yet.
+# screens). Built and turned like the field props. The bench and the field meter stand in the
+# dome; the reference meter is not placed yet.
 METROLOGY_LAB = {
     "lab_calibration_bench": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "E1": "#3A4E5C",
                                "B1": "#D9A13B", "S": SHADOW}, 0.1),

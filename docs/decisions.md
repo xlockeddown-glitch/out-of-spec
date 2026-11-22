@@ -495,3 +495,13 @@ Agent's notes (flagged for Ryan, not his words):
 - The calibration bench replaces the plain table under the cal station (the dome's right bench). The cal station now sits on its ESD mat at 0.9 m, a little left of center, with the silk tray beside it; the bench click area covers the new bench.
 - The chamber cart stands on the floor right of the bench, its door toward the camera. It is set dressing only: it does nothing in play yet.
 - Both are kept off the back wall, so the lab spaces there are unchanged. The two meters are not placed yet.
+
+## 2026-11-22: Field meter on the calibration bench
+
+### Ryan chose
+
+- Put the field meter on the calibration bench next: "Yes, place it".
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The FM-3 lies face up on the mat at the bench's rear right, behind the silk tray, turned a little off square. It is at true size (0.15 m × 0.25 m), so it reads as a small yellow shape from the default camera. Set dressing only; the reference meter is not placed yet.
