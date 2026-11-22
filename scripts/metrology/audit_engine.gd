@@ -12,6 +12,8 @@ extends RefCounted
 ##   - Either one is a violation: add
 ##     min(repeat_surcharge_credits * prior_offences, max_repeat_surcharge_credits)
 ##     once, cap the instrument's total at max_fine_credits, round to whole credits.
+##   - Suspect (a recall flagged the unit's calibration and it was not redone)
+##     = suspect_cal_credits.
 ##   - Repeat offences reset after a fully clean audit (GameState).
 ##   - Calibration records since the last audit are listed on the report
 ##     (traceability). They don't change the fine; Week 4 Vance may care.
@@ -22,7 +24,10 @@ const CONFIG_TABLE: StringName = &"sensor_drift_config"
 ## sensors: instrument_id -> DriftingSensor
 ## prior_offences: instrument_id -> int (earlier audits that fined it)
 ## cal_records: calibration records since the last audit
-static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, cal_records: Array[Dictionary]) -> Dictionary:
+## suspect_ids: instrument_id -> recall day, for calibrations a recall made
+## suspect that have not been redone
+static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, cal_records: Array[Dictionary],
+		suspect_ids: Dictionary = {}) -> Dictionary:
 	var lines: Array[Dictionary] = []
 	var total_fine: int = 0
 	var any_violation: bool = false
@@ -34,9 +39,10 @@ static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, 
 		var repeats: int = int(prior_offences.get(instrument_id, 0))
 		var out_of_tolerance: bool = band == DriftingSensor.Band.OUT_OF_TOLERANCE
 		var overdue: bool = sensor.is_overdue(day)
-		var violation: bool = out_of_tolerance or overdue
+		var suspect: bool = suspect_ids.has(instrument_id)
+		var violation: bool = out_of_tolerance or overdue or suspect
 		any_violation = any_violation or violation
-		var fine: int = fine_for(ratio, out_of_tolerance, overdue, repeats) if violation else 0
+		var fine: int = fine_for(ratio, out_of_tolerance, overdue, repeats, suspect) if violation else 0
 		total_fine += fine
 		lines.append({
 			"instrument_id": instrument_id,
@@ -47,6 +53,7 @@ static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, 
 			"band": band,
 			"out_of_tolerance": out_of_tolerance,
 			"overdue": overdue,
+			"suspect": suspect,
 			"due_day": sensor.cal_due_day,
 			"violation": violation,
 			"prior_offences": repeats,
@@ -61,12 +68,16 @@ static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, 
 		"passed": not any_violation,
 		"cal_records": cal_records.size(),
 		"cal_fails_found": cal_records.filter(func(r: Dictionary) -> bool: return not r.get("as_found_in_tolerance", true)).size(),
+		"suspect_units": suspect_ids.size(),
 	}
 
 
 ## Fine in credits for one instrument with at least one violation.
-static func fine_for(error_ratio: float, out_of_tolerance: bool, overdue: bool, prior_offences: int) -> int:
+static func fine_for(error_ratio: float, out_of_tolerance: bool, overdue: bool, prior_offences: int,
+		suspect: bool = false) -> int:
 	var fine: float = 0.0
+	if suspect:
+		fine += _cfg("suspect_cal_credits", 75.0)
 	if out_of_tolerance:
 		fine += _cfg("base_credits", 50.0) + _cfg("credits_per_excess_ratio", 100.0) * maxf(error_ratio - 1.0, 0.0)
 	if overdue:

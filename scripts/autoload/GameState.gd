@@ -16,6 +16,8 @@ signal drop_pod_changed(present: bool)
 signal ore_changed(ore: int)
 signal fissures_changed
 signal upgrades_changed
+## A standard left on, or came back from, the OIRM drop pod (milestone 2).
+signal oirm_changed
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -72,6 +74,22 @@ var last_cal_records: Dictionary = {}
 ## traceable calibration. The next bench pass then can't lengthen the interval,
 ## so a remote zero can't hide a FAIL from the interval logic.
 var _untraceable_since_cal: Dictionary = {}
+
+# --- OIRM and traceability (milestone 2) ---
+## standard_id -> its current OIRM certificate (see _issue_certificate).
+var certificates: Dictionary = {}
+## Every certificate issued, oldest first, founding stock included.
+var certificate_log: Array[Dictionary] = []
+## standard_id -> the audit day it comes back on the drop pod.
+var at_oirm: Dictionary = {}
+## Unit id -> day a recall made its calibration suspect. A traceable
+## recalibration clears it; Vance fines what is left at the audit.
+var suspect_units: Dictionary = {}
+## Audits in a row with no violations (a grace warning breaks the streak).
+var clean_audit_streak: int = 0
+## Tier 1 equipment gate: the first audit with zero violations (Q19).
+var tier1_unlocked: bool = false
+var _next_certificate_number: int = 1
 
 ## Credits (MegaCorp scrip). Fines come out of this; can go negative.
 var credits: int = 0
@@ -150,6 +168,7 @@ func build_registry() -> void:
 		sensors[id] = sensor
 	steering = sensors.get(STEERING_ID)
 	hygrometer = sensors.get(HYGROMETER_ID)
+	_issue_founding_certificates()
 	if steering == null or hygrometer == null:
 		push_error("GameState: %s needs %s and %s." % [DRIFT_TABLE, STEERING_ID, HYGROMETER_ID])
 
@@ -226,6 +245,15 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 			"reason": "TUR %s:1 is under the %s:1 floor. The standard is not good enough for this instrument." % [
 				SP811.number(budget["tur"], 1), SP811.number(CalUncertainty.tur_floor(), 0)],
 		}
+	if not budget.is_empty() and at_oirm.has(budget["standard_id"]):
+		return {
+			"instrument_id": instrument_id,
+			"refused": true,
+			"standard_id": budget["standard_id"],
+			"tur": budget["tur"],
+			"reason": "%s is at OIRM until the day %d drop pod." % [
+				instrument_name(budget["standard_id"], true), at_oirm[budget["standard_id"]]],
+		}
 	var standard: DriftingSensor = get_sensor(budget["standard_id"]) if not budget.is_empty() else null
 	var today: int = GameClock.get_day_index()
 	var on_time: bool = not sensor.is_overdue(today)
@@ -244,7 +272,10 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 	# A pass only counts as interval evidence if the instrument has run at
 	# least half its interval since the last calibration, so re-calibrating
 	# the same day can't farm longer intervals or erase a shortened one.
-	var traceable: bool = standard != null
+	# A link in the chain needs a standard that was in date that day (section 1.7);
+	# with an overdue standard the zero adjusts the unit but is not a calibration.
+	var standard_overdue: bool = standard.is_overdue(today) if standard else false
+	var traceable: bool = standard != null and not standard_overdue
 	var previous_interval: int = sensor.cal_interval_days
 	var days_in_service: int = today - sensor.last_cal_day if sensor.last_cal_day >= 0 else previous_interval
 	var enough_service: bool = days_in_service >= ceili(previous_interval / 2.0)
@@ -254,6 +285,7 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 		enough_service = false
 		_untraceable_since_cal.erase(instrument_id)
 	if traceable:
+		suspect_units.erase(instrument_id)  # redone after a recall
 		if result == CalUncertainty.FAIL:
 			sensor.cal_interval_days = maxi(int(_interval_cfg("min_days", 2.0)),
 				previous_interval - int(_interval_cfg("shorten_days", 2.0)))
@@ -287,8 +319,10 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 		"result": result,
 		"traceable": traceable,
 		"bench_minutes": bench_minutes,
-		"standard_overdue": standard.is_overdue(today) if standard else false,
-		# Set by a recall (milestone 2) if the standard is later found out of tolerance.
+		"standard_overdue": standard_overdue,
+		"standard_certificate": certificates.get(standard.instrument_id, {}).get("id", "") if standard else "",
+		# Set by recall() if the standard is later found out of tolerance and
+		# correcting for its error changes this result.
 		"suspect": false,
 	}
 	cal_log.append(record)
@@ -358,11 +392,14 @@ func _run_audit(day: int) -> void:
 	var since: Array[Dictionary] = []
 	since.assign(cal_log.slice(_cal_index_at_last_audit))
 	_cal_index_at_last_audit = cal_log.size()
-	# Standards are not audited until OIRM certificates land (milestone 2).
+	# Standards on this pod come back (and are certified) before Vance inspects.
+	_receive_oirm_returns(day)
+	# Units and standards; a standard away at OIRM is not here to inspect.
 	var audited: Dictionary = {}
-	for id: String in unit_ids():
-		audited[id] = sensors[id]
-	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since)
+	for id: String in unit_ids() + standard_ids():
+		if not at_oirm.has(id):
+			audited[id] = sensors[id]
+	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since, suspect_units)
 
 	if not report["passed"] and not audit_grace_used:
 		_apply_audit_grace(report)
@@ -387,6 +424,8 @@ func _run_audit(day: int) -> void:
 			sensor.format_value(line["as_found"]), SP811.number(line["ratio"], 3), DriftingSensor.band_label(line["band"])]
 		if line["overdue"]:
 			label += ", OVERDUE (due day %d)" % line["due_day"]
+		if line.get("suspect", false):
+			label += ", SUSPECT CAL (recalled, not redone)"
 		if line.get("waived", false):
 			label += ": WAIVED (one-time warning)"
 		elif line["violation"]:
@@ -395,6 +434,9 @@ func _run_audit(day: int) -> void:
 		post_phone(label)
 	post_phone("Traceability: %d calibration record(s) since last audit, %d found out of tolerance." % [
 		report["cal_records"], report["cal_fails_found"]])
+	for id: String in unit_ids():
+		var chain: Dictionary = traceability_chain(id)
+		post_phone(("Chain: %s" if chain["traceable"] else "Chain BROKEN: %s") % chain["text"])
 	if report.get("warning", false):
 		post_phone("MANAGER: Caught %s before Vance got in and recalibrated. One-time favor. Don't make it a habit." % report["waived_names"])
 		post_phone("VANCE: Warning issued. Next time it's a fine.")
@@ -407,8 +449,22 @@ func _run_audit(day: int) -> void:
 		var fines: Array[Dictionary] = DataManager.get_records(DISPATCH_TABLE, "audit_fines")
 		var footer: String = fines.pick_random().get("snarky_footer", "") if not fines.is_empty() else ""
 		post_phone("TOTAL FINE %s CR. Balance %s CR. %s" % [SP811.integer(report["total_fine"]), SP811.integer(credits), footer])
+	_update_clean_audit_gate(report)
 	audit_log.append(report)
 	audit_completed.emit(report)
+
+
+## Tier 1 needs one audit with zero violations; a grace warning is not clean
+## (Q19). The streak is kept for the Tier 3 gate (milestone 3).
+func _update_clean_audit_gate(report: Dictionary) -> void:
+	if not report["passed"]:
+		clean_audit_streak = 0
+		return
+	clean_audit_streak += 1
+	report["clean"] = true
+	if not tier1_unlocked:
+		tier1_unlocked = true
+		post_phone("VANCE: First clean audit on file. Tier 1 equipment is cleared for purchase.")
 
 
 ## Turns this audit's fines into a one-time warning. The manager calibrates
@@ -421,7 +477,9 @@ func _apply_audit_grace(report: Dictionary) -> void:
 		if line["violation"]:
 			# The manager uses the bench standard; if the TUR refuses, they zero it
 			# without one (untraceable) rather than claim a calibration that didn't happen.
-			if calibrate(line["instrument_id"], "Manager").get("refused", false):
+			# Standards are only calibrated at OIRM, so theirs are waived as they are.
+			if get_sensor(line["instrument_id"]).role != "standard" \
+					and calibrate(line["instrument_id"], "Manager").get("refused", false):
 				calibrate(line["instrument_id"], "Manager", false)
 			line["fine"] = 0
 			line["waived"] = true
@@ -429,6 +487,175 @@ func _apply_audit_grace(report: Dictionary) -> void:
 	report["total_fine"] = 0
 	report["warning"] = true
 	report["waived_names"] = " and the ".join(names).insert(0, "the ")
+
+
+# --- OIRM, certificates, recall (milestone 2) -------------------------------------
+
+## Tier 0 standards start with a certificate from the colony's founding stock
+## (section 1.7 [ASSUMPTION]): issued day 0, due at the end of the first interval.
+func _issue_founding_certificates() -> void:
+	certificates.clear()
+	certificate_log.clear()
+	at_oirm.clear()
+	suspect_units.clear()
+	_next_certificate_number = 1
+	for id: String in standard_ids():
+		sensors[id].last_cal_day = 0
+		_issue_certificate(id, 0, null, null, true)
+
+
+## Records a new OIRM certificate for `standard_id` from its current due day.
+## as_found / as_left are null on a founding certificate (no measurement on file).
+func _issue_certificate(standard_id: String, day: int, as_found: Variant, as_left: Variant, founding: bool) -> Dictionary:
+	var sensor: DriftingSensor = sensors[standard_id]
+	var cert: Dictionary = {
+		"id": "OIRM-%04d" % _next_certificate_number,
+		"standard_id": standard_id,
+		"issuer": "OIRM",
+		"day": day,
+		"due_day": sensor.cal_due_day,
+		"as_found": as_found,
+		"as_left": as_left,
+		"as_found_in_tolerance": as_found == null or absf(float(as_found)) <= sensor.mpe,
+		"expanded_uncertainty": sensor.certificate_uncertainty,
+		"k": sensor.certificate_k,
+		"founding": founding,
+	}
+	_next_certificate_number += 1
+	certificates[standard_id] = cert
+	certificate_log.append(cert)
+	return cert
+
+
+## The next audit day after `day` (when the drop pod is back).
+func next_audit_day(day: int) -> int:
+	var cadence: int = maxi(int(_schedule("cadence_days", 5.0)), 1)
+	return (day / cadence + 1) * cadence
+
+
+func oirm_fee() -> int:
+	return int(DataManager.get_number(DRIFT_TABLE, "oirm/fee_credits", 150.0))
+
+
+## Puts a standard on the drop pod to OIRM. Needs the pod on the ground and
+## the fee. Returns { "ok": bool, "reason": String, "return_day": int }.
+func send_to_oirm(standard_id: String) -> Dictionary:
+	var sensor: DriftingSensor = get_sensor(standard_id)
+	if sensor == null or sensor.role != "standard":
+		return { "ok": false, "reason": "Only reference standards go to OIRM." }
+	if at_oirm.has(standard_id):
+		return { "ok": false, "reason": "Already at OIRM until the day %d drop pod." % at_oirm[standard_id] }
+	if not drop_pod_present:
+		return { "ok": false, "reason": "No drop pod on the pad. It lands on audit mornings." }
+	var fee: int = oirm_fee()
+	if credits < fee:
+		return { "ok": false, "reason": "OIRM charges %s CR; balance %s CR." % [SP811.integer(fee), SP811.integer(credits)] }
+	add_credits(-fee)
+	var return_day: int = next_audit_day(GameClock.get_day_index())
+	at_oirm[standard_id] = return_day
+	post_phone("OIRM: %s loaded on the drop pod. Fee %s CR. Back on the day %d pod; nothing can be calibrated against it until then." % [
+		instrument_name(standard_id, true), SP811.integer(fee), return_day])
+	oirm_changed.emit()
+	return { "ok": true, "reason": "", "return_day": return_day }
+
+
+func _receive_oirm_returns(day: int) -> void:
+	for id: Variant in at_oirm.keys():
+		if int(at_oirm[id]) <= day:
+			oirm_calibrate(str(id), day)
+
+
+## OIRM's calibration of a returned standard: measured against a perfect
+## reference, adjusted, and certified. Its interval is unchanged
+## [ASSUMPTION]. An out-of-tolerance as-found starts a recall.
+func oirm_calibrate(standard_id: String, day: int) -> Dictionary:
+	var sensor: DriftingSensor = sensors[standard_id]
+	at_oirm.erase(standard_id)
+	var previous: Dictionary = certificates.get(standard_id, {})
+	var zeroed: Dictionary = sensor.zero(0.0)
+	sensor.cal_due_day = day + sensor.cal_interval_days
+	sensor.last_cal_day = day
+	var cert: Dictionary = _issue_certificate(standard_id, day, zeroed["as_found"], zeroed["as_left"], false)
+	post_phone("OIRM: %s returned with certificate %s. As-found %s (%s). Due day %d." % [
+		instrument_name(standard_id, true), cert["id"], sensor.format_value(zeroed["as_found"], 3),
+		"in tolerance" if cert["as_found_in_tolerance"] else "OUT OF TOLERANCE", cert["due_day"]])
+	if not cert["as_found_in_tolerance"]:
+		var flagged: Array[Dictionary] = recall(standard_id, zeroed["as_found"], int(previous.get("day", 0)))
+		var names: PackedStringArray = []
+		for record: Dictionary in flagged:
+			names.append("%s (day %d)" % [instrument_name(record["instrument_id"]), record["day"]])
+		post_phone("RECALL: %d calibration(s) made with it are suspect%s. Redo them before the next audit." % [
+			flagged.size(), (": " + ", ".join(names)) if not names.is_empty() else ""])
+	oirm_changed.emit()
+	return cert
+
+
+## Reverse traceability (section 1.6). `standard_error` is the standard's as-found
+## error. Every traceable calibration made with it from `since_day` on is
+## re-judged with its as-found corrected by that error; it becomes suspect
+## only if the result changes (impact threshold). A suspect calibration of
+## another standard cascades to that standard's own calibrations. Returns
+## the records flagged, cascade included.
+func recall(standard_id: String, standard_error: float, since_day: int) -> Array[Dictionary]:
+	var flagged: Array[Dictionary] = []
+	var today: int = GameClock.get_day_index()
+	for record: Dictionary in cal_log:
+		if record.get("standard_id", "") != standard_id or record.get("suspect", false):
+			continue
+		if int(record["day"]) < since_day or not record.get("traceable", false):
+			continue
+		var corrected: float = float(record["as_found"]) + standard_error
+		var rejudged: String = CalUncertainty.classify(corrected, record["mpe"], record["acceptance_limit"])
+		if rejudged == record["result"]:
+			continue
+		record["suspect"] = true
+		record["suspect_result"] = rejudged
+		record["recalled_by"] = standard_id
+		flagged.append(record)
+		var instrument: DriftingSensor = get_sensor(record["instrument_id"])
+		if instrument and instrument.role == "standard":
+			flagged.append_array(recall(record["instrument_id"], standard_error, int(record["day"])))
+		else:
+			suspect_units[record["instrument_id"]] = today
+	return flagged
+
+
+## Traceability of an instrument's readings right now (section 1.7), for the
+## bench and the audit. { "traceable": bool, "text": String }; text reads like
+## "Steering encoder <- Rotary table (OIRM-0001, day 3) <- OIRM" or says where it breaks.
+func traceability_chain(instrument_id: String) -> Dictionary:
+	var sensor: DriftingSensor = get_sensor(instrument_id)
+	if sensor == null:
+		return { "traceable": false, "text": "%s: unknown instrument" % instrument_id }
+	var today: int = GameClock.get_day_index()
+	var name: String = instrument_name(instrument_id)
+	if sensor.role == "standard":
+		if at_oirm.has(instrument_id):
+			return { "traceable": false, "text": "%s: at OIRM until day %d" % [name, at_oirm[instrument_id]] }
+		var cert: Dictionary = certificates.get(instrument_id, {})
+		if cert.is_empty():
+			return { "traceable": false, "text": "%s: no OIRM certificate" % name }
+		if sensor.is_overdue(today):
+			return { "traceable": false, "text": "%s ← %s lapsed (due day %d)" % [name, cert["id"], cert["due_day"]] }
+		return { "traceable": true, "text": "%s ← %s (due day %d) ← OIRM" % [name, cert["id"], cert["due_day"]] }
+	var record: Dictionary = _last_traceable_record(instrument_id)
+	if record.is_empty():
+		return { "traceable": false, "text": "%s: no traceable calibration on record" % name }
+	var standard_name: String = instrument_name(record["standard_id"])
+	var link: String = "%s ← %s (%s, day %d)" % [name, standard_name, record.get("standard_certificate", "?"), record["day"]]
+	if suspect_units.has(instrument_id):
+		return { "traceable": false, "text": "%s: SUSPECT, recalled day %d" % [link, suspect_units[instrument_id]] }
+	if sensor.is_overdue(today):
+		return { "traceable": false, "text": "%s: calibration lapsed (due day %d)" % [link, sensor.cal_due_day] }
+	return { "traceable": true, "text": link + " ← OIRM" }
+
+
+func _last_traceable_record(instrument_id: String) -> Dictionary:
+	for i: int in range(cal_log.size() - 1, -1, -1):
+		var record: Dictionary = cal_log[i]
+		if record["instrument_id"] == instrument_id and record.get("traceable", false):
+			return record
+	return {}
 
 
 # --- Ore and Bram ----------------------------------------------------------------
