@@ -246,15 +246,15 @@ Ryan's ideas (his message, lightly condensed):
 - The lab runs more efficiently and makes more money when it passes audits and keeps things from going overdue, or at least from being used overdue.
 - That builds **credibility**, which leads to **contracts** that offer discounted high-end or even intrinsic calibration standards to use as primary standards.
 - With those standards and new skills, the player can eventually harvest crops **off planet**, using remote-controlled AI rockets and robots.
-- The master auditors at OIRM are a **robot audit team** of SI-powered agents, one each modeled on Claude, Gemini, SpaceXSI and ChatGPT.
+- The master auditors at OIRM are a **robot audit team** of SI-powered agents "from Claude, Gemini, SpaceXSI and ChatGPT".
 
 Ryan chose:
 
-- **Auditor names: "Fictional nods".** The four auditors get original names that wink at the real ones, so the game ships with no real trademarks.
+- **Auditor names: "Fictional nods".** The auditors get original names that wink at the real ones instead of the real product names.
 - **Roadmap: "Credibility first".** The next milestone after the M3a hooks is a credibility score fed by audits and on-time calibrations, plus a first contract offer. Rockets, off-planet harvest and the OIRM audit team come later.
 
 Agent's notes (flagged for Ryan, not his words):
 
-- "Used overdue" suggests credibility drops more for using an overdue instrument than for merely letting it lapse. The calibration log and audit lines already record both, so the score can read them. Weights are [PLACEHOLDER].
-- Intrinsic standards are ones realized from physics rather than calibrated against another standard (for example a Josephson voltage standard or a cesium clock). In game terms they would end a chain at the lab instead of at OIRM; which quantities get one is open.
-- The auditor names, the shape of a contract and the credibility thresholds need Ryan's answers before that milestone is built.
+- "Used overdue" suggests credibility drops more for using an overdue instrument than for merely letting it lapse. Today audit lines record what is overdue at inspection and calibration records flag an overdue standard used for an adjustment; scoring other use of overdue instruments would need new tracking. Weights are [PLACEHOLDER].
+- An intrinsic standard takes its value from an inherent, reproducible physical property (VIM 5.10), for example a Josephson voltage standard or a cesium fountain primary frequency standard; it still needs periodic verification. A game-design proposal: an intrinsic standard could end a chain at the lab instead of at OIRM. Which quantities get one is open.
+- The shape of a contract and the credibility thresholds need Ryan's answers before the credibility milestone is built. The individual auditor names can wait for the OIRM milestone.
