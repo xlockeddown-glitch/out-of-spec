@@ -42,9 +42,29 @@ So most of the new equipment needs **new drifting sensors** to be useful. §1.3 
 
 **[ASSUMPTION]** My proposal for the existing three: the steering encoder and dish azimuth are calibrated against the jig and the tripod, which become "Tier 0" standards with their own drift. The hygrometer gets a "salt-cell kit" Tier 0 standard. All three Tier 0 standards are additions to Ryan's list and need his OK.
 
-### 1.2 Trademarks
+### 1.2 Names (shortlist for Ryan)
 
-The seven real products are trademarked names (Fluke, Mensor, Crystal / Ametek, CDI / Snap-on, and the model numbers). **The game should not ship them.** Below I propose a fictional maker per instrument, named after Mars features so it fits the setting. These are suggestions only, and I have not done a trademark search on them (Q2).
+The seven real products are trademarked names (Fluke, Mensor, Crystal / Ametek, CDI / Snap-on, and the model numbers). **The game should not ship them.** Ryan asked for name ideas from other models; this shortlist came from Claude Fable (2026-11-22). The doc uses the bold entry in each row as a working name until Ryan picks (Q2). No trademark search has been run on any of them; the collision notes are the model's own recall.
+
+| Instrument | Mars-geography style | Maker-surname style | Plain industrial style |
+|---|---|---|---|
+| Handheld meter | **Arsia Fieldworks FM-3** | Vostrikov & Daly VD-24 | Habitat Electric HE-40 |
+| Multi-product calibrator | Pavonis Sourceworks MPC-12 | **Halvorsen-Mbeki HM-3** | Unified Source Works USW-3 |
+| Reference meter | Chryse Precision CP-85 | Okafor & Lindqvist Model 8R | **Longscale Instruments LS-8.5** |
+| Rubidium standard | Noctis Timeworks NT-1 Relay-Lock (consumer brands use "Noctis") | **Qureshi & Hale Rb-87D** | Colony Time & Frequency CTF-10 |
+| Torque standard | Jezero Torque Works JT-250 | Stenmark & Adeyemi SA-4 | **Turnwright TW-6** |
+| Pressure controller | **Hellas Basin Controls HB-700** (Greek firms use "Hellas") | Ferreira & Holt FH-2 | Regulated Atmosphere Co. RAC-16 |
+| Pressure gauge | Isidis Gauge Works IG-30 | **Wren & Dufour WD-1** | Colony Gauge & Valve CGV-7 |
+
+Model numbers avoid well-known real ones (87, 5522, 5730, 3458, 8588, 6270, CPC6050). Names deliberately avoided: Olympus (a real instrument brand), Kasei, Elysium, Utopia, Arcadia, and anything close to "Bureau of Weights and Measures". My first draft used Elysium, so it is dropped.
+
+Institute shortlist (§1.7):
+
+| Full name | Acronym | Where it sits | Collision note |
+|---|---|---|---|
+| **Orbital Institute of Reference Measures** | **OIRM** | A free-flying lab in high Earth orbit, the hand-off point for standards bound for Mars | None known |
+| Terran Primary Standards Office | TPSO | On Earth; certificates lag by months | None known |
+| Relay Station Standards Directorate | RSSD | Aboard the Mars orbital relay; holds transfer standards traceable to Earth | ESA once used the abbreviation |
 
 ### 1.3 Proposed new drifting sensors
 
@@ -58,15 +78,15 @@ All rates, MPEs and intervals are **[PLACEHOLDER]** and would go in `sensor_drif
 | `soil_moisture_probe` | soil moisture, fraction | Hand probe for crops | Crops have `soil_moisture_target` and `tolerance_band`; the prop exists |
 | `drill_torque` | torque, N·m | Rover drill clutch | Depths drills need sub-percent calibration |
 | `relay_timebase` | fractional frequency, dimensionless | Relay mast oscillator | The relay and uplink lag exist |
-| `field_meter_dc` | DC voltage, V | The player's own handheld meter (it is itself a unit under test) | Traceability chain, §1.6 |
+| `field_meter_dc` | DC voltage, V | The player's own handheld meter (it is itself a unit under test) | Traceability chain, §1.7 |
 
 ### 1.4 The seven instruments
 
-The spec column is what the real product claims. The game would give its fictional twin the same numbers only if Ryan agrees (Q3); the alternative is to scale them to the game's MPEs.
+**Decided by Ryan (2026-11-22):** the fictional instruments carry real-life accuracies. Each spec line below is what the real product's maker publishes, with the source in §7. Where no maker sheet could be read, the value stays **[PLACEHOLDER]**.
 
 #### 1. Handheld digital multimeter (Fluke 87V class)
 
-- **In-game name:** Tharsis TX-17 Field Meter **[ASSUMPTION]**
+- **In-game name:** Arsia Fieldworks FM-3 Field Meter **[ASSUMPTION]**
 - **Role:** First tool. Checks the electrical side: the soil moisture probe output, the terrarium thermometer readout chain, and rover battery voltage. It is not a primary reference for anything; it is the workhorse that later gets calibrated by the multi-product calibrator.
 - **Tier / unlock:** Tier 1. Bram sells it for crystal ore and credits after the first audit (price **[PLACEHOLDER]**).
 - **Spec [CITED]:** DC voltage ±(0.05 % of reading + 1 count), 18 °C to 28 °C, per the maker's product page and spec sheet. Resolution 10 µV on the lowest range.
@@ -74,31 +94,31 @@ The spec column is what the real product claims. The game would give its fiction
 
 #### 2. Multi-product calibrator (Fluke 5560A class)
 
-- **In-game name:** Hellas MC-55 Multi-Source Calibrator **[ASSUMPTION]**
-- **Role:** Sources voltage, current and resistance, and simulates temperature sensors, so it calibrates the field meter and the terrarium thermometer's readout. **[ASSUMPTION]**: I have not confirmed the 5560A's thermocouple and RTD simulation in its data sheet; that role needs checking before it is used.
+- **In-game name:** Halvorsen-Mbeki HM-3 Multi-Source Calibrator **[ASSUMPTION]**
+- **Role:** Sources voltage, current and resistance, and simulates temperature sensors, so it calibrates the field meter and the terrarium thermometer's readout. The maker's specification table confirms temperature simulation: 17 thermocouple types and 10 RTD types, best case 0.09 °C (thermocouple) and 0.002 °C (RTD) **[CITED]**.
 - **Tier / unlock:** Tier 2. Kestrel sells it on a solar-flare night, gated on the Instrumentation skill (§2).
-- **Spec [CITED]:** DC voltage 6 µV/V best case, 1 year, 95 % confidence, from the maker's comparison table. That is a marketing summary; the full by-range table is in the maker's specification PDF and has not been read yet.
+- **Spec [CITED]:** DC voltage 6 µV/V best case over 0 V to ±1020 V, 1 year, 95 % confidence, ±5 °C, from the "Best Performance" row of the maker's specification table. That row does not say which range gives the best case or what the floor term is; the full by-range table is in the maker's specification PDF, which could not be read as text (§7). Until it is, per-range values are **[PLACEHOLDER]**.
 - **TUR:** The maker's own table says it supports a 6.5-digit class bench meter at 4:1. Against the field meter's 0.05 % (500 µV/V), the ratio is about 80:1.
 
 #### 3. Reference multimeter (Fluke 8588A class)
 
-- **In-game name:** Syrtis RM-8 Reference Meter **[ASSUMPTION]**
-- **Role:** Top of the electrical chain. It calibrates the multi-product calibrator; nothing in the field needs it directly. It exists so the player can stop shipping the calibrator off-world.
-- **Tier / unlock:** Tier 3. Kestrel, late game. Its own calibration has to go off-world (§1.6).
+- **In-game name:** Longscale LS-8.5 Reference Meter **[ASSUMPTION]**
+- **Role:** Top of the electrical chain. It calibrates the multi-product calibrator; nothing in the field needs it directly. It exists so the player can stop sending the calibrator to OIRM.
+- **Tier / unlock:** Tier 3. Kestrel, late game. Its own calibration goes to OIRM (§1.7).
 - **Spec [CITED]:** 1-year DC voltage relative accuracy 2.7 µV/V at 95 % confidence and 3.5 µV/V at 99 % confidence; 24-hour stability 0.5 µV/V (95 %); 8.5 digits. "Relative" means the uncertainty of the lab standards it was calibrated against is added on top.
 - **TUR:** Against the calibrator's 6 µV/V, the ratio is only about 2:1. That is realistic (top-level standards rarely get 4:1) and a good teaching moment: the game should let a ratio under 4:1 through only with a guard band (§1.5).
 
 #### 4. Rubidium frequency standard (Fluke 910R class)
 
-- **In-game name:** Phobos RB-9 Rubidium Reference **[ASSUMPTION]**
+- **In-game name:** Qureshi & Hale Rb-87D Rubidium Reference **[ASSUMPTION]**
 - **Role:** Calibrates the relay mast timebase. The real one is disciplined by GPS. In game it locks to the orbital satellite **while the relay has line of sight**, and in holdover (LOS blocked) it drifts at its aging rate. That ties a standard's drift to the existing LOS mechanic.
 - **Tier / unlock:** Tier 3. Old Orin teaches it alongside relay beacons for the Basalt Thermal Tunnels.
 - **Spec [CITED]:** Holdover aging under 2 × 10⁻¹² per day (typical) and under 5 × 10⁻¹¹ per month; under 3 × 10⁻¹⁰ over 0 °C to 50 °C. From a reseller's copy of the spec; the maker lists the product as discontinued.
-- **TUR:** Huge against any plausible relay timebase MPE (a crystal oscillator is usually specified around 10⁻⁶ to 10⁻⁸). The game value of this instrument is that it never needs the off-world trip as long as it keeps line of sight.
+- **TUR:** Huge against any plausible relay timebase MPE (a crystal oscillator is usually specified around 10⁻⁶ to 10⁻⁸). The game value of this instrument is that it never rides the drop pod as long as it keeps line of sight (§1.7).
 
 #### 5. Torque standard (CDI 5000 class)
 
-- **In-game name:** Valles TQ-5 Torque Standard **[ASSUMPTION]**
+- **In-game name:** Turnwright TW-6 Torque Standard **[ASSUMPTION]**
 - **Role:** Calibrates the drill clutch (`drill_torque`), Bram's torque wrench, and the robots' grip torque (§3).
 - **Tier / unlock:** Tier 2. Bram, once Instrumentation reaches the gate level. Required before the first robot can be commissioned.
 - **Spec [PLACEHOLDER]:** Sources disagree. Two retailer listings give ±0.25 % of indicated value from 10 % to 100 % of full scale; a manual excerpt gives ±0.5 % for a transducer. The range on one listing is very small (in·ozf) up to 2000 ft·lbf, about 2700 N·m. Ryan picks, or the maker's own sheet settles it (Q4).
@@ -106,7 +126,7 @@ The spec column is what the real product claims. The game would give its fiction
 
 #### 6. Pressure controller (Mensor CPC8000 class)
 
-- **In-game name:** Elysium PC-8 Pressure Controller **[ASSUMPTION]**
+- **In-game name:** Hellas Basin Controls HB-700 Pressure Controller **[ASSUMPTION]**
 - **Role:** Bench reference that generates and holds pressure. Calibrates the field pressure gauge (instrument 7), the dome pressure gauge, and the robots' water tank gauges. It is a bench unit, so it stays in the dome.
 - **Tier / unlock:** Tier 3. Kestrel or Dr. Lin **[ASSUMPTION]**; needs the dome lab bench.
 - **Spec [CITED]:** Accuracy down to 0.008 % of IntelliScale (the maker's name for its reading-based spec); precision 0.004 % of full scale; control stability 0.002 % of span; range −1 bar to 400 bar. Accuracy depends on which internal transducer is fitted.
@@ -114,7 +134,7 @@ The spec column is what the real product claims. The game would give its fiction
 
 #### 7. Digital pressure gauge (Crystal XP2i class)
 
-- **In-game name:** Gale PG-2 Field Pressure Gauge **[ASSUMPTION]**
+- **In-game name:** Wren & Dufour WD-1 Reference Gauge **[ASSUMPTION]**
 - **Role:** Portable reference. Calibrates the rover tire gauge in the field and spot-checks the dome. This is how the player answers AUD-1T's tire checks.
 - **Tier / unlock:** Tier 1. Bram, early.
 - **Spec [CITED]:** ±0.1 % of reading from 20 % to 110 % of range, and ±0.02 % of full scale below 20 % of range (one model's data sheet); the gauge must be zeroed for rated accuracy; the 1-year figure includes temperature and stability on the absolute-pressure model.
@@ -124,13 +144,13 @@ The spec column is what the real product claims. The game would give its fiction
 
 | # | In-game name [ASSUMPTION] | Class | Tier | From | Calibrates | Its own cal comes from |
 |---|---|---|---|---|---|---|
-| 1 | Tharsis TX-17 Field Meter | Handheld meter | 1 | Bram | Soil probe, readout chains, batteries | #2 |
-| 7 | Gale PG-2 Field Pressure Gauge | Pressure gauge | 1 | Bram | Tire, dome pressure | #6, or off-world |
-| 5 | Valles TQ-5 Torque Standard | Torque | 2 | Bram | Drill, wrench, robot grip | Off-world |
-| 2 | Hellas MC-55 Multi-Source Calibrator | Electrical source | 2 | Kestrel | #1, thermometer chain | #3, or off-world |
-| 6 | Elysium PC-8 Pressure Controller | Pressure | 3 | Kestrel or Dr. Lin | #7, dome gauge, robot tanks | Off-world |
-| 3 | Syrtis RM-8 Reference Meter | Reference meter | 3 | Kestrel | #2 | Off-world |
-| 4 | Phobos RB-9 Rubidium Reference | Frequency | 3 | Old Orin | Relay timebase | Orbital lock (LOS) |
+| 1 | Arsia Fieldworks FM-3 Field Meter | Handheld meter | 1 | Bram | Soil probe, readout chains, batteries | #2 |
+| 7 | Wren & Dufour WD-1 Reference Gauge | Pressure gauge | 1 | Bram | Tire, dome pressure | #6, or OIRM |
+| 5 | Turnwright TW-6 Torque Standard | Torque | 2 | Bram | Drill, wrench, robot grip | OIRM |
+| 2 | Halvorsen-Mbeki HM-3 Multi-Source Calibrator | Electrical source | 2 | Kestrel | #1, thermometer chain | #3, or OIRM |
+| 6 | Hellas Basin Controls HB-700 Pressure Controller | Pressure | 3 | Kestrel or Dr. Lin | #7, dome gauge, robot tanks | OIRM |
+| 3 | Longscale LS-8.5 Reference Meter | Reference meter | 3 | Kestrel | #2 | OIRM |
+| 4 | Qureshi & Hale Rb-87D Rubidium Reference | Frequency | 3 | Old Orin | Relay timebase | Relay lock to OIRM time (LOS) |
 
 ### 1.5 TUR in the game
 
@@ -146,12 +166,45 @@ Today `as_found_in_tolerance` is just |as-found| ≤ MPE, with no uncertainty. P
 
 Terminology to keep straight on screen: the game's existing amber **guard band** (0.8 to 1.0 × MPE) is a warning band on the reading. The TUR guard band above is a different thing (it moves the acceptance limit). The bench UI should call the second one "acceptance limit" to avoid two meanings of one word **[ASSUMPTION]**.
 
-### 1.6 The standards drift too, and the traceability chain
+### 1.6 The standards drift too
 
 - Each owned standard is itself a `DriftingSensor` with its own interval, so the same code drives it. Its MPE is its spec.
-- A standard can only be calibrated by a better one (TUR rules above), up the chain in the §1.4 summary.
-- **Off-world calibration:** a standard with nothing above it rides Vance's drop pod to orbit and comes back on the next audit (5 d out of service, cost **[PLACEHOLDER]**). That makes buying a higher standard a real trade-off: credits now vs. downtime later.
+- A standard can only be calibrated by a better one (TUR rules above), up the chain in the §1.4 summary, and at the top by the institute (§1.7).
 - **Reverse traceability (recall):** if a standard is found out of tolerance at its own calibration, every calibration it did since its last good one is flagged `suspect` in the log. Vance fines suspect calibrations that were not redone before the audit (fine **[PLACEHOLDER]**). This is the main hook for robots too (§3.4).
+
+### 1.7 The national metrology institute and traceability
+
+Ryan asked for "an organization like NIST". Working name: **Orbital Institute of Reference Measures (OIRM)** (§1.2 has the alternatives). Real-world model: a national metrology institute realizes the SI units and calibrates other labs' reference standards, issuing certificates that state the value found and its uncertainty.
+
+**In the fiction [ASSUMPTION]:** OIRM is a lab in Earth orbit that holds the colony's primary references. Inspector Vance works for the colony authority, not OIRM, but enforces OIRM traceability in audits. Vance's drop pod is the courier.
+
+**What traceability means in game.** An instrument is *traceable* only if there is an unbroken chain of calibrations from it up to OIRM, where every link:
+
+1. was done with a standard that was itself in date and in tolerance on that day;
+2. has a stated expanded uncertainty and a TUR that passed §1.5;
+3. is recorded in `cal_log` (the record already has `day` and `performed_by`; §4 adds `standard_id`, `standard_uncertainty`, `tur`).
+
+The game can compute this by walking `standard_id` links in the log back to an OIRM certificate. A link breaks if the standard was overdue, out of tolerance, or later recalled (§1.6). The bench and the audit screen show the chain, for example: tire gauge ← WD-1 gauge ← HB-700 controller ← OIRM certificate.
+
+**Sending a standard to OIRM.**
+
+- Only top-of-chain standards go (the summary table's "own cal comes from" column says OIRM).
+- The standard rides Vance's drop pod after an audit and returns on the next one: out of service for one audit cycle (5 d). Fee **[PLACEHOLDER]** credits.
+- It comes back with an **OIRM certificate**: an item with the standard's id, as-found and as-left values, the expanded uncertainty and coverage factor, the date and a due date. The certificate uncertainty becomes the bottom of that standard's budget.
+- While it is away, nothing can be calibrated against it. Owning a spare, or using a lower standard as a stopgap with a guard-banded acceptance limit, is the planning puzzle.
+
+**Kestrel's gray-market standards (canon hook).** Kestrel's standards come with **no OIRM certificate**: they work on the bench, but anything calibrated with them is untraceable until the standard has been sent to OIRM once. Cheap now, expensive at audit. Chet's fake ISO certs fit the same rule: a forged certificate fails Vance's check **[ASSUMPTION]**.
+
+**How it gates equipment tiers (levels [PLACEHOLDER]).**
+
+| Tier | Needs |
+|---|---|
+| 0 (jig, tripod, salt cell) | Nothing; issued at start with an OIRM-traceable certificate from the colony's founding stock **[ASSUMPTION]** |
+| 1 | Instrumentation 1; first clean audit |
+| 2 | Instrumentation 3; an **OIRM account**, opened by sending any Tier 1 standard for its first OIRM calibration |
+| 3 | Instrumentation 6; at least one Tier 2 standard with a current OIRM certificate; Vance's sign-off as a "traceable lab" after two clean audits in a row |
+
+The rubidium standard is the exception at the top: while it is locked to the orbital relay, its traceability runs through the relay's link to OIRM's time scale, so it never rides the pod. If line of sight is lost for longer than **[PLACEHOLDER]** days, its certificate lapses until it relocks.
 
 ## 2. Player skills
 
@@ -292,7 +345,7 @@ New files would need entries in `DataManager.RECORD_SECTIONS` where they are arr
 [
   {
     "id": "field_meter",
-    "display_name": "Tharsis TX-17 Field Meter",
+    "display_name": "Arsia Fieldworks FM-3 Field Meter",
     "class": "handheld_multimeter",
     "tier": 1,
     "seller": "bram",
@@ -301,7 +354,7 @@ New files would need entries in `DataManager.RECORD_SECTIONS` where they are arr
     "skill_gate": { "instrumentation": 1 },
     "calibrates": ["soil_moisture_probe", "terrarium_thermometer"],
     "spec": { "basis": "pct_of_reading_plus_counts", "value": null, "confidence": null },
-    "own_cal_from": ["multi_source_calibrator", "off_world"],
+    "own_cal_from": ["multi_source_calibrator", "oirm"],
     "_note": "Spec from the maker's sheet once Ryan approves; see docs/design/equipment_skills_robots.md."
   }
 ]
@@ -351,14 +404,14 @@ Code impact for later PRs (not done here): `GameState.get_sensor()` is a `match`
 1. TUR and standards on the existing three instruments (Tier 0 jig, tripod, salt cell), so the record shape is proven.
 2. Tier 1 equipment and the two pressure sensors (tire, dome).
 3. Skills: calibration, uncertainty, instrumentation.
-4. Tier 2 and 3, off-world calibration, recall.
+4. Tier 2 and 3, OIRM calibration and certificates, recall.
 5. Robots and the robotics skill.
 
 ## 6. Open questions for Ryan
 
 1. **Angle and humidity references.** None of the seven covers the game's current sensors. OK to add Tier 0 standards (encoder jig, survey tripod, salt-cell kit), or should the existing three keep zeroing with no reference?
-2. **Names.** OK with the fictional makers (Tharsis, Hellas, Syrtis, Phobos, Valles, Elysium, Gale), or do you want different names? They still need a trademark check before shipping.
-3. **Real specs or game-scaled specs?** Should the fictional instruments carry the real products' published accuracy, or numbers scaled to the game's MPEs (which are much wider than real lab tolerances)?
+2. **Names.** Pick from the §1.2 shortlist (instruments and institute), or keep the bold working names. Finalists still need a trademark check before shipping.
+3. **Game MPEs vs real accuracies.** Decided: instruments carry real accuracies. But the game's current MPEs (4.0°, 5.0 %) are far wider than real lab tolerances, so almost every TUR would be huge. Should the new sensors (§1.3) get realistic MPEs too, so TUR choices matter?
 4. **Torque spec.** The sources disagree (±0.25 % of indicated value vs ±0.5 % for a transducer). Which do you want, or should I find the maker's own sheet?
 5. **Spec as uncertainty.** OK to treat a maker's accuracy spec as the expanded uncertainty at about 95 % confidence? (The 8588A states both 95 % and 99 %; the gauge sheets don't state a confidence level.)
 6. **Bench time.** Calibration is instant today. Should it take game time, so the Calibration skill has something to speed up?
@@ -367,16 +420,16 @@ Code impact for later PRs (not done here): `GameState.get_sensor()` is a `match`
 9. **Robot look.** Hull color, height, and whether the eye really costs a silk spool.
 10. **Robots and audits.** Should Vance audit robot sensors like any instrument, and fine an overridden interlock?
 11. **Optional skills.** Keep Husbandry and Field Ops, or only the four you named?
-12. **Off-world calibration.** OK for standards to ride Vance's drop pod, out of service for one audit cycle?
+12. **OIRM.** OK with the institute in Earth orbit, standards riding Vance's drop pod for one audit cycle, Kestrel's standards arriving uncertified, and the tier gates in §1.7?
 
 ## 7. Sources for the [CITED] values
 
 Read on 2026-11-22. All need checking against the maker's current official data sheet before any number ships.
 
 - Handheld meter: Fluke 87V product page, specifications tab, <https://www.fluke.com/en-us/product/electrical-testing/digital-multimeters/fluke-87v>; detailed spec sheet hosted by Farnell, <https://www.farnell.com/datasheets/2830418.pdf>.
-- Multi-product calibrator: Fluke 5560A product and comparison pages, <https://www.fluke.com/en-us/product/calibration-tools/multifunction-calibrators/55x0a>, <https://www.fluke.com/en-us/product/calibration-tools/multifunction-calibrators/5500x>. Marketing summary; full spec PDF not read.
+- Multi-product calibrator: Fluke 5560A product and comparison pages, <https://www.fluke.com/en-us/product/calibration-tools/multifunction-calibrators/55x0a>, <https://www.fluke.com/en-us/product/calibration-tools/multifunction-calibrators/5500x>. Values from the product page's specification table (the "Best Performance" heading, which states 95 % confidence, ±5 °C, 1 year; the DCV row; the Temperature row). The maker's specification PDF linked from that page, <https://media.fluke.com/421591d3-03b5-40c3-ad8c-b2d5016f30e9_original%20file.pdf>, downloaded as compressed data and could not be read as text, so per-range values are not cited yet.
 - Reference multimeter: Fluke 8588A product page, <https://fluke.com/en-us/product/calibration-tools/electrical-calibration/bench-multimeters/8588a>.
 - Rubidium standard: Fluke 910/910R page (discontinued), <https://www.fluke.com/en-us/product/calibration-tools/electrical-calibration/electrical-standards/910-910r>; numbers from a reseller copy, <https://www.transcat.com/fluke-910r-gps-controlled-rubidium-frequency-standard-used>.
-- Torque standard: retailer listings and manual excerpts only (no maker sheet found), <https://www.protorquetools.com/cdi-supreme-suretest-torque-calibration-system-5000-2/?m=widget>, <https://zoro.com/cdi-cdi-suretest-calibration-monitor-5000-st/i/G2004941>, <https://manualmachine.com/snapon/5000st/1765604-user-manual>.
+- Torque standard: retailer listings and manual excerpts only (no maker sheet found; cditorque.com refused the connection on 2026-11-22), <https://www.protorquetools.com/cdi-supreme-suretest-torque-calibration-system-5000-2/?m=widget>, <https://zoro.com/cdi-cdi-suretest-calibration-monitor-5000-st/i/G2004941>, <https://manualmachine.com/snapon/5000st/1765604-user-manual>.
 - Pressure controller: Mensor / WIKA CPC8000 data sheet CT 28.01, <https://www.mensor.com/media/Data-sheets/Calibration/Pressure-controllers/ds_ct2801_en_um.pdf>.
 - Pressure gauge: Crystal XP2i data sheet (reseller copy), <https://www.transcat.com/media/pdf/XP2i.pdf>; maker's accuracy note, <https://www.globaltestsupply.com/content/crystal-pressure-understanding-accuracy-statements>.
