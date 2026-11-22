@@ -1,0 +1,35 @@
+steering_encoder_jig — 6 × 6 × 4 (X: 0..5 left→right, Y: 5..0 rear → front -Y), from Gemini's field props spec; Z = 2 corrected by Gemini Neon 2026-11-21
+Palette: J1 #2B303A anodized black, J2 #5C6B73 machined aluminum, J3 #E0A96D knurled brass, J4 #7BB661 spirit green
+X:    00 01 02 03 04 05
+
+Z = 0 (Base Plate & Wheel Notch Channel)
+Y=5  J1 J1 J1 J1 J1 J1
+Y=4  J1 .. .. .. .. J1   <- Central alignment channel cutout
+Y=3  J1 .. .. .. .. J1
+Y=2  J1 .. .. .. .. J1
+Y=1  J1 .. .. .. .. J1
+Y=0  J1 J1 J1 J1 J1 J1
+
+Z = 1 (Clamp Arms & Adjustment Screws)
+Y=5  .. .. .. .. .. ..
+Y=4  J3 J2 .. .. J2 J3   <- Brass screws (J3) driving aluminum clamps (J2)
+Y=3  .. J2 .. .. J2 ..
+Y=2  .. J2 .. .. J2 ..
+Y=1  J3 J2 .. .. J2 J3
+Y=0  .. .. .. .. .. ..
+
+Z = 2 (Upper Clamp Tops & Target Plate)
+Y=5  .. .. .. .. .. ..
+Y=4  .. J2 .. .. J2 ..   <- Upper clamp tops framing rear optical alignment notch
+Y=3  .. J2 J1 J1 J2 ..   <- Anodized target bridge plate (J1) spanning clamp arms (J2)
+Y=2  .. J2 J1 J1 J2 ..   <- Directly supports Z=3 spirit-level assembly
+Y=1  .. J2 .. .. J2 ..   <- Upper clamp tops framing front optical alignment notch
+Y=0  .. .. .. .. .. ..
+
+Z = 3 (Top Spirit Level Vial Assembly)
+Y=5  .. .. .. .. .. ..
+Y=4  .. .. .. .. .. ..
+Y=3  .. .. J1 J4 .. ..   <- Spirit level vial (J4) mounted on frame (J1)
+Y=2  .. .. J1 J1 .. ..
+Y=1  .. .. .. .. .. ..
+Y=0  .. .. .. .. .. ..

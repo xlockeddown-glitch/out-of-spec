@@ -587,18 +587,21 @@ def boulder_sheet(name: str, sheet: str) -> Model:
 def token_sheet(sheet: str) -> dict[int, list[list[str]]]:
     """Reads a token layer grid from tools/voxgen/sheets/: "Z = n" headers are layers
     bottom up; each "Y=NN  t t t ..." row lists one token per X (".." = empty), first
-    row = highest Y. Anything after "<-" is a comment. Returns {z: rows}."""
+    row = highest Y. "Z = a..b" repeats one grid on layers a to b. Anything after "<-"
+    is a comment. Returns {z: rows}."""
     import re
     layers: dict[int, list[list[str]]] = {}
-    current = -1
+    current: list[list[str]] | None = None
     for line in (Path(__file__).parent / "sheets" / sheet).read_text(encoding="utf-8").splitlines():
-        header = re.match(r"Z\s*=\s*(\d+)", line)
+        header = re.match(r"Z\s*=\s*(\d+)(?:\.\.(\d+))?", line)
         row = re.match(r"Y=\d+\s+(.*)", line)
         if header:
-            current = int(header.group(1))
-            layers[current] = []
-        elif row and current >= 0:
-            layers[current].append(row.group(1).split("<-")[0].split())
+            first = int(header.group(1))
+            current = []
+            for z in range(first, int(header.group(2) or first) + 1):
+                layers[z] = current
+        elif row and current is not None:
+            current.append(row.group(1).split("<-")[0].split())
     w, d = len(layers[0][0]), len(layers[0])
     for z, rows in layers.items():
         assert len(rows) == d and all(len(r) == w for r in rows), f"{sheet}: Z={z} is not {w} x {d}"
@@ -638,6 +641,37 @@ def tarantula_exuvia() -> Model:
     return m
 
 
+# ---------------------------------------------------------------- field props
+# Gemini's field calibration & survey props pack (2026-11-21; the jig's Z = 2 and the tripod's
+# Z = 1..13 are Gemini Neon's corrected grids from the same day): 0.1 m voxels, origin at the
+# footprint center on the ground, palettes as given in the spec. Like the exuvia, each is
+# turned 180 degrees from the sheet so its front (sheet Y=0, -Y) faces -z.
+FIELD_PROPS = {
+    "soil_moisture_probe": {"P1": "#3A3F47", "P2": "#8A94A0", "P3": "#D9534F", "P4": "#E8ECEF"},
+    "steering_encoder_jig": {"J1": "#2B303A", "J2": "#5C6B73", "J3": "#E0A96D", "J4": "#7BB661"},
+    "field_survey_tripod": {"T1": "#C47D2B", "T2": "#4A4E57", "T3": "#D1D5DB", "T4": "#3B82F6"},
+}
+
+
+def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int) -> Model:
+    """cells: {(x, y, z): token} in sheet axes (X right, Y back, Z up). Sheet (x, y, z) goes
+    to Godot (w-1-x, z, y), so sheet Y=0 (the front) lands at -z after the offset."""
+    m = Model(name, offset=(-w / 2.0, 0.0, -d / 2.0))
+    for (x, y, z), token in cells.items():
+        m.put("prop", w - 1 - x, z, y, FIELD_PROPS[name][token])
+    return m
+
+
+def prop_sheet(name: str) -> Model:
+    """Built voxel for voxel from Gemini's layer grid in sheets/<name>.txt."""
+    layers = token_sheet(f"{name}.txt")
+    w, d = len(layers[0][0]), len(layers[0])
+    cells = {(x, d - 1 - row_i, z): cell
+             for z, rows in layers.items() for row_i, row in enumerate(rows)
+             for x, cell in enumerate(row) if cell != ".."}
+    return front_to_minus_z(name, cells, w, d)
+
+
 MODELS = [
     (lambda: tractor(False), 0.1), (lambda: tractor(True), 0.1),
     (terrarium, 0.1), (curlyhair, 0.1), (bram_bay, 0.2), (ore_fissure, 0.2),
@@ -651,6 +685,9 @@ MODELS = [
     (lambda: boulder_sheet("boulder_d", "boulder_d.txt"), 0.2),
     (lambda: soil_sheet(False), 0.1), (lambda: soil_sheet(True), 0.1),
     (tarantula_exuvia, 0.1),
+    (lambda: prop_sheet("soil_moisture_probe"), 0.1),
+    (lambda: prop_sheet("steering_encoder_jig"), 0.1),
+    (lambda: prop_sheet("field_survey_tripod"), 0.1),
 ]
 
 
