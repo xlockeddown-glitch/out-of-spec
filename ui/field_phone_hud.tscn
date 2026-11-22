@@ -210,6 +210,13 @@ text = "RELAY: STOCK TRANSCEIVER"
 layout_mode = 2
 size_flags_horizontal = 3
 
+[node name="OreLabel" type="Label" parent="Bezel/Screen/Content/RelayRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.22, 0.88, 0.78, 1)
+theme_override_font_sizes/font_size = 18
+text = "ORE 0   "
+
 [node name="SpoolLabel" type="Label" parent="Bezel/Screen/Content/RelayRow"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -239,6 +246,27 @@ size_flags_horizontal = 3
 focus_mode = 0
 theme_override_font_sizes/font_size = 18
 text = "ENTER DOME  [Tab]"
+
+[node name="BramPanel" type="VBoxContainer" parent="Bezel/Screen/Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="BramLabel" type="Label" parent="Bezel/Screen/Content/BramPanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.96, 0.65, 0.14, 1)
+theme_override_font_sizes/font_size = 16
+autowrap_mode = 3
+
+[node name="TradeButton" type="Button" parent="Bezel/Screen/Content/BramPanel"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 18
+text = "TRADE 6 ORE: WIDE TREADS  [E]"
 
 [node name="Sep2" type="HSeparator" parent="Bezel/Screen/Content"]
 layout_mode = 2

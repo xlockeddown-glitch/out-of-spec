@@ -12,6 +12,9 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 @onready var _rover: RoverController = %Rover
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
 @onready var _airlock: Clickable = %Airlock
+@onready var _bram_bay: BramBay = %BramBay
+
+var _bram_line: String = ""
 
 
 func _ready() -> void:
@@ -29,6 +32,11 @@ func _ready() -> void:
 	GameState.relay_changed.connect(_on_relay_changed)
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.credits_changed.connect(_hud.set_credits)
+	GameState.ore_changed.connect(_on_ore_changed)
+	_rover.ore_mined.connect(_on_ore_mined)
+	_bram_bay.rover_entered.connect(_on_rover_entered_bay)
+	_bram_bay.rover_exited.connect(_hud.hide_bram)
+	_hud.trade_pressed.connect(_try_trade)
 
 	# Replay the persistent phone log first, so fresh SYS lines land on top of it.
 	for line: String in GameState.phone_log.slice(-LOG_REPLAY_LINES):
@@ -39,6 +47,7 @@ func _ready() -> void:
 	_rover.broadcast_state()
 	_refresh_relay_hud()
 	_hud.set_credits(GameState.credits)
+	_hud.set_ore(GameState.crystal_ore)
 
 
 func _process(_delta: float) -> void:
@@ -94,6 +103,48 @@ func _on_soil_tilled(cell: Vector3i) -> void:
 
 func _on_till_rejected(reason: String) -> void:
 	_hud.push_log("TILL FAILED: %s" % reason)
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"interact") and _bram_bay.rover_inside:
+		get_viewport().set_input_as_handled()
+		_try_trade()
+
+
+func _on_ore_mined(_fissure_id: StringName) -> void:
+	_hud.push_log("Drilled 1 crystal ore. Carrying %d." % GameState.crystal_ore)
+
+
+func _on_ore_changed(ore: int) -> void:
+	_hud.set_ore(ore)
+	if _bram_bay.rover_inside:
+		_refresh_bram()
+
+
+func _on_rover_entered_bay() -> void:
+	var cost: int = GameState.treads_ore_cost()
+	if GameState.has_wide_treads:
+		_bram_line = GameState.bram_line("greetings")
+	elif GameState.crystal_ore >= cost:
+		_bram_line = "That's %d crystal ore. Treads coming right up, hit trade." % cost
+	else:
+		_bram_line = "Bring me %d crystal ore and I'll bolt wider treads onto your tractor. Carrying %d." % [cost, GameState.crystal_ore]
+	_refresh_bram()
+
+
+func _refresh_bram() -> void:
+	_hud.show_bram(_bram_line, GameState.treads_ore_cost(), GameState.crystal_ore, GameState.has_wide_treads)
+
+
+func _try_trade() -> void:
+	if not _bram_bay.rover_inside or GameState.has_wide_treads:
+		return
+	var problem: String = GameState.buy_wide_treads()
+	if problem.is_empty():
+		_bram_line = "Fresh treads, wide stance. Try not to till a boulder with them."
+	else:
+		_hud.push_log("BRAM: " + problem)
+	_refresh_bram()
 
 
 func _go_to_dome() -> void:

@@ -6,6 +6,7 @@ extends Control
 signal zero_steering_pressed
 signal slot_spool_pressed
 signal enter_dome_pressed
+signal trade_pressed
 
 const MAX_LOG_LINES: int = 8
 const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
@@ -31,12 +32,17 @@ var _log_lines: PackedStringArray = []
 @onready var _dome_button: Button = %DomeButton
 @onready var _clock_label: Label = %ClockLabel
 @onready var _credits_label: Label = %CreditsLabel
+@onready var _ore_label: Label = %OreLabel
+@onready var _bram_panel: Control = %BramPanel
+@onready var _bram_label: Label = %BramLabel
+@onready var _trade_button: Button = %TradeButton
 
 
 func _ready() -> void:
 	_zero_button.pressed.connect(func() -> void: zero_steering_pressed.emit())
 	_slot_spool_button.pressed.connect(func() -> void: slot_spool_pressed.emit())
 	_dome_button.pressed.connect(func() -> void: enter_dome_pressed.emit())
+	_trade_button.pressed.connect(func() -> void: trade_pressed.emit())
 	_log_label.text = ""
 
 
@@ -82,6 +88,26 @@ func set_clock(text: String) -> void:
 func set_credits(credits: int) -> void:
 	_credits_label.text = "%s CR" % SP811.integer(credits)
 	_credits_label.add_theme_color_override("font_color", COLOR_FAIL if credits < 0 else COLOR_WARN)
+
+
+func set_ore(ore: int) -> void:
+	_ore_label.text = "ORE %d   " % ore
+
+
+## Bram's panel while the rover is parked in his bay.
+func show_bram(line: String, cost: int, ore: int, owned: bool) -> void:
+	_bram_panel.visible = true
+	_bram_label.text = "BRAM: " + line
+	if owned:
+		_trade_button.text = "WIDE TREADS FITTED"
+		_trade_button.disabled = true
+	else:
+		_trade_button.text = "TRADE %d ORE: WIDE TREADS  [E]" % cost
+		_trade_button.disabled = ore < cost
+
+
+func hide_bram() -> void:
+	_bram_panel.visible = false
 
 
 func push_log(line: String) -> void:

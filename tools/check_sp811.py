@@ -27,6 +27,7 @@ RULES: list[tuple[str, re.Pattern[str]]] = [
     ("U+2212 minus sign, not a hyphen", re.compile(r"(?<![\w.\-])-\d")),
     ("× for multiplication, not x (2× speed)", re.compile(r"\d\s?x\s")),
     ("plane-angle ° takes no space", re.compile(r"\d\s+°(?!C)")),
+    ("§9.2 US spelling (meter, liter)", re.compile(r"(?i)\b(?:\w*metre|\w*litre)s?\b")),
 ]
 
 GD_STRING = re.compile(r'"((?:[^"\\]|\\.)*)"')

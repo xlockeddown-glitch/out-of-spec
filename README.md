@@ -9,7 +9,9 @@ Open `project.godot` in Godot 4.7 and press F5. Main scene: `scenes/main_farm.ts
 | Input | Action |
 |---|---|
 | WASD / arrows | Drive rover (through the uplink lag) |
-| Space | Till the soil tile under the rover |
+| Space | Drill a crystal ore fissure under the rover, or till the soil tile |
+| E (in Bram's bay) | Trade 6 crystal ore for wide treads |
+| F9 (debug builds) | Skip to the next morning |
 | R or ZERO STEERING button | Re-zero steering drift remotely |
 | Tab, airlock, or ENTER DOME | Swap farm <-> dome |
 | Click (dome) | Bench calibration, terrarium info, collect silk spool |
