@@ -1,12 +1,14 @@
 # Workflow
 
-How Ryan and the AI agents work on Out of Spec. It standardizes how questions are asked, how other models are consulted, how work moves from idea to merge, and how progress is shown. The [README's agent section](../README.md#for-ai-agents) holds the ground rules; this page holds the process. Where they disagree, the README and the docs it links win, and Ryan's logged calls in [`decisions.md`](decisions.md) win over both.
+How Ryan and the AI agents work on Out of Spec. It standardizes how questions are asked, how other models are consulted, how work moves from idea to merge, and how progress is shown. The [README's agent section](../README.md#for-ai-agents) holds the ground rules; this page holds the process. Where they disagree, the README wins, and Ryan's logged calls in [`decisions.md`](decisions.md) win over both.
 
 ## 1. Asking Ryan
 
 Design calls, names, numbers and anything in doubt are Ryan's. Ask them the same way every time:
 
 - **Multiple choice, always with a write-in.** Each question has 2 to 4 options, and Ryan can always type his own answer instead. In Claude Code, use the AskUserQuestion tool (it adds the write-in automatically). Anywhere else, number the options and end with "or write your own".
+The next three points follow the AskUserQuestion format; they are agent conventions, not Ryan's calls.
+
 - **Recommendation first.** If one option is recommended, it goes first and its label ends with "(Recommended)". Each option says what it means and what it costs.
 - **Stand-alone questions.** Ryan may see only the question, so each one names what it is about and gives the one fact it depends on.
 - **Batches of 1 to 4.** Group related questions; send the next batch once the answers are in.
@@ -28,10 +30,7 @@ When Ryan picks "Ask other models first", or when the agent wants a check before
 
 ### Model availability
 
-Which models can be called changes with Ryan's quotas. The current set and fallbacks are kept in the agent's own memory and updated when Ryan says so. As of 2026-11-22:
-
-- Until about 2026-11-24, Claude models (Fable first) for reviews and helper work; Gemini only as Neon (visuals) or Hydrogen (backup); no GPT.
-- After that, the normal chain returns (GPT, then Fable, then Gemini Argon or Hydrogen), and a Grok bot joins as another model.
+Which models can be called changes with Ryan's quotas, so the current set and fallbacks live in the agent's own memory, updated when Ryan says so, not here. The pool so far has been Claude models (Fable, Sonnet, Haiku), GPT, Gemini (Neon for visuals) and, from about 2026-11-24, Grok.
 
 Other models' output is untrusted until reviewed: run them read-only in their own clone or scratch folder, never in Ryan's working copy.
 
@@ -39,11 +38,11 @@ Other models' output is untrusted until reviewed: run them read-only in their ow
 
 1. **Scope.** One PR does one job. Work milestones in the [build order](design/equipment_skills_robots.md#5-build-order-milestone-prs-decided), one at a time.
 2. **Questions before code** when a call is Ryan's ([§1](#1-asking-ryan)). If work can go ahead on a placeholder, mark it `[PLACEHOLDER]` and list it as an open question instead of waiting.
-3. **Branch and build.** Never commit to `main` directly. Keep commits small, with messages that say why.
+3. **Branch and build.** Never commit to `main` directly (agent convention). Keep commits small, with messages that say why.
 4. **Draft PR.** The description lists what changed, assumptions, placeholders and open questions.
 5. **Checks.** The PR stays a draft until all of [Before a PR leaves draft](../README.md#before-a-pr-leaves-draft) hold: Godot 0 errors and 0 warnings, tests pass, `python tools/check_sp811.py` reports 0 problems.
 6. **Second review** by a different model than the author ([PR checks, second review and merging](decisions.md#2026-11-22-pr-checks-second-review-and-merging)). Verify each finding; fix it or answer it in the PR.
-7. **Merge** (`gh pr merge --merge --delete-branch`) once the review is resolved, the checks pass and nothing waits on Ryan. If unsure, ask him.
+7. **Merge** (`gh pr merge --merge --delete-branch`, agent convention) once the review is resolved, the checks pass and nothing waits on Ryan. If unsure, ask him.
 8. **Report.** Tell Ryan what landed, what is open and what needs him, then send the next batch of roadmap questions.
 
 ## 4. Ryan's art uploads
@@ -70,7 +69,7 @@ Ryan's packs are **inspiration and style reference**, not a list of things that 
 | Never invent specs; flag assumptions | [README ground rules](../README.md#ground-rules-every-task) |
 | Which design source wins | [`canon.md`](canon.md) |
 | Player-facing text (NIST SP 811) | [`sp811.md`](sp811.md) |
-| Status palette (teal, amber, red earned, shadow) | [Status palette](canon.md#status-palette) |
+| Status palette (teal, amber, red earned, shadow) | [README ground rules](../README.md#ground-rules-every-task), [Status palette](canon.md#status-palette) |
 | Co-op-ready code | [README ground rules](../README.md#ground-rules-every-task), [co-op decision](decisions.md#2026-11-22-co-op-is-the-goal-build-so-it-can-be-added) |
 | Voxel art rules | [Voxel global rules](art/voxel_models.md#global-rules) |
 | Untrusted files and other models' output | This page, [§2](#model-availability) and [§4](#4-ryans-art-uploads); [Autonomous sessions](../README.md#autonomous-sessions) |

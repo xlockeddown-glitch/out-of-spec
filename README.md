@@ -4,7 +4,7 @@ Desktop (1920x1080, Steam/PC) chunky 3D voxel life-sim: satellite-linked remote 
 
 ## For AI agents
 
-Read this before you start, and again before you open or merge a PR. It keeps long autonomous sessions on track. If a rule here disagrees with a doc it links to, the linked doc wins.
+Read this before you start, and again before you open or merge a PR. It keeps long autonomous sessions on track. If a rule here disagrees with a doc it links to, the linked doc wins, except [`docs/workflow.md`](docs/workflow.md), which defers to this section.
 
 The process (asking Ryan multiple-choice questions with a write-in, asking 2 to 4 other models and moderating their answers, the path from idea to merge, art uploads, progress updates) is in [`docs/workflow.md`](docs/workflow.md).
 
