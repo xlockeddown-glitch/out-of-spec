@@ -238,12 +238,12 @@ light_color = Color(0.3, 0.85, 1, 1)
 omni_range = 1.2
 
 [node name="RightBench" type="CSGBox3D" parent="."]
-position = Vector3(3, 0.5, 0)
-size = Vector3(3.6, 1, 1.6)
+position = Vector3(3, 0.45, 0)
+size = Vector3(2, 0.9, 1.4)
 material = SubResource("MatBench")
 
 [node name="CalStation" type="Node3D" parent="."]
-position = Vector3(3, 1, 0)
+position = Vector3(2.8, 0.9, 0)
 
 [node name="Body" type="CSGBox3D" parent="CalStation"]
 position = Vector3(0, 0.3, -0.1)
@@ -262,13 +262,13 @@ light_energy = 0.6
 omni_range = 2.0
 
 [node name="SilkTray" type="CSGBox3D" parent="CalStation"]
-position = Vector3(1.25, 0.04, 0.3)
-size = Vector3(0.6, 0.08, 0.4)
+position = Vector3(0.9, 0.04, 0.3)
+size = Vector3(0.5, 0.08, 0.4)
 material = SubResource("MatMetal")
 
 [node name="BenchClick" type="Area3D" parent="CalStation"]
 unique_name_in_owner = true
-position = Vector3(0, 0.35, 0)
+position = Vector3(0.2, 0.35, 0)
 collision_layer = 8
 collision_mask = 0
 script = ExtResource("3_click")
@@ -489,11 +489,17 @@ model_scale = 0.1
 greybox = [NodePath("../LeftBench")]
 
 [node name="RightBenchModel" type="Node3D" parent="." node_paths=PackedStringArray("greybox")]
-position = Vector3(3, 0, 0)
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 3, 0, 0)
 script = ExtResource("5_slot")
-model_path = "res://assets/voxels/dome_bench.glb"
+model_path = "res://assets/voxels/lab_calibration_bench.glb"
 model_scale = 0.1
 greybox = [NodePath("../RightBench")]
+
+[node name="EnvChamberCartModel" type="Node3D" parent="."]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 5.2, 0, 0)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/env_chamber_cart.glb"
+model_scale = 0.1
 
 [node name="StationModel" type="Node3D" parent="CalStation" node_paths=PackedStringArray("greybox")]
 script = ExtResource("5_slot")
