@@ -432,3 +432,20 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - Paid jobs (PR 49) merged after ten GPT review passes. Lab upgrade sizes, costs and what each area enables still need Ryan's answers before building.
+
+## 2026-11-22: Upgradeable lab, Ryan's answers
+
+### Ryan chose
+
+- An area gives more space. Each new area is the player's choice: more of a discipline the lab already has, or another discipline.
+- More space for a discipline the lab already has gives both: more of its jobs in progress at once, and room for bigger items (the biggest, best-paying jobs need a large area).
+- The small starting lab covers a few disciplines. Adding more disciplines, or growing one, needs a bigger lab.
+- Upgrades cost credits plus crystal ore and take a few days to build.
+- Upgrades are chosen and bought at a plan board inside the dome, and the dome visibly changes as it grows.
+- The large lab's layout (one big area or many separate areas) can be changed later, at a cost and with some downtime.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The automation path stays after this milestone (Ryan, earlier today).
+- Every number still to be set (areas per lab size, disciplines in the small lab, costs, build days, rebuild cost and downtime, which jobs count as "big") will be [PLACEHOLDER] in data until Ryan sets it.
+- Open question for later: what happens to a discipline whose standard you own but which has no area (today every owned standard can do jobs at the single bench). Proposed: existing saves get the starting lab with areas for the disciplines they already own, so nothing is taken away.
