@@ -24,7 +24,7 @@ TEAL, AMBER, RED, SHADOW = "#38E1C6", "#F5A623", "#FF5A5F", "#1D222B"
 
 # ---------------------------------------------------------------- tractor
 def tractor(wide: bool) -> Model:
-    """After Neon's concept sheet. 16 (20 wide) x ~19 x 25 voxels at 0.1 m. Front = -Z.
+    """After Neon's concept sheet. 16 (20 wide) x 19 x 25 voxels at 0.1 m. Front = -Z.
     Big rear wheels, small front wheels, mustard lower panels, chrome grille,
     amber headlights, roof dish (uplink, at the Rover/Antenna marker) and a cyan
     roof beacon. Wide variant: full-length tracks and amber roof lights.
@@ -56,7 +56,6 @@ def tractor(wide: bool) -> Model:
         m.disc_x("wheels", outer, outer, 4.0, -8.0, 2.0, CHROME)  # idler
         m.disc_x("wheels", outer, outer, 2.5, 0.0, 1.4, CHROME)   # road wheel
         m.box("body", x0, x1, 8, 8, -10, 10, HULL)                # fender
-        m.box("body", x0, x1, 8, 8, -10, 10, HULL)
 
     if wide:
         track(-10, -6, -10)
@@ -71,6 +70,8 @@ def tractor(wide: bool) -> Model:
 
     # chassis and axles
     m.box("body", -4, 3, 3, 4, -11, 11, SHADOW)
+    if not wide:
+        m.box("body", -5, 4, 3, 3, -8, -8, SHADOW)  # front axle
     # hood with mustard lower panels, chrome-slatted grille, amber headlights
     m.box("body", -3, 2, 5, 9, -12, -3, HULL)
     m.box("body", -3, -3, 5, 6, -12, -3, PANEL)
@@ -119,7 +120,7 @@ def tractor(wide: bool) -> Model:
 
 # -------------------------------------------------------------- terrarium
 def terrarium() -> Model:
-    """After Neon's concept sheet. 14 x 14 x 10 voxels at 0.1 m; origin on the bench.
+    """After Neon's concept sheet. 14 x 15 x 10 voxels at 0.1 m; origin on the bench.
     Glass tank with slate posts, amber dome heat lamp on a bracket, half-log hide,
     round water dish, pebbles. Hygrometer pod front-right (LED is game-driven).
     """
@@ -128,22 +129,22 @@ def terrarium() -> Model:
     PEBBLE, BOWL, WATER, POD = "#6B5A4A", "#8C96A6", "#2E5A6B", "#D4D9DE"
     m.glass_parts.add("glass")
     m.box("frame", -7, 6, 0, 0, -5, 4, FRAME)
-    m.box("substrate", -6, 5, 1, 3, -4, 3, SUB)
+    m.box("substrate", -6, 5, 1, 2, -4, 3, SUB)  # top at 0.3 m, where the spider stands
     for x, z in ((-5, 1), (-2, -1), (1, 2), (3, -3), (4, 0), (-1, 3), (2, -2)):
-        m.put("substrate", x, 3, z, SUB2)
-    for x, z in ((-1, 1), (2, 3), (0, -3), (3, 1)):
-        m.put("decor", x, 4, z, PEBBLE)
+        m.put("substrate", x, 2, z, SUB2)
+    for x, z in ((2, 3), (5, -4), (-6, 3)):
+        m.put("decor", x, 3, z, PEBBLE)
     # half-log hide, back-left, hollow so it reads as a tunnel
-    cy, cz, r_out, r_in = 4.0, -2.5, 2.4, 1.3
+    cy, cz, r_out, r_in = 3.0, -2.5, 2.4, 1.3
     for x in range(-6, -1):
-        for y in range(4, 7):
+        for y in range(3, 6):
             for z in range(-5, 0):
                 d2 = (y + 0.5 - cy) ** 2 + (z + 0.5 - cz) ** 2
                 if r_in * r_in < d2 <= r_out * r_out:
                     m.put("decor", x, y, z, BARK2 if x in (-6, -2) else BARK)
     # water dish, front-left
-    m.disc_y("decor", -3.5, 2.0, 1.6, 4, BOWL, hollow=0.8)
-    m.disc_y("decor", -3.5, 2.0, 0.9, 4, WATER)
+    m.disc_y("decor", -3.5, 2.0, 1.6, 3, BOWL, hollow=0.8)
+    m.disc_y("decor", -3.5, 2.0, 0.9, 3, WATER)
     # glass panes, slate corner posts and top frame
     m.box("glass", -6, 5, 1, 10, -5, -5, GLASS)
     m.box("glass", -6, 5, 1, 10, 4, 4, GLASS)
@@ -182,6 +183,7 @@ def curlyhair() -> Model:
     for side in (-1, 1):
         for hip_z, tip_z in ((-2, -3), (-1, -1), (0, 1), (0, 3)):
             m.put("spider", side * 2, 1, hip_z, BODY)       # raised knee
+            m.put("spider", side * 2, 0, (hip_z + tip_z) // 2, BODY)
             m.put("spider", side * 3, 0, tip_z, BODY)
             m.put("spider", side * 3, -1, tip_z, GOLD)      # gold-tipped foot
     return m
@@ -189,12 +191,13 @@ def curlyhair() -> Model:
 
 # -------------------------------------------------------------- Bram's bay
 def bram_bay() -> Model:
-    """After Neon's concept sheet. 24 x 17 x 20 voxels at 0.2 m; open side faces +Z.
+    """After Neon's concept sheet. 25 x 18 x 20 voxels at 0.2 m; open side faces +Z;
+    the slab is sunk so its top is flush with the ground (the rover drives in).
     Timber posts, lean-to corrugated roof over the back half (the front stays open
     so the game camera sees in), pegboard tool wall, tire stacks, barrels,
     workbench monitor, two hanging amber lamps, and Bram with a pipe wrench.
     """
-    m = Model("bram_bay", offset=(0.0, 0.0, -2.5))
+    m = Model("bram_bay", offset=(0.0, -1.0, -2.5))
     SLAB, POST, PEG, WOOD = "#8A857A", "#5A3A2A", "#8B6A3F", "#6B4A2A"
     RUST, ROOF2, ROOF3, TOOL, REDTOOL = "#8A4A2A", "#6B4A3A", "#8C8C8C", "#8C96A6", "#B0392B"
     NAVY, SKIN, HAIR, LENS = "#2B3C65", "#D99B78", "#6B3F1F", "#2A3A40"
@@ -212,12 +215,12 @@ def bram_bay() -> Model:
     # corrugated roof over the back half, sloping toward the front
     panels = ((RUST, "#6E3A22"), (ROOF2, "#553A2E"), (ROOF3, "#707070"), (RUST, "#6E3A22"), (ROOF2, "#553A2E"))
     for z in range(-10, 0):
-        y = 16 - (z + 10) * 3 // 19
+        y = math.floor(16 - (z + 10) * 3 / 19)  # sits on the rafters
         for x in range(-12, 12):
             light, dark = panels[((x + 12) // 5) % len(panels)]
             m.put("roof", x, y + 1, z, light if x % 2 else dark)
     # back wall: lower planks and the pegboard with tools
-    m.box("frame", -11, 10, 1, 4, -10, -10, WOOD)
+    m.box("frame", -11, 10, 1, 5, -10, -10, WOOD)
     m.box("frame", -9, -1, 6, 10, -10, -10, PEG)
     for x, color in ((-8, TOOL), (-7, REDTOOL), (-4, TOOL), (-3, REDTOOL), (-2, TOOL)):
         m.box("props", x, x, 7, 9, -9, -9, color)
@@ -239,7 +242,7 @@ def bram_bay() -> Model:
             m.disc_y("props", bx0 + 0.5, bz0 + 0.5, 1.2, y, TOOL if y == 3 else RUST)
     # two hanging amber lamps
     for lx in (-6, 3):
-        m.box("props", lx, lx, 12, 14, -4, -4, SHADOW)
+        m.box("props", lx, lx, 12, 16, -4, -4, SHADOW)
         m.box("emit_work_lamp", lx - 1, lx, 11, 11, -5, -4, AMBER)
     # Bram (chibi): boots, navy coveralls, big head, messy hair, goggles up
     bx, bz = 9, -7
@@ -277,13 +280,13 @@ def ore_fissure() -> Model:
         m.put("rock", x, -1, z, CLAY2)
     # the fissure: a jagged diagonal with a short branch, open down to the quartz
     path = [(-3, 3), (-2, 2), (-2, 1), (-1, 1), (-1, 0), (0, 0), (0, -1), (1, -1), (1, -2), (2, -3)]
-    for x, z in path + [(1, 1), (2, 2)]:
-        m.put("rock", x, -1, z, SHADOW)
+    for i, (x, z) in enumerate(path + [(1, 1), (2, 2)]):
+        m.put("rock", x, -1, z, QUARTZ if i % 3 == 1 else SHADOW)  # quartz glints in the crack
         m.put("rock", x, -2, z, QUARTZ)
 
     def crystal(x: int, z: int, h: int, lean: tuple[int, int]) -> None:
         for y in range(0, h):
-            dx, dz = (lean[0] * y) // 3, (lean[1] * y) // 3
+            dx, dz = int(lean[0] * y / 3), int(lean[1] * y / 3)
             m.put("emit_crystals", x + dx, y, z + dz, TEAL)
             if y < h - 2:  # thicker shaft, single-voxel point
                 m.put("emit_crystals", x + dx + (1 if lean[0] >= 0 else -1), y, z + dz, TEAL)

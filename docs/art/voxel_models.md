@@ -36,6 +36,8 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
 
 ## 1. Tractor (`tractor.glb`, `tractor_wide.glb`)
 
+Superseded in part by the Neon concept sheet section below: the whip and `emit_antenna` are replaced by the roof dish and `emit_beacon`.
+
 - **Footprint:**
   - standard: 16 × 24 × 14 voxels = 1.6 m × 2.4 m × 1.4 m, matching the collision box
   - wide: 20 × 24 × 14 voxels (+2 voxels each side)
@@ -84,7 +86,7 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
 - **Footprint:** 24 × 20 × 16 voxels = 4.8 m × 4.0 m × 3.2 m, against the 5.6 m × 4.6 m greybox roof. Bram is about 6 × 4 × 9 voxels, roughly 1.8 m tall.
 - **Pick: answer A.**
   - Its jokes are on theme: a digital torque wrench on the pegboard, permanently red and out of calibration, and a cyan diagnostic scope on the bench.
-  - Blue overalls `#2B4C65` stand out against the amber lamp.
+  - Blue overalls `#2B3C65` stand out against the amber lamp.
 - **From B:**
   - Bram's unkempt steel-gray beard, `#5E5855`
   - the sledgehammer raised over a bent suspension arm in a floor vise
@@ -159,13 +161,14 @@ Neon (Gemini) drew concept sheets for the tractor, terrarium, Bram's shed, the o
   - big rear wheels (1.2 m), small front wheels (0.7 m)
   - mustard lower panels `#C9962E`, kept well off guard-band amber `#F5A623`
   - chrome-slatted grille, amber headlights
-  - roof dish and a cyan roof beacon. The uplink dish replaces the whip, and `Rover/Antenna` (the LOS origin and beam start) moved to the dish center, (0.25, 1.75, 0.45) m.
+  - roof dish and a cyan roof beacon. The uplink dish replaces the whip, and `Rover/Antenna` (the LOS origin and beam start) moved to the dish center, (0.22, 1.88, 0.38) m, the tip of the feed horn.
   - wide variant: full-length tracks with sprocket, idler and fenders, plus amber roof lights
 - **Terrarium:** glowing amber dome heat lamp on a slate bracket, hollow half-log hide, round water dish, pebbles. The sheet's two cyan LEDs stay one game-driven LED, colored by the hygrometer band.
 - **Bram's shed:**
   - timber posts and a lean-to corrugated roof
   - pegboard tool wall, tire stacks, rusty barrels, a workbench with a cyan monitor, two hanging amber lamps
-  - **Change:** the roof covers only the back half, so the game's overhead camera can still see Bram.
+  - **Change:** the roof covers only the back half of the shed. Bram stands under it; the game camera's angle still shows him.
+  - **Change:** the slab is sunk 0.2 m so it is flush with the ground and the rover drives onto it.
   - **Change:** tools are painted `#B0392B`, not alert red; the out-of-cal torque wrench is the only `#FF5A5F` red.
 - **Bram:** chibi proportions, navy coveralls, messy brown hair, goggles pushed up, a big pipe wrench. No beard, per the sheet.
 - **Ore fissure:** cracked terracotta flush with the ground, a dark jagged crack with a branch, and clusters of tall pointed crystals growing out of it.
@@ -178,9 +181,9 @@ Where the generated models differ from the footprints above:
 
 | Model | Spec | Built | Why |
 |---|---|---|---|
-| tractor | 16 × 24 × 14 | 16 × 25 × 19 | Neon sheet: 12-voxel rear wheels; the roof dish tops out at 1.9 m |
+| tractor | 16 × 24 × 14 | 16 × 25 × 19 | Neon sheet: 12-voxel rear wheels; the roof dish tops out at 1.9 m; the hitch adds 1 voxel of depth |
 | tractor_wide | 20 × 24 × 14 | 20 × 25 × 19 | same, with full-length tracks |
-| terrarium | 14 × 10 × 12 | 14 × 10 × 15 | the dome lamp and bracket sit above the 1.1 m tank |
+| terrarium | 14 × 10 × 12 | 14 × 10 × 15 | the dome lamp and bracket sit above the tank, whose frame tops out at 1.2 m |
 | bram_bay | 24 × 20 × 16 | 25 × 20 × 18 | Neon sheet: lean-to roof peaks at 3.6 m; Bram's wrench pokes 1 voxel past the slab; the bay sits 0.5 m back to match the greybox |
 | relay_mast | 12 × 12 × 35 (Neon sheet) | 12 × 12 × 35 | rebuilt from Neon's concept sheet; see section 6 |
 | drop_pod | 12 × 12 × 16 | 12 × 13 × 16 | the hatch seam stands 1 voxel proud on +Z |

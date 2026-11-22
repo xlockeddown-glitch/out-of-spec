@@ -416,7 +416,7 @@ height = 0.6
 material = SubResource("MatDark")
 
 [node name="Antenna" type="Marker3D" parent="WorldView/WorldViewport/World/Rover" unique_id=752251794]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.25, 1.75, 0.45)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22, 1.88, 0.38)
 
 [node name="UplinkBeam" type="MeshInstance3D" parent="WorldView/WorldViewport/World/Rover/Antenna" node_paths=PackedStringArray("rover")]
 script = ExtResource("13_beam")
