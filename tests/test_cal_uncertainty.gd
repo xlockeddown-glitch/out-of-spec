@@ -323,3 +323,34 @@ func test_displays_show_the_observed_error() -> String:
 	if absf(drifted - 0.1) > EPS:
 		return "Drift after the calibration must show on the display."
 	return ""
+
+
+func test_remote_zero_keeps_the_bench_offset() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var unit: DriftingSensor = gs.steering
+	var standard: DriftingSensor = gs.get_sensor(unit.calibrated_by)
+	_set_day(unit.cal_due_day)
+	standard.max_error = INF
+	standard.error = 0.3
+	gs.calibrate(gs.STEERING_ID)  # bench zero against a standard off by 0.3
+	unit.error += 0.5
+	var observed_before: float = unit.observed_error
+	var seen: Array[float] = []
+	var listener: Callable = func(_e: float, _b: int) -> void: seen.append(unit.observed_error)
+	unit.error_changed.connect(listener)
+	var record: Dictionary = gs.calibrate(gs.STEERING_ID, "You", false)  # remote zero
+	unit.error_changed.disconnect(listener)
+	var offset: float = unit.reference_offset
+	var true_error: float = unit.error
+	GameClock.elapsed_days = saved
+	gs.free()
+	if absf(record["as_found"] - observed_before) > EPS:
+		return "The remote zero's as-found must be the observed error (%s), got %s." % [observed_before, record["as_found"]]
+	if absf(offset - 0.3) > EPS:
+		return "The remote zero must keep the bench offset, got %s." % offset
+	if absf(true_error - 0.3) > unit.as_left_residual + EPS:
+		return "After a remote zero the true error must stay near the bad standard's 0.3, got %s." % true_error
+	if seen.is_empty() or absf(seen[-1] - record["as_left"]) > EPS:
+		return "error_changed listeners must read the new observed value during the zero."
+	return ""

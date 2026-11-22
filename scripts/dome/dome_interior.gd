@@ -72,7 +72,7 @@ func _refresh_status() -> void:
 		GameState.MoltStage.PRE_MOLT:
 			_molt_label.text = "PRE-MOLT  %d %%" % roundi(GameState.molt_progress * 100.0)
 		_:
-			_molt_label.text = ("MOLT PAUSED: hygrometer out of tolerance" if GameState.is_molt_paused()
+			_molt_label.text = ("MOLT PAUSED: humidity out of range" if GameState.is_molt_paused()
 				else "MOLT  %d %%" % roundi(GameState.molt_progress * 100.0))
 	_silk_label.text = "SILK SPOOLS %d   RELAY: %s" % [
 		GameState.optical_silk_spools, "OPTICAL SILK" if GameState.relay_slotted else "STOCK"]

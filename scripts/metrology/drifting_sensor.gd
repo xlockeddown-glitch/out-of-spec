@@ -19,6 +19,8 @@ extends RefCounted
 ##
 ## Instances live in the GameState autoload so they survive scene swaps.
 
+## Carries the TRUE error and band. Display code should read observed_error
+## and get_observed_band() instead (Ryan, 2026-11-22).
 signal error_changed(error: float, band: int)
 signal zeroed(as_found: float, as_left: float)
 
@@ -145,7 +147,11 @@ func zero(reference_error: float = 0.0) -> Dictionary:
 	var residual: float = _rng.randf_range(-as_left_residual, as_left_residual)
 	# Set before error so error_changed listeners read the new observed value.
 	reference_offset = reference_error
+	var before: float = error
 	error = reference_error + residual
+	if error == before:
+		# The setter skips unchanged values, but the observed error may have moved.
+		error_changed.emit(error, get_band())
 	var as_left: float = error - reference_error
 	zeroed.emit(as_found, as_left)
 	return { "as_found": as_found, "as_left": as_left }
