@@ -9,7 +9,7 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `tractor_wide.glb` | Tractor after Bram's wide treads | Same origin as `tractor.glb`; swapped in when the treads are bought. |
 | `ore_fissure.glb` | Crystal ore fissure greybox (`OreFissure`) | 1.6 m across; hidden while mined. |
 | `terrarium.glb` | Tank, substrate, hygrometer pod, lamp hood (`Terrarium/TankModel`) | Leave the hygrometer LED out; the game drives it. |
-| `curlyhair.glb` | Spider greybox (`Terrarium/Tarantula/SpiderModel`) | Center origin. Separate so molt visuals can be added. |
+| `curlyhair.glb` | Earlier spider model, replaced in the terrarium by `live_tarantula.glb` (kept for reference; not placed in any scene) | Center origin. Separate so molt visuals can be added. |
 | `drop_pod.glb` | Pod hull, nose, hatch (`DropPod/PodModel`) | |
 | `aud1t.glb` | AUD-1T drone (`DropPod/AUD1T/DroneModel`) | Center origin. The game bobs it. |
 | `relay_mast.glb` | Mast and dish (`SatelliteRelay/MastModel`) | Model the spool bay empty; the spool is game-driven. |
@@ -22,8 +22,8 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `crop_stage_1.glb` | Sun-pod crop, growth stage 1: twin-leaf sprout (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/crop_stage_1.txt`). |
 | `crop_stage_2.glb` | Sun-pod crop, growth stage 2: leafy stalk and tight bud (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/crop_stage_2.txt`). |
 | `crop_stage_3.glb` | Sun-pod crop, growth stage 3: mature sun-pod (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/crop_stage_3.txt`). |
-| `crop_stage_wilted.glb` | Wilted, drooped crop (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/crop_stage_wilted.txt`). |
-| `live_tarantula.glb` | Live Curlyhair, a second take on the spider that matches the exuvia (not placed in any scene yet; `curlyhair.glb` is still the one in the terrarium) | 0.1 m voxels, origin at ground level, same footprint as `curlyhair`. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/live_tarantula.txt`). |
+| `crop_stage_wilted.glb` | Wilted, over-watered crop (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/crop_stage_wilted.txt`). |
+| `live_tarantula.glb` | Live Curlyhair, matching the exuvia (`Terrarium/Tarantula/SpiderModel`; replaced `curlyhair.glb` on 2026-11-22) | 0.1 m voxels, origin at ground level, same footprint as `curlyhair`. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/live_tarantula.txt`). |
 | `irrigation_junction.glb` | Drip-line valve and manifold junction (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Pack 3 grid (`tools/voxgen/sheets/irrigation_junction.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.

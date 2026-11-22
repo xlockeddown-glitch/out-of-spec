@@ -385,9 +385,9 @@ emit_energy_overrides = Dictionary[String, float]({
 greybox = [NodePath("../Glass"), NodePath("../Substrate"), NodePath("../HygroPod"), NodePath("../LampHead")]
 
 [node name="SpiderModel" type="Node3D" parent="Terrarium/Tarantula" node_paths=PackedStringArray("greybox")]
-position = Vector3(0, 0.25, 0)
+position = Vector3(0, 0.1, 0)
 script = ExtResource("5_slot")
-model_path = "res://assets/voxels/curlyhair.glb"
+model_path = "res://assets/voxels/live_tarantula.glb"
 model_scale = 0.1
 greybox = [NodePath("../Abdomen"), NodePath("../Cephalothorax"), NodePath("../Legs")]
 
