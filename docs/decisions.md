@@ -2,6 +2,10 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-22: Art requests favor what the game will use
+
+- Art requests to Gemini Neon should be for things we already know the game will use, such as the test equipment and the companies (Ryan). The agent reads this as also covering the canon characters, and as coming before open-ended props. The process is in [`workflow.md` §4](workflow.md#4-ryans-art-uploads).
+
 ## 2026-11-22: Milestone 3 plan and Tier 0 names
 
 - **Split milestone 3 in two** (Ryan). M3a: the five new sensors plus Tier 1 (Bram sells the field meter and the reference gauge after the first clean audit). M3b: the Tier 2 and 3 instruments, Kestrel's uncertified standards and their gates.
