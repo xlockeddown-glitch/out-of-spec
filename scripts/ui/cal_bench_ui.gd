@@ -10,6 +10,9 @@ signal closed
 
 var _ids: Array[String] = []
 var _current_id: String = ""
+## Budget and acceptance limit of the selected instrument against its standard.
+var _budget: Dictionary = {}
+var _limit: float = 0.0
 
 @onready var _instrument_option: OptionButton = %InstrumentOption
 @onready var _found_value: Label = %FoundValue
@@ -63,14 +66,16 @@ func _on_instrument_selected(index: int) -> void:
 	var sensor: DriftingSensor = GameState.get_sensor(_current_id)
 	if sensor == null:
 		return
+	_budget = GameState.calibration_budget(_current_id)
+	_limit = _budget.get("acceptance_limit", sensor.mpe)
 	for meter: BandMeter in [_found_meter, _left_meter]:
 		meter.mpe = sensor.mpe
-		meter.acceptance_ratio = sensor.acceptance_ratio
-	_mpe_label.text = "%s   MPE ±%s   ACCEPT ±%s (%d %% of MPE)" % [
-		sensor.quantity_name().capitalize(), _unsigned(sensor, sensor.mpe),
-		_unsigned(sensor, sensor.mpe * sensor.acceptance_ratio), roundi(sensor.acceptance_ratio * 100.0)]
+		meter.acceptance_ratio = _limit / sensor.mpe if sensor.mpe > 0.0 else 1.0
+	_mpe_label.text = "%s   MPE ±%s" % [sensor.quantity_name().capitalize(), _unsigned(sensor, sensor.mpe)]
 	_standard_label.text = _standard_text(_current_id)
-	_show_as_found(sensor, sensor.error)
+	# What the bench would read: the unit's error seen through the standard's.
+	var standard: DriftingSensor = GameState.get_sensor(_budget.get("standard_id", ""))
+	_show_as_found(sensor, sensor.error - (standard.error if standard else 0.0))
 	_left_value.text = "--"
 	_left_band.text = ""
 	_left_meter.show_needle = false
@@ -94,7 +99,7 @@ func _on_calibrate_pressed() -> void:
 	var sensor: DriftingSensor = GameState.get_sensor(_current_id)
 	_show_as_found(sensor, record["as_found"] as float)
 	var as_left: float = record["as_left"]
-	var left_band: int = record["as_left_band"]
+	var left_band: int = _bench_band(sensor, as_left)
 	_left_value.text = sensor.format_value(as_left)
 	_left_band.text = DriftingSensor.band_label(left_band)
 	_left_band.add_theme_color_override("font_color", DriftingSensor.band_color(left_band))
@@ -121,12 +126,22 @@ func _on_calibrate_pressed() -> void:
 
 
 func _show_as_found(sensor: DriftingSensor, value: float) -> void:
-	var band: int = sensor.band_for(value)
+	var band: int = _bench_band(sensor, value)
 	_found_value.text = sensor.format_value(value)
 	_found_band.text = DriftingSensor.band_label(band)
 	_found_band.add_theme_color_override("font_color", DriftingSensor.band_color(band))
 	_found_meter.value = value
 	_found_meter.show_needle = true
+
+
+## Bench colours follow the RSS acceptance limit, not the HUD's fixed ratio.
+func _bench_band(sensor: DriftingSensor, value: float) -> int:
+	match CalUncertainty.classify(value, sensor.mpe, _limit):
+		CalUncertainty.PASS:
+			return DriftingSensor.Band.IN_BAND
+		CalUncertainty.INDETERMINATE:
+			return DriftingSensor.Band.GUARDBAND
+	return DriftingSensor.Band.OUT_OF_TOLERANCE
 
 
 func _last_record_text(instrument_id: String) -> String:

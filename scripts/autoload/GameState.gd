@@ -202,8 +202,12 @@ func calibration_budget(instrument_id: String) -> Dictionary:
 ## fail result, and the standard's hidden error is carried into the unit. A
 ## TUR under the floor refuses the calibration: nothing changes and the
 ## returned dictionary has "refused": true and a "reason". Without a standard
-## (the remote zero) the result is plain pass / fail against the MPE.
-func calibrate(instrument_id: String, performed_by: String = "You", use_standard: bool = true) -> Dictionary:
+## (the remote zero) the result is plain pass / fail against the MPE, and the
+## zero is untraceable: it adjusts the unit but is not a calibration, so the
+## interval, due day and last calibration day stay as they were.
+## `bench_minutes` is copied onto the record (0 off the bench).
+func calibrate(instrument_id: String, performed_by: String = "You", use_standard: bool = true,
+		bench_minutes: float = 0.0) -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(instrument_id)
 	if sensor == null:
 		push_warning("GameState.calibrate: unknown instrument '%s'." % instrument_id)
@@ -233,17 +237,19 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 	# A pass only counts as interval evidence if the instrument has run at
 	# least half its interval since the last calibration, so re-calibrating
 	# the same day can't farm longer intervals or erase a shortened one.
+	var traceable: bool = standard != null
 	var previous_interval: int = sensor.cal_interval_days
 	var days_in_service: int = today - sensor.last_cal_day if sensor.last_cal_day >= 0 else previous_interval
 	var enough_service: bool = days_in_service >= ceili(previous_interval / 2.0)
-	if result == CalUncertainty.FAIL:
-		sensor.cal_interval_days = maxi(int(_interval_cfg("min_days", 2.0)),
-			previous_interval - int(_interval_cfg("shorten_days", 2.0)))
-	elif result == CalUncertainty.PASS and on_time and enough_service:
-		sensor.cal_interval_days = mini(int(_interval_cfg("max_days", 15.0)),
-			previous_interval + int(_interval_cfg("lengthen_days", 2.0)))
-	sensor.cal_due_day = today + sensor.cal_interval_days
-	sensor.last_cal_day = today
+	if traceable:
+		if result == CalUncertainty.FAIL:
+			sensor.cal_interval_days = maxi(int(_interval_cfg("min_days", 2.0)),
+				previous_interval - int(_interval_cfg("shorten_days", 2.0)))
+		elif result == CalUncertainty.PASS and on_time and enough_service:
+			sensor.cal_interval_days = mini(int(_interval_cfg("max_days", 15.0)),
+				previous_interval + int(_interval_cfg("lengthen_days", 2.0)))
+		sensor.cal_due_day = today + sensor.cal_interval_days
+		sensor.last_cal_day = today
 	var record: Dictionary = {
 		"instrument_id": instrument_id,
 		"unit": sensor.error_unit,
@@ -267,7 +273,8 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 		"tur": budget.get("tur"),
 		"acceptance_limit": limit,
 		"result": result,
-		"traceable": standard != null,
+		"traceable": traceable,
+		"bench_minutes": bench_minutes,
 		"standard_overdue": standard.is_overdue(today) if standard else false,
 		# Set by a recall (milestone 2) if the standard is later found out of tolerance.
 		"suspect": false,
@@ -282,11 +289,13 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 ## bench time passes on the game clock (instruments keep drifting meanwhile).
 ## The record gains "bench_minutes". A refused calibration takes no time.
 func calibrate_at_bench(instrument_id: String) -> Dictionary:
-	var record: Dictionary = calibrate(instrument_id, "You", true)
+	var sensor: DriftingSensor = get_sensor(instrument_id)
+	if sensor == null:
+		return {}
+	var minutes: float = sensor.bench_minutes
+	var record: Dictionary = calibrate(instrument_id, "You", true, minutes)
 	if record.is_empty() or record.get("refused", false):
 		return record
-	var minutes: float = get_sensor(instrument_id).bench_minutes
-	record["bench_minutes"] = minutes
 	if minutes > 0.0:
 		GameClock.advance(minutes / 1440.0)
 	return record
@@ -398,7 +407,10 @@ func _apply_audit_grace(report: Dictionary) -> void:
 	var names: PackedStringArray = []
 	for line: Dictionary in report["lines"]:
 		if line["violation"]:
-			calibrate(line["instrument_id"], "Manager")
+			# The manager uses the bench standard; if the TUR refuses, they zero it
+			# without one (untraceable) rather than claim a calibration that didn't happen.
+			if calibrate(line["instrument_id"], "Manager").get("refused", false):
+				calibrate(line["instrument_id"], "Manager", false)
 			line["fine"] = 0
 			line["waived"] = true
 			names.append(instrument_name(line["instrument_id"]).to_lower())

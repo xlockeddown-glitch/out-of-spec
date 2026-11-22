@@ -196,13 +196,65 @@ func test_remote_zero_is_untraceable() -> String:
 	var gs: GameStateScript = _make_state()
 	_set_day(gs.steering.cal_due_day)
 	gs.steering.error = gs.steering.mpe * 0.5
+	var before_interval: int = gs.steering.cal_interval_days
+	var before_due: int = gs.steering.cal_due_day
+	var before_last: int = gs.steering.last_cal_day
 	var record: Dictionary = gs.calibrate(gs.STEERING_ID, "You", false)
+	var after_error: float = gs.steering.error
+	var schedule_kept: bool = (gs.steering.cal_interval_days == before_interval
+		and gs.steering.cal_due_day == before_due and gs.steering.last_cal_day == before_last)
 	GameClock.elapsed_days = saved
 	gs.free()
 	if record["traceable"] or record["standard_id"] != "" or record["tur"] != null:
 		return "A zero without a standard must be untraceable with no TUR: %s" % record
 	if record["acceptance_limit"] != record["mpe"]:
 		return "Without a standard the acceptance limit is the MPE."
+	if not schedule_kept:
+		return "An untraceable zero must not change the interval, due day or last calibration day."
+	if absf(after_error) > absf(record["as_found"]):
+		return "An untraceable zero must still adjust the unit."
+	return ""
+
+
+func test_negative_as_found_with_opposite_standard_error() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var unit: DriftingSensor = gs.hygrometer
+	var standard: DriftingSensor = gs.get_sensor(unit.calibrated_by)
+	_set_day(unit.cal_due_day)
+	standard.error = standard.mpe * 0.5
+	unit.error = -unit.mpe * 1.2  # observed −1.2 × MPE − e_s: a clear fail on the negative side
+	var record: Dictionary = gs.calibrate(gs.HYGROMETER_ID)
+	var true_after: float = unit.error
+	GameClock.elapsed_days = saved
+	gs.free()
+	if absf(record["as_found"] - (-unit.mpe * 1.2 - standard.error)) > EPS:
+		return "Observed as-found must be e_unit − e_standard on the negative side, got %s." % record["as_found"]
+	if record["result"] != CalUncertainty.FAIL:
+		return "A negative as-found beyond −MPE must fail, got %s." % record["result"]
+	if absf(true_after - (standard.error + record["as_left"])) > EPS:
+		return "After adjustment the unit's true error must be e_standard + residual."
+	return ""
+
+
+func test_bench_refusal_takes_no_time() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var unit: DriftingSensor = gs.steering
+	var standard: DriftingSensor = gs.get_sensor(unit.calibrated_by)
+	_set_day(unit.cal_due_day)
+	standard.certificate_uncertainty = unit.mpe * standard.certificate_k
+	var start: float = GameClock.elapsed_days
+	var before_last: int = unit.last_cal_day
+	var record: Dictionary = gs.calibrate_at_bench(gs.STEERING_ID)
+	var elapsed: float = GameClock.elapsed_days - start
+	var last_after: int = unit.last_cal_day
+	GameClock.elapsed_days = saved
+	gs.free()
+	if not record.get("refused", false):
+		return "The setup must refuse: %s" % record
+	if elapsed != 0.0 or last_after != before_last:
+		return "A refused bench calibration must take no time and record nothing."
 	return ""
 
 

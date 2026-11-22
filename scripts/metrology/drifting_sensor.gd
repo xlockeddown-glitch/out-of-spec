@@ -180,7 +180,7 @@ func format_value(value: float, decimals: int = -1) -> String:
 func quantity_name() -> String:
 	match error_unit:
 		"degrees":
-			return "steering angle"
+			return "angle"
 		"percentage_points_rh":
 			return "relative humidity"
 		_:
