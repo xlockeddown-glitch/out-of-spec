@@ -16,8 +16,8 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `boulder_a.glb` … `boulder_d.glb` | Farm boulders (`Rocks/Rock<A–D>/Model`) | 0.2 m voxels, origin at ground level. Each fills its rock's box collider. Built from Gemini's layer grids (`tools/voxgen/sheets/boulder_a.txt` … `boulder_d.txt`). |
 | `tarantula_exuvia.glb` | Molted skin left after a molt (not placed in any scene yet) | 0.1 m voxels like `curlyhair`, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/tarantula_exuvia.txt`). |
 | `soil_moisture_probe.glb` | Hand soil-moisture probe with a front dial (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/soil_moisture_probe.txt`). |
-| `steering_encoder_jig.glb` | Steering-encoder calibration jig (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/steering_encoder_jig.txt`). |
-| `field_survey_tripod.glb` | Survey tripod with a target head (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/field_survey_tripod.txt`). |
+| `steering_encoder_jig.glb` | Steering-encoder calibration jig (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid, with Z = 2 corrected by Gemini Neon (`tools/voxgen/sheets/steering_encoder_jig.txt`). |
+| `field_survey_tripod.glb` | Survey tripod with a target head (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid for Z = 0 and Gemini Neon's corrected grids for Z = 1 to 13 (`tools/voxgen/sheets/field_survey_tripod.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 
