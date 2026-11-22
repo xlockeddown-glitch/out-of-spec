@@ -1,0 +1,29 @@
+tarantula_exuvia — 7 × 7 × 3 (X: 0..6 left→right, Y: 6..0 rear +Y → front -Y)
+X:    00 01 02 03 04 05 06
+
+Z = 0 (ground layer — splayed leg tips, hollow body floor, dark interior S)
+Y=06  E2 .. E1 E1 E1 .. E2   <- Leg 4L/4R tips + 3-wide abdomen rear (+Y)
+Y=05  .. E1 E1 S  E1 E1 ..   <- Leg 4L/4R mids + hollow abdomen floor (S)
+Y=04  E2 .. .. E1 .. .. E2   <- Leg 3L/3R tips + narrow pedicel waist
+Y=03  .. E1 E1 S  E1 E1 ..   <- Leg 3L/3R mids + hollow cephalothorax floor (S)
+Y=02  E2 .. E1 S  E1 .. E2   <- Leg 2L/2R tips + hollow cephalothorax floor (S)
+Y=01  .. .. E1 E1 E1 .. ..   <- Front cephalothorax rim / carapace hinge base
+Y=00  E2 E1 .. .. .. E1 E2   <- Leg 1L/1R splayed forward (-Y)
+
+Z = 1 (thin papery hollow walls, crumpled abdomen rim, arched mid-front knees, lid hinge)
+Y=06  .. .. E2 E1 E2 .. ..   <- Crumpled 3-wide abdomen rim with E2 gold speckles
+Y=05  .. .. .. .. E2 .. ..   <- Left wall collapsed/crumpled; open center reveals S; E2 speckle on right wall
+Y=04  .. .. .. .. .. .. ..   <- Flat 1-voxel-thick waist
+Y=03  .. .. E1 .. E1 .. ..   <- Open cephalothorax walls (center open, reveals S below)
+Y=02  .. E1 E1 .. E1 E1 ..   <- Slightly arched Leg 2L/2R knees + open cephalothorax walls
+Y=01  .. .. E1 E1 E1 .. ..   <- Hinged lower edge of flipped-open carapace lid
+Y=00  .. .. .. .. .. .. ..   <- Clear underneath flipped lid tip
+
+Z = 2 (flipped-open carapace lid apex at front -Y)
+Y=06  .. .. .. .. .. .. ..
+Y=05  .. .. .. .. .. .. ..
+Y=04  .. .. .. .. .. .. ..
+Y=03  .. .. .. .. .. .. ..
+Y=02  .. .. .. .. .. .. ..
+Y=01  .. .. .. .. .. .. ..
+Y=00  .. .. .. E1 .. .. ..   <- 1-voxel-thick carapace lid tipped open at 45° forward

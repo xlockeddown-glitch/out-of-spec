@@ -73,7 +73,7 @@ Superseded in part by the Neon concept sheet section below: the whip and `emit_a
   - lamp hood: `#9E7D3B` (B)
   - lamp bulb: `emit_heat_lamp`, `#F5A623`
 - **From B:** the water dish and the bark slab tilted into the back corner.
-- **Spider:** *Tliltocatl albopilosus*, a separate model. The pre-molt squash (scale) already applies to it, and it is hidden while molted (until the spool is taken). A voxel exuvia is not built yet.
+- **Spider:** *Tliltocatl albopilosus*, a separate model. The pre-molt squash (scale) already applies to it, and it is hidden while molted (until the spool is taken); a voxel exuvia exists (`tarantula_exuvia.glb`) but is not placed yet.
   - carapace `#261710` (A)
   - gold curly tips `#D4A359` (A), on leg tips and joints and as abdomen speckle
   - B's shape: 3 × 4 abdomen, 2 × 2 prosoma, center origin
@@ -237,3 +237,4 @@ Where the generated models differ from the footprints above:
   - Untilled: layer 0 all U1, layer 1 flat with speckles and six 2-voxel pebbles. U1 tan `#78563B`, U2 light `#A98463`, U3 dark `#563D26`. Which of U2 and U3 is light is an assumption; the grid does not say.
   - Tilled: layer 0 all T2 (`#2A1D15`, the wet trough floor). Layer 1 is ridges of T1 (`#442E21`) speckled with T3 (`#2D1E14`), with empty rows at Y = 2, 5, 8, 11, 14 and 17 as the furrows, running along X. No shadow-edge color.
   - Placement: `SoilGrid` sits at y = −0.05 m, so with 0.2 m cells centered on y = 0.05 m each tile's base layer spans −0.05 m to 0.05 m and its top layer 0.05 m to 0.15 m. That keeps the furrow floor 0.05 m above the Ground top (y = 0), so the furrows show `#2A1D15` and not the ground, with no z-fighting. The height is a tuning choice, not from a spec. The rover still drives on the Ground (y = 0), so its wheels sink up to 0.15 m into the tile tops; the tiles have no collision. Before this the base layer was buried (−0.15 m to −0.05 m) and the furrows showed the green ground.
+- **Tarantula exuvia** (`tarantula_exuvia`, 0.1 m): 7 × 3 × 7 voxels (0.7 m × 0.3 m × 0.7 m), the same footprint as `curlyhair`. Built voxel for voxel by `tarantula_exuvia()` from Gemini's grid in `tools/voxgen/sheets/tarantula_exuvia.txt`, turned 180° so its front faces −Z like the spider's. E1 husk cream `#E8D4A8`, E2 gold tips `#C6944E` (both sampled from the concept), S hollow interior in shadow `#1D222B`. Origin at the footprint center, on the ground. The grid is coarser than Gemini's render (short single-voxel legs; the leg tips and lid apex touch the body only at edges), and the grid wins. Not placed in any scene yet.

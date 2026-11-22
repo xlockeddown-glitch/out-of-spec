@@ -621,6 +621,23 @@ def soil_sheet(tilled: bool) -> Model:
     return m
 
 
+# ---------------------------------------------------------------- tarantula exuvia
+def tarantula_exuvia() -> Model:
+    """The Curlyhair's shed skin, built voxel for voxel from Gemini's 7 x 7 x 3 layer grid
+    (sheets/tarantula_exuvia.txt). 0.1 m voxels like curlyhair, origin at the footprint
+    center on the ground. Turned 180 degrees from the sheet so its front faces -z, as
+    curlyhair's does. E1 husk cream, E2 gold tips/speckle (sampled off the concept),
+    S = the hollow interior in shadow."""
+    colors = {"E1": "#E8D4A8", "E2": "#C6944E", "S": SHADOW}
+    m = Model("tarantula_exuvia", offset=(-3.5, 0.0, -3.5))
+    for layer, rows in token_sheet("tarantula_exuvia.txt").items():
+        for row_i, row in enumerate(rows):          # row 0 = rear (+Y)
+            for x, cell in enumerate(row):
+                if cell != "..":
+                    m.put("husk", 6 - x, layer, 6 - row_i, colors[cell])
+    return m
+
+
 MODELS = [
     (lambda: tractor(False), 0.1), (lambda: tractor(True), 0.1),
     (terrarium, 0.1), (curlyhair, 0.1), (bram_bay, 0.2), (ore_fissure, 0.2),
@@ -633,6 +650,7 @@ MODELS = [
     (lambda: boulder_sheet("boulder_c", "boulder_c.txt"), 0.2),
     (lambda: boulder_sheet("boulder_d", "boulder_d.txt"), 0.2),
     (lambda: soil_sheet(False), 0.1), (lambda: soil_sheet(True), 0.1),
+    (tarantula_exuvia, 0.1),
 ]
 
 
