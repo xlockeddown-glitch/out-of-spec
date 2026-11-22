@@ -10,14 +10,13 @@ Ryan wants players to share the game: co-op at least, and more players later if 
 - **Connection:** online. One player hosts and friends join; no dedicated servers.
 - **Timing:** prepare now, build later. Co-op gets its own milestone after robots (milestone 5). Until then, new code follows the co-op-ready rules in the README's [ground rules](../README.md#ground-rules-every-task).
 
-Open questions (not decided; ask Ryan before building on them):
+Ryan's answers to the open questions (2026-11-22):
 
-- Are skills (milestone 4) per player, shared by the farm, or both?
-- Are credits one farm wallet or one wallet per player?
-- Does each player get a rover, or do players share the one?
-- Does the farm only exist while the host is playing, or can guests play without the host?
-- Whose save is it: the host's only?
-- Who can pause or skip time (sleep, bench minutes) when several players are in?
+- **Skills (milestone 4): both.** Each player has their own skills, and the farm has shared ones too. Milestone 4 decides which skill goes where.
+- **Credits:** one shared farm wallet. Vance fines the farm, OIRM bills the farm, and everyone spends from the same pot.
+- **Rovers:** the farm starts with one shared rover and can buy more as it grows. Each rover's steering sensor is its own instrument to keep calibrated.
+- **Save:** the farm lives in the host's save and exists only while the host plays. A guest's personal skills travel with the guest.
+- **Time:** the day ends only when every player is in bed. Waiting out time (for example at the bench) works only in solo play.
 
 ## 2026-11-22: PR checks, second review and merging
 
