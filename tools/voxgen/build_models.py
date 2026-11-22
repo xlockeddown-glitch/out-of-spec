@@ -692,6 +692,18 @@ CLUTTER = {
                        "S": SHADOW},
 }
 
+# Ryan's Farm Logistics pack (2026-11-22, 0.1 m voxels): a water cistern, a harvest crate and a
+# shipping pallet. Colors are his generator's own (the cistern reuses the irrigation junction's
+# steel and brass; the crate's pods are the sun-pod C1/C2). Built and turned like the field props.
+# Not placed in any scene yet.
+LOGISTICS = {
+    "water_cistern": {"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "B1": "#D9A13B",
+                      "S": SHADOW},
+    "harvest_crate": {"O1": "#E85D25", "O2": "#B54414", "M3": "#2E3844",
+                      "C1": CROP_SUNPOD["C1"], "C2": CROP_SUNPOD["C2"], "S": SHADOW},
+    "shipping_pallet": {"W1": "#8C6742", "W2": "#6B4D30", "M3": "#2E3844", "S": SHADOW},
+}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop") -> Model:
@@ -732,6 +744,7 @@ MODELS = [
     *[((lambda n=n: prop_sheet(f"crop_stage_{n}", CROP_SUNPOD, "crop")), 0.1) for n in range(4)],
     *[((lambda n=n: prop_sheet(n, *PACK3[n])), 0.1) for n in PACK3],
     *[((lambda n=n: prop_sheet(n, CLUTTER[n])), 0.2) for n in CLUTTER],
+    *[((lambda n=n: prop_sheet(n, LOGISTICS[n])), 0.1) for n in LOGISTICS],
 ]
 
 

@@ -28,6 +28,9 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `mesa_scrub_bush.glb` | Wind-bent sage scrub, 2.0 m across and 1.6 m tall (not placed in any scene yet) | 0.2 m voxels, origin at ground level. Built from Ryan's Plateau Clutter grid (`tools/voxgen/sheets/mesa_scrub_bush.txt`). |
 | `scatter_pebbles_cluster.glb` | Three flat-topped plateau cobbles, 2.0 m × 1.6 m (not placed in any scene yet) | 0.2 m voxels, origin at ground level. Built from Ryan's Plateau Clutter grid (`tools/voxgen/sheets/scatter_pebbles_cluster.txt`). |
 | `mesa_dry_stump.glb` | Sun-bleached dry stump on red dust, 1.2 m tall (not placed in any scene yet) | 0.2 m voxels, origin at ground level. Built from Ryan's Plateau Clutter grid (`tools/voxgen/sheets/mesa_dry_stump.txt`). |
+| `water_cistern.glb` | Steel water cistern with pipe outlets and a brass handwheel, 1.6 m across and 1.8 m tall (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Farm Logistics grid (`tools/voxgen/sheets/water_cistern.txt`). |
+| `harvest_crate.glb` | Safety-orange crate packed with sun-pods, 1.0 m × 0.8 m × 0.6 m (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Farm Logistics grid (`tools/voxgen/sheets/harvest_crate.txt`). |
+| `shipping_pallet.glb` | Slatted wood pallet with steel corner shoes, 1.4 m × 1.2 m × 0.3 m (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Ryan's Farm Logistics grid (`tools/voxgen/sheets/shipping_pallet.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 
