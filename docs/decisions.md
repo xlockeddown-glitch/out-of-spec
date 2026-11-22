@@ -2,6 +2,52 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-22: Story path ("The Silk Standard")
+
+Four models drafted a story arc from the same brief without seeing each other's drafts (Claude Opus, Claude Sonnet, Fable, Gemini Hydrogen; GPT skipped under the usage limit to 2026-11-24). The drafts, the brief and the comparison are in [`story/`](story/). Ryan picked one fork at a time over six rounds. The merged story is [`story/story.md`](story/story.md).
+
+Ryan chose:
+
+- **Title:** *The Silk Standard*.
+- **Why you are on Mars:** fine-print indenture. A recruitment drive's small print turned your certification into a five-year colony metrology contract (Gemini draft).
+- **Corporation:** Brightwell-Nonesuch Habitats (BNH), "Every Sticker Counts" (Sonnet draft).
+- **Manager:** a former bench metrologist promoted to orbital dispatch. She rides down in secret the night before the first failing audit, fixes the bench and leaves a mug ring; she never mentions it (Fable draft).
+- **Rival rogue lab:** BNH buys Chet's outfit and runs it as a corporate lab that skips calibrations (Fable and Opus drafts).
+- **Act III crisis:** a shutdown deadline. BNH will close the colony unless the lab passes the OIRM master audit (Gemini draft).
+- **Lin's spider fear:** the greenhouse incident. A hygrometer read fine while a sealed greenhouse dried out, and the conservatory's Curlyhairs came through the vents looking for moisture. Her arc is learning it was the hygrometer (Fable draft).
+- **Kestrel:** the contractor before you. She refused to sign off the greenhouse sensors, was overruled, took the blame and lost her certification (Fable draft). Her arc ends with her selling your slings off-world.
+- **Off-planet harvest:** proves Mars can export something real.
+- **Robot helper:** Jig-1 to Jig-3, then the humanoid Sora-7 (Gemini draft). When Sora-7 asks for its own OIRM credential, the player chooses; either way it never calibrates itself.
+- **OIRM auditors:** CLADEUS, GEMINID, CHATTERLY-PT and SPACEFLUX-SI (Sonnet draft).
+- **Old Orin:** signed the colony's site survey with an overdue instrument, so the colony sits in the wrong place; the beacons are his penance (Fable draft).
+- **Vance:** once a real inspector, he defies BNH by following OIRM rules exactly (Fable draft).
+- **Chet, after his lab collapses:** a humbler errand runner, still guessing by eye (Gemini draft).
+- **Way back from rogue:** the Long Recal, a multi-day recalibration and a hard audit with no grace, rewarded with a "Returned to Spec" stamp (Opus draft).
+- **No band above ACCREDITED.**
+- **More tarantulas, throughout.** Ryan rejected every proposed ending set: "not enough tarantula incorporation in general". He then chose:
+  - each act's key unlock needs a new morph's silk;
+  - the intrinsic standard is made of silk;
+  - spiders go off-planet: the off-planet site needs a spider colony to keep its instruments in tolerance.
+- **Endings:**
+  - **Main:** silk ships first. The first Mars export that passes OIRM is certified tarantula silk, measured against the silk intrinsic standard, with the crops on the same rocket.
+  - **Rogue:** the spiders run the dome.
+  - **Ultimate breed:** a morph with every silk trait, bred by crossing all five alien morphs. Its climate band is the tightest in the game, so only a fully calibrated dome can hold it.
+  - **Breeder:** you let metrology slide and become Mars's tarantula breeder.
+  - Not kept: the specialist ending and a separate "Returned to Spec" ending.
+
+Agent's notes (flagged for Ryan, not his words):
+
+- Names the agent filled in from the drafts to match Ryan's picks, all open to change:
+  - the manager is **Odalys Brandt** (Fable's name for the option he chose);
+  - the shutdown plan is **Project Sunsetting** (Gemini);
+  - Chet's BNH lab is **Certainty Plus** (Fable);
+  - the remote link is **the Gossamer link**, whose antenna needs Silk-Spinner silk (Fable, and fits the morph-per-act rule);
+  - the off-planet site is a robot-and-spider greenhouse on Phobos, **the Larder** (Fable);
+  - the colony is **Pavonis Shelf Station** (Fable).
+- Which morph unlocks which act, which silk the intrinsic standard uses, and the ultimate breed's name are the agent's proposals in `story.md`, marked (proposed).
+- The indenture premise is darker than the canon tone. `story.md` plays it as fine-print comedy, not hardship.
+- The specialist path stays as gameplay (Ryan's earlier call); only its separate ending was dropped.
+
 ## 2026-11-22: Art requests favor what the game will use
 
 - Art requests to Gemini Neon should be for things we already know the game will use, such as the test equipment and the companies (Ryan). The agent reads this as also covering the canon characters, and as coming before open-ended props. The process is in [`workflow.md` §4](workflow.md#4-ryans-art-uploads).
