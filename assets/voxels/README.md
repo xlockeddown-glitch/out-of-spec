@@ -18,6 +18,10 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `soil_moisture_probe.glb` | Hand soil-moisture probe with a front dial (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/soil_moisture_probe.txt`). |
 | `steering_encoder_jig.glb` | Steering-encoder calibration jig (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/steering_encoder_jig.txt`). |
 | `field_survey_tripod.glb` | Survey tripod with a target head (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/field_survey_tripod.txt`). |
+| `crop_stage_0.glb` | Sun-pod crop, growth stage 0: seeded mound (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/crop_stage_0.txt`). |
+| `crop_stage_1.glb` | Sun-pod crop, growth stage 1: twin-leaf sprout (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/crop_stage_1.txt`). |
+| `crop_stage_2.glb` | Sun-pod crop, growth stage 2: leafy stalk and tight bud (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/crop_stage_2.txt`). |
+| `crop_stage_3.glb` | Sun-pod crop, growth stage 3: mature sun-pod (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/crop_stage_3.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 
