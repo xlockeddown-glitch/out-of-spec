@@ -6,7 +6,7 @@
       "id": "disp_01",
       "sender": "Orbital Compliance",
       "severity": "warning",
-      "text": "Reminder: Tractor wheel circumference exceeds nominal spec by 1.4%. Any unauthorized harvest mileage will be billed as recreational joyriding."
+      "text": "Reminder: Tractor wheel circumference exceeds nominal spec by 1.4 %. Any unauthorized harvest mileage will be billed as recreational joyriding."
     },
     {
       "id": "disp_02",
@@ -42,7 +42,7 @@
       "id": "disp_07",
       "sender": "HR & Morale",
       "severity": "info",
-      "text": "Outpost loneliness is down 4% after we reclassified talking to your rover as 'verbal diagnostics.'"
+      "text": "Outpost loneliness is down 4 % after we reclassified talking to your rover as 'verbal diagnostics.'"
     },
     {
       "id": "disp_08",
@@ -60,14 +60,14 @@
       "id": "disp_10",
       "sender": "Drop-Pod Dispatch",
       "severity": "info",
-      "text": "Your replacement reference weight fell off the cargo rail at 12,000 meters. Please re-zero it before use."
+      "text": "Your replacement reference weight fell off the cargo rail at 12 000 meters. Please re-zero it before use."
     }
   ],
   "audit_fines": [
     {
       "id": "fine_01",
       "title": "Unapproved Arachnid-Assisted Telemetry",
-      "reason": "Used homegrown tarantula silk to out-perform a 40,000-credit corporate transceiver.",
+      "reason": "Used homegrown tarantula silk to out-perform a 40 000-credit corporate transceiver.",
       "credit_penalty": 175,
       "snarky_footer": "Innovation without a Form 88-C is just vandalism with better tolerances."
     },
@@ -97,7 +97,7 @@
       "title": "Excessive Signal Clarity",
       "reason": "Satellite relay latency dropped below your paid subscription tier.",
       "credit_penalty": 210,
-      "snarky_footer": "Upgrade to Platinum Uplink or kindly re-introduce 200ms of lag."
+      "snarky_footer": "Upgrade to Platinum Uplink or kindly re-introduce 200 ms of lag."
     }
   ],
   "npcs": {

@@ -42,8 +42,8 @@ func _ready() -> void:
 
 func configure(relay_name: String, mpe_deg: float, acceptance_ratio: float) -> void:
 	_relay_label.text = relay_name
-	_tolerance_label.text = "MPE ±%.2f°   ACCEPT ±%.2f° (%d%%)" % [
-		mpe_deg, mpe_deg * acceptance_ratio, roundi(acceptance_ratio * 100.0)]
+	_tolerance_label.text = "MPE ±%s°   ACCEPT ±%s° (%d %%)" % [
+		SP811.number(mpe_deg, 2), SP811.number(mpe_deg * acceptance_ratio, 2), roundi(acceptance_ratio * 100.0)]
 
 
 func set_uplink(has_los: bool, quality: float, lag_s: float) -> void:
@@ -57,7 +57,7 @@ func set_uplink(has_los: bool, quality: float, lag_s: float) -> void:
 
 ## band is a DriftingSensor.Band value.
 func set_drift(drift_deg: float, band: int) -> void:
-	_drift_value.text = "%+.2f°" % drift_deg
+	_drift_value.text = SP811.signed(drift_deg) + "°"
 	match band:
 		DriftingSensor.Band.IN_BAND:
 			_set_status("IN TOLERANCE", COLOR_OK)
@@ -71,7 +71,7 @@ func set_relay(slotted: bool, spools: int, can_slot: bool) -> void:
 	_relay_status_label.text = "RELAY: OPTICAL SILK" if slotted else "RELAY: STOCK TRANSCEIVER"
 	_relay_status_label.add_theme_color_override(
 		"font_color", Color(0.45, 0.9, 1) if slotted else Color(0.4, 0.7, 0.45))
-	_spool_label.text = "SILK x%d" % spools
+	_spool_label.text = "SILK SPOOLS %d" % spools
 	_slot_spool_button.disabled = not can_slot
 
 
@@ -80,7 +80,7 @@ func set_clock(text: String) -> void:
 
 
 func set_credits(credits: int) -> void:
-	_credits_label.text = "%d CR" % credits
+	_credits_label.text = "%s CR" % SP811.integer(credits)
 	_credits_label.add_theme_color_override("font_color", COLOR_FAIL if credits < 0 else COLOR_WARN)
 
 

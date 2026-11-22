@@ -30,8 +30,13 @@ scripts/dome/       dome interior + terrarium visuals
 assets/voxels/   MagicaVoxel exports (Week 4)
 docs/design/     concept blueprint, art bible, Week 2 board (ignored by Godot via docs/.gdignore)
 docs/canon.md      which design source wins (merged art bibles)
+docs/sp811.md      NIST SP 811 rules for player-facing text
 docs/decisions.md  design calls that shape code and data
 ```
+
+## Local checks
+
+Before pushing: open the project in Godot 4.7 with no errors in Output, and run `python tools/check_sp811.py` (NIST SP 811 text rules, see `docs/sp811.md`).
 
 ## Data
 

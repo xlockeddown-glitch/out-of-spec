@@ -60,7 +60,7 @@
     "optical_silk_yield": null,
     "lag_reduction_pct": 25,
     "output": "Standard optical silk",
-    "unlock": "Cuts Day 1 tractor input lag when slotted into the dish (bible: 25%)."
+    "unlock": "Cuts Day 1 tractor input lag when slotted into the dish (bible: 25 %)."
   },
   {
     "id": "terracotta_knee",

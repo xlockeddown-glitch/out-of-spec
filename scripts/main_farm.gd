@@ -65,12 +65,14 @@ func _on_zero_pressed() -> void:
 
 
 func _on_steering_zeroed(record: Dictionary) -> void:
-	_hud.push_log("As-found %+.2f°  As-left %+.2f°" % [record.get("as_found", 0.0), record.get("as_left", 0.0)])
+	_hud.push_log("As-found %s°  As-left %s°  Next due day %d (%d d)" % [
+		SP811.signed(record.get("as_found", 0.0)), SP811.signed(record.get("as_left", 0.0)),
+		record.get("due_day", 0), record.get("interval_days", 0)])
 
 
 func _on_slot_spool_pressed() -> void:
 	if GameState.slot_spool_into_relay():
-		_hud.push_log("Optical silk spool installed. Uplink lag x%.2f." % GameState.get_relay_lag_multiplier())
+		_hud.push_log("Optical silk spool installed. Uplink lag × %s." % SP811.number(GameState.get_relay_lag_multiplier(), 2))
 
 
 func _on_silk_changed(_spools: int) -> void:

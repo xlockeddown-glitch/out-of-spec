@@ -51,15 +51,18 @@ func _process(delta: float) -> void:
 
 
 func _refresh_status() -> void:
-	_clock_label.text = "%s   %d CR" % [GameClock.format_now(), GameState.credits]
+	_clock_label.text = "%s   %s CR" % [GameClock.format_now(), SP811.integer(GameState.credits)]
 	var hygro: DriftingSensor = GameState.hygrometer
 	var reading: String = "--"
 	var ideal: Variant = GameState.get_dome_species().get("ideal_humidity_pct")
 	if typeof(ideal) == TYPE_FLOAT or typeof(ideal) == TYPE_INT:
-		reading = "%.1f %%RH" % (float(ideal) + hygro.error)
-	_hygro_label.text = "HYGROMETER READS  %s" % reading
+		reading = SP811.number(float(ideal) + hygro.error, 1) + " %"
+	_hygro_label.text = "RELATIVE HUMIDITY  %s" % reading
 	var band: int = hygro.get_band()
-	_hygro_band_label.text = DriftingSensor.band_label(band)
+	var today: int = GameClock.get_day_index()
+	var due_text: String = ("CAL OVERDUE (due day %d)" % hygro.cal_due_day if hygro.is_overdue(today)
+		else "cal due day %d" % hygro.cal_due_day)
+	_hygro_band_label.text = "%s  ·  %s" % [DriftingSensor.band_label(band), due_text]
 	_hygro_band_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
 
 	_molt_bar.value = GameState.molt_progress
@@ -67,17 +70,17 @@ func _refresh_status() -> void:
 		GameState.MoltStage.MOLTED:
 			_molt_label.text = "MOLTED: optical silk spool ready"
 		GameState.MoltStage.PRE_MOLT:
-			_molt_label.text = "PRE-MOLT  %d%%" % roundi(GameState.molt_progress * 100.0)
+			_molt_label.text = "PRE-MOLT  %d %%" % roundi(GameState.molt_progress * 100.0)
 		_:
 			_molt_label.text = ("MOLT PAUSED: hygrometer out of tolerance" if GameState.is_molt_paused()
-				else "MOLT  %d%%" % roundi(GameState.molt_progress * 100.0))
+				else "MOLT  %d %%" % roundi(GameState.molt_progress * 100.0))
 	_silk_label.text = "SILK SPOOLS %d   RELAY: %s" % [
 		GameState.optical_silk_spools, "OPTICAL SILK" if GameState.relay_slotted else "STOCK"]
 
 
 func _on_terrarium_clicked() -> void:
 	var species: Dictionary = GameState.get_dome_species()
-	_toast("%s: ideal %s °C / %s %%RH. Keep the hygrometer within MPE to progress the molt." % [
+	_toast("%s: ideal %s °C, relative humidity %s %%. Keep the hygrometer within MPE to progress the molt." % [
 		_field(species, "common_name", "?"), _field(species, "ideal_temp_c", "?"), _field(species, "ideal_humidity_pct", "?")])
 
 
@@ -99,15 +102,25 @@ static func _field(record: Dictionary, key: String, fallback: String) -> String:
 
 
 func _on_audit_completed(report: Dictionary) -> void:
+	if report.get("warning", false):
+		_toast("AUDIT DAY %d: WARNING ONLY. Your manager recalibrated %s before Vance got in. One time only." % [
+			report.get("day", 0), report.get("waived_names", "")])
+		return
 	if report.get("passed", true):
 		_toast("AUDIT DAY %d: PASS. Vance is disappointed." % report.get("day", 0))
 		return
 	var failing: PackedStringArray = []
 	for line: Dictionary in report.get("lines", []):
-		if line.get("out_of_tolerance", false):
-			failing.append(str(GameState.INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"])))
-	_toast("AUDIT DAY %d: FINE %d CR. Out of tolerance: %s. Details on the phone log." % [
-		report.get("day", 0), report.get("total_fine", 0), ", ".join(failing)])
+		if line.get("violation", false):
+			var name_text: String = str(GameState.INSTRUMENT_NAMES.get(line["instrument_id"], line["instrument_id"]))
+			var why: PackedStringArray = []
+			if line.get("out_of_tolerance", false):
+				why.append("out of tolerance")
+			if line.get("overdue", false):
+				why.append("overdue")
+			failing.append("%s (%s)" % [name_text, ", ".join(why)])
+	_toast("AUDIT DAY %d: FINE %s CR. %s. Details on the phone log." % [
+		report.get("day", 0), SP811.integer(int(report.get("total_fine", 0))), ", ".join(failing)])
 
 
 func _toast(text: String) -> void:
