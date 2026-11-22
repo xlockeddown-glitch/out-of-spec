@@ -543,69 +543,10 @@ def relay_mast() -> Model:
 
 
 # ---------------------------------------------------------------- boulders
-# Concepts from Gemini (2026-11-21): boulder_a as a layer grid (sheets/boulder_a.txt),
-# b-d as rendered concept images only, rebuilt here by boulder_block. Plateau palette
-# from the ore fissure; each fills its greybox box collider. Z=0 sits on the ground.
+# Concepts from Gemini (2026-11-21) as layer grids (sheets/boulder_a.txt .. boulder_d.txt),
+# built voxel for voxel by boulder_sheet. Plateau palette from the ore fissure; each
+# fills its greybox box collider. Z=0 sits on the ground.
 PLATEAU = ("#A8422B", "#8E3522", "#6E2617", "#5E2214")  # clay, clay 2, rust crust, crack
-
-
-def boulder_block(name: str, w: int, h: int, d: int, *, chamfer: int, bands: dict[int, int],
-                  crack: list[tuple[int, int]], crack_depth: int, lean: int = 0,
-                  top_slot: tuple[int, int] | None = None) -> Model:
-    """A boulder following Gemini's rendered concept (no layer grid): a chamfered block,
-    Z=0 on the ground, origin on the footprint center. `bands` maps a layer to a PLATEAU
-    index (1 = clay 2, 2 = rust crust) for the strata lines; the top layer is a rust crust
-    inset one voxel from a clay rim. `crack` is (layer, x) points down the front (+z)
-    face, cut `crack_depth` voxels in with a SHADOW floor. `lean` pulls the +x face in by
-    that many voxels at the top. `top_slot` = (x, z_from) cuts the crack back across the
-    top as a slot from the front edge to z_from."""
-    clay, clay2, crust, dark = PLATEAU
-    m = Model(name, offset=(-w / 2.0, 0.0, -d / 2.0))
-    for y in range(h):
-        bevel = 1 if y in (0, h - 1) else 0  # small step at the base and the top edge
-        c = chamfer + bevel
-        x_max = w - 1 - bevel - round(lean * y / max(h - 1, 1))
-        for x in range(bevel, x_max + 1):
-            for z in range(bevel, d - bevel):
-                # cut corners: stepped chamfer measured from the nearest corner
-                ex = min(x - bevel, x_max - x)
-                ez = min(z - bevel, d - 1 - bevel - z)
-                if ex + ez < c:
-                    continue
-                color = (clay, clay2, crust)[bands.get(y, 0)]
-                if y == h - 1 and ex >= 1 and ez >= 1:
-                    color = dark
-                m.put("rock", x, y, z, color)
-    # crack, 2 voxels wide: interpolate the polyline layer by layer and cut in from the
-    # front face; the walls take the dark crack color and the floor is SHADOW
-    pts = sorted(crack)
-    cut: set[tuple[int, int, int]] = set()
-    floor: set[tuple[int, int, int]] = set()
-    for (y0, x0), (y1, x1) in zip(pts, pts[1:]):
-        for y in range(y0, y1 + 1):
-            xc = round(x0 + (x1 - x0) * (y - y0) / max(y1 - y0, 1))
-            for x in (xc, xc + 1):
-                front = max((z for (vx, vy, z) in m.voxels if vx == x and vy == y), default=None)
-                if front is None:
-                    continue
-                cut.update((x, y, z) for z in range(front - crack_depth + 1, front + 1))
-                floor.add((x, y, front - crack_depth))
-    if top_slot:
-        sx, z_from = top_slot
-        for z in range(z_from, d):
-            for x in (sx, sx + 1):
-                cut.update({(x, h - 1, z), (x, h - 2, z)})
-                floor.add((x, h - 3, z))
-    for v in cut:
-        m.clear(*v)
-    for (x, y, z) in cut:
-        for nx in (x - 1, x + 1):
-            if (nx, y, z) in m.voxels and (nx, y, z) not in floor:
-                m.put("rock", nx, y, z, dark)
-    for v in floor - cut:
-        if v in m.voxels:
-            m.put("rock", *v, SHADOW)
-    return m
 
 
 def boulder_sheet(name: str, sheet: str) -> Model:
@@ -641,26 +582,36 @@ def boulder_sheet(name: str, sheet: str) -> Model:
 # GridMap items for FarmGrid.Tile (0 = untilled, 1 = tilled), built into
 # assets/voxels/soil_tiles.tres by tools/voxgen/build_soil_library.gd. 19 x 2 x 19
 # voxels at 0.1 m = 1.9 m x 0.2 m x 1.9 m in a 2 m x 0.2 m x 2 m cell, centered on
-# the cell (voxel rows -1 and 0). Base colors are the greybox tile colors.
-def soil_tile(tilled: bool) -> Model:
-    import random
-    rng = random.Random(11 if tilled else 7)
-    m = Model("soil_tilled" if tilled else "soil_untilled", offset=(-9.5, 0.0, -9.5))
+# the cell (voxel rows -1 and 0). Colors sampled off the Gemini concepts.
+def soil_sheet(tilled: bool) -> Model:
+    """Built from a top-view sheet (sheets/soil_tilled.txt, sheets/soil_untilled.txt),
+    sampled off Gemini's concepts (2026-11-21). One character per voxel column, first row
+    = back (-z). Tilled: R/D ridges stand on layer 0 over a layer -1 base, E/G furrows
+    are layer -1 only. Untilled: B/L/D are a flush 2-layer slab, the letter coloring the
+    top layer."""
+    import re
+    name = "soil_tilled" if tilled else "soil_untilled"
+    rows = [line for line in (Path(__file__).parent / "sheets" / f"{name}.txt")
+            .read_text(encoding="utf-8").splitlines() if re.fullmatch(r"[BLDREG]{19}", line)]
+    assert len(rows) == 19, f"{name}.txt: {len(rows)} rows, need 19"
+    m = Model(name, offset=(-9.5, 0.0, -9.5))
     if tilled:
-        crest, trough, base = ("#3D2919", "#2E1F13", "#33231A")
+        top = {"R": "#442E21", "D": "#2D1E14"}             # ridge, ridge speckle
+        floor = {"E": "#1A100A", "G": "#2A1D15"}           # furrow shadow edge, furrow floor
+        under = "#33231A"                                  # layer -1 below the ridges
     else:
-        base = "#785A3D"
-        dry, dark = "#866648", "#6A4F35"
-    for x in range(19):
-        for z in range(19):
+        top = {"B": "#78563B", "L": "#A98463", "D": "#563D26"}
+    for z, row in enumerate(rows):
+        for x, cell in enumerate(row):
             if tilled:
-                m.put("soil", x, -1, z, trough if z % 3 == 0 else base)
-                if z % 3 != 0:  # furrow ridges run along X; every third row is a trough
-                    m.put("soil", x, 0, z, crest if rng.random() < 0.8 else trough)
+                if cell in top:
+                    m.put("soil", x, -1, z, under)
+                    m.put("soil", x, 0, z, top[cell])
+                else:
+                    m.put("soil", x, -1, z, floor[cell])
             else:
-                m.put("soil", x, -1, z, base)
-                roll = rng.random()
-                m.put("soil", x, 0, z, dry if roll < 0.2 else dark if roll < 0.35 else base)
+                m.put("soil", x, -1, z, top["B"])
+                m.put("soil", x, 0, z, top[cell])
     return m
 
 
@@ -670,19 +621,12 @@ MODELS = [
     (drop_pod, 0.2), (aud1t, 0.2), (relay_mast, 0.5),
     (dome_room, 0.2), (dome_bench, 0.1), (cal_station, 0.1),
     # boulders match the greybox boxes: RockA 5 x 4 x 4 m, B 4 x 3.5 x 5 m, C 4 m cube, D 3 m cube
-    # a: Gemini layer grid; b, c, d: Gemini concept renders (no grid), see boulder_block
+    # Gemini layer grids in sheets/
     (lambda: boulder_sheet("boulder_a", "boulder_a.txt"), 0.2),
-    (lambda: boulder_block("boulder_b", 20, 18, 25, chamfer=2, lean=3,
-                           bands={4: 2, 5: 1, 9: 2, 10: 1, 14: 2},
-                           crack=[(0, 11), (8, 10), (17, 8)], crack_depth=4), 0.2),
-    (lambda: boulder_block("boulder_c", 20, 20, 20, chamfer=2,
-                           bands={6: 2, 7: 1, 11: 2, 12: 1},
-                           crack=[(6, 10), (12, 10), (19, 9)], crack_depth=5,
-                           top_slot=(9, 10)), 0.2),
-    (lambda: boulder_block("boulder_d", 15, 15, 15, chamfer=3,
-                           bands={4: 2, 5: 1, 9: 2, 10: 1},
-                           crack=[(0, 7), (4, 8), (8, 7), (11, 8), (14, 7)], crack_depth=3), 0.2),
-    (lambda: soil_tile(False), 0.1), (lambda: soil_tile(True), 0.1),
+    (lambda: boulder_sheet("boulder_b", "boulder_b.txt"), 0.2),
+    (lambda: boulder_sheet("boulder_c", "boulder_c.txt"), 0.2),
+    (lambda: boulder_sheet("boulder_d", "boulder_d.txt"), 0.2),
+    (lambda: soil_sheet(False), 0.1), (lambda: soil_sheet(True), 0.1),
 ]
 
 

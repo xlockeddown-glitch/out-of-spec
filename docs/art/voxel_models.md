@@ -231,8 +231,8 @@ Where the generated models differ from the footprints above:
 ## Boulders and soil tiles
 
 - **Boulders** (`boulder_a`–`boulder_d`, 0.2 m): canon puts surface boulders on the Terracotta Plateau, so they use the ore fissure's plateau palette (`#A8422B`, `#8E3522`, `#6E2617`, crack `#5E2214`) plus shadow `#1D222B` in the cracks. Each matches its greybox box (A 5 m × 4 m × 4 m, B 4 m × 3.5 m × 5 m, C 4 m cube, D 3 m cube) because the collider stays that box; B's model is 3.6 m tall (18 voxels). Layer 0 sits on the ground. No glow.
-  - `boulder_a` is built voxel for voxel from Gemini's layer grid, saved as `tools/voxgen/sheets/boulder_a.txt` (25 × 20 × 20, MagicaVoxel axes). Gemini's rendered image of boulder_a (a box with a raised top block) doesn't match its own grid; the grid wins.
-  - `boulder_b`–`boulder_d` follow Gemini's rendered concepts (no grids): chamfered blocks with strata bands, a dark rust top inset from a clay rim, and a 2-voxel crack down the front face (B leans in on +x; C's crack runs back across the top; D's zigzags). Built by `boulder_block` in `build_models.py`; swap in `boulder_sheet` if grids arrive.
-- **Soil tiles** (`soil_untilled`, `soil_tilled`, 0.1 m): 1.9 m × 0.2 m × 1.9 m in the 2 m cell, in the greybox tile browns. Tilled is darker, with furrows along X.
-
-Soil tiles still have no concept sheet; spec not found. Replace them once there is one.
+  - All four are built voxel for voxel by `boulder_sheet` from Gemini's layer grids, saved as `tools/voxgen/sheets/boulder_a.txt` … `boulder_d.txt` (MagicaVoxel axes; A 25 × 20 × 20, B 20 × 25 × 18, C 20 × 20 × 20, D 15 × 15 × 15). Where Gemini's rendered images disagree with its grids, the grids win.
+  - B leans toward +x from layer 4 up (about 50 overhanging cells). C has a canyon split down the middle; one shadow voxel at (9, 5, 7) is fully buried and never seen. Each grid is one connected solid with no sealed air.
+- **Soil tiles** (`soil_untilled`, `soil_tilled`, 0.1 m): 19 × 2 × 19 voxels (1.9 m × 0.2 m × 1.9 m) in the 2 m cell, from Gemini's concepts. The top layers are sampled off each concept's top view into `tools/voxgen/sheets/soil_untilled.txt` and `soil_tilled.txt`, and the colors are sampled from the same images.
+  - Untilled: tan base (`#78563B`) with light and dark speckles. The concept's side view shows sub-voxel bumps; the slab is kept flush at 2 layers, per the 19 × 19 × 2 label.
+  - Tilled: dark ridges (`#442E21`) with speckles, a shadow edge, and furrows one layer down (`#2A1D15`), running along X.
