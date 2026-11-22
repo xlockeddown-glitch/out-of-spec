@@ -25,6 +25,8 @@ const TOAST_SECONDS_PER_CHAR: float = 0.04
 @onready var _hint_label: Label = %HintLabel
 
 var _toast_left: float = 0.0
+## Frame the last toast was shown; another the same frame is added under it.
+var _toast_frame: int = -1
 ## True while the audit summary is showing; phone lines don't replace it.
 var _holding_audit: bool = false
 
@@ -170,5 +172,13 @@ func _show_audit(report: Dictionary) -> void:
 
 
 func _toast(text: String) -> void:
-	_hint_label.text = text
-	_toast_left = maxf(TOAST_SECONDS, text.length() * TOAST_SECONDS_PER_CHAR)
+	# Two messages in one frame (a dawn cancellation, then the bench result
+	# after the same time jump) both stay on screen.
+	var frame: int = Engine.get_process_frames()
+	if frame == _toast_frame and _toast_left > 0.0:
+		_hint_label.text += "
+" + text
+	else:
+		_hint_label.text = text
+	_toast_frame = frame
+	_toast_left = maxf(TOAST_SECONDS, _hint_label.text.length() * TOAST_SECONDS_PER_CHAR)

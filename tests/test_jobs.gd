@@ -91,6 +91,9 @@ func test_job_needs_a_standard_of_its_discipline() -> String:
 	gs.job_board.append(_template(gs, "kestrel_tire_gauge"))
 	var refused: String = gs.accept_job(0)
 	gs.owned_standards["reference_gauge"] = 0
+	# As bought from Bram: with the maker's certificate, in date.
+	gs.get_sensor("reference_gauge").cal_due_day = GameClock.get_day_index() + 5
+	gs._issue_certificate("reference_gauge", GameClock.get_day_index(), null, 0.0, false, "the maker", "MKR")
 	var accepted: String = gs.accept_job(0)
 	gs.credibility = 60
 	var tight: Dictionary = _template(gs, "dome1_cabin_transducer")
@@ -443,4 +446,17 @@ func test_two_morning_cancellations_share_one_line() -> String:
 		return "Both overdue jobs must be cancelled that morning."
 	if newest.find(first + " cancelled") < 0 or newest.find(second + " cancelled") < 0:
 		return "Both cancellations must be on the newest phone line, got %s." % newest
+	return ""
+
+
+func test_an_expired_standard_cannot_take_a_job() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.get_sensor("rotary_table").cal_due_day = GameClock.get_day_index() - 1
+	gs.job_board.clear()
+	gs.job_board.append(_template(gs, "relay_inclinometer"))
+	var problem: String = gs.accept_job(0)
+	var taken: int = gs.active_jobs.size()
+	_done(gs)
+	if taken != 0 or problem.find("traceable") < 0:
+		return "A lapsed standard must block the job, got '%s' with %d active." % [problem, taken]
 	return ""

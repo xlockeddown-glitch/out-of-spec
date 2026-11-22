@@ -1498,8 +1498,13 @@ func job_accept_problem(job: Dictionary) -> String:
 		var tier: int = int(job.get("min_tier", 0))
 		return "Needs your own %s standard%s." % [job.get("discipline", "?"),
 			" (Tier %s or better)" % SP811.integer(tier) if tier > 0 else ""]
-	if job_bench_standard(job) == "":
+	var standard: String = job_bench_standard(job)
+	if standard == "":
 		return job_bench_problem(job)
+	# The customer wants a traceable result: the standard must be in date now.
+	var chain: Dictionary = traceability_chain(standard)
+	if not chain.get("traceable", false):
+		return "Needs a traceable %s standard: %s." % [job.get("discipline", "?"), chain.get("text", "?")]
 	return ""
 
 
