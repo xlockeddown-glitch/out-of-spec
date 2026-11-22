@@ -667,6 +667,17 @@ FIELD_PROPS = {
 CROP_SUNPOD = {"T1": "#3D2919", "G3": "#2E4F22", "G1": "#4C7A34", "G2": "#6FA34B",
                "C1": "#D9A13B", "C2": "#F2C96B", "S": SHADOW}
 
+# Ryan's Pack 3 (2026-11-22): 0.1 m voxels, origin at the footprint center on the ground,
+# palettes as given in his generator script (S there is already SHADOW). Built and turned
+# like the field props. Not placed in any scene yet.
+PACK3 = {
+    "crop_stage_wilted": ({"T1": "#3D2919", "W1": "#7A6838", "W2": "#544728", "W3": "#9E8B4F",
+                           "S": SHADOW}, "crop"),
+    "live_tarantula": ({"B1": "#2B1D16", "B2": "#473124", "E2": "#D4A359", "S": SHADOW}, "spider"),
+    "irrigation_junction": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "B1": "#D9A13B",
+                             "S": SHADOW}, "prop"),
+}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop") -> Model:
@@ -705,6 +716,7 @@ MODELS = [
     (lambda: prop_sheet("steering_encoder_jig"), 0.1),
     (lambda: prop_sheet("field_survey_tripod"), 0.1),
     *[((lambda n=n: prop_sheet(f"crop_stage_{n}", CROP_SUNPOD, "crop")), 0.1) for n in range(4)],
+    *[((lambda n=n: prop_sheet(n, *PACK3[n])), 0.1) for n in PACK3],
 ]
 
 

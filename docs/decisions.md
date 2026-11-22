@@ -2,6 +2,14 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-22: Pack 3 models (spider, wilting, irrigation)
+
+Ryan's calls on the three Pack 3 models:
+
+- **Spider:** `live_tarantula.glb` replaces `curlyhair.glb` in the terrarium. The pre-molt dim and squash carry over.
+- **Wilting:** `crop_stage_wilted` means the crop is over-watered. The mechanic (what counts as too wet, and whether it recovers) is not designed yet.
+- **Irrigation junction:** art only for now. Where it goes and how big it is are decided when an irrigation milestone is planned.
+
 ## 2026-11-22: Co-op is the goal; build so it can be added
 
 Ryan wants players to share the game: co-op at least, and more players later if it works. His calls:
