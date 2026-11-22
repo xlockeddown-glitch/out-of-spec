@@ -625,3 +625,41 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 1, 0, 13.3)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/shipping_pallet.glb"
 model_scale = 0.1
+
+[node name="Gulch" type="Node3D" parent="WorldView/WorldViewport/World"]
+
+[node name="GulchTileA" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, -0.4, -25)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/dry_gulch_straight.glb"
+model_scale = 0.2
+
+[node name="GulchTileB" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, -0.4, -25)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/dry_gulch_straight.glb"
+model_scale = 0.2
+
+[node name="GulchTileC" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, -0.4, -25)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/dry_gulch_straight.glb"
+model_scale = 0.2
+
+[node name="GulchTileD" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -0.4, -25)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/dry_gulch_straight.glb"
+model_scale = 0.2
+
+[node name="GulchTileE" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, -0.4, -25)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/dry_gulch_straight.glb"
+model_scale = 0.2
+
+[node name="GulchTileF" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, -0.4, -25)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/dry_gulch_straight.glb"
+model_scale = 0.2
