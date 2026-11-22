@@ -340,3 +340,20 @@ func test_out_at_dawn_counts_against_new_day() -> String:
 	if days != 1 or not carried:
 		return "Out at dawn must count the past day and mark the new one, got %d days, marked %s." % [days, carried]
 	return ""
+
+
+## GPT review 4: the offset sent with a planting command is the one used, even
+## if [ or ] changes it while the command is in flight.
+func test_plant_uses_the_offset_sent_with_the_command() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.seed_crop_id = "lensberry"
+	gs.adjust_planting_offset(4)
+	var sent: int = gs.planting_offset_steps
+	gs.adjust_planting_offset(-1)
+	gs.plant_crop(CELL, "lensberry", sent)
+	var setpoint: float = float(gs.plantings[CELL]["setpoint"])
+	var expected: float = float(gs.crop("lensberry")["soil_moisture_target"]) + 4.0 * gs.SETPOINT_STEP
+	_done(gs)
+	if absf(setpoint - expected) > 1e-9:
+		return "Set point must use the +4 offset sent with the command, got %s." % setpoint
+	return ""

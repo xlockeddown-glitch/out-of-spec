@@ -160,6 +160,8 @@ var seed_crop_id: String = ""
 ## Irrigation offset (in SETPOINT_STEP steps) that new plantings start with,
 ## so a player who knows the probe's error can correct for it before planting.
 var planting_offset_steps: int = 0
+## Passed as plant_crop's offset to mean "use planting_offset_steps now".
+const OFFSET_CURRENT: int = -2147483648
 
 
 func _ready() -> void:
@@ -1432,7 +1434,7 @@ func crop_name(crop_id: String) -> String:
 ## Returns "" or the reason not. With too few credits for the seed, Lin
 ## fronts it and takes its cost out of that crop's sale, so fines can't lock
 ## the player out of farming.
-func plant_crop(cell: Vector3i, crop_id: String = "") -> String:
+func plant_crop(cell: Vector3i, crop_id: String = "", offset_steps: int = OFFSET_CURRENT) -> String:
 	if crop_id == "":
 		crop_id = current_seed()
 	if crop_id == "" or crop(crop_id).is_empty():
@@ -1451,7 +1453,7 @@ func plant_crop(cell: Vector3i, crop_id: String = "") -> String:
 		"planted_day": GameClock.get_day_index(),
 		"planted_at": GameClock.elapsed_days,
 		"days_grown": 0,
-		"setpoint": clampf(float(crop(crop_id).get("soil_moisture_target", 0.0)) + planting_offset_steps * SETPOINT_STEP, 0.0, 1.0),
+		"setpoint": clampf(float(crop(crop_id).get("soil_moisture_target", 0.0)) + (planting_offset_steps if offset_steps == OFFSET_CURRENT else offset_steps) * SETPOINT_STEP, 0.0, 1.0),
 		"out_of_band_days": 0,
 		"out_today": false,
 		"advance": advance,
@@ -1624,7 +1626,7 @@ func crop_status_text(cell: Vector3i) -> String:
 		return ""
 	var spec: Dictionary = crop(planting["crop_id"])
 	var stage: String = ("ready to harvest" if is_crop_ready(cell)
-		else "day %d of %d" % [int(planting["days_grown"]), int(spec.get("growth_days", 1))])
+		else "day %s of %s" % [SP811.integer(int(planting["days_grown"])), SP811.integer(int(spec.get("growth_days", 1)))])
 	return "%s, %s. Irrigation set point %s %%, target %s %%" % [
 		crop_name(planting["crop_id"]), stage,
 		SP811.number(float(planting["setpoint"]) * 100.0, 0),

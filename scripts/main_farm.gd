@@ -118,7 +118,7 @@ func _on_soil_tilled(cell: Vector3i) -> void:
 
 
 ## Space on tilled soil: harvest a ready crop, report a growing one, or plant.
-func _on_tilled_cell_used(cell: Vector3i, seed_id: String) -> void:
+func _on_tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int) -> void:
 	if GameState.is_crop_ready(cell):
 		var entry: Dictionary = GameState.harvest_crop(cell)
 		var grade: String = ("in spec" if entry["in_spec"]
@@ -128,7 +128,7 @@ func _on_tilled_cell_used(cell: Vector3i, seed_id: String) -> void:
 	elif GameState.plantings.has(cell):
 		_hud.push_log(GameState.crop_status_text(cell) + ". [ and ] move the set point.")
 	else:
-		var problem: String = GameState.plant_crop(cell, seed_id)
+		var problem: String = GameState.plant_crop(cell, seed_id, offset_steps)
 		if problem.is_empty():
 			_hud.push_log("PLANTED " + GameState.crop_status_text(cell))
 		else:
@@ -152,9 +152,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _is_key(event, KEY_C):
 		get_viewport().set_input_as_handled()
 		var seed: String = GameState.cycle_seed()
-		_hud.push_log("SEED: %s, %s CR, %d days, soil moisture target %s %%" % [
+		_hud.push_log("SEED: %s, %s CR, %s days, soil moisture target %s %%" % [
 			GameState.crop_name(seed), SP811.integer(GameState.seed_cost(seed)),
-			int(GameState.crop(seed).get("growth_days", 0)),
+			SP811.integer(int(GameState.crop(seed).get("growth_days", 0))),
 			SP811.number(float(GameState.crop(seed).get("soil_moisture_target", 0.0)) * 100.0, 0)])
 	elif _is_key(event, KEY_BRACKETLEFT) or _is_key(event, KEY_BRACKETRIGHT):
 		var cell: Vector3i = _rover.cell_under()
