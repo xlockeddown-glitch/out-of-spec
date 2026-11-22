@@ -696,7 +696,8 @@ CLUTTER = {
 # Ryan's Farm Logistics pack (2026-11-22, 0.1 m voxels): a water cistern, a harvest crate and a
 # shipping pallet. Colors are his generator's own (the cistern reuses the irrigation junction's
 # steel and brass; the crate's pods are the sun-pod C1/C2). Built and turned like the field props.
-# Only the cistern is placed (in the farm, beside the junction).
+# Only the cistern (in the farm, beside the junction) and the crate (at the plot's front edge)
+# are placed.
 LOGISTICS = {
     "water_cistern": {"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "B1": "#D9A13B",
                       "S": SHADOW},
