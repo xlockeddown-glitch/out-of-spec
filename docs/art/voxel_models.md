@@ -31,7 +31,7 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
   - the terrarium hygrometer LED (`Terrarium/StatusLED`)
   - the rover's cab readout
   - the relay's spool core
-- **Emissive voxels:** put each glowing part in its own MagicaVoxel object named `emit_<part>`, for example `emit_headlights`. `ModelSlot` makes any mesh named `emit_*` glow in its own colors, because MagicaVoxel exports don't carry emission into Godot.
+- **Emissive voxels:** put each glowing part in its own MagicaVoxel object named `emit_<part>`, for example `emit_headlights`. `ModelSlot` makes any mesh named `emit_*` glow in its own colors, because MagicaVoxel exports don't carry emission into Godot. Glow parts are emission only (scene lights don't tint them) at `ModelSlot.EMIT_ENERGY` (1.2). Amber clips toward yellow under the Filmic tonemap long before teal does, so amber lamps get a per-part value through the slot's `emit_energy_overrides` (dome pendants and terrarium heat lamp: 0.5).
 - **Readability at about 40 m:** keep silhouette features at least 2 voxels thick. Where space allows, give lit voxels a 1-voxel `#1D222B` border (from answer A). The generated first pass doesn't yet.
 
 ## 1. Tractor (`tractor.glb`, `tractor_wide.glb`)

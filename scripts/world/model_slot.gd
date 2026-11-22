@@ -12,7 +12,7 @@ extends Node3D
 ## docs/art/voxel_models.md for the naming rules.
 
 const EMIT_PREFIX := "emit_"
-const EMIT_ENERGY := 2.5
+const EMIT_ENERGY := 1.2
 
 @export_file("*.glb", "*.gltf", "*.tscn") var model_path: String = ""
 ## Uniform scale for the imported model, so one voxel lands at the size given in
@@ -20,6 +20,10 @@ const EMIT_ENERGY := 2.5
 @export var model_scale: float = 1.0
 ## Greybox nodes to hide when a model loads. Empty = this node's geometry children.
 @export var greybox: Array[Node3D] = []
+## Glow strength per emit_* part, for parts that should not use EMIT_ENERGY. Warm
+## amber clips toward yellow under the Filmic tonemap well before teal does, so
+## amber lamps need a lower value to keep their hue.
+@export var emit_energy_overrides: Dictionary[String, float] = {}
 
 var _model: Node3D = null
 
@@ -47,7 +51,7 @@ func swap_model(path: String) -> bool:
 		_model.queue_free()
 	_hide_greybox()
 	instance.scale = Vector3.ONE * model_scale
-	apply_emission(instance)
+	apply_emission(instance, emit_energy_overrides)
 	add_child(instance)
 	_model = instance
 	model_path = path
@@ -81,8 +85,9 @@ func _hide_greybox() -> void:
 			node.visible = false
 
 
-## Makes meshes named emit_* glow in their own colors. Also used by OreFissure.
-static func apply_emission(root: Node) -> void:
+## Makes meshes named emit_* glow in their own colors, at EMIT_ENERGY unless
+## `overrides` names the part. Also used by OreFissure.
+static func apply_emission(root: Node, overrides: Dictionary[String, float] = {}) -> void:
 	for node: Node in root.find_children("*", "MeshInstance3D", true, false):
 		if not String(node.name).to_lower().begins_with(EMIT_PREFIX):
 			continue
@@ -95,7 +100,7 @@ static func apply_emission(root: Node) -> void:
 				continue
 			var glow := source.duplicate() as BaseMaterial3D
 			glow.emission_enabled = true
-			glow.emission_energy_multiplier = EMIT_ENERGY
+			glow.emission_energy_multiplier = float(overrides.get(String(node.name), EMIT_ENERGY))
 			if glow.albedo_texture:
 				# Palette texture: glow = texture color (MULTIPLY, not the default ADD,
 				# which would wash it to white).
@@ -104,4 +109,7 @@ static func apply_emission(root: Node) -> void:
 				glow.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
 			else:
 				glow.emission = glow.albedo_color
+			# Emission only: scene lights falling on the part would add to its glow and
+			# shift the hue (amber lamps under a warm light read yellow).
+			glow.albedo_color = Color.BLACK
 			mesh_instance.set_surface_override_material(i, glow)
