@@ -42,30 +42,30 @@
       "display_name": "Rover Tire Gauge",
       "short_name": "Tire gauge",
       "error_unit": "kPa",
-      "daily_drift_rate": 0.08,
-      "usage_drift_rate": 0.0004,
+      "daily_drift_rate": 0.138,
+      "usage_drift_rate": 0.00069,
       "usage_unit": "metre_driven",
-      "max_permissible_error": 2.0,
+      "max_permissible_error": 3.45,
       "as_left_residual": 0.1,
-      "resolution": 0.1,
+      "resolution": 0.69,
       "display_decimals": 1,
       "calibrated_by": "reference_gauge",
       "bench_minutes": 20,
-      "_note": "M3a [PLACEHOLDER]: ±1 % of a 200 kPa tire, a common digital tire-gauge class (spec section 1.4 #7 uses ±1 % as its example). AUD-1T's tire checks are the canon hook."
+      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: MPE ±0.5 % of a 100 psi span (3.45 kPa) and 0.1 psi steps (0.69 kPa), from the JACO Elite 100 PSI digital tire gauge. Drift keeps the game pace (MPE in about 25 days; usage drift scaled with the MPE); a real Honeywell ABP 100PG sensor would take about 84 days. AUD-1T's tire checks are the canon hook."
     },
     "dome_pressure": {
       "role": "unit",
       "display_name": "Dome Atmosphere Gauge",
       "short_name": "Dome pressure",
       "error_unit": "kPa",
-      "daily_drift_rate": 0.03,
-      "max_permissible_error": 0.5,
+      "daily_drift_rate": 0.024,
+      "max_permissible_error": 0.4,
       "as_left_residual": 0.05,
       "resolution": 0.01,
       "display_decimals": 2,
       "calibrated_by": "reference_gauge",
       "bench_minutes": 30,
-      "_note": "M3a [PLACEHOLDER]: ±0.5 % of about 100 kPa. Against the WD-1 the TUR is under 4:1 on purpose; the HB-700 (Tier 3) is its proper reference."
+      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: WIKA CPG1200 digital absolute gauge, 0 kPa to 160 kPa, ±0.25 % of span (0.40 kPa), 0.01 kPa display. Drift keeps the game pace (MPE in about 17 days); the CPG1200's real stability would take over a year. Against the WD-1 the TUR is 3.11:1, under 4:1 on purpose (Ryan, 2026-11-22); the HB-700 (Tier 3) is its proper reference."
     },
     "terrarium_thermometer": {
       "role": "unit",
@@ -78,9 +78,9 @@
       "resolution": 0.1,
       "display_decimals": 2,
       "calibrated_by": "field_meter_dc",
-      "standard_sensitivity": 15.0,
+      "standard_sensitivity": 5.0,
       "bench_minutes": 40,
-      "_note": "M3a [PLACEHOLDER]: ±0.5 °C probe. The FM-3 checks its 0 V to 10 V readout, assumed to span −50 °C to 100 °C, so 15 °C per volt (standard_sensitivity converts the standard's volts into this unit's degrees Celsius)."
+      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: Pt100 RTD probe (Vaisala TMP115) on a TMT130-class transmitter, ±0.5 °C overall, 0.1 °C display (Testo 108 class). The FM-3 checks its 0 V to 10 V output, scaled to 0 °C to 50 °C, so 5 °C/V (standard_sensitivity converts the standard's volts into this unit's degrees Celsius). Drift keeps the game pace (MPE in about 25 days); a real WIKA T32 transmitter drifts far slower."
     },
     "relay_timebase": {
       "role": "unit",
@@ -94,7 +94,7 @@
       "display_decimals": 2,
       "calibrated_by": "",
       "bench_minutes": 60,
-      "_note": "M3a [PLACEHOLDER]: fractional frequency in units of 10^-6, a crystal-oscillator class MPE. Its standard, the Rb-2D, comes in M3b; until then it is out of service: it does not drift and is not audited."
+      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: fractional frequency in units of 10^-6. ±1.0 × 10⁻⁶ first-year limit for a Stratum 3 OCXO (CTS Model 137, ±0.5 × 10⁻⁶ annual aging); 0.01 × 10⁻⁶ readout (Keysight 53230A class counter). Drift keeps the game pace. Its standard, the Rb-2D, comes in M3b; until then it is out of service: it does not drift and is not audited."
     },
     "rotary_table": {
       "role": "standard",
@@ -128,18 +128,18 @@
       "display_name": "Arsia Fieldworks FM-3 Field Meter",
       "short_name": "FM-3 field meter",
       "error_unit": "V",
-      "daily_drift_rate": 0.00006,
-      "max_permissible_error": 0.0035,
+      "daily_drift_rate": 0.000125,
+      "max_permissible_error": 0.015,
       "spec_confidence_pct": null,
-      "certificate_uncertainty": 0.0005,
+      "certificate_uncertainty": 0.0007,
       "certificate_k": 2,
       "initial_interval_days": 30,
-      "display_decimals": 4,
+      "display_decimals": 3,
       "price_credits": 250,
       "price_ore": 2,
       "maker": "Arsia Fieldworks",
       "certificate_prefix": "AF",
-      "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #1). MPE is the cited ±(0.05 % + 1 count) at a 5 V test point on the 6 V range: 2.5 mV + 1 mV [PLACEHOLDER test point]. Price, drift, interval and certificate uncertainty are [PLACEHOLDER]. It is both the player's handheld and, until the HM-3 (M3b), a standard calibrated only at OIRM."
+      "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #1). Researched 2026-11-22: Fluke 87V MAX class 4½-digit handheld, 60 V range in HiRes mode, ±(0.05 % + 10 counts) at 10 V gives 15 mV; certificate 0.7 mV at k = 2 from a Fluke 5560A-class calibrator. Drift takes it to its MPE in about 120 days (Ryan, 2026-11-22); the real meter is specified over two years. Price and interval are game balance [PLACEHOLDER]. It is both the player's handheld and, until the HM-3 (M3b), a standard calibrated only at OIRM."
     },
     "reference_gauge": {
       "role": "standard",
@@ -147,9 +147,9 @@
       "display_name": "Wren & Dufour WD-1 Reference Gauge",
       "short_name": "WD-1 reference gauge",
       "error_unit": "kPa",
-      "daily_drift_rate": 0.0025,
-      "max_permissible_error": 0.15,
-      "spec_confidence_pct": null,
+      "daily_drift_rate": 0.00104,
+      "max_permissible_error": 0.125,
+      "spec_confidence_pct": 95,
       "certificate_uncertainty": 0.03,
       "certificate_k": 2,
       "initial_interval_days": 30,
@@ -158,9 +158,9 @@
       "price_ore": 3,
       "maker": "Wren & Dufour",
       "certificate_prefix": "WD",
-      "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #7). MPE is the cited ±0.1 % of reading taken at 150 kPa, between the dome and the tires [PLACEHOLDER test point]. Price, drift, interval and certificate uncertainty are [PLACEHOLDER]."
+      "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #7). Researched 2026-11-22: WIKA CPG1500 class precision digital test gauge, 0 kPa to 250 kPa, ±0.05 % of span (0.125 kPa) stated at k = 2, so spec_confidence_pct 95; certificate 0.03 kPa at k = 2 from a Mensor CPC8000-class controller. Drift takes it to its MPE in about 120 days (Ryan, 2026-11-22); the real gauge holds its spec for a year. Price and interval are game balance [PLACEHOLDER]."
     },
-    "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. Standards' daily_drift_rate takes one from zero to its MPE in about 60 days (Ryan, 2026-11-22), so skipping an OIRM cycle risks a recall. resolution (one digit of the unit under test), bench_minutes and the standards' specs and drift rates are placeholders (docs/design/equipment_skills_robots.md section 1.5). tier 0 (or absent) = owned from the start; tier 1+ = bought, arrives with a maker's certificate traceable to OIRM (section 1.7). A unit is in service (audited, on the bench) only while its calibrated_by standard is owned. standard_sensitivity (default 1) converts the standard's unit into the unit's own. display_decimals sets how many decimals readings show."
+    "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. Tier 0 standards' daily_drift_rate takes one from zero to its MPE in about 60 days, Tier 1 in about 120 days (Ryan, 2026-11-22), so skipping an OIRM cycle risks a recall. resolution (one digit of the unit under test), bench_minutes and the standards' specs and drift rates are placeholders (docs/design/equipment_skills_robots.md section 1.5). tier 0 (or absent) = owned from the start; tier 1+ = bought, arrives with a maker's certificate traceable to OIRM (section 1.7). A unit is in service (audited, on the bench) only while its calibrated_by standard is owned. standard_sensitivity (default 1) converts the standard's unit into the unit's own. display_decimals sets how many decimals readings show."
   },
   "guardband": {
     "green": {

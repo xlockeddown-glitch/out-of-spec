@@ -207,3 +207,15 @@ Agent's notes (flagged for Ryan, not his words):
 - The dome against the WD-1 is allowed by the bench but never counts as a clean 4:1 calibration; the HB-700 (Tier 3) is what fixes that.
 - Two presses means the first press (key or button) shows the price and the second buys. It applies to Bram's Tier 1 standards.
 - Research covers the [PLACEHOLDER] MPEs, resolutions, drift rates and the thermometer's 15 °C/V scale, with sources cited in the data notes. Credit and ore prices have no real-world source, so they are set from game balance and tuned in playtest.
+
+## 2026-11-22: Ryan's answers on the researched M3a numbers
+
+Ryan chose:
+
+- **Use the researched values** GPT sourced from real instrument classes (Fluke 87V MAX class for the FM-3, WIKA CPG1500 class for the WD-1, an RTD transmitter scaled 0 °C to 50 °C over 0 V to 10 V for the thermometer, so 5 °C/V). TURs: thermometer 4.80:1, dome 3.11:1 (still under 4:1 on purpose), tire 8.24:1. They stay [PLACEHOLDER] until playtest.
+- **Tier 1 drift pace "in between":** the FM-3 and WD-1 reach their MPE in about 120 days, between Tier 0's 60 days and the real one-to-two-year rates.
+
+Agent's notes (flagged for Ryan, not his words):
+
+- The pace question covered standards only, so the M3a units keep their game pace (the same days to reach the MPE as before, scaled to the new MPEs: tire about 25 days, dome about 17, thermometer about 25). Their real rates are in the data notes.
+- The tire gauge's 0.69 kPa resolution is a 0.1 psi step; its display still shows one decimal in kPa.
