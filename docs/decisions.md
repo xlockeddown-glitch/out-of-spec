@@ -577,3 +577,15 @@ Agent's notes (flagged for Ryan, not his words):
 - The crate stands at (3, 0, 13) m, just past the plot's front edge (its near side is 0.6 m out), turned so its front faces the camera, as if a harvest were being packed. The airlock is about 5 m away and the drop pod's spot about 6 m.
 - It is at true size (1.0 m × 0.8 m × 0.6 m). Set dressing only: no collision, and harvests do not go into it; no capacity is specified.
 - The voxel README also said the survey tripod was not placed in any scene; it is (`FieldCalPad/Tripod`), so that row is fixed too.
+
+## 2026-11-22: Shipping pallet in the farm
+
+### Ryan chose
+
+- "Shipping pallet"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next.
+- The pallet stands at (1, 0, 13.3) m, beside the harvest crate with 0.8 m between them, its near side 0.7 m past the plot's front edge, so the two read as a packing spot. It faces the camera like the crate. Its nearest edge is 2.3 m from the edge of the drop pod's spot.
+- It is at true size (1.4 m × 1.2 m × 0.3 m). Set dressing only: no collision, nothing stacked on it, and no load rating; the crate stays on the ground beside it.
