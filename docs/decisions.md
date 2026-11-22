@@ -2,6 +2,12 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-22: PR checks, second review and merging
+
+- A PR stays a draft until Godot shows 0 errors and 0 warnings, the headless tests pass, and `python tools/check_sp811.py` reports 0 problems (Ryan).
+- Every merge needs a second review from a different model than the one that wrote the work (Ryan).
+- An agent may merge without asking Ryan once the PR is second-reviewed, its findings are resolved and the checks pass. If unsure (a design call, an open question for Ryan, reviewers disagreeing), ask Ryan first (Ryan).
+
 ## 2026-11-21: Week 4 scope
 
 - Voxel models: Neon concept sheets first, then MagicaVoxel. Meanwhile greybox stays, behind `ModelSlot` swap points (`assets/voxels/README.md` lists file names).
