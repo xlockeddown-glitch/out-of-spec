@@ -472,4 +472,4 @@ Agent's notes (flagged for Ryan, not his words):
 
 ### Agent's notes (flagged for Ryan, not his words)
 
-- Groundwork goes one PR per README "known exception". First: seeded randomness. The farm has one `world_seed`; morning dispatches, audit footers, Bram's lines and every sensor's drift direction and as-left residual come from it, so a joining player can be sent the seed and see the same game.
+- Groundwork goes one PR per README "known exception". First: seeded randomness. The farm has one `world_seed`; morning dispatches, audit footers, Bram's lines and every sensor's drift direction and as-left residual come from it, so a new co-op farm started from the same seed plays out the same. Joining mid-game will also need the generator states and sensor signs, which comes with host save/load. Bram's bay lines draw from the shared generator too; in co-op the host should run them.
