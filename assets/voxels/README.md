@@ -15,3 +15,9 @@ Soil tiles: build a MeshLibrary whose item IDs match `FarmGrid.Tile` (0 = soil_u
 Rocks: keep `collision_layer = 5` (world + signal_occluder) on whatever replaces the CSG boxes, or LOS stops working.
 
 Scale: 1 voxel = 0.1 m reads well with the current camera (the greybox rover is 1.4 m × 2.4 m).
+
+## Upgrade visuals
+
+Wide treads currently widen the greybox `Wheel*` cylinders. Once `tractor.glb`
+replaces the greybox, those cylinders are hidden, so the upgrade has no visual
+until a `tractor_wide.glb` variant (or separate wheel meshes) is added.

@@ -9,3 +9,6 @@ Godot_v*.exe
 
 # Files the Claude app saves into the project folder
 Claude outputs/
+
+# Python
+__pycache__/

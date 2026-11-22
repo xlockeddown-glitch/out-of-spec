@@ -250,12 +250,18 @@ func _till_under_rover() -> void:
 func _try_mine() -> bool:
 	if ore_fissures_root == null:
 		return false
+	var nearest: OreFissure = null
+	var best: float = INF
 	for child: Node in ore_fissures_root.get_children():
 		var fissure := child as OreFissure
 		if fissure and fissure.is_available() and fissure.is_in_reach(global_position):
-			if GameState.mine_fissure(fissure.fissure_id):
-				ore_mined.emit(fissure.fissure_id)
-				return true
+			var d: float = fissure.global_position.distance_squared_to(global_position)
+			if d < best:
+				best = d
+				nearest = fissure
+	if nearest and GameState.mine_fissure(nearest.fissure_id):
+		ore_mined.emit(nearest.fissure_id)
+		return true
 	return false
 
 

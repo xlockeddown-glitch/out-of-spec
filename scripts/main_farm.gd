@@ -128,9 +128,7 @@ func _on_rover_entered_bay() -> void:
 	elif GameState.crystal_ore >= cost:
 		_bram_line = "That's %d crystal ore. Treads coming right up, hit trade." % cost
 	else:
-		# His own line from data/dialogue_dispatches.json (upgrade hints).
-		_bram_line = str(DataManager.get_value(&"dialogue_dispatches", "npcs/bram/upgrade_and_audit_hints/1",
-			"Bring me crystal ore and I'll bolt wider treads onto your tractor."))
+		_bram_line = "Bring me %d crystal ore and I'll bolt wider treads onto your tractor. Carrying %d." % [cost, GameState.crystal_ore]
 	_refresh_bram()
 
 
@@ -139,11 +137,11 @@ func _refresh_bram() -> void:
 
 
 func _try_trade() -> void:
-	if not _bram_bay.rover_inside:
+	if not _bram_bay.rover_inside or GameState.has_wide_treads:
 		return
 	var problem: String = GameState.buy_wide_treads()
 	if problem.is_empty():
-		_bram_line = GameState.bram_line("greetings")
+		_bram_line = "Fresh treads, wide stance. Try not to till a boulder with them."
 	else:
 		_hud.push_log("BRAM: " + problem)
 	_refresh_bram()

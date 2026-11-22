@@ -32,6 +32,9 @@ func _process(_delta: float) -> void:
 		return
 	var from: Vector3 = get_parent_node_3d().global_position
 	var to: Vector3 = rover.satellite_relay.get_uplink_point()
+	if from.is_equal_approx(to):
+		visible = false
+		return
 	var dir: Vector3 = (to - from).normalized()
 	# Cylinder axis is +Y: build a basis whose Y points along the beam.
 	var y: Vector3 = dir

@@ -38,7 +38,10 @@ func _refresh() -> void:
 
 func _build_visual() -> Node3D:
 	if ResourceLoader.exists(MODEL_PATH):
-		return (load(MODEL_PATH) as PackedScene).instantiate()
+		var scene := load(MODEL_PATH) as PackedScene
+		if scene != null:
+			return scene.instantiate()
+		push_warning("OreFissure: %s is not a scene; using greybox." % MODEL_PATH)
 	var root := Node3D.new()
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = Color("#38E1C6")
