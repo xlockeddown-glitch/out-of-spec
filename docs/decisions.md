@@ -297,6 +297,11 @@ Agent's notes (flagged for Ryan, not his words):
 - Seeds cost 25 % of the crop's base price ([PLACEHOLDER], data/economy.json). C changes the seed; using the rover on tilled soil plants, reports, or harvests.
 - Lin buys the whole harvest bin at Bram's bay (L key) until she has a place of her own.
 - Crops show as the existing crop_stage voxel models: stages 0 to 2 while growing, stage 3 when ready, and the wilted model once the soil has left its band. That wilting is a visible clue that the probe has drifted; hiding it would make the drift harder to spot.
+- After GPT's first review: the off-spec check now catches soil that leaves the band at any time between mornings (when the probe drifts or is calibrated, or a set point changes), not only at the morning check. Soil exactly on a band edge counts as in band.
+- Growth counts time since planting: a morning counts once at least half a day has passed, so a crop planted just before 06:00 waits for the next morning. That half-day rule is the agent's choice.
+- If fines leave the player without enough credits for a seed, with nothing growing and nothing to sell, Lin fronts one seed and takes its cost out of that crop's sale. That keeps fines from locking the player out of farming. The rule is the agent's choice.
+- The seed chosen when Space is sent is the one planted, even if C changes it while the command is on its way up the link.
+- Biscuit Reed (±18 %), Dust Turnip (±12 %) and Bubble Pods (±10 %) tolerate even the probe's worst drift (capped at ±9 %), so a probe left alone only spoils Suncatch Squash (±8 %) and Lensberry (±5 %). The agent kept that on purpose: the starter crops are forgiving, and the drift starts to matter as the player moves to pricier crops. Ryan may want the bands tightened instead.
 - Paid calibration jobs at TRUSTED come in the next PR.
 
 ## 2026-11-22: Ryan's idea, a calibration robot helper

@@ -16,7 +16,8 @@ signal steering_zeroed(record: Dictionary)
 signal soil_tilled(cell: Vector3i)
 signal till_rejected(reason: String)
 ## Space on a cell that is already tilled: plant, check or harvest it.
-signal tilled_cell_used(cell: Vector3i)
+## `seed_id` is the seed selected when the command was sent.
+signal tilled_cell_used(cell: Vector3i, seed_id: String)
 signal ore_mined(fissure_id: StringName)
 
 enum Command { TILL, ZERO_STEERING }
@@ -38,10 +39,14 @@ class UplinkFrame:
 class UplinkCommand:
 	var sent_at: float
 	var command: int
+	## Seed selected when a TILL was sent, so switching seeds while the
+	## command is in flight doesn't change what gets planted.
+	var seed_id: String
 
-	func _init(p_sent_at: float, p_command: int) -> void:
+	func _init(p_sent_at: float, p_command: int, p_seed_id: String = "") -> void:
 		sent_at = p_sent_at
 		command = p_command
+		seed_id = p_seed_id
 
 
 @export_group("Scene Links")
@@ -125,7 +130,8 @@ func _physics_process(delta: float) -> void:
 
 ## Queue a one-shot command. It executes after the current uplink lag.
 func queue_command(command: Command) -> void:
-	_commands.append(UplinkCommand.new(_uplink_clock, command))
+	var seed_id: String = GameState.current_seed() if command == Command.TILL else ""
+	_commands.append(UplinkCommand.new(_uplink_clock, command, seed_id))
 
 
 func get_current_lag() -> float:
@@ -195,13 +201,13 @@ func _deliver_uplink() -> void:
 		_applied_steer = frame.steer
 	while not _commands.is_empty() and _commands[0].sent_at <= arrival_cutoff:
 		var cmd: UplinkCommand = _commands.pop_front()
-		_execute(cmd.command)
+		_execute(cmd)
 
 
-func _execute(command: int) -> void:
-	match command:
+func _execute(cmd: UplinkCommand) -> void:
+	match cmd.command:
 		Command.TILL:
-			_till_under_rover()
+			_till_under_rover(cmd.seed_id)
 		Command.ZERO_STEERING:
 			_zero_steering()
 
@@ -246,7 +252,7 @@ func _on_steering_error_changed(_error: float, _band: int) -> void:
 
 # --- Tilling ----------------------------------------------------------------
 
-func _till_under_rover() -> void:
+func _till_under_rover(seed_id: String) -> void:
 	if _try_mine():
 		return
 	if soil_grid == null:
@@ -257,7 +263,7 @@ func _till_under_rover() -> void:
 		FarmGrid.TillResult.TILLED:
 			soil_tilled.emit(cell)
 		FarmGrid.TillResult.ALREADY_TILLED:
-			tilled_cell_used.emit(cell)
+			tilled_cell_used.emit(cell, seed_id)
 		FarmGrid.TillResult.NOT_SOIL:
 			till_rejected.emit("No soil under tractor.")
 

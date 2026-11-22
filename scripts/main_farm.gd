@@ -118,17 +118,17 @@ func _on_soil_tilled(cell: Vector3i) -> void:
 
 
 ## Space on tilled soil: harvest a ready crop, report a growing one, or plant.
-func _on_tilled_cell_used(cell: Vector3i) -> void:
+func _on_tilled_cell_used(cell: Vector3i, seed_id: String) -> void:
 	if GameState.is_crop_ready(cell):
 		var entry: Dictionary = GameState.harvest_crop(cell)
 		var grade: String = ("in spec" if entry["in_spec"]
-			else "OFF SPEC: the soil left its moisture band on %d days" % entry["out_of_band_days"])
-		_hud.push_log("HARVESTED %s, %s. Bin: %d crops for Lin at Bram's bay." % [
-			GameState.crop_name(entry["crop_id"]), grade, GameState.harvest_bin.size()])
+			else "OFF SPEC: the soil left its moisture band on %s days" % SP811.integer(entry["out_of_band_days"]))
+		_hud.push_log("HARVESTED %s, %s. Bin: %s crops for Lin at Bram's bay." % [
+			GameState.crop_name(entry["crop_id"]), grade, SP811.integer(GameState.harvest_bin.size())])
 	elif GameState.plantings.has(cell):
 		_hud.push_log(GameState.crop_status_text(cell) + ". [ and ] move the set point.")
 	else:
-		var problem: String = GameState.plant_crop(cell)
+		var problem: String = GameState.plant_crop(cell, seed_id)
 		if problem.is_empty():
 			_hud.push_log("PLANTED " + GameState.crop_status_text(cell))
 		else:
@@ -173,7 +173,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _is_key(event: InputEvent, keycode: Key) -> bool:
 	var key := event as InputEventKey
-	return key != null and key.pressed and not key.echo and key.physical_keycode == keycode
+	return key != null and key.pressed and not key.echo and key.keycode == keycode
 
 
 func _sell_to_lin() -> void:
@@ -245,8 +245,8 @@ func _on_rover_entered_bay() -> void:
 	else:
 		_bram_line = "Bring me %d crystal ore and I'll bolt wider treads onto your tractor. Carrying %d." % [cost, GameState.crystal_ore]
 	if not GameState.harvest_bin.is_empty():
-		_hud.push_log("LIN: %d crops in your bin, %s CR for the lot. Press L to sell." % [
-			GameState.harvest_bin.size(), SP811.integer(GameState.harvest_bin_value())])
+		_hud.push_log("LIN: %s crops in your bin, %s CR for the lot. Press L to sell." % [
+			SP811.integer(GameState.harvest_bin.size()), SP811.integer(GameState.harvest_bin_value())])
 	_refresh_bram()
 
 

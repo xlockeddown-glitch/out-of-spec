@@ -3,7 +3,8 @@ extends RefCounted
 ## the soil probe reads it, graded by whether the soil stayed in its moisture
 ## band, and sold to Lin. Prices and bands come from data/crops.json and
 ## data/economy.json ([PLACEHOLDER]); the tests read them.
-## The tests do not move GameClock; every GameState is freed.
+## Each test starts the clock at the first morning and puts it back after;
+## every GameState is freed.
 
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 const CELL: Vector3i = Vector3i(1, 0, 2)
@@ -16,11 +17,21 @@ func _make_state() -> GameStateScript:
 	gs.credits = 1000
 	gs.tilled_cells[CELL] = true
 	gs.get_sensor(gs.SOIL_PROBE_ID).error = 0.0
+	gs.set_meta(&"saved_clock", GameClock.elapsed_days)
+	GameClock.elapsed_days = 0.0
 	return gs
 
 
+## Puts the clock back and frees the state.
+func _done(gs: GameStateScript) -> void:
+	GameClock.elapsed_days = float(gs.get_meta(&"saved_clock"))
+	gs.free()
+
+
+## Runs `days` mornings: the clock moves to the next whole day, then crops grow.
 func _grow(gs: GameStateScript, days: int) -> void:
 	for i: int in days:
+		GameClock.elapsed_days = floorf(GameClock.elapsed_days) + 1.0
 		gs._grow_crops()
 
 
@@ -39,7 +50,7 @@ func test_plant_needs_tilled_empty_cell_and_charges_seed() -> String:
 		problem = "Planting twice on one cell must fail."
 	elif cost <= 0:
 		problem = "Seeds should cost something."
-	gs.free()
+	_done(gs)
 	return problem
 
 
@@ -50,7 +61,7 @@ func test_seed_cycles_through_every_crop() -> String:
 	for i: int in ids.size():
 		seen[gs.cycle_seed()] = true
 	var back: String = gs.current_seed()
-	gs.free()
+	_done(gs)
 	if seen.size() != ids.size() or back != ids[0]:
 		return "C must cycle through all %d crops and wrap, saw %d." % [ids.size(), seen.size()]
 	return ""
@@ -76,7 +87,7 @@ func test_crop_ready_after_growth_days_and_sells_in_spec() -> String:
 		problem = "Lin must pay the base price in spec, paid %d." % paid
 	elif not gs.harvest_bin.is_empty() or gs.plantings.has(CELL):
 		problem = "Selling must empty the bin and harvesting must clear the cell."
-	gs.free()
+	_done(gs)
 	return problem
 
 
@@ -95,7 +106,7 @@ func test_drifted_probe_makes_crop_off_spec() -> String:
 	var entry: Dictionary = gs.harvest_crop(CELL)
 	var price: int = gs.crop_sale_price(entry)
 	var expected: int = roundi(int(spec["base_sell_credits"]) * (1.0 - float(spec["out_of_spec_penalty_pct"]) / 100.0))
-	gs.free()
+	_done(gs)
 	if in_band:
 		return "Soil must be out of band with the probe %s %% high." % (band_pct + 1.0)
 	if entry.is_empty() or entry["in_spec"] or price != expected:
@@ -114,7 +125,7 @@ func test_setpoint_offset_corrects_known_probe_error() -> String:
 	var ok: bool = gs.is_soil_in_band(CELL)
 	var moisture: float = gs.soil_moisture(CELL)
 	var target: float = float(gs.crop("lensberry")["soil_moisture_target"])
-	gs.free()
+	_done(gs)
 	if not ok or absf(moisture - target) > 0.0001:
 		return "Raising the set point by the probe's error must put the soil on target, got %s." % moisture
 	return ""
@@ -125,9 +136,129 @@ func test_soil_probe_is_an_audited_unit() -> String:
 	var in_service: bool = gs.is_in_service(gs.SOIL_PROBE_ID)
 	var listed: bool = gs.unit_ids().has(gs.SOIL_PROBE_ID)
 	var text: String = gs.get_sensor(gs.SOIL_PROBE_ID).format_value(2.5)
-	gs.free()
+	_done(gs)
 	if not in_service or not listed:
 		return "The soil probe must be in service against the gravimetric kit from the start."
 	if text != "+2.50 %":
 		return "The probe's error must read like '+2.50 %%', got '%s'." % text
+	return ""
+
+
+## GPT review 1: soil that leaves its band and comes back before morning
+## still costs the crop its in-spec grade.
+func test_excursion_between_mornings_makes_crop_off_spec() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.seed_crop_id = "lensberry"
+	var spec: Dictionary = gs.crop("lensberry")
+	var probe: DriftingSensor = gs.get_sensor(gs.SOIL_PROBE_ID)
+	gs.plant_crop(CELL)
+	probe.error = float(spec["tolerance_band"]) * 100.0 + 1.0
+	gs._on_time_advanced(0.0)
+	probe.error = 0.0
+	var back_in_band: bool = gs.is_soil_in_band(CELL)
+	_grow(gs, int(spec["growth_days"]))
+	var entry: Dictionary = gs.harvest_crop(CELL)
+	var paid: int = gs.sell_harvest_to_lin()
+	var expected: int = roundi(int(spec["base_sell_credits"]) * (1.0 - float(spec["out_of_spec_penalty_pct"]) / 100.0))
+	_done(gs)
+	if not back_in_band:
+		return "The probe set back to true must put the soil back in band."
+	if entry.is_empty() or entry["in_spec"] or int(entry["out_of_band_days"]) != 1 or paid != expected:
+		return "One afternoon out of band must cost the grade: expected %d CR and 1 day, got %s paying %d." % [expected, entry, paid]
+	return ""
+
+
+## GPT review 1: broke after fines with nothing growing or to sell, Lin fronts
+## one seed and takes its cost out of that crop's sale.
+func test_lin_fronts_a_seed_when_broke() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.credits = -50
+	var seed: String = gs.current_seed()
+	var cost: int = gs.seed_cost(seed)
+	var other: Vector3i = CELL + Vector3i(1, 0, 0)
+	gs.tilled_cells[other] = true
+	var first: String = gs.plant_crop(CELL)
+	var second: String = gs.plant_crop(other)
+	var credits_after_plant: int = gs.credits
+	_grow(gs, int(gs.crop(seed)["growth_days"]))
+	gs.harvest_crop(CELL)
+	var paid: int = gs.sell_harvest_to_lin()
+	var expected: int = int(gs.crop(seed)["base_sell_credits"]) - cost
+	var credits_end: int = gs.credits
+	_done(gs)
+	if first != "":
+		return "Lin must front the first seed when broke, got '%s'." % first
+	if second == "":
+		return "Lin fronts one seed at a time; a second planting while broke must fail."
+	if credits_after_plant != -50:
+		return "A fronted seed must not charge credits, credits are %d." % credits_after_plant
+	if paid != expected or credits_end != -50 + expected:
+		return "Lin must pay the base price less the fronted %d CR (%d CR), paid %d." % [cost, expected, paid]
+	return ""
+
+
+## GPT review 1: a crop planted just before morning doesn't count that morning,
+## so growth takes at least growth_days - 0.5 days.
+func test_growth_counts_days_since_planting() -> String:
+	var problem: String = ""
+	for planted_at: float in [0.99, 0.01]:
+		var gs: GameStateScript = _make_state()
+		var days: int = int(gs.crop(gs.current_seed())["growth_days"])
+		GameClock.elapsed_days = planted_at
+		gs.plant_crop(CELL)
+		_grow(gs, days)
+		var ready_on_time: bool = gs.is_crop_ready(CELL)
+		_grow(gs, 1)
+		var ready_late: bool = gs.is_crop_ready(CELL)
+		_done(gs)
+		var late_planting: bool = planted_at > 0.5
+		if late_planting and (ready_on_time or not ready_late):
+			problem = "Planted just before morning, the crop must be ready one morning later."
+		elif not late_planting and not ready_on_time:
+			problem = "Planted just after morning, the crop must be ready after its growth days."
+	return problem
+
+
+## GPT review 1: soil exactly on a band edge is in band; just past it is not.
+func test_band_edges_are_inclusive() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.seed_crop_id = "lensberry"
+	var band_pct: float = float(gs.crop("lensberry")["tolerance_band"]) * 100.0
+	gs.plant_crop(CELL)
+	var probe: DriftingSensor = gs.get_sensor(gs.SOIL_PROBE_ID)
+	var results: Array[bool] = []
+	for error: float in [band_pct, -band_pct, band_pct + 0.01, -band_pct - 0.01]:
+		probe.error = error
+		results.append(gs.is_soil_in_band(CELL))
+	_done(gs)
+	if results != [true, true, false, false]:
+		return "Edges at +/-%s %% must be in band and just past them out, got %s." % [band_pct, results]
+	return ""
+
+
+## GPT review 1: the seed chosen when Space was sent is what gets planted,
+## even if C changed the selection while the command was in flight.
+func test_plant_uses_the_seed_sent_with_the_command() -> String:
+	var gs: GameStateScript = _make_state()
+	var ids: Array[String] = gs.crop_ids()
+	gs.seed_crop_id = ids[0]
+	gs.plant_crop(CELL, ids[1])
+	var planted: String = str(gs.plantings.get(CELL, {}).get("crop_id", ""))
+	var credits: int = gs.credits
+	var cost: int = gs.seed_cost(ids[1])
+	_done(gs)
+	if planted != ids[1] or credits != 1000 - cost:
+		return "Planting must use and charge for the sent seed %s, planted '%s'." % [ids[1], planted]
+	return ""
+
+
+## GPT review 1: when credits change for a seed, the cell already shows the planting.
+func test_planting_is_recorded_before_the_seed_charge() -> String:
+	var gs: GameStateScript = _make_state()
+	var seen: Array[bool] = []
+	gs.credits_changed.connect(func(_credits: int) -> void: seen.append(gs.plantings.has(CELL)))
+	gs.plant_crop(CELL)
+	_done(gs)
+	if seen != [true]:
+		return "credits_changed must fire once, after the planting is recorded, saw %s." % [seen]
 	return ""

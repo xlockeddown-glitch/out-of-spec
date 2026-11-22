@@ -37,6 +37,10 @@ const CROPS_TABLE: StringName = &"crops"
 const SOIL_PROBE_ID: String = "soil_probe"
 ## Set-point step for [ and ], as a volumetric fraction (1 %).
 const SETPOINT_STEP: float = 0.01
+## Moisture exactly on a band edge counts as in band despite float rounding.
+const BAND_EPSILON: float = 1e-9
+## A morning counts as growth day k once k - 0.5 days have passed since planting.
+const GROWTH_DAY_MIN: float = 0.5
 const PHONE_LOG_MAX: int = 40
 
 # --- Playtest tuning (Week 2 board: keep the loop under two minutes) ---------
@@ -407,6 +411,7 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 	cal_log.append(record)
 	last_cal_records[instrument_id] = record
 	calibration_recorded.emit(record)
+	_note_soil_excursions()
 	_credibility_after_calibration(record)
 	return record
 
@@ -431,6 +436,7 @@ func _on_time_advanced(delta_days: float) -> void:
 	for id: Variant in sensors:
 		if is_in_service(str(id)):
 			(sensors[id] as DriftingSensor).advance_days(delta_days)
+	_note_soil_excursions()
 	if drop_pod_present and GameClock.elapsed_days >= _drop_pod_departure_at:
 		drop_pod_present = false
 		drop_pod_changed.emit(false)
@@ -1419,26 +1425,42 @@ func crop_name(crop_id: String) -> String:
 	return str(crop(crop_id).get("name", crop_id))
 
 
-## Plants the current seed on a tilled, empty cell. Returns "" or the reason not.
-func plant_crop(cell: Vector3i) -> String:
-	var crop_id: String = current_seed()
+## Plants `crop_id` (default: the current seed) on a tilled, empty cell.
+## Returns "" or the reason not. With too few credits for the seed and nothing
+## growing or waiting to sell, Lin fronts the seed and takes its cost out of
+## that crop's sale, so fines can't lock the player out of farming.
+func plant_crop(cell: Vector3i, crop_id: String = "") -> String:
 	if crop_id == "":
+		crop_id = current_seed()
+	if crop_id == "" or crop(crop_id).is_empty():
 		return "No crops in the data."
 	if not tilled_cells.has(cell):
 		return "Till the soil first."
 	if plantings.has(cell):
 		return "Something is already growing here."
 	var cost: int = seed_cost(crop_id)
+	var advance: int = 0
 	if credits < cost:
-		return "%s seed costs %s CR; you have %s CR." % [crop_name(crop_id), SP811.integer(cost), SP811.integer(credits)]
-	add_credits(-cost)
+		if not plantings.is_empty() or not harvest_bin.is_empty():
+			return "%s seed costs %s CR; you have %s CR." % [crop_name(crop_id), SP811.integer(cost), SP811.integer(credits)]
+		advance = cost
+	# Write the planting before any signal, so listeners see the cell occupied.
 	plantings[cell] = {
 		"crop_id": crop_id,
 		"planted_day": GameClock.get_day_index(),
+		"planted_at": GameClock.elapsed_days,
 		"days_grown": 0,
 		"setpoint": float(crop(crop_id).get("soil_moisture_target", 0.0)),
 		"out_of_band_days": 0,
+		"out_today": false,
+		"advance": advance,
 	}
+	_note_soil_excursions()
+	if advance > 0:
+		post_phone("LIN: I'll front you the %s seed and take the %s CR out of what I pay for that crop." % [
+			crop_name(crop_id), SP811.integer(advance)])
+	else:
+		add_credits(-cost)
 	crops_changed.emit()
 	return ""
 
@@ -1468,21 +1490,37 @@ func is_soil_in_band(cell: Vector3i) -> bool:
 		return false
 	var spec: Dictionary = crop(planting["crop_id"])
 	var target: float = float(spec.get("soil_moisture_target", 0.0))
-	return absf(soil_moisture(cell) - target) <= float(spec.get("tolerance_band", 0.0))
+	return absf(soil_moisture(cell) - target) <= float(spec.get("tolerance_band", 0.0)) + BAND_EPSILON
 
 
-## Each morning: crops still growing note a day out of their moisture band,
-## then grow one day.
+## Marks each growing crop whose soil is out of its band right now. Runs
+## whenever the probe drifts or is calibrated and when a set point changes, so
+## an excursion between mornings still counts against that day.
+func _note_soil_excursions() -> void:
+	for cell: Variant in plantings:
+		var planting: Dictionary = plantings[cell]
+		if not planting.get("out_today", false) and not is_crop_ready(cell) and not is_soil_in_band(cell):
+			planting["out_today"] = true
+
+
+## Each morning: a growing crop counts a day out of band if its soil left the
+## band at any time since the last morning, then grows a day once at least
+## GROWTH_DAY_MIN of that day has passed since planting. A crop is ready within
+## half a day of its stated growth time, however late in the day it went in.
 func _grow_crops() -> void:
 	if plantings.is_empty():
 		return
+	_note_soil_excursions()
 	for cell: Variant in plantings:
 		if is_crop_ready(cell):
 			continue
 		var planting: Dictionary = plantings[cell]
-		if not is_soil_in_band(cell):
+		if planting.get("out_today", false):
 			planting["out_of_band_days"] = int(planting["out_of_band_days"]) + 1
-		planting["days_grown"] = int(planting["days_grown"]) + 1
+			planting["out_today"] = false
+		var age: float = GameClock.elapsed_days - float(planting.get("planted_at", GameClock.elapsed_days))
+		if age >= float(planting["days_grown"]) + 1.0 - GROWTH_DAY_MIN:
+			planting["days_grown"] = int(planting["days_grown"]) + 1
 	crops_changed.emit()
 
 
@@ -1493,6 +1531,7 @@ func adjust_setpoint(cell: Vector3i, steps: int) -> float:
 		return -1.0
 	var planting: Dictionary = plantings[cell]
 	planting["setpoint"] = clampf(snappedf(float(planting["setpoint"]) + steps * SETPOINT_STEP, SETPOINT_STEP), 0.0, 1.0)
+	_note_soil_excursions()
 	crops_changed.emit()
 	return planting["setpoint"]
 
@@ -1504,8 +1543,9 @@ func harvest_crop(cell: Vector3i) -> Dictionary:
 	var planting: Dictionary = plantings[cell]
 	var entry: Dictionary = {
 		"crop_id": planting["crop_id"],
-		"in_spec": int(planting["out_of_band_days"]) == 0,
-		"out_of_band_days": int(planting["out_of_band_days"]),
+		"in_spec": int(planting["out_of_band_days"]) == 0 and not planting.get("out_today", false),
+		"out_of_band_days": int(planting["out_of_band_days"]) + (1 if planting.get("out_today", false) else 0),
+		"advance": int(planting.get("advance", 0)),
 	}
 	plantings.erase(cell)
 	harvest_bin.append(entry)
@@ -1526,7 +1566,7 @@ func crop_sale_price(entry: Dictionary) -> int:
 func harvest_bin_value() -> int:
 	var total: int = 0
 	for entry: Dictionary in harvest_bin:
-		total += crop_sale_price(entry)
+		total += maxi(0, crop_sale_price(entry) - int(entry.get("advance", 0)))
 	return total
 
 
@@ -1537,15 +1577,19 @@ func sell_harvest_to_lin() -> int:
 	var total: int = harvest_bin_value()
 	var count: int = harvest_bin.size()
 	var off_spec: int = 0
+	var advanced: int = 0
 	for entry: Dictionary in harvest_bin:
 		if not entry.get("in_spec", false):
 			off_spec += 1
+		advanced += int(entry.get("advance", 0))
 	harvest_bin.clear()
 	add_credits(total)
 	crops_changed.emit()
 	var note: String = ("" if off_spec == 0
-		else " %d off spec, paid at the reduced price." % off_spec)
-	post_phone("LIN: Bought %d crops for %s CR.%s" % [count, SP811.integer(total), note])
+		else " %s off spec, paid at the reduced price." % SP811.integer(off_spec))
+	if advanced > 0:
+		note += " Less the %s CR of seed I fronted you." % SP811.integer(advanced)
+	post_phone("LIN: Bought %s crops for %s CR.%s" % [SP811.integer(count), SP811.integer(total), note])
 	return total
 
 
