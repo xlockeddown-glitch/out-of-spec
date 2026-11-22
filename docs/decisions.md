@@ -516,3 +516,15 @@ Agent's notes (flagged for Ryan, not his words):
 
 - Ryan's answer was to the offer to put the LS-8.5 reference meter in the dome next.
 - The calibration bench has no free room left (cal station, silk tray and field meter), so the reference meter stands on the chamber cart's lid instead, on the free front strip in front of the lid fittings, its front panel toward the camera. It is at true size (0.4 m × 0.35 m × 0.15 m). Set dressing only; it does nothing in play yet.
+
+## 2026-11-22: Crops in the farm
+
+### Ryan chose
+
+- "Crops in the farm"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next.
+- The farm already shows the crop models: since the income milestone, `FarmGrid` stands stage 0 to 2 on a growing cell, stage 3 when it is ready, and the wilted model once the soil leaves its band. A render with all five on one row confirms they sit on the soil and read clearly. No scene change was needed, so this only corrects the docs that still called them unplaced.
+- Every crop in `data/crops.json` uses the same sun-pod models. Models per crop are still an open question.

@@ -663,7 +663,7 @@ FIELD_PROPS = {
 
 # Gemini's Plateau Sun-Pod crop growth stages (2026-11-21): crop_stage_0..3, 0.1 m voxels,
 # origin at the footprint center on the ground, palette as given in its generator script.
-# Built and turned like the field props.
+# Built and turned like the field props. FarmGrid shows them on planted cells.
 CROP_SUNPOD = {"T1": "#3D2919", "G3": "#2E4F22", "G1": "#4C7A34", "G2": "#6FA34B",
                "C1": "#D9A13B", "C2": "#F2C96B", "S": SHADOW}
 
