@@ -4,5 +4,6 @@
   "dawn_yaw_deg": -120.0,
   "dusk_yaw_deg": 60.0,
   "min_elevation_deg": 10.0,
-  "max_elevation_deg": 62.0
+  "max_elevation_deg": 62.0,
+  "twilight_hours": 0.75
 }

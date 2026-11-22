@@ -1,8 +1,9 @@
 class_name DayNight
 extends DirectionalLight3D
-## Drives the farm sun from GameClock: rises at 04:30, peaks at noon, sets at
-## 19:30, so the 06:00 start of each game day is already light. Warm at dawn/dusk, dim moonlight at night. Also scales the
-## environment's sky and ambient light so nights read as nights.
+## Drives the farm sun from GameClock (hours in data/day_night.json): rises at
+## 04:30, peaks at noon, sets at 19:30, so the 06:00 start of each game day is
+## already light. Warm at dawn and dusk, fading to dim blue moonlight over a short
+## twilight. Also scales the sky and ambient light so nights read as nights.
 
 const CONFIG_TABLE: StringName = &"day_night"
 const COLOR_LOW_SUN := Color(1.0, 0.62, 0.38)
@@ -20,6 +21,7 @@ var _dawn_yaw_deg: float
 var _dusk_yaw_deg: float
 var _min_elevation_deg: float
 var _max_elevation_deg: float
+var _twilight_hours: float
 
 
 func _ready() -> void:
@@ -29,14 +31,21 @@ func _ready() -> void:
 	_dusk_yaw_deg = DataManager.get_number(CONFIG_TABLE, "dusk_yaw_deg", NAN)
 	_min_elevation_deg = DataManager.get_number(CONFIG_TABLE, "min_elevation_deg", NAN)
 	_max_elevation_deg = DataManager.get_number(CONFIG_TABLE, "max_elevation_deg", NAN)
+	_twilight_hours = DataManager.get_number(CONFIG_TABLE, "twilight_hours", NAN)
 	for value: float in [_dawn_hour, _dusk_hour, _dawn_yaw_deg, _dusk_yaw_deg,
-			_min_elevation_deg, _max_elevation_deg]:
+			_min_elevation_deg, _max_elevation_deg, _twilight_hours]:
 		if not is_finite(value):
 			push_error("DayNight: expected numeric settings in data/day_night.json.")
 			set_process(false)
 			return
 	if _dawn_hour < 0.0 or _dawn_hour >= _dusk_hour or _dusk_hour >= GameClock.HOURS_PER_DAY:
 		push_error("DayNight: expected dawn before dusk within one wall-clock day.")
+		set_process(false)
+	elif _min_elevation_deg < 0.0 or _min_elevation_deg > _max_elevation_deg or _max_elevation_deg > 90.0:
+		push_error("DayNight: expected 0 <= min_elevation_deg <= max_elevation_deg <= 90.")
+		set_process(false)
+	elif _twilight_hours <= 0.0:
+		push_error("DayNight: expected twilight_hours > 0.")
 		set_process(false)
 
 
@@ -62,7 +71,10 @@ func _process(_delta: float) -> void:
 		light_color = COLOR_LOW_SUN.lerp(COLOR_HIGH_SUN, clampf(daylight * 2.0, 0.0, 1.0))
 	else:
 		light_energy = night_energy
-		light_color = COLOR_MOON
+		# Fade warm sun to moonlight over the twilight, both after dusk and before dawn.
+		var hours_into_night: float = minf(fposmod(hour - _dusk_hour, GameClock.HOURS_PER_DAY),
+			fposmod(_dawn_hour - hour, GameClock.HOURS_PER_DAY))
+		light_color = COLOR_LOW_SUN.lerp(COLOR_MOON, clampf(hours_into_night / _twilight_hours, 0.0, 1.0))
 
 	if environment_node and environment_node.environment:
 		var env: Environment = environment_node.environment

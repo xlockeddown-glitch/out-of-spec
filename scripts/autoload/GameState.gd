@@ -241,13 +241,15 @@ func _run_audit(day: int) -> void:
 	var departure_hour: float = _schedule("drop_pod_departs_hour", 18.0)
 	_drop_pod_departure_at = GameClock.elapsed_at_hour(day, departure_hour)
 	# A 06:00 departure means the end of the audit day, not the moment it starts.
-	if is_equal_approx(_drop_pod_departure_at, float(day - 1)):
+	if _drop_pod_departure_at - float(day - 1) < 1.0e-6:
 		_drop_pod_departure_at += 1.0
+	post_phone("AUDIT DAY %d: Inspector Vance and AUD-1T have landed." % day)
 	# A time skip can run the audit after its departure deadline has passed.
 	if GameClock.elapsed_days < _drop_pod_departure_at:
 		drop_pod_present = true
 		drop_pod_changed.emit(true)
-	post_phone("AUDIT DAY %d: Inspector Vance and AUD-1T have landed." % day)
+	else:
+		post_phone("AUD-1T: Departing. Please remain compliant in our absence.")
 	for line: Dictionary in report["lines"]:
 		var sensor: DriftingSensor = get_sensor(line["instrument_id"])
 		# Three decimals so 1.004 x MPE doesn't read as "1.00 ... OUT OF TOLERANCE".

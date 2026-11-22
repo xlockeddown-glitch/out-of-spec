@@ -45,6 +45,7 @@ const RECORD_SECTIONS: Dictionary = {
 		"audit_fines": ["title", "credit_penalty"],
 	},
 	&"sensor_drift_config": {},
+	&"day_night": {},
 	&"items": {},
 	&"economy": {},
 }
