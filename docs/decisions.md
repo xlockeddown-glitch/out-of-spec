@@ -334,3 +334,15 @@ Agent's notes (flagged for Ryan, not his words):
 
 - Not scheduled yet; it shapes the paid calibration jobs coming at TRUSTED. Jobs could be grouped by discipline (pressure, torque, electrical, ...), so a lab that owns only some disciplines' standards can still earn, at higher stakes per job.
 - Open questions for Ryan: how a specialist is rewarded (better pay, steadier customers, faster credibility in that discipline), and how the site's own instruments outside the specialty get looked after (an outside cal service, Bram, a robot helper).
+
+## 2026-11-22: Ryan's idea, an upgradeable lab building
+
+### Ryan said
+
+- The lab building is upgradeable, to allow bigger sections or dedicated calibration areas.
+- Start with a small lab with one or a few sections. Upgrade to a medium lab, where areas can be made bigger or more separate areas added. Then a large lab, with one really big area or many separate areas, depending on how you specialize.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Not scheduled yet. It pairs with the specialization idea: one big area suits a specialist, many small areas suit a jack of all trades.
+- The dome interior today is a single room with the calibration bench; sizes, costs and what each area enables (for example, a discipline's jobs need a matching area) are Ryan's call.
