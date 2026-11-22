@@ -542,11 +542,97 @@ def relay_mast() -> Model:
     return m
 
 
+# ---------------------------------------------------------------- boulders
+# Concepts from Gemini (2026-11-21) as layer grids (sheets/boulder_a.txt .. boulder_d.txt),
+# built voxel for voxel by boulder_sheet. Plateau palette from the ore fissure; each
+# fills its greybox box collider. Z=0 sits on the ground.
+PLATEAU = ("#A8422B", "#8E3522", "#6E2617", "#5E2214")  # clay, clay 2, rust crust, crack
+
+
+def boulder_sheet(name: str, sheet: str) -> Model:
+    """Built voxel for voxel from a layer-grid concept sheet in tools/voxgen/sheets/.
+    Sheet axes are MagicaVoxel's: "Z=n" headers are layers bottom up, each layer has
+    one row per Y (first row = highest Y, the back) and one character per X. Cells:
+    1-4 = PLATEAU colors, S = SHADOW, . = empty. Layer Z=0 sits on the ground; origin
+    is the footprint center. MagicaVoxel (x, y, z) maps to Godot (x, z, -y)."""
+    import re
+    colors = dict(zip("1234", PLATEAU)) | {"S": SHADOW}
+    layers: dict[int, list[str]] = {}
+    current = -1
+    for line in (Path(__file__).parent / "sheets" / sheet).read_text(encoding="utf-8").splitlines():
+        header = re.match(r"Z=(\d+)", line)
+        if header:
+            current = int(header.group(1))
+            layers[current] = []
+        elif current >= 0 and re.fullmatch(r"[.1234S]+", line):
+            layers[current].append(line)
+    w = len(layers[0][0])
+    d = len(layers[0])
+    m = Model(name, offset=(-w / 2.0, 0.0, -d / 2.0))
+    for y, rows in layers.items():
+        assert len(rows) == d and all(len(r) == w for r in rows), f"{sheet}: Z={y} is not {w} x {d}"
+        for z, row in enumerate(rows):
+            for x, cell in enumerate(row):
+                if cell != ".":
+                    m.put("rock", x, y, z, colors[cell])
+    return m
+
+
+# ---------------------------------------------------------------- soil tiles
+# GridMap items for FarmGrid.Tile (0 = untilled, 1 = tilled), built into
+# assets/voxels/soil_tiles.tres by tools/voxgen/build_soil_library.gd. 19 x 2 x 19
+# voxels at 0.1 m = 1.9 m x 0.2 m x 1.9 m in a 2 m x 0.2 m x 2 m cell, centered on
+# the cell (voxel rows -1 and 0). Gemini's layer grids give no hex values; the colors
+# are sampled off its concept images.
+def token_sheet(sheet: str) -> dict[int, list[list[str]]]:
+    """Reads a token layer grid from tools/voxgen/sheets/: "Z = n" headers are layers
+    bottom up; each "Y=NN  t t t ..." row lists one token per X (".." = empty), first
+    row = highest Y. Anything after "<-" is a comment. Returns {z: rows}."""
+    import re
+    layers: dict[int, list[list[str]]] = {}
+    current = -1
+    for line in (Path(__file__).parent / "sheets" / sheet).read_text(encoding="utf-8").splitlines():
+        header = re.match(r"Z\s*=\s*(\d+)", line)
+        row = re.match(r"Y=\d+\s+(.*)", line)
+        if header:
+            current = int(header.group(1))
+            layers[current] = []
+        elif row and current >= 0:
+            layers[current].append(row.group(1).split("<-")[0].split())
+    w, d = len(layers[0][0]), len(layers[0])
+    for z, rows in layers.items():
+        assert len(rows) == d and all(len(r) == w for r in rows), f"{sheet}: Z={z} is not {w} x {d}"
+    return layers
+
+
+def soil_sheet(tilled: bool) -> Model:
+    """Built voxel for voxel from Gemini's layer grids (sheets/soil_tilled.txt,
+    sheets/soil_untilled.txt). Sheet Z=0 is voxel row -1, Z=1 is row 0; the first
+    sheet row (Y=18) is the back (-z). Tilled furrows are the empty cells of Z=1."""
+    name = "soil_tilled" if tilled else "soil_untilled"
+    colors = {"U1": "#78563B", "U2": "#A98463", "U3": "#563D26",   # base, light, dark speckle
+              "T1": "#442E21", "T2": "#2A1D15", "T3": "#2D1E14"}   # ridge, wet base/furrow, speckle
+    m = Model(name, offset=(-9.5, 0.0, -9.5))
+    for layer, rows in token_sheet(f"{name}.txt").items():
+        for z, row in enumerate(rows):
+            for x, cell in enumerate(row):
+                if cell != "..":
+                    m.put("soil", x, layer - 1, z, colors[cell])
+    return m
+
+
 MODELS = [
     (lambda: tractor(False), 0.1), (lambda: tractor(True), 0.1),
     (terrarium, 0.1), (curlyhair, 0.1), (bram_bay, 0.2), (ore_fissure, 0.2),
     (drop_pod, 0.2), (aud1t, 0.2), (relay_mast, 0.5),
     (dome_room, 0.2), (dome_bench, 0.1), (cal_station, 0.1),
+    # boulders match the greybox boxes: RockA 5 x 4 x 4 m, B 4 x 3.5 x 5 m, C 4 m cube, D 3 m cube
+    # Gemini layer grids in sheets/
+    (lambda: boulder_sheet("boulder_a", "boulder_a.txt"), 0.2),
+    (lambda: boulder_sheet("boulder_b", "boulder_b.txt"), 0.2),
+    (lambda: boulder_sheet("boulder_c", "boulder_c.txt"), 0.2),
+    (lambda: boulder_sheet("boulder_d", "boulder_d.txt"), 0.2),
+    (lambda: soil_sheet(False), 0.1), (lambda: soil_sheet(True), 0.1),
 ]
 
 

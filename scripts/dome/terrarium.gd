@@ -26,7 +26,7 @@ var _time: float = 0.0
 
 func _ready() -> void:
 	_led_mat.emission_enabled = true
-	_led_mat.emission_energy_multiplier = 3.0
+	_led_mat.emission_energy_multiplier = ModelSlot.EMIT_ENERGY
 	if status_led:
 		status_led.material_override = _led_mat
 	if tarantula:

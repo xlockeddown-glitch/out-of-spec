@@ -31,7 +31,7 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
   - the terrarium hygrometer LED (`Terrarium/StatusLED`)
   - the rover's cab readout
   - the relay's spool core
-- **Emissive voxels:** put each glowing part in its own MagicaVoxel object named `emit_<part>`, for example `emit_headlights`. `ModelSlot` makes any mesh named `emit_*` glow in its own colors, because MagicaVoxel exports don't carry emission into Godot.
+- **Emissive voxels:** put each glowing part in its own MagicaVoxel object named `emit_<part>`, for example `emit_headlights`. `ModelSlot` makes any mesh named `emit_*` glow in its own colors, because MagicaVoxel exports don't carry emission into Godot. Glow parts are emission only (black albedo, no specular, so scene lights don't tint them) at `ModelSlot.EMIT_ENERGY` (1.2). Amber clips toward yellow under the Filmic tonemap long before teal does, so an amber lamp can get a per-part value through the slot's `emit_energy_overrides`. So far only the dome pendants and the terrarium heat lamp have one (0.5, tuned by eye); the farm's amber lamps (tractor headlights and roof lights, work lamp, drop-pod hatch, AUD-1T eye, relay bay lamp) still use 1.2 and haven't been tuned.
 - **Readability at about 40 m:** keep silhouette features at least 2 voxels thick. Where space allows, give lit voxels a 1-voxel `#1D222B` border (from answer A). The generated first pass doesn't yet.
 
 ## 1. Tractor (`tractor.glb`, `tractor_wide.glb`)
@@ -227,3 +227,13 @@ Where the generated models differ from the footprints above:
 
 - **Tractor hull color.** The greybox's orange (`#E68C1F`) and answer A's gold (`#D99B26`) both sit too close to guard-band amber. I picked B's `#C85A2A`; say if you want something else.
 - **Material values are unverified.** The Strength, Power and Flux numbers in the source answers aren't checked against MagicaVoxel's material panel. The game ignores them: glow comes from the `emit_*` naming.
+
+## Boulders and soil tiles
+
+- **Boulders** (`boulder_a`–`boulder_d`, 0.2 m): canon puts surface boulders on the Terracotta Plateau, so they use the ore fissure's plateau palette (`#A8422B`, `#8E3522`, `#6E2617`, crack `#5E2214`) plus shadow `#1D222B` in the cracks. Each matches its greybox box (A 5 m × 4 m × 4 m, B 4 m × 3.5 m × 5 m, C 4 m cube, D 3 m cube) because the collider stays that box; B's model is 3.6 m tall (18 voxels). Layer 0 sits on the ground. No glow.
+  - All four are built voxel for voxel by `boulder_sheet` from Gemini's layer grids, saved as `tools/voxgen/sheets/boulder_a.txt` … `boulder_d.txt` (MagicaVoxel axes; A 25 × 20 × 20, B 20 × 25 × 18, C 20 × 20 × 20, D 15 × 15 × 15). Where Gemini's rendered images disagree with its grids, the grids win.
+  - B leans toward +x from layer 4 up (about 50 overhanging cells). C has a canyon split down the middle; one shadow voxel at X = 9, Y = 14, Z = 7 (the sheet's axes) is fully buried and never seen. Each grid is one connected solid with no sealed air.
+- **Soil tiles** (`soil_untilled`, `soil_tilled`, 0.1 m): 19 × 2 × 19 voxels (1.9 m × 0.2 m × 1.9 m) in the 2 m cell. Both are built voxel for voxel by `soil_sheet` from Gemini's layer grids, saved as `tools/voxgen/sheets/soil_untilled.txt` and `soil_tilled.txt`. The grids name tokens but give no hex values, so the colors are sampled from Gemini's concept images.
+  - Untilled: layer 0 all U1, layer 1 flat with speckles and six 2-voxel pebbles. U1 tan `#78563B`, U2 light `#A98463`, U3 dark `#563D26`. Which of U2 and U3 is light is an assumption; the grid does not say.
+  - Tilled: layer 0 all T2 (`#2A1D15`, the wet trough floor). Layer 1 is ridges of T1 (`#442E21`) speckled with T3 (`#2D1E14`), with empty rows at Y = 2, 5, 8, 11, 14 and 17 as the furrows, running along X. No shadow-edge color.
+  - Placement: `SoilGrid` sits at y = −0.05 m, so with 0.2 m cells centered on y = 0.05 m each tile's base layer spans −0.05 m to 0.05 m and its top layer 0.05 m to 0.15 m. That keeps the furrow floor 0.05 m above the Ground top (y = 0), so the furrows show `#2A1D15` and not the ground, with no z-fighting. The height is a tuning choice, not from a spec. The rover still drives on the Ground (y = 0), so its wheels sink up to 0.15 m into the tile tops; the tiles have no collision. Before this the base layer was buried (−0.15 m to −0.05 m) and the furrows showed the green ground.
