@@ -44,8 +44,8 @@
   },
   "audit_schedule": {
     "cadence_days": 5,
-    "drop_pod_departs_hour": 18,
-    "_note": "Inspector Vance + AUD-1T land every 5th morning (docs/canon.md). Departure hour is a placeholder."
+    "departs": 18,
+    "_note": "Inspector Vance + AUD-1T land every 5th morning (docs/canon.md). Departure uses a wall-clock hour. Hours before the game day's start belong to the following calendar morning of the same game day."
   },
   "calibration_interval": {
     "initial_days": 5,

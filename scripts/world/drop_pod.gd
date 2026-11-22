@@ -1,7 +1,7 @@
 class_name DropPod
 extends Node3D
 ## MegaCorp drop-pod. Present while GameState.drop_pod_present (audit mornings
-## until evening). Lands from the sky, AUD-1T hovers beside it, lifts off when
+## until the scheduled departure). Lands from the sky, AUD-1T hovers beside it, lifts off when
 ## the audit is over. Visual only; the audit itself runs in GameState.
 
 const DROP_HEIGHT: float = 40.0

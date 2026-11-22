@@ -70,9 +70,9 @@ var phone_log: Array[String] = []
 var audit_log: Array[Dictionary] = []
 ## instrument_id -> number of audits that fined it (repeat surcharge).
 var offence_counts: Dictionary = {}
-## True from an audit morning until the pod departs that evening.
+## True from an audit morning until the pod's scheduled departure.
 var drop_pod_present: bool = false
-var _drop_pod_day: int = 0
+var _drop_pod_departure_at: float = 0.0
 ## Crystal ore carried by the rover, and fissure id -> day it was mined.
 var crystal_ore: int = 0
 var mined_fissures: Dictionary = {}
@@ -190,9 +190,7 @@ func calibrate(instrument_id: String, performed_by: String = "You") -> Dictionar
 func _on_time_advanced(delta_days: float) -> void:
 	steering.advance_days(delta_days)
 	hygrometer.advance_days(delta_days)
-	# Leaves at the departure hour, or at once if a time skip jumped past that evening.
-	if drop_pod_present and (GameClock.get_day_index() != _drop_pod_day
-			or GameClock.get_hour() >= _schedule("drop_pod_departs_hour", 18.0)):
+	if drop_pod_present and GameClock.elapsed_days >= _drop_pod_departure_at:
 		drop_pod_present = false
 		drop_pod_changed.emit(false)
 		post_phone("AUD-1T: Departing. Please remain compliant in our absence.")
@@ -240,9 +238,12 @@ func _run_audit(day: int) -> void:
 	if not report["passed"] and not audit_grace_used:
 		_apply_audit_grace(report)
 
-	drop_pod_present = true
-	_drop_pod_day = day
-	drop_pod_changed.emit(true)
+	var departure_hour: float = _schedule("departs", GameClock.DAY_START_HOUR)
+	_drop_pod_departure_at = GameClock.elapsed_at_hour(day, departure_hour)
+	# A time skip can run the audit after its departure deadline has passed.
+	if GameClock.elapsed_days < _drop_pod_departure_at:
+		drop_pod_present = true
+		drop_pod_changed.emit(true)
 	post_phone("AUDIT DAY %d: Inspector Vance and AUD-1T have landed." % day)
 	for line: Dictionary in report["lines"]:
 		var sensor: DriftingSensor = get_sensor(line["instrument_id"])

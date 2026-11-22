@@ -1,0 +1,8 @@
+{
+  "dawn_hour": 4.5,
+  "dusk_hour": 19.5,
+  "dawn_yaw_deg": -120.0,
+  "dusk_yaw_deg": 60.0,
+  "min_elevation_deg": 10.0,
+  "max_elevation_deg": 62.0
+}

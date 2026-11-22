@@ -11,6 +11,7 @@ signal time_advanced(delta_days: float)
 signal day_started(day_index: int)
 
 const DAY_START_HOUR: float = 6.0
+const HOURS_PER_DAY: float = 24.0
 ## Real seconds per in-game day. Stardew-style pacing; tune by feel.
 const DEFAULT_SECONDS_PER_DAY: float = 720.0
 
@@ -51,7 +52,13 @@ func get_day_index() -> int:
 
 ## Hours since midnight, 0.0 to 24.0.
 func get_hour() -> float:
-	return fmod(DAY_START_HOUR + fmod(elapsed_days, 1.0) * 24.0, 24.0)
+	return fmod(DAY_START_HOUR + fmod(elapsed_days, 1.0) * HOURS_PER_DAY, HOURS_PER_DAY)
+
+
+## Maps a wall-clock hour to elapsed time within a 1-based game day.
+func elapsed_at_hour(day_index: int, hour: float) -> float:
+	var hours_since_start: float = fposmod(hour - DAY_START_HOUR, HOURS_PER_DAY)
+	return float(day_index - 1) + hours_since_start / HOURS_PER_DAY
 
 
 ## "DAY 3  14:20"
