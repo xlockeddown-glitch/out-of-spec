@@ -48,7 +48,7 @@
       "certificate_uncertainty": 0.02,
       "certificate_k": 2,
       "initial_interval_days": 30,
-      "_note": "Tier 0 angle standard (Ryan, 2026-11-22). Name picked by Ryan 2026-11-22 (no trademark search yet); every number here are game placeholders, not from a datasheet. spec_confidence_pct null = no stated confidence, so the spec is rectangular (half-width / √3)."
+      "_note": "Tier 0 angle standard (Ryan, 2026-11-22). Name picked by Ryan 2026-11-22 (no trademark search yet); every number here is a game placeholder, not from a datasheet. spec_confidence_pct null = no stated confidence, so the spec is rectangular (half-width / √3)."
     },
     "humidity_generator": {
       "role": "standard",
@@ -61,7 +61,7 @@
       "certificate_uncertainty": 0.3,
       "certificate_k": 2,
       "initial_interval_days": 30,
-      "_note": "Tier 0 humidity standard, two-pressure generator class (Ryan, 2026-11-22). Name picked by Ryan 2026-11-22 (no trademark search yet); every number here are game placeholders, not from a datasheet."
+      "_note": "Tier 0 humidity standard, two-pressure generator class (Ryan, 2026-11-22). Name picked by Ryan 2026-11-22 (no trademark search yet); every number here is a game placeholder, not from a datasheet."
     },
     "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. Standards' daily_drift_rate takes one from zero to its MPE in about 60 days (Ryan, 2026-11-22), so skipping an OIRM cycle risks a recall. resolution (one digit of the unit under test), bench_minutes and the standards' specs and drift rates are placeholders (docs/design/equipment_skills_robots.md section 1.5)."
   },

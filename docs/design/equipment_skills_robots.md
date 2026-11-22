@@ -41,7 +41,7 @@ Every drifting sensor in the game today is an angle (steering, dish) or a relati
 
 So most of the new equipment needs **new drifting sensors** to be useful. §1.3 proposes them, each tied to something canon already mentions. Open question Q1 asks how the existing three should be referenced.
 
-**Decided by Ryan (2026-11-22):** the existing three are calibrated against two new Tier 0 standards, issued at start with OIRM certificates: a **rotary table** (angle; calibrates the steering encoder and the dish azimuth) and a **humidity generator chamber, Thunder Scientific class** (relative humidity; calibrates the hygrometer). They replace the jig, tripod and salt cell of the first draft. The `steering_encoder_jig` and `field_survey_tripod` props can stay as the fixtures that hold the unit under test **[ASSUMPTION]**. Fictional names, real specs and sources for both are still **[PLACEHOLDER]**; Thunder Scientific is a real trademark, so it gets a fictional maker name like the other seven.
+**Decided by Ryan (2026-11-22):** the existing three are calibrated against two new Tier 0 standards, issued at start with OIRM certificates: a **rotary table** (angle; calibrates the steering encoder and the dish azimuth) and a **humidity generator chamber, Thunder Scientific class** (relative humidity; calibrates the hygrometer). They replace the jig, tripod and salt cell of the first draft. The `steering_encoder_jig` and `field_survey_tripod` props can stay as the fixtures that hold the unit under test **[ASSUMPTION]**. Ryan named them the **Pavonis Indexworks PX-1** and the **Meridiani Dewpoint MD-2P** (2026-11-22; Thunder Scientific is a real trademark, so the chamber has a fictional maker like the other seven). Real specs and sources for both are still **[PLACEHOLDER]**.
 
 ### 1.2 Names (shortlist for Ryan)
 
@@ -447,7 +447,9 @@ Ryan chose milestone-sized PRs, worked one at a time in one session, each second
 
 1. **Calibration core.** Sensor registry in `GameState` (replacing the hardcoded ids in `get_sensor()`, `_on_time_advanced()` and `_run_audit()`); the rotary table and humidity chamber as Tier 0 standards on the existing three sensors; the new record fields (`standard_id`, U, TUR, acceptance limit, result); the uncertainty budget, RSS acceptance limit and 2:1 floor; hidden standard error carried into the unit; bench time.
 2. **OIRM and traceability.** Certificates, the drop-pod courier, traceability chains on the bench and audit screens, recall with impact threshold and cascade, the Tier 1 gate on a clean audit.
-3. **Equipment tiers and new sensors.** The seven instruments as data (working names), tire and dome pressure, terrarium thermometer, relay timebase, field meter; Kestrel's uncertified standards; Tier 2 and 3 gates.
+3. **Equipment tiers and new sensors**, split in two by Ryan (2026-11-22, see [`decisions.md`](../decisions.md)):
+   - **3a.** The five new sensors (tire and dome pressure, terrarium thermometer, relay timebase, field meter) and Tier 1: Bram sells the FM-3 field meter and the WD-1 reference gauge after the first clean audit.
+   - **3b.** The Tier 2 and 3 instruments, Kestrel's uncertified standards and their gates.
 4. **Skills.** All six skills, starting at level 1, XP from existing calls, the level curve.
 5. **Robots.** Trellis build, commissioning, job cards, robot audits and the interlock fine, plus the Neon concept sheet.
 

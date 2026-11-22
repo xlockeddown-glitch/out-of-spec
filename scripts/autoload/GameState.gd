@@ -502,12 +502,12 @@ func _apply_audit_grace(report: Dictionary) -> void:
 			line["fine"] = 0
 			line["waived"] = true
 			if get_sensor(line["instrument_id"]).role == "standard":
-				excused.append(instrument_name(line["instrument_id"]).to_lower())
+				excused.append(_mid_sentence(instrument_name(line["instrument_id"])))
 			else:
-				names.append(instrument_name(line["instrument_id"]).to_lower())
+				names.append(_mid_sentence(instrument_name(line["instrument_id"])))
 	report["total_fine"] = 0
 	report["warning"] = true
-	# "recalibrated the steering encoder and talked Vance out of the rotary table's certificate"
+	# "recalibrated the steering encoder and talked Vance out of the lapsed certificate on the PX-1 rotary table"
 	var done: PackedStringArray = []
 	if not names.is_empty():
 		done.append("recalibrated the " + " and the ".join(names))
@@ -515,6 +515,14 @@ func _apply_audit_grace(report: Dictionary) -> void:
 		done.append("talked Vance out of the lapsed certificate on the " + " and the ".join(excused))
 	report["waived_names"] = " and ".join(done)
 
+
+## A short name for use mid-sentence: "Steering" -> "steering", but a model
+## designator such as "PX-1 rotary table" keeps its capitals.
+static func _mid_sentence(name: String) -> String:
+	var first: String = name.get_slice(" ", 0)
+	if first.length() > 1 and first.substr(1) == first.substr(1).to_lower() 			and first.substr(1).to_upper() != first.substr(1).to_lower():
+		return first.to_lower() + name.substr(first.length())
+	return name
 
 # --- OIRM, certificates, recall (milestone 2) -------------------------------------
 
@@ -699,7 +707,7 @@ func recall(standard_id: String, standard_error: float, since_day: int) -> Array
 
 ## Traceability of an instrument's readings right now (section 1.7), for the
 ## bench and the audit. { "traceable": bool, "text": String }; text reads like
-## "Steering encoder <- Rotary table (OIRM-0001, day 3) <- OIRM" or says where it breaks.
+## "Steering <- PX-1 rotary table (OIRM-0001, day 3) <- OIRM" or says where it breaks.
 func traceability_chain(instrument_id: String) -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(instrument_id)
 	if sensor == null:
