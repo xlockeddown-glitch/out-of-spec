@@ -238,8 +238,11 @@ func _run_audit(day: int) -> void:
 	if not report["passed"] and not audit_grace_used:
 		_apply_audit_grace(report)
 
-	var departure_hour: float = _schedule("departs", GameClock.DAY_START_HOUR)
+	var departure_hour: float = _schedule("drop_pod_departs_hour", 18.0)
 	_drop_pod_departure_at = GameClock.elapsed_at_hour(day, departure_hour)
+	# A 06:00 departure means the end of the audit day, not the moment it starts.
+	if is_equal_approx(_drop_pod_departure_at, float(day - 1)):
+		_drop_pod_departure_at += 1.0
 	# A time skip can run the audit after its departure deadline has passed.
 	if GameClock.elapsed_days < _drop_pod_departure_at:
 		drop_pod_present = true
