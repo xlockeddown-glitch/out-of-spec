@@ -192,8 +192,6 @@ func test_unit_due_while_standard_away_is_excused_once() -> String:
 	gs.drop_pod_present = false
 	gs.send_to_oirm(table_id)
 	gs.steering.cal_due_day = 2  # falls due while the table is away
-	_set_day(1 + gs.oirm_courier_days())
-	gs._on_day_started(1 + gs.oirm_courier_days())  # the table comes back
 	_set_day(cadence)
 	gs._run_audit(cadence)
 	var line: Dictionary = _lines_by_id(gs.audit_log[-1])[gs.STEERING_ID]
@@ -201,6 +199,8 @@ func test_unit_due_while_standard_away_is_excused_once() -> String:
 		problem = "An excused unit must be no violation and no fine: %s" % line
 	elif not gs.audit_log[-1]["passed"] or not gs.tier1_unlocked:
 		problem = "An excused unit must not block a clean audit or Tier 1."
+	_set_day(1 + gs.oirm_courier_days())
+	gs._on_day_started(1 + gs.oirm_courier_days())  # the table comes back
 	# Another unit due while its own standard is home is not excused.
 	gs.hygrometer.cal_due_day = cadence + 1
 	_set_day(cadence * 2)

@@ -410,8 +410,8 @@ func _run_audit(day: int) -> void:
 	for id: Variant in suspect_units:
 		if int(suspect_units[id]) < day:
 			fineable_suspects[id] = suspect_units[id]
-	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since, fineable_suspects,
-		_excused_units(day))
+	var excused: Dictionary = _excused_units(day)
+	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since, fineable_suspects, excused)
 
 	if not report["passed"] and not audit_grace_used:
 		_apply_audit_grace(report)
@@ -440,7 +440,7 @@ func _run_audit(day: int) -> void:
 		if line["overdue"]:
 			label += ", OVERDUE (due day %d)" % line["due_day"]
 		if line.get("excused", false):
-			label += ", EXCUSED (its standard was at OIRM when it fell due; calibrate it before the first audit after the standard is back)"
+			label += ", EXCUSED (its standard was at OIRM when it fell due; calibrate before the day %d audit)" % excused[line["instrument_id"]]
 		if line.get("suspect", false):
 			label += ", SUSPECT CAL (recalled, not redone)"
 		if line.get("waived", false):
@@ -578,6 +578,7 @@ func oirm_courier_days() -> int:
 ## are overdue, and at any audit while the standard is still away or only came
 ## back that morning (a courier trip is longer than the audit cadence). After
 ## that they need a traceable calibration by the next audit.
+## Returns instrument_id -> the audit day by which it must be calibrated.
 func _excused_units(day: int) -> Dictionary:
 	var excused: Dictionary = {}
 	var cadence: int = maxi(int(_schedule("cadence_days", 5.0)), 1)
@@ -588,10 +589,12 @@ func _excused_units(day: int) -> Dictionary:
 			continue
 		for trip: Dictionary in oirm_trips:
 			var back: int = int(trip["return_day"])
+			if at_oirm.has(trip["standard_id"]):
+				back = maxi(back, day)  # late, still away
 			# Due after it left (the player could calibrate on the send day) and before it came back.
 			if trip["standard_id"] == sensor.calibrated_by and int(trip["sent_day"]) < due and due < back \
 					and (due >= day - cadence or back >= day):
-				excused[id] = true
+				excused[id] = next_audit_day(maxi(day, back))
 				break
 	return excused
 
