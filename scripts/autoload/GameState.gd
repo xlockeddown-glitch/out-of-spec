@@ -13,6 +13,9 @@ signal phone_message(text: String)
 signal credits_changed(credits: int)
 signal audit_completed(report: Dictionary)
 signal drop_pod_changed(present: bool)
+signal ore_changed(ore: int)
+signal fissures_changed
+signal upgrades_changed
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -70,6 +73,11 @@ var offence_counts: Dictionary = {}
 ## True from an audit morning until the pod departs that evening.
 var drop_pod_present: bool = false
 var _drop_pod_day: int = 0
+## Crystal ore carried by the rover, and fissure id -> day it was mined.
+var crystal_ore: int = 0
+var mined_fissures: Dictionary = {}
+var has_wide_treads: bool = false
+
 ## One-time grace: the first audit that would fine you becomes a warning,
 ## because your manager recalibrated the offenders before Vance got in.
 var audit_grace_used: bool = false
@@ -99,6 +107,7 @@ func _ready() -> void:
 	hygrometer.cal_due_day = 0
 	GameClock.time_advanced.connect(_on_time_advanced)
 	GameClock.day_started.connect(_on_day_started)
+	GameClock.day_started.connect(_on_day_started_regrow.unbind(1))
 	credits = int(DataManager.get_number(ECONOMY_TABLE, "starting_credits", 0.0))
 	_post_morning_dispatch(1)  # day 1 is already under way at boot
 
@@ -282,6 +291,57 @@ func _apply_audit_grace(report: Dictionary) -> void:
 	report["total_fine"] = 0
 	report["warning"] = true
 	report["waived_names"] = " and the ".join(names).insert(0, "the ")
+
+
+# --- Ore and Bram ----------------------------------------------------------------
+
+## A mined fissure regrows `fissure_regrow_days` mornings later.
+func is_fissure_available(fissure_id: StringName) -> bool:
+	if not mined_fissures.has(fissure_id):
+		return true
+	var regrow: int = int(DataManager.get_number(ITEMS_TABLE, "crystal_ore/fissure_regrow_days", 1.0))
+	return GameClock.get_day_index() >= int(mined_fissures[fissure_id]) + regrow
+
+
+func mine_fissure(fissure_id: StringName) -> bool:
+	if not is_fissure_available(fissure_id):
+		return false
+	mined_fissures[fissure_id] = GameClock.get_day_index()
+	crystal_ore += 1
+	ore_changed.emit(crystal_ore)
+	fissures_changed.emit()
+	return true
+
+
+func treads_ore_cost() -> int:
+	return int(DataManager.get_number(ITEMS_TABLE, "wide_treads/ore_cost", 6.0))
+
+
+## Bram's trade. Returns "" on success, or the reason it can't happen.
+func buy_wide_treads() -> String:
+	if has_wide_treads:
+		return "Already running wide treads."
+	var cost: int = treads_ore_cost()
+	if crystal_ore < cost:
+		return "Needs %d crystal ore; carrying %d." % [cost, crystal_ore]
+	crystal_ore -= cost
+	has_wide_treads = true
+	steering.usage_drift_rate *= DataManager.get_number(ITEMS_TABLE, "wide_treads/usage_drift_multiplier", 0.5)
+	ore_changed.emit(crystal_ore)
+	upgrades_changed.emit()
+	post_phone("BRAM: Treads are on. Steering drift per metre is cut in half. Don't till any boulders.")
+	return ""
+
+
+func bram_line(section: String) -> String:
+	var lines: Variant = DataManager.get_value(DISPATCH_TABLE, "npcs/bram/" + section)
+	if typeof(lines) != TYPE_ARRAY or (lines as Array).is_empty():
+		return ""
+	return str((lines as Array).pick_random())
+
+
+func _on_day_started_regrow() -> void:
+	fissures_changed.emit()
 
 
 func _interval_cfg(key: String, fallback: float) -> float:

@@ -3,5 +3,17 @@
     "display_name": "Optical Silk Spool",
     "relay_lag_reduction_pct": 60,
     "_note": "Week 2 decision: one spool cuts rover uplink lag about 60 % (0.45 s to 0.18 s occluded)."
+  },
+  "crystal_ore": {
+    "display_name": "Crystal Ore",
+    "fissure_regrow_days": 1,
+    "_note": "Shallow cyan quartz fissures on the Terracotta Plateau (canon Tier 1). Regrow timing is a placeholder."
+  },
+  "wide_treads": {
+    "display_name": "Wide Treads",
+    "seller": "bram",
+    "ore_cost": 6,
+    "usage_drift_multiplier": 0.5,
+    "_note": "Bram: 'Bring me six crystal ore and I'll bolt wider treads onto your tractor. Cuts steering drift in half on loose dirt.' Halves usage (per-metre) drift only."
   }
 }

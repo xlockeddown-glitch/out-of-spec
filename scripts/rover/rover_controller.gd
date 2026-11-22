@@ -15,6 +15,7 @@ signal drift_changed(drift_deg: float, band: int)
 signal steering_zeroed(record: Dictionary)
 signal soil_tilled(cell: Vector3i)
 signal till_rejected(reason: String)
+signal ore_mined(fissure_id: StringName)
 
 enum Command { TILL, ZERO_STEERING }
 
@@ -46,6 +47,12 @@ class UplinkCommand:
 @export var soil_grid: FarmGrid
 ## LOS ray origin. Falls back to 2 m above the rover origin if unset.
 @export var antenna: Node3D
+## Parent of OreFissure nodes. The till/drill action mines a fissure in reach
+## before it tries to till soil.
+@export var ore_fissures_root: Node3D
+## Greybox wheels (VisualRoot children named Wheel*) widen with Bram's treads.
+@export var wheel_width_m: float = 0.3
+@export var wide_wheel_width_m: float = 0.55
 
 @export_group("Drive")
 @export var max_speed_mps: float = 6.0
@@ -87,6 +94,8 @@ func _ready() -> void:
 	# Bound methods (not lambdas) so Godot drops these connections when the
 	# rover is freed on a scene swap; the sensor outlives us.
 	steering.error_changed.connect(_on_steering_error_changed)
+	GameState.upgrades_changed.connect(_apply_upgrades)
+	_apply_upgrades()
 	if GameState.has_rover_transform:
 		global_transform = GameState.rover_transform
 	if satellite_relay == null:
@@ -223,6 +232,8 @@ func _on_steering_error_changed(error: float, band: int) -> void:
 # --- Tilling ----------------------------------------------------------------
 
 func _till_under_rover() -> void:
+	if _try_mine():
+		return
 	if soil_grid == null:
 		till_rejected.emit("No soil grid linked.")
 		return
@@ -234,3 +245,25 @@ func _till_under_rover() -> void:
 			till_rejected.emit("Cell (%d, %d) already tilled." % [cell.x, cell.z])
 		FarmGrid.TillResult.NOT_SOIL:
 			till_rejected.emit("No soil under tractor.")
+
+
+func _try_mine() -> bool:
+	if ore_fissures_root == null:
+		return false
+	for child: Node in ore_fissures_root.get_children():
+		var fissure := child as OreFissure
+		if fissure and fissure.is_available() and fissure.is_in_reach(global_position):
+			if GameState.mine_fissure(fissure.fissure_id):
+				ore_mined.emit(fissure.fissure_id)
+				return true
+	return false
+
+
+func _apply_upgrades() -> void:
+	var width: float = wide_wheel_width_m if GameState.has_wide_treads else wheel_width_m
+	var visual: Node = get_node_or_null("VisualRoot")
+	if visual == null:
+		return
+	for child: Node in visual.get_children():
+		if child is CSGCylinder3D and child.name.begins_with("Wheel"):
+			(child as CSGCylinder3D).height = width
