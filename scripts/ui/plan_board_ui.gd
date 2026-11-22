@@ -46,6 +46,20 @@ func open() -> void:
 	_result_label.text = ""
 	_refresh()
 	show()
+	# Keyboard and gamepad players start on the first button they can use.
+	var first: Button = _first_usable_button()
+	if first != null:
+		first.grab_focus()
+
+
+func _first_usable_button() -> Button:
+	if not _grow_button.disabled:
+		return _grow_button
+	for row: Node in _areas_box.get_children():
+		for child: Node in row.get_children():
+			if child is Button and not (child as Button).disabled:
+				return child as Button
+	return null
 
 
 func close() -> void:

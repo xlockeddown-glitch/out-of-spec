@@ -46,6 +46,8 @@ func rebuild() -> void:
 	# Each space keeps its place on the wall (GameState.lab_layout_slots).
 	var slots: Array[Dictionary] = []
 	var layout: Array[String] = GameState.lab_layout_slots()
+	# The first space right of the airlock starts a new label group too.
+	var right_start: int = ceili(_layout_count(layout.size()) / 2.0)
 	for i: int in layout.size():
 		var slot: String = layout[i]
 		if slot == "":
@@ -53,7 +55,7 @@ func rebuild() -> void:
 		elif slot == GameState.LAB_REFIT_SLOT:
 			slots.append({ "kind": "refit" })
 		else:
-			slots.append({ "kind": "area", "discipline": slot, "first": i == 0 or layout[i - 1] != slot,
+			slots.append({ "kind": "area", "discipline": slot, "first": i == 0 or i == right_start or layout[i - 1] != slot,
 				"spaces": GameState.lab_space(slot) })
 	if GameState.lab_build.get("kind", "") == "grow":
 		var target: Dictionary = GameState.lab_size_record(int(GameState.lab_build.get("size", 0)))
