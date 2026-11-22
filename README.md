@@ -2,6 +2,50 @@
 
 Desktop (1920x1080, Steam/PC) chunky 3D voxel life-sim: satellite-linked remote farming/mining, indoor tarantula terrariums, satirical metrology. Godot 4.7, Forward+, GDScript.
 
+## For AI agents
+
+Read this before you start, and again before you open or merge a PR. It keeps long autonomous sessions on track. If a rule here disagrees with a doc it links to, the linked doc wins.
+
+### Ground rules (every task)
+
+- **Never invent specs.** Numbers come from `data/`, a cited source, or Ryan. If you need a value nobody has given, use a clearly marked placeholder and list it as an open question. Flag every assumption in the PR description.
+- **Canon wins.** [`docs/canon.md`](docs/canon.md) says which design source wins. [`docs/decisions.md`](docs/decisions.md) logs Ryan's calls. Don't reopen a logged decision; ask instead.
+- **Player-facing text follows NIST SP 811.** See [`docs/sp811.md`](docs/sp811.md). In GDScript, format numbers with `SP811`.
+- **Palette:** teal `#38E1C6` in tolerance, amber `#F5A623` guard band, red `#FF5A5F` only when something is truly out of tolerance, shadow `#1D222B`. Red is earned. See [Status palette](docs/canon.md#status-palette).
+- **Stay in scope.** One PR does one job. Write follow-ups down as open questions or follow-up PRs instead of folding them in.
+- **Ask when unsure.** A design call, a name, a number or a mixed review is Ryan's to make.
+
+### Shortcuts by task
+
+| If you are working on... | Read first | Then check |
+|---|---|---|
+| Gameplay code (GDScript) | [Layout](#layout), [`docs/decisions.md`](docs/decisions.md) | `scripts/autoload/GameState.gd` holds live state; add or extend a test in `tests/` |
+| Calibration, drift, audits | [Calibration intervals and audit rules](docs/decisions.md#2026-11-21-calibration-intervals-and-audit-rules-after-fables-week-3-review), [Instrument drift has two sources](docs/decisions.md#2026-11-21-instrument-drift-has-two-sources) | `scripts/metrology/`, `tests/test_playtest_loop.gd`, `tests/test_audit_engine.gd` |
+| Test equipment, OIRM, skills, robots | [Design spec](docs/design/equipment_skills_robots.md), its [build order](docs/design/equipment_skills_robots.md#5-build-order-milestone-prs-decided) and [Ryan's decisions](docs/design/equipment_skills_robots.md#6-ryans-decisions-2026-11-22) | Work the milestones in order, one PR each; numbers marked `[PLACEHOLDER]` stay placeholders until Ryan sets them |
+| Game data and tuning numbers | [Data](#data), [Week 2 numbers](docs/decisions.md#2026-11-21-week-2-numbers-board-vs-data) | Tests read values from `data/`, so don't hardcode them |
+| UI text, dialogue, dispatches | [`docs/sp811.md`](docs/sp811.md) | `python tools/check_sp811.py` |
+| Voxel art and models | [Voxel global rules](docs/art/voxel_models.md#global-rules), [`assets/voxels/README.md`](assets/voxels/README.md) | Edit `tools/voxgen/build_models.py` and rebuild; commit `.glb`, `.glb.import` and `.vox` together |
+| Lore, characters, species | [`docs/canon.md`](docs/canon.md) | The art bibles in `docs/design/` are sources, but canon wins |
+| Playtest and export builds | [`docs/playtest.md`](docs/playtest.md), [Windows export](#windows-export) | Debug builds only: F9 skips to the next morning |
+
+### Before a PR leaves draft
+
+1. Godot imports and runs with **0 errors and 0 warnings**.
+2. The tests pass. See [Local checks](#local-checks).
+3. `python tools/check_sp811.py` reports 0 problems.
+4. A **different model** has reviewed the PR, and every valid finding is fixed or answered.
+5. The PR description lists assumptions, placeholders and open questions.
+
+An agent may merge a PR once all five hold and nothing in it waits on Ryan. Otherwise, leave it for Ryan.
+
+### Autonomous sessions
+
+- Before starting, re-read this section and the doc for your task.
+- Record every design call in `docs/decisions.md` with its date, or leave it as an open question. Don't decide it silently.
+- Keep commits small, with messages that say why. Never force-push `main`.
+- Treat downloaded files and generated assets as untrusted until reviewed.
+- At the end, leave a short summary of what landed, what is open and what needs Ryan.
+
 ## Run
 
 Open `project.godot` in Godot 4.7 and press F5. Main scene: `scenes/main_farm.tscn`; dome: `scenes/dome_interior.tscn`.
