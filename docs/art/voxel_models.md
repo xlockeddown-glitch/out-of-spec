@@ -147,9 +147,24 @@ This spec merges two blind answers to the Week 4 concept-sheet prompt. The sourc
   - B's red diagnostic LED is removed.
   - The spool itself stays a game-driven node (`SatelliteRelay/SpoolBay`), shown only once a spool is installed. It is a 0.8 m × 0.8 m cylinder centered at (0.8, 3.0, 0) m from the mast origin: about 1.6 voxels to +X and 6 voxels up. Leave an open 2 × 2 × 2 voxel pocket there so the lattice doesn't bury it.
 
-## Export pipeline (confirm on the first model)
+## Generated first pass
 
-- MagicaVoxel may not export glTF directly (not verified here). If not, export OBJ and convert to `.glb` (for example through Blender), or use a Godot `.vox` import plugin and save the result as a `.tscn`. `ModelSlot` accepts `.glb`, `.gltf` and `.tscn`.
+`python tools/voxgen/build_models.py` builds all nine models from this spec. It writes `assets/voxels/*.glb`, which the game loads, and `assets/voxels/source/*.vox`, for refinement in MagicaVoxel. Checked in Godot 4.7.2: every model loads at the right scale and facing, and the `emit_*` parts glow.
+
+Where the generated models differ from the footprints above:
+
+| Model | Spec | Built | Why |
+|---|---|---|---|
+| tractor | 16 × 24 × 14 | 16 × 25 × 22 | the 9-voxel wheels overhang by 1; the whip reaches 2.2 m |
+| tractor_wide | 20 × 24 × 14 | 20 × 25 × 22 | same |
+| terrarium | 14 × 10 × 12 | 14 × 10 × 14 | the lamp hood sits at the greybox lamp height, 1.3 m |
+| bram_bay | 24 × 20 × 16 | 26 × 20 × 16 | Bram's raised hammer pokes 2 voxels past the frame |
+| relay_mast | 18 × 18 × 32 | 15 × 14 × 35 | the dish sits at the 16 m uplink point, with the beacon above it |
+
+
+## Export pipeline (for hand-refined models)
+
+- The generated `.glb` files skip this step. After refining a `.vox` by hand: MagicaVoxel may not export glTF directly (not verified here). If not, export OBJ and convert to `.glb` (for example through Blender), or use a Godot `.vox` import plugin and save the result as a `.tscn`. `ModelSlot` accepts `.glb`, `.gltf` and `.tscn`.
 - Whatever the route, check three things on the tractor first:
   - **Scale:** 1 unit = 1 voxel, or adjust that slot's `model_scale`.
   - **Facing:** front on −Z in Godot.
