@@ -79,7 +79,7 @@ Superseded in part by the Neon concept sheet section below: the whip and `emit_a
   - B's shape: 3 × 4 abdomen, 2 × 2 prosoma, center origin
 - **Changes:**
   - Hygrometer pod: body `#D4D9DE` (B). LED left out; the game drives it.
-  - The pre-molt dimming currently tints only the greybox spider. The model keeps its colors unless that is extended.
+  - Pre-molt dimming applies to the model too: `terrarium.gd` lays a multiply overlay on its meshes equal to the greybox body's own dim, `BODY_PRE_MOLT / BODY_ACTIVE` per channel taken in linear light (about 0.26, 0.35, 0.52 linear), so no new value.
 
 ## 3. Bram and his bay (`bram_bay.glb`)
 
