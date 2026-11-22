@@ -494,12 +494,13 @@ func _on_day_started(day: int) -> void:
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)
 	_morning = false
-	# Cancellations go after the audit's lines so they are not buried by them.
-	for note: String in _morning_notes:
-		post_phone(note)
-	_morning_notes.clear()
 	# After the audit, so the board matches the band the lab ends the morning in.
 	refresh_job_board(day)
+	# The morning's cancellations go last, as one line, so neither the audit's
+	# lines nor the board's are newer and one cancellation can't hide another.
+	if not _morning_notes.is_empty():
+		post_phone(" ".join(_morning_notes))
+		_morning_notes.clear()
 
 
 ## One morning dispatch per day, no repeats until the whole deck is used.

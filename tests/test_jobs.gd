@@ -419,7 +419,28 @@ func test_audit_morning_cancellation_is_posted_after_the_audit() -> String:
 		return "The cancellation must be on the phone log."
 	if not audited:
 		return "The audit must post its lines that morning, got %s." % [lines]
-	for i: int in range(cancel_at + 1, lines.size()):
-		if not lines[i].begins_with("JOB BOARD"):
-			return "Only the job board may follow the cancellation, got %s." % [lines]
+	if cancel_at != lines.size() - 1:
+		return "The cancellation must be the newest phone line, got %s." % [lines]
+	return ""
+
+
+func test_two_morning_cancellations_share_one_line() -> String:
+	var gs: GameStateScript = _make_state()
+	GameClock.elapsed_days = 1.0
+	var first: String = _take(gs, "lin_soil_probe")
+	# A second copy, due the same day, so both are cancelled the same morning.
+	var second: String = _take(gs, "lin_soil_probe")
+	var day: int = int(gs.active_job(first)["due_day"]) + _cfg(gs, "late_grace_days") + 1
+	GameClock.elapsed_days = float(day - 1)
+	var before: int = gs.phone_log.size()
+	gs._on_day_started(day)
+	var newest: String = gs.phone_log[gs.phone_log.size() - 1] if gs.phone_log.size() > before else ""
+	var both_gone: bool = gs.active_job(first).is_empty() and (second == "" or gs.active_job(second).is_empty())
+	_done(gs)
+	if first == "" or second == "":
+		return "The test needs two accepted jobs, got '%s' and '%s'." % [first, second]
+	if not both_gone:
+		return "Both overdue jobs must be cancelled that morning."
+	if newest.find(first + " cancelled") < 0 or newest.find(second + " cancelled") < 0:
+		return "Both cancellations must be on the newest phone line, got %s." % newest
 	return ""

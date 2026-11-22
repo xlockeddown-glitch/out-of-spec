@@ -14,9 +14,9 @@ signal accept_job_pressed(index: int)
 
 const MAX_LOG_LINES: int = 8
 ## Tallest the job list grows before it scrolls, px.
-const JOBS_MAX_HEIGHT: float = 100.0
+const JOBS_MAX_HEIGHT: float = 86.0
 ## The dispatch log always keeps room for this many lines, px.
-const LOG_MIN_HEIGHT: float = 66.0
+const LOG_MIN_HEIGHT: float = 80.0
 const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
 const COLOR_BAR_OFF := Color(0.14, 0.22, 0.2)
 const COLOR_OK := DriftingSensor.COLOR_IN_BAND
