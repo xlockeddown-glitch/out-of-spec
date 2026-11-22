@@ -683,7 +683,7 @@ PACK3 = {
 # Ryan's Plateau Clutter pack (2026-11-22): 0.2 m voxels (like the boulders), origin at the
 # footprint center on the ground, palettes as given in his generator script (S is SHADOW; the
 # cobbles' P1..P4 and the stump's dust P1 are the boulders' PLATEAU colors). Built and turned
-# like the field props. Not placed in any scene yet.
+# like the field props. Two of each are scattered in the farm.
 CLUTTER = {
     "mesa_scrub_bush": {"B1": "#5A3E2B", "B2": "#3D2919", "F1": "#6D7A4C", "F2": "#8A9663",
                         "F3": "#4E5936", "S": SHADOW},

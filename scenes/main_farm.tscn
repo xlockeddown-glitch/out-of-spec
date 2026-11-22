@@ -575,3 +575,41 @@ transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.6, 0, 13.2)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/water_cistern.glb"
 model_scale = 0.1
+
+[node name="Clutter" type="Node3D" parent="WorldView/WorldViewport/World"]
+
+[node name="ScrubBushA" type="Node3D" parent="WorldView/WorldViewport/World/Clutter"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -20, 0, 8)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/mesa_scrub_bush.glb"
+model_scale = 0.2
+
+[node name="ScrubBushB" type="Node3D" parent="WorldView/WorldViewport/World/Clutter"]
+transform = Transform3D(-0.7071068, 0, -0.7071068, 0, 1, 0, 0.7071068, 0, -0.7071068, 9, 0, -20)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/mesa_scrub_bush.glb"
+model_scale = 0.2
+
+[node name="CobblesA" type="Node3D" parent="WorldView/WorldViewport/World/Clutter"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, -14, 0, -14)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/scatter_pebbles_cluster.glb"
+model_scale = 0.2
+
+[node name="CobblesB" type="Node3D" parent="WorldView/WorldViewport/World/Clutter"]
+transform = Transform3D(-0.8660254, 0, 0.5, 0, 1, 0, -0.5, 0, -0.8660254, 20, 0, 13)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/scatter_pebbles_cluster.glb"
+model_scale = 0.2
+
+[node name="DryStumpA" type="Node3D" parent="WorldView/WorldViewport/World/Clutter"]
+transform = Transform3D(-0.9396926, 0, -0.3420201, 0, 1, 0, 0.3420201, 0, -0.9396926, -6, 0, 19)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/mesa_dry_stump.glb"
+model_scale = 0.2
+
+[node name="DryStumpB" type="Node3D" parent="WorldView/WorldViewport/World/Clutter"]
+transform = Transform3D(0.5, 0, 0.8660254, 0, 1, 0, -0.8660254, 0, 0.5, 17, 0, -14)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/mesa_dry_stump.glb"
+model_scale = 0.2
