@@ -64,7 +64,7 @@ func test_tire_check_offset_and_limit() -> String:
 		return "sensor_drift_config needs a positive compliance_fine/aud1t_tire_limit_kpa."
 	var inside: Dictionary = AuditEngine.tire_check(limit * 0.5)
 	var outside: Dictionary = AuditEngine.tire_check(-limit * 1.5)
-	if not is_equal_approx(inside["offset_kpa"], -limit * 0.5):
+	if not is_equal_approx(inside["offset_kpa"], snappedf(-limit * 0.5, AuditEngine.TIRE_REPORT_KPA)):
 		return "Tires filled to a gauge reading high must sit low by the error: %s" % inside
 	if inside["violation"] or inside["fine"] != 0:
 		return "Inside the limit must not fine: %s" % inside
@@ -149,7 +149,8 @@ func test_tire_limit_edge_and_compliant_line() -> String:
 	var limit: float = DataManager.get_number(DRIFT, "compliance_fine/aud1t_tire_limit_kpa", NAN)
 	var gs: GameStateScript = _make_state()
 	var at_limit: Dictionary = AuditEngine.tire_check(-limit)
-	var just_over: Dictionary = AuditEngine.tire_check(-(limit + 0.01))
+	var rounds_to_limit: Dictionary = AuditEngine.tire_check(-(limit + 0.004))
+	var just_over: Dictionary = AuditEngine.tire_check(-(limit + 0.06))
 	var at_line: String = gs._tire_check_line(at_limit)
 	var over_line: String = gs._tire_check_line(just_over)
 	gs.free()
@@ -157,8 +158,10 @@ func test_tire_limit_edge_and_compliant_line() -> String:
 		return "Exactly at the limit must be compliant: %s" % at_limit
 	if not at_line.ends_with(". Compliant."):
 		return "A compliant check must say so, got '%s'." % at_line
+	if rounds_to_limit["violation"]:
+		return "An offset AUD-1T reports as the limit must be compliant: %s" % rounds_to_limit
 	if not just_over["violation"]:
-		return "0.01 kPa past the limit must be a violation: %s" % just_over
-	if not over_line.contains("%s kPa above set point" % SP811.number(limit + 0.01, 2)):
-		return "A fine just past the limit must show enough digits to read past it, got '%s'." % over_line
+		return "An offset reported 0.1 kPa past the limit must be a violation: %s" % just_over
+	if not over_line.contains("%s kPa above set point" % SP811.number(limit + 0.1, 1)):
+		return "A fined offset must read past the limit, got '%s'." % over_line
 	return ""

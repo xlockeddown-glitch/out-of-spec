@@ -100,13 +100,18 @@ static func fine_for(error_ratio: float, out_of_tolerance: bool, overdue: bool, 
 	return roundi(minf(fine, _cfg("max_fine_credits", 350.0)))
 
 
+## AUD-1T reports tire offsets to 0.1 kPa [PLACEHOLDER: game choice].
+const TIRE_REPORT_KPA: float = 0.1
+
+
 ## AUD-1T's tire measurement for a tire gauge whose true error is
-## gauge_error_kpa. Returns offset_kpa (tires minus set point), limit_kpa,
-## violation and fine.
+## gauge_error_kpa. Returns offset_kpa (tires minus set point, as AUD-1T
+## reports it to TIRE_REPORT_KPA), limit_kpa, violation and fine. AUD-1T
+## judges the value it reports, so the phone line and the fine always agree.
 static func tire_check(gauge_error_kpa: float) -> Dictionary:
-	var offset: float = -gauge_error_kpa
+	var offset: float = snappedf(-gauge_error_kpa, TIRE_REPORT_KPA)
 	var limit: float = _cfg("aud1t_tire_limit_kpa", 6.9)
-	var violation: bool = absf(offset) > limit
+	var violation: bool = absf(offset) > limit + TIRE_REPORT_KPA * 0.5
 	return {
 		"offset_kpa": offset,
 		"limit_kpa": limit,
