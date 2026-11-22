@@ -483,3 +483,15 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - The game already names both: the reference meter is the Longscale LS-8.5 Reference Meter (equipment design doc) and the handheld is the Arsia Fieldworks FM-3 Field Meter (the `field_meter_dc` standard). The models are now `ref_meter_ls85` and `field_meter_fm3`; the voxels are unchanged.
+
+## 2026-11-22: Calibration bench and chamber cart in the dome
+
+### Ryan chose
+
+- Where the calibration bench and the environmental chamber cart stand: "your call".
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The calibration bench replaces the plain table under the cal station (the dome's right bench). The cal station now sits on its ESD mat at 0.9 m, a little left of center, with the silk tray beside it; the bench click area covers the new bench.
+- The chamber cart stands on the floor right of the bench, its door toward the camera. It is set dressing only: it does nothing in play yet.
+- Both are kept off the back wall, so the lab spaces there are unchanged. The two meters are not placed yet.
