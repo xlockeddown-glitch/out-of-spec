@@ -31,8 +31,8 @@ static func integer(value: int) -> String:
 ## Values that round to zero become exactly 0, so they never print as −0.00.
 static func _snap(value: float, decimals: int) -> float:
 	var step: float = pow(10.0, -decimals)
-	var snapped: float = snappedf(value, step)
-	return 0.0 if is_zero_approx(snapped) else snapped
+	var rounded: float = snappedf(value, step)
+	return 0.0 if is_zero_approx(rounded) else rounded
 
 
 static func _group(text: String) -> String:
