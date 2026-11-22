@@ -642,7 +642,8 @@ def tarantula_exuvia() -> Model:
 
 
 # ---------------------------------------------------------------- field props
-# Gemini's field calibration & survey props pack (2026-11-21): 0.1 m voxels, origin at the
+# Gemini's field calibration & survey props pack (2026-11-21; the jig's Z = 2 and the tripod's
+# Z = 1..13 are Gemini Neon's corrected grids from the same day): 0.1 m voxels, origin at the
 # footprint center on the ground, palettes as given in the spec. Like the exuvia, each is
 # turned 180 degrees from the sheet so its front (sheet Y=0, -Y) faces -z.
 FIELD_PROPS = {
@@ -671,27 +672,6 @@ def prop_sheet(name: str) -> Model:
     return front_to_minus_z(name, cells, w, d)
 
 
-def field_survey_tripod() -> Model:
-    """7 x 7 x 14. Gemini's spec gives the legs (Z=1..7) only in words and the hub/head
-    layers as 3 of 7 rows, so the voxels are the ones in Gemini's own exporter
-    (magicavoxel_exporter.py, create_field_survey_tripod), copied here as (x, y, z)."""
-    cells: dict[tuple[int, int, int], str] = {}
-    for foot in [(3, 6, 0), (0, 0, 0), (6, 0, 0)]:
-        cells[foot] = "T2"
-    for leg in [(3, 6, 1), (3, 5, 2), (3, 5, 3), (3, 4, 4), (3, 4, 5), (3, 4, 6), (3, 3, 7),  # rear
-                (0, 0, 1), (1, 1, 2), (1, 1, 3), (2, 2, 4), (2, 2, 5), (2, 2, 6),              # front left
-                (6, 0, 1), (5, 1, 2), (5, 1, 3), (4, 2, 4), (4, 2, 5), (4, 2, 6)]:             # front right
-        cells[leg] = "T1"
-    for x in range(2, 5):
-        for y in range(2, 5):
-            cells[(x, y, 8)] = "T2"                                   # hub
-            for z in (12, 13):                                        # target head
-                cells[(x, y, z)] = "T4" if (x, y, z) == (3, 3, 13) else "T3"
-    for z in (9, 10, 11):
-        cells[(3, 3, z)] = "T3"                                       # center post
-    return front_to_minus_z("field_survey_tripod", cells, 7, 7)
-
-
 MODELS = [
     (lambda: tractor(False), 0.1), (lambda: tractor(True), 0.1),
     (terrarium, 0.1), (curlyhair, 0.1), (bram_bay, 0.2), (ore_fissure, 0.2),
@@ -707,7 +687,7 @@ MODELS = [
     (tarantula_exuvia, 0.1),
     (lambda: prop_sheet("soil_moisture_probe"), 0.1),
     (lambda: prop_sheet("steering_encoder_jig"), 0.1),
-    (field_survey_tripod, 0.1),
+    (lambda: prop_sheet("field_survey_tripod"), 0.1),
 ]
 
 

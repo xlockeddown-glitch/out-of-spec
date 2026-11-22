@@ -17,7 +17,7 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `tarantula_exuvia.glb` | Molted skin left after a molt (not placed in any scene yet) | 0.1 m voxels like `curlyhair`, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/tarantula_exuvia.txt`). |
 | `soil_moisture_probe.glb` | Hand soil-moisture probe with a front dial (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/soil_moisture_probe.txt`). |
 | `steering_encoder_jig.glb` | Steering-encoder calibration jig (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/steering_encoder_jig.txt`). |
-| `field_survey_tripod.glb` | Survey tripod with a target head (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from the voxel list in Gemini's exporter (`field_survey_tripod()` in `build_models.py`). |
+| `field_survey_tripod.glb` | Survey tripod with a target head (not placed in any scene yet) | 0.1 m voxels, origin at ground level. Built from Gemini's layer grid (`tools/voxgen/sheets/field_survey_tripod.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 

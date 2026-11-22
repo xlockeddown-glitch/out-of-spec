@@ -1,0 +1,121 @@
+field_survey_tripod — 7 × 7 × 14 (X: 0..6 left→right, Y: 6..0 rear → front -Y). Z = 0 from Gemini's field props spec;
+Layers 1..13 come from Gemini Neon's corrected grids (2026-11-21), which replace the exporter's edge-only legs and flat target head
+Palette: T1 #C47D2B hi-vis orange, T2 #4A4E57 cast iron dark, T3 #D1D5DB stainless steel, T4 #3B82F6 target blue
+X:    00 01 02 03 04 05 06
+
+Z = 0 (Leg Feet)
+Y=6  .. .. .. T2 .. .. ..
+Y=5  .. .. .. .. .. .. ..
+Y=4  .. .. .. .. .. .. ..
+Y=3  .. .. .. .. .. .. ..
+Y=2  .. .. .. .. .. .. ..
+Y=1  .. .. .. .. .. .. ..
+Y=0  T2 .. .. .. .. .. T2
+
+Z = 1 (Lower Legs Rising from Feet)
+Y=6  .. .. .. T1 .. .. ..
+Y=5  .. .. .. .. .. .. ..
+Y=4  .. .. .. .. .. .. ..
+Y=3  .. .. .. .. .. .. ..
+Y=2  .. .. .. .. .. .. ..
+Y=1  .. .. .. .. .. .. ..
+Y=0  T1 .. .. .. .. .. T1
+
+Z = 2 (First Inward Step: Rear -Y, Fronts +/-X)
+Y=6  .. .. .. T1 .. .. ..
+Y=5  .. .. .. T1 .. .. ..
+Y=4  .. .. .. .. .. .. ..
+Y=3  .. .. .. .. .. .. ..
+Y=2  .. .. .. .. .. .. ..
+Y=1  .. .. .. .. .. .. ..
+Y=0  T1 T1 .. .. .. T1 T1
+
+Z = 3 (Front Legs Step +Y)
+Y=6  .. .. .. .. .. .. ..
+Y=5  .. .. .. T1 .. .. ..
+Y=4  .. .. .. .. .. .. ..
+Y=3  .. .. .. .. .. .. ..
+Y=2  .. .. .. .. .. .. ..
+Y=1  .. T1 .. .. .. T1 ..
+Y=0  .. T1 .. .. .. T1 ..
+
+Z = 4 (Mid-Leg Straight Segment)
+Y=6  .. .. .. .. .. .. ..
+Y=5  .. .. .. T1 .. .. ..
+Y=4  .. .. .. .. .. .. ..
+Y=3  .. .. .. .. .. .. ..
+Y=2  .. .. .. .. .. .. ..
+Y=1  .. T1 .. .. .. T1 ..
+Y=0  .. .. .. .. .. .. ..
+
+Z = 5 (Second Inward Step: Rear -Y, Fronts +/-X)
+Y=6  .. .. .. .. .. .. ..
+Y=5  .. .. .. T1 .. .. ..
+Y=4  .. .. .. T1 .. .. ..
+Y=3  .. .. .. .. .. .. ..
+Y=2  .. .. .. .. .. .. ..
+Y=1  .. T1 T1 .. T1 T1 ..
+Y=0  .. .. .. .. .. .. ..
+
+Z = 6 (Front Legs Step +Y)
+Y=6  .. .. .. .. .. .. ..
+Y=5  .. .. .. .. .. .. ..
+Y=4  .. .. .. T1 .. .. ..
+Y=3  .. .. .. .. .. .. ..
+Y=2  .. .. T1 .. T1 .. ..
+Y=1  .. .. T1 .. T1 .. ..
+Y=0  .. .. .. .. .. .. ..
+
+Z = 7 (Upper Legs Meeting Hub Underside)
+Y=6  .. .. .. .. .. .. ..
+Y=5  .. .. .. .. .. .. ..
+Y=4  .. .. .. T1 .. .. ..
+Y=3  .. .. .. .. .. .. ..
+Y=2  .. .. T1 .. T1 .. ..
+Y=1  .. .. .. .. .. .. ..
+Y=0  .. .. .. .. .. .. ..
+
+Z = 8 (Central Hub Clamp Assembly)
+Y=6  .. .. .. .. .. .. ..
+Y=5  .. .. .. .. .. .. ..
+Y=4  .. .. T2 T2 T2 .. ..
+Y=3  .. .. T2 T2 T2 .. ..
+Y=2  .. .. T2 T2 T2 .. ..
+Y=1  .. .. .. .. .. .. ..
+Y=0  .. .. .. .. .. .. ..
+
+Z = 9..10 (Stainless Center Post Column)
+Y=6  .. .. .. .. .. .. ..
+Y=5  .. .. .. .. .. .. ..
+Y=4  .. .. .. .. .. .. ..
+Y=3  .. .. .. T3 .. .. ..   <- Vertical center shaft
+Y=2  .. .. .. .. .. .. ..
+Y=1  .. .. .. .. .. .. ..
+Y=0  .. .. .. .. .. .. ..
+
+Z = 11 (Vertical Target Plate - Bottom Row)
+Y=6  .. .. .. .. .. .. ..
+Y=5  .. .. .. .. .. .. ..
+Y=4  .. .. .. .. .. .. ..
+Y=3  .. .. T3 T3 T3 .. ..   <- Bottom edge of retroreflective target
+Y=2  .. .. .. .. .. .. ..
+Y=1  .. .. .. .. .. .. ..
+Y=0  .. .. .. .. .. .. ..
+
+Z = 12 (Vertical Target Plate - Center Crosshair Row)
+Y=6  .. .. .. .. .. .. ..
+Y=5  .. .. .. .. .. .. ..
+Y=4  .. .. .. .. .. .. ..
+Y=3  .. .. T3 T4 T3 .. ..   <- Blue center optic (T4) visible from front (-Y) and rear (+Y)
+Y=2  .. .. .. .. .. .. ..
+Y=1  .. .. .. .. .. .. ..
+Y=0  .. .. .. .. .. .. ..
+
+Z = 13 (Vertical Target Plate - Top Row)
+Y=6  .. .. .. .. .. .. ..
+Y=5  .. .. .. .. .. .. ..
+Y=4  .. .. .. .. .. .. ..
+Y=3  .. .. T3 T3 T3 .. ..   <- Top edge of retroreflective target
+Y=2  .. .. .. .. .. .. ..
+Y=1  .. .. .. .. .. .. ..
+Y=0  .. .. .. .. .. .. ..
