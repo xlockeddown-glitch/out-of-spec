@@ -50,7 +50,8 @@ static func evaluate(day: int, sensors: Dictionary, prior_offences: Dictionary, 
 		lines.append({
 			"instrument_id": instrument_id,
 			"standard": is_standard,
-			"as_found": sensor.error,
+			# A standard's true error stays hidden until OIRM measures it.
+			"as_found": null if is_standard else sensor.error,
 			"unit": sensor.error_unit,
 			"mpe": sensor.mpe,
 			"ratio": ratio,

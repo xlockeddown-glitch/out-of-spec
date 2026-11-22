@@ -446,7 +446,7 @@ func _run_audit(day: int) -> void:
 		var chain: Dictionary = traceability_chain(id)
 		post_phone(("Chain: %s" if chain["traceable"] else "Chain BROKEN: %s") % chain["text"])
 	if report.get("warning", false):
-		post_phone("MANAGER: Caught %s before Vance got in and recalibrated. One-time favor. Don't make it a habit." % report["waived_names"])
+		post_phone("MANAGER: Caught it before Vance got in: %s. One-time favor. Don't make it a habit." % report["waived_names"])
 		post_phone("VANCE: Warning issued. Next time it's a fine.")
 	elif report["passed"]:
 		# A fully clean audit wipes the repeat-offence history.
@@ -481,6 +481,7 @@ func _update_clean_audit_gate(report: Dictionary) -> void:
 func _apply_audit_grace(report: Dictionary) -> void:
 	audit_grace_used = true
 	var names: PackedStringArray = []
+	var excused: PackedStringArray = []
 	for line: Dictionary in report["lines"]:
 		if line["violation"]:
 			# The manager uses the bench standard; if the TUR refuses, they zero it
@@ -491,10 +492,19 @@ func _apply_audit_grace(report: Dictionary) -> void:
 				calibrate(line["instrument_id"], "Manager", false)
 			line["fine"] = 0
 			line["waived"] = true
-			names.append(instrument_name(line["instrument_id"]).to_lower())
+			if get_sensor(line["instrument_id"]).role == "standard":
+				excused.append(instrument_name(line["instrument_id"]).to_lower())
+			else:
+				names.append(instrument_name(line["instrument_id"]).to_lower())
 	report["total_fine"] = 0
 	report["warning"] = true
-	report["waived_names"] = " and the ".join(names).insert(0, "the ")
+	# "recalibrated the steering encoder and talked Vance out of the rotary table's certificate"
+	var done: PackedStringArray = []
+	if not names.is_empty():
+		done.append("recalibrated the " + " and the ".join(names))
+	if not excused.is_empty():
+		done.append("talked Vance out of the lapsed certificate on the " + " and the ".join(excused))
+	report["waived_names"] = " and ".join(done)
 
 
 # --- OIRM, certificates, recall (milestone 2) -------------------------------------
@@ -623,7 +633,7 @@ func recall(standard_id: String, standard_error: float, since_day: int) -> Array
 		var instrument: DriftingSensor = get_sensor(record["instrument_id"])
 		if instrument and instrument.role == "standard":
 			flagged.append_array(recall(record["instrument_id"], standard_error, int(record["day"])))
-		elif _last_traceable_record(record["instrument_id"]) == record:
+		elif is_same(_last_traceable_record(record["instrument_id"]), record):
 			# A later good calibration already superseded an older suspect one.
 			suspect_units[record["instrument_id"]] = today
 	return flagged
