@@ -25,5 +25,36 @@
     "seed_cost_pct": 25,
     "_note": "Income milestone (Ryan, 2026-11-22: crop sales to Lin). Seeds cost this percentage of a crop's base_sell_credits, rounded, bought when planted. An in-spec harvest sells for base_sell_credits; one whose soil left its tolerance band on any growing day sells for out_of_spec_penalty_pct less. [PLACEHOLDER]."
   },
+  "jobs": {
+    "board_size": 3,
+    "max_active": 2,
+    "late_pay_cut_pct": 50,
+    "untraceable_pay_cut_pct": 75,
+    "late_grace_days": 3,
+    "clean_job_points": 2,
+    "late_job_points": -3,
+    "untraceable_job_points": -5,
+    "abandoned_job_points": -5,
+    "disciplines": {
+      "angle": ["rotary_table"],
+      "humidity": ["humidity_generator"],
+      "electrical": ["field_meter_dc"],
+      "temperature": ["field_meter_dc"],
+      "pressure": ["reference_gauge", "pressure_controller"],
+      "soil moisture": ["gravimetric_kit"]
+    },
+    "templates": [
+      { "id": "dome4_hygrometer", "customer": "Dome 4 hydroponics", "item": "a grow-room hygrometer", "discipline": "humidity", "min_band": "Trusted", "min_tier": 0, "pay": 120, "due_in_days": 2, "bench_minutes": 60 },
+      { "id": "kestrel_tire_gauge", "customer": "Rover crew Kestrel", "item": "a tire pressure gauge", "discipline": "pressure", "min_band": "Trusted", "min_tier": 1, "pay": 150, "due_in_days": 2, "bench_minutes": 40 },
+      { "id": "lin_soil_probe", "customer": "Lin", "item": "a soil probe", "discipline": "soil moisture", "min_band": "Trusted", "min_tier": 0, "pay": 100, "due_in_days": 3, "bench_minutes": 40 },
+      { "id": "relay_inclinometer", "customer": "Relay crew", "item": "an antenna inclinometer", "discipline": "angle", "min_band": "Trusted", "min_tier": 0, "pay": 130, "due_in_days": 2, "bench_minutes": 60 },
+      { "id": "dome2_oven_thermometer", "customer": "Dome 2 kitchen", "item": "an oven thermometer", "discipline": "temperature", "min_band": "Trusted", "min_tier": 1, "pay": 110, "due_in_days": 2, "bench_minutes": 40 },
+      { "id": "talus_voltmeter", "customer": "Rover crew Talus", "item": "a battery voltmeter", "discipline": "electrical", "min_band": "Trusted", "min_tier": 1, "pay": 120, "due_in_days": 2, "bench_minutes": 30 },
+      { "id": "dome1_cabin_transducer", "customer": "Dome 1 life support", "item": "a cabin pressure transducer (tight tolerance)", "discipline": "pressure", "min_band": "Accredited", "min_tier": 3, "pay": 400, "due_in_days": 3, "bench_minutes": 90 },
+      { "id": "survey_theodolite", "customer": "Survey team", "item": "a theodolite (tight tolerance)", "discipline": "angle", "min_band": "Accredited", "min_tier": 0, "pay": 350, "due_in_days": 3, "bench_minutes": 90 },
+      { "id": "medbay_incubator", "customer": "Medical bay", "item": "an incubator thermometer (tight tolerance)", "discipline": "temperature", "min_band": "Accredited", "min_tier": 1, "pay": 320, "due_in_days": 2, "bench_minutes": 60 }
+    ],
+    "_note": "Paid calibration jobs (Ryan, 2026-11-22): customers post jobs to the phone board each morning once the lab is Trusted; Accredited adds tighter-tolerance, better-paying jobs. A job needs an owned standard of its discipline at min_tier or better, not at OIRM. Late (after due_day) or untraceable (standard overdue) work pays less and costs credibility; a clean, on-time job earns a small bonus. A job not done by due_day + late_grace_days is cancelled and costs abandoned_job_points. Every customer, number and discipline mapping here is [PLACEHOLDER]."
+  },
   "_note": "Starting balance [PLACEHOLDER]. Crops sold to Lin add credits; audit fines, OIRM fees and purchases take them away."
 }

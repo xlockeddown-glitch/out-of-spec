@@ -9,6 +9,8 @@ signal enter_dome_pressed
 signal trade_pressed
 ## A Tier 1 standard's buy button (milestone 3a).
 signal buy_standard_pressed(standard_id: String)
+## An ACCEPT button on the job board (paid calibration jobs).
+signal accept_job_pressed(index: int)
 
 const MAX_LOG_LINES: int = 8
 const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
@@ -22,6 +24,8 @@ var _log_lines: PackedStringArray = []
 var _standards_box: VBoxContainer
 ## Lab credibility band, a row under the clock, built in code.
 var _credibility_label: Label
+## Accepted jobs and today's offers, under the credibility row.
+var _jobs_box: VBoxContainer
 
 @onready var _bars: Array[ColorRect] = [%Bar1, %Bar2, %Bar3, %Bar4]
 @onready var _relay_label: Label = %RelayLabel
@@ -60,6 +64,10 @@ func _ready() -> void:
 	var clock_row: Node = _credits_label.get_parent()
 	clock_row.get_parent().add_child(_credibility_label)
 	clock_row.get_parent().move_child(_credibility_label, clock_row.get_index() + 1)
+	_jobs_box = VBoxContainer.new()
+	_jobs_box.name = "JobsBox"
+	clock_row.get_parent().add_child(_jobs_box)
+	clock_row.get_parent().move_child(_jobs_box, _credibility_label.get_index() + 1)
 
 
 func configure(relay_name: String, mpe_deg: float, acceptance_ratio: float) -> void:
@@ -153,6 +161,35 @@ func show_standards(offers: Array[Dictionary], note: String) -> void:
 		var id: String = str(offer["id"])
 		button.pressed.connect(func() -> void: buy_standard_pressed.emit(id))
 		_standards_box.add_child(button)
+
+
+## Accepted jobs as lines, today's offers as ACCEPT buttons. Each offer is
+## { "text", "disabled" }; `note` shows when there are no offers.
+func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: String) -> void:
+	for child: Node in _jobs_box.get_children():
+		_jobs_box.remove_child(child)
+		child.queue_free()
+	var lines: PackedStringArray = active.duplicate()
+	if offers.is_empty() and note != "":
+		lines.append(note)
+	if not lines.is_empty():
+		var label := Label.new()
+		label.text = "\n".join(lines)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.add_theme_font_size_override("font_size", 14)
+		label.add_theme_color_override("font_color", COLOR_OK)
+		_jobs_box.add_child(label)
+	for i: int in offers.size():
+		var button := Button.new()
+		button.text = "ACCEPT " + str(offers[i]["text"])
+		button.disabled = bool(offers[i]["disabled"])
+		button.tooltip_text = str(offers[i].get("tooltip", ""))
+		button.focus_mode = Control.FOCUS_NONE
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.add_theme_font_size_override("font_size", 13)
+		var index: int = i
+		button.pressed.connect(func() -> void: accept_job_pressed.emit(index))
+		_jobs_box.add_child(button)
 
 
 func hide_bram() -> void:

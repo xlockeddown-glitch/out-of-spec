@@ -8,10 +8,13 @@ extends Control
 ## Standards are listed too (milestone 2): they can't be calibrated here, only
 ## sent to OIRM (drop pod, or courier on other days), so the button becomes SEND. Each
 ## instrument shows its traceability chain under the standard line.
+## Accepted customer jobs are listed too ("job:" ids): CALIBRATE FOR CUSTOMER
+## runs GameState.complete_job() against the best standard for the job.
 
 signal closed
 
 const CALIBRATE_TEXT: String = "ZERO / CALIBRATE"
+const JOB_PREFIX: String = "job:"
 
 var _ids: Array[String] = []
 var _current_id: String = ""
@@ -69,6 +72,9 @@ func _rebuild_list() -> void:
 	_instrument_option.clear()
 	for id: String in _ids:
 		_instrument_option.add_item(GameState.instrument_name(id, true))
+	for job: Dictionary in GameState.active_jobs:
+		_ids.append(JOB_PREFIX + str(job["job_id"]))
+		_instrument_option.add_item("%s: %s for %s" % [job["job_id"], job.get("item", "?"), job.get("customer", "?")])
 
 
 func close() -> void:
@@ -89,6 +95,9 @@ func _is_standard(instrument_id: String) -> bool:
 
 func _on_instrument_selected(index: int) -> void:
 	_current_id = _ids[index]
+	if _current_id.begins_with(JOB_PREFIX):
+		_show_job(GameState.active_job(_current_id.trim_prefix(JOB_PREFIX)))
+		return
 	var sensor: DriftingSensor = GameState.get_sensor(_current_id)
 	if sensor == null:
 		return
@@ -155,6 +164,36 @@ func _show_standard(sensor: DriftingSensor) -> void:
 		_result_label.text = "Drop pod on the pad. While it is away nothing can be calibrated against this standard. %s" % _due_text(sensor, today)
 
 
+## A customer's job: what it needs, when it is due, what it pays.
+func _show_job(job: Dictionary) -> void:
+	_budget = {}
+	for meter: BandMeter in [_found_meter, _left_meter]:
+		meter.show_needle = false
+	for label: Label in [_found_value, _left_value]:
+		label.text = "--"
+	_found_band.text = "CUSTOMER JOB"
+	_found_band.remove_theme_color_override("font_color")
+	_left_band.text = ""
+	_result_label.remove_theme_color_override("font_color")
+	if job.is_empty():
+		_mpe_label.text = "Job finished."
+		_standard_label.text = ""
+		_calibrate_button.disabled = true
+		return
+	_mpe_label.text = "%s: %s (%s)" % [job.get("customer", "?"), job.get("item", "?"), job.get("discipline", "?")]
+	var standard_id: String = GameState.job_bench_standard(job)
+	_standard_label.text = ("Standard: %s" % GameState.instrument_name(standard_id, true) if standard_id != ""
+		else "No standard on the bench for this job.")
+	_calibrate_button.text = "CALIBRATE FOR CUSTOMER (%s min)" % SP811.integer(roundi(float(job.get("bench_minutes", 0.0))))
+	var problem: String = GameState.job_bench_problem(job)
+	_calibrate_button.disabled = problem != ""
+	var today: int = GameClock.get_day_index()
+	_result_label.text = problem if problem != "" else "%s. Pays %s CR on time and traceable; late or with an overdue standard it pays less and costs credibility." % [
+		GameState.active_job_text(job), SP811.integer(int(job.get("pay", 0)))]
+	if standard_id != "" and GameState.get_sensor(standard_id).is_overdue(today):
+		_result_label.text += " The standard is OVERDUE: this job would not be traceable."
+
+
 func _due_text(sensor: DriftingSensor, today: int) -> String:
 	return ("OVERDUE since day %d." % (sensor.cal_due_day + 1) if sensor.is_overdue(today)
 		else "Due day %d." % sensor.cal_due_day)
@@ -181,6 +220,15 @@ func _chain_text(instrument_id: String) -> String:
 
 
 func _on_calibrate_pressed() -> void:
+	if _current_id.begins_with(JOB_PREFIX):
+		var result: Dictionary = GameState.complete_job(_current_id.trim_prefix(JOB_PREFIX))
+		_calibrate_button.disabled = true
+		var clean: bool = result.get("ok", false) and result["on_time"] and result["traceable"]
+		_result_label.text = GameState.job_result_text(result) if result.get("ok", false) else "REFUSED: " + str(result["reason"])
+		_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(
+			DriftingSensor.Band.IN_BAND if clean else DriftingSensor.Band.GUARDBAND if result.get("ok", false)
+			else DriftingSensor.Band.OUT_OF_TOLERANCE))
+		return
 	if _is_standard(_current_id):
 		var sent: Dictionary = GameState.send_to_oirm(_current_id)
 		if not sent["ok"]:

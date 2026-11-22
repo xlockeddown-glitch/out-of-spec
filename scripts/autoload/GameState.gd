@@ -21,6 +21,8 @@ signal oirm_changed
 signal credibility_changed(points: int)
 ## A crop was planted, grew, or was harvested (income milestone).
 signal crops_changed
+## The job board or the accepted jobs changed (paid calibration jobs).
+signal jobs_changed
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -148,6 +150,14 @@ var _best_band: int = 0
 ## "complete" (its standard is for sale) or "fulfilled" (bought).
 var contract_state: String = ""
 var contract_run: int = 0
+
+## Paid calibration jobs (Ryan, 2026-11-22). Offers on today's board, and
+## accepted jobs (an offer plus job_id, accepted_day, due_day).
+var job_board: Array[Dictionary] = []
+var active_jobs: Array[Dictionary] = []
+## One result per finished job (see complete_job).
+var job_log: Array[Dictionary] = []
+var _next_job_number: int = 1
 
 ## Income milestone (Ryan, 2026-11-22): crops on tilled cells, auto-irrigated
 ## to a set point as the soil probe reads it, sold to Lin.
@@ -467,6 +477,8 @@ func _on_day_started(day: int) -> void:
 	# Courier returns land in the morning, before an audit that day.
 	_receive_oirm_returns(day)
 	_charge_overdue_credibility(day)
+	_expire_jobs(day)
+	refresh_job_board(day)
 	_grow_crops()
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
@@ -1201,6 +1213,8 @@ func reset_credibility() -> void:
 	_best_band = credibility_band_index()
 	contract_state = ""
 	contract_run = 0
+	job_board.clear()
+	active_jobs.clear()
 
 
 func credibility_band_index(points: int = -1) -> int:
@@ -1242,6 +1256,8 @@ func change_credibility(points: int) -> void:
 	if index > _best_band:
 		_best_band = index
 		post_phone("OIRM: Lab credibility raised to %s." % credibility_band().to_upper())
+		# A new band opens its jobs now rather than next morning.
+		refresh_job_board(GameClock.get_day_index())
 	if contract_state == "" and index >= _contract_offer_band_index():
 		_offer_first_contract()
 
@@ -1370,12 +1386,16 @@ func contract_discount_pct() -> int:
 
 
 func _contract_offer_band_index() -> int:
-	var band_name: String = str(DataManager.get_value(ECONOMY_TABLE, "credibility/first_contract/offer_band", ""))
+	return _band_index_named(str(DataManager.get_value(ECONOMY_TABLE, "credibility/first_contract/offer_band", "")))
+
+
+## Index of the band called `band_name`; past the last band if unknown.
+func _band_index_named(band_name: String) -> int:
 	var bands: Array[Dictionary] = _cred_bands()
 	for i: int in bands.size():
 		if str(bands[i].get("name", "")) == band_name:
 			return i
-	return bands.size()  # unknown band: never offered
+	return bands.size()
 
 
 func _offer_first_contract() -> void:
@@ -1389,6 +1409,245 @@ func _offer_first_contract() -> void:
 	post_phone("OIRM CONTRACT offered: make %d calibrations in a row on time and traceable, and Bram will sell you the %s for %s CR + %d crystal ore (%d %% off). Calibrating a unit again before it has run half its interval doesn't count." % [
 		contract_run_needed(), instrument_name(standard), SP811.integer(_discounted(sensor.price_credits)),
 		sensor.price_ore, contract_discount_pct()])
+
+
+# --- Paid calibration jobs (Ryan, 2026-11-22) -------------------------------------
+
+func _jobs_number(key: String, fallback: float) -> float:
+	return DataManager.get_number(ECONOMY_TABLE, "jobs/" + key, fallback)
+
+
+## Discipline -> ids of the standards that can do its jobs.
+func job_disciplines() -> Dictionary:
+	var raw: Variant = DataManager.get_value(ECONOMY_TABLE, "jobs/disciplines", {})
+	return raw if typeof(raw) == TYPE_DICTIONARY else {}
+
+
+func _job_templates() -> Array[Dictionary]:
+	var templates: Array[Dictionary] = []
+	var raw: Variant = DataManager.get_value(ECONOMY_TABLE, "jobs/templates", [])
+	if typeof(raw) == TYPE_ARRAY:
+		for entry: Variant in raw:
+			if typeof(entry) == TYPE_DICTIONARY:
+				templates.append(entry)
+	return templates
+
+
+## The lowest band any job opens at, e.g. "Trusted".
+func jobs_open_band() -> String:
+	var lowest: int = _cred_bands().size()
+	for template: Dictionary in _job_templates():
+		lowest = mini(lowest, _band_index_named(str(template.get("min_band", ""))))
+	return str(_cred_bands()[lowest].get("name", "")) if lowest < _cred_bands().size() else ""
+
+
+## Owned standards that can do `job` (its discipline, at its tier or better),
+## best first: in date before overdue, then the higher tier.
+func job_standards(job: Dictionary) -> Array[String]:
+	var ids: Array[String] = []
+	var listed: Variant = job_disciplines().get(str(job.get("discipline", "")), [])
+	if typeof(listed) != TYPE_ARRAY:
+		return ids
+	for raw_id: Variant in listed:
+		var id: String = str(raw_id)
+		var sensor: DriftingSensor = get_sensor(id)
+		if sensor != null and owned_standards.has(id) and sensor.tier >= int(job.get("min_tier", 0)):
+			ids.append(id)
+	var today: int = GameClock.get_day_index()
+	ids.sort_custom(func(a: String, b: String) -> bool:
+		var a_late: bool = get_sensor(a).is_overdue(today)
+		var b_late: bool = get_sensor(b).is_overdue(today)
+		if a_late != b_late:
+			return not a_late
+		return get_sensor(a).tier > get_sensor(b).tier)
+	return ids
+
+
+## Why `job` can't be accepted now, or "".
+func job_accept_problem(job: Dictionary) -> String:
+	var max_active: int = maxi(int(_jobs_number("max_active", 2.0)), 1)
+	if active_jobs.size() >= max_active:
+		return "You already have %s jobs to finish." % SP811.integer(active_jobs.size())
+	if job_standards(job).is_empty():
+		var tier: int = int(job.get("min_tier", 0))
+		return "Needs your own %s standard%s." % [job.get("discipline", "?"),
+			" (Tier %s or better)" % SP811.integer(tier) if tier > 0 else ""]
+	return ""
+
+
+## Takes offer `index` off the board. Returns "" or why it can't be taken.
+func accept_job(index: int) -> String:
+	if index < 0 or index >= job_board.size():
+		return "That job is gone."
+	var offer: Dictionary = job_board[index]
+	var problem: String = job_accept_problem(offer)
+	if problem != "":
+		return problem
+	job_board.remove_at(index)
+	var today: int = GameClock.get_day_index()
+	var job: Dictionary = offer.duplicate(true)
+	job["job_id"] = "JOB-%04d" % _next_job_number
+	_next_job_number += 1
+	job["accepted_day"] = today
+	job["due_day"] = today + maxi(int(offer.get("due_in_days", 2)), 0)
+	active_jobs.append(job)
+	post_phone("%s accepted: %s for %s. Calibrate it at the bench by day %s for %s CR." % [
+		job["job_id"], job.get("item", "?"), job.get("customer", "?"),
+		SP811.integer(job["due_day"]), SP811.integer(int(job.get("pay", 0)))])
+	jobs_changed.emit()
+	return ""
+
+
+func active_job(job_id: String) -> Dictionary:
+	for job: Dictionary in active_jobs:
+		if job["job_id"] == job_id:
+			return job
+	return {}
+
+
+## The standard complete_job would use for `job` today: the best one not at
+## OIRM, or "" if there is none.
+func job_bench_standard(job: Dictionary) -> String:
+	for id: String in job_standards(job):
+		if not at_oirm.has(id):
+			return id
+	return ""
+
+
+## Why `job` can't be done at the bench now, or "".
+func job_bench_problem(job: Dictionary) -> String:
+	if job_bench_standard(job) != "":
+		return ""
+	var owned: Array[String] = job_standards(job)
+	if owned.is_empty():
+		return "You no longer own a standard for this job."
+	return "The %s is at OIRM until day %s." % [instrument_name(owned[0], true), SP811.integer(int(at_oirm[owned[0]]))]
+
+
+## Calibrates the customer's item at the bench against the best standard for
+## the job. Pays the job's price, cut if it is late (after due_day) or not
+## traceable (the standard is overdue); each costs credibility, and a clean,
+## on-time job earns a little. The bench time then passes on the clock.
+## Returns { ok, reason } on failure, else the result written to job_log.
+func complete_job(job_id: String) -> Dictionary:
+	var job: Dictionary = active_job(job_id)
+	if job.is_empty():
+		return { "ok": false, "reason": "No such job." }
+	var problem: String = job_bench_problem(job)
+	if problem != "":
+		return { "ok": false, "reason": problem }
+	var standard_id: String = job_bench_standard(job)
+	var today: int = GameClock.get_day_index()
+	var on_time: bool = today <= int(job["due_day"])
+	var traceable: bool = not get_sensor(standard_id).is_overdue(today)
+	var offered: int = int(job.get("pay", 0))
+	var pay: float = float(offered)
+	var points: int = 0
+	if not on_time:
+		pay *= (100.0 - clampf(_jobs_number("late_pay_cut_pct", 50.0), 0.0, 100.0)) / 100.0
+		points += int(_jobs_number("late_job_points", -3.0))
+	if not traceable:
+		pay *= (100.0 - clampf(_jobs_number("untraceable_pay_cut_pct", 75.0), 0.0, 100.0)) / 100.0
+		points += int(_jobs_number("untraceable_job_points", -5.0))
+	if on_time and traceable:
+		points = int(_jobs_number("clean_job_points", 2.0))
+	active_jobs.erase(job)
+	var result: Dictionary = {
+		"ok": true,
+		"job_id": job_id,
+		"customer": job.get("customer", ""),
+		"item": job.get("item", ""),
+		"standard_id": standard_id,
+		"day": today,
+		"on_time": on_time,
+		"traceable": traceable,
+		"offered": offered,
+		"pay": roundi(pay),
+		"points": points,
+		"bench_minutes": float(job.get("bench_minutes", 0.0)),
+	}
+	job_log.append(result)
+	add_credits(result["pay"])
+	change_credibility(points)
+	post_phone(job_result_text(result))
+	jobs_changed.emit()
+	if result["bench_minutes"] > 0.0:
+		GameClock.advance(result["bench_minutes"] / 1440.0)
+	return result
+
+
+## "JOB-0003 done for Lin: 100 CR, on time and traceable, credibility +2."
+func job_result_text(result: Dictionary) -> String:
+	var problems: PackedStringArray = []
+	if not result["on_time"]:
+		problems.append("LATE")
+	if not result["traceable"]:
+		problems.append("NOT TRACEABLE (%s overdue)" % _model_name(result["standard_id"]))
+	var points: int = result["points"]
+	return "%s done for %s: %s CR%s, credibility %s%s." % [
+		result["job_id"], result["customer"], SP811.integer(result["pay"]),
+		", on time and traceable" if problems.is_empty()
+			else " of %s, %s" % [SP811.integer(result["offered"]), " and ".join(problems)],
+		"+" if points > 0 else "", SP811.integer(points)]
+
+
+## Each morning: jobs left past their grace days are cancelled and cost
+## credibility.
+func _expire_jobs(day: int) -> void:
+	var grace: int = maxi(int(_jobs_number("late_grace_days", 3.0)), 0)
+	for job: Dictionary in active_jobs.duplicate():
+		if day > int(job["due_day"]) + grace:
+			active_jobs.erase(job)
+			change_credibility(int(_jobs_number("abandoned_job_points", -5.0)))
+			post_phone("%s cancelled: %s took %s elsewhere." % [job["job_id"], job.get("customer", "?"), job.get("item", "?")])
+			jobs_changed.emit()
+
+
+## Replaces today's offers with jobs the lab's band allows, rotating through
+## them by day, skipping any already accepted.
+func refresh_job_board(day: int) -> void:
+	job_board.clear()
+	var band: int = credibility_band_index()
+	var eligible: Array[Dictionary] = []
+	for template: Dictionary in _job_templates():
+		if _band_index_named(str(template.get("min_band", ""))) > band:
+			continue
+		var taken: bool = false
+		for job: Dictionary in active_jobs:
+			taken = taken or job.get("id", "") == template.get("id", "")
+		if not taken:
+			eligible.append(template)
+	var count: int = mini(maxi(int(_jobs_number("board_size", 3.0)), 0), eligible.size())
+	if count > 0:
+		var start: int = posmod(day * count, eligible.size())
+		for i: int in count:
+			job_board.append(eligible[(start + i) % eligible.size()].duplicate(true))
+		post_phone("JOB BOARD: %s new calibration jobs from the domes and rover crews. Accept one on the phone." % SP811.integer(count))
+	jobs_changed.emit()
+
+
+## "Rover crew Kestrel: a tire pressure gauge (pressure), 150 CR, 2 days"
+func job_offer_text(job: Dictionary) -> String:
+	return "%s: %s (%s), %s CR, %s days" % [job.get("customer", "?"), job.get("item", "?"),
+		job.get("discipline", "?"), SP811.integer(int(job.get("pay", 0))), SP811.integer(int(job.get("due_in_days", 0)))]
+
+
+## "JOB-0003 Lin: a soil probe, due day 7, 100 CR"
+func active_job_text(job: Dictionary) -> String:
+	var late: bool = GameClock.get_day_index() > int(job["due_day"])
+	return "%s %s: %s, %s day %s, %s CR" % [job["job_id"], job.get("customer", "?"), job.get("item", "?"),
+		"LATE since" if late else "due", SP811.integer(int(job["due_day"]) + (1 if late else 0)),
+		SP811.integer(int(job.get("pay", 0)))]
+
+
+## One line when the board shows no offers.
+func job_board_note() -> String:
+	var open_band: String = jobs_open_band()
+	if open_band == "":
+		return ""
+	if credibility_band_index() < _band_index_named(open_band):
+		return "JOB BOARD opens at %s." % open_band.to_upper()
+	return "JOB BOARD: no new jobs today."
 
 
 # --- Crops and Lin (income milestone) ----------------------------------------
