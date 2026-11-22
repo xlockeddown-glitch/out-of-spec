@@ -266,7 +266,7 @@ func _last_record_text(instrument_id: String) -> String:
 		verdict, due]
 
 
-## "Standard: Rotary Table   U ±0.0x°   TUR 47:1   Limit ±0.9x°"
+## "Standard: Pavonis Indexworks PX-1 Rotary Table   U ±0.0x°   TUR 47:1   Limit ±0.9x°"
 func _standard_text(instrument_id: String) -> String:
 	var budget: Dictionary = GameState.calibration_budget(instrument_id)
 	if budget.is_empty():

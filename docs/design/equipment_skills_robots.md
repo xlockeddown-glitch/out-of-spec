@@ -41,7 +41,7 @@ Every drifting sensor in the game today is an angle (steering, dish) or a relati
 
 So most of the new equipment needs **new drifting sensors** to be useful. §1.3 proposes them, each tied to something canon already mentions. Open question Q1 asks how the existing three should be referenced.
 
-**Decided by Ryan (2026-11-22):** the existing three are calibrated against two new Tier 0 standards, issued at start with OIRM certificates: a **rotary table** (angle; calibrates the steering encoder and the dish azimuth) and a **humidity generator chamber, Thunder Scientific class** (relative humidity; calibrates the hygrometer). They replace the jig, tripod and salt cell of the first draft. The `steering_encoder_jig` and `field_survey_tripod` props can stay as the fixtures that hold the unit under test **[ASSUMPTION]**. Fictional names, real specs and sources for both are still **[PLACEHOLDER]**; Thunder Scientific is a real trademark, so it gets a fictional maker name like the other seven.
+**Decided by Ryan (2026-11-22):** the existing three are calibrated against two new Tier 0 standards, issued at start with OIRM certificates: a **rotary table** (angle; calibrates the steering encoder and the dish azimuth) and a **humidity generator chamber, Thunder Scientific class** (relative humidity; calibrates the hygrometer). They replace the jig, tripod and salt cell of the first draft. The `steering_encoder_jig` and `field_survey_tripod` props can stay as the fixtures that hold the unit under test **[ASSUMPTION]**. Ryan named them the **Pavonis Indexworks PX-1** and the **Meridiani Dewpoint MD-2P** (2026-11-22; Thunder Scientific is a real trademark, so the chamber has a fictional maker like the other seven). Real specs and sources for both are still **[PLACEHOLDER]**.
 
 ### 1.2 Names (shortlist for Ryan)
 
@@ -145,8 +145,8 @@ Each entry ends with an **accuracy ratio**: the unit under test's MPE divided by
 
 | # | In-game name [ASSUMPTION] | Class | Tier | From | Calibrates | Its own cal comes from |
 |---|---|---|---|---|---|---|
-| 0a | Rotary table (name [PLACEHOLDER]) | Angle | 0 | Issued at start | Steering encoder, dish azimuth, robot joint encoders | OIRM |
-| 0b | Humidity generator chamber, Thunder Scientific class (name [PLACEHOLDER]) | Humidity | 0 | Issued at start | Hygrometer | OIRM |
+| 0a | Pavonis Indexworks PX-1 Rotary Table | Angle | 0 | Issued at start | Steering encoder, dish azimuth, robot joint encoders | OIRM |
+| 0b | Meridiani Dewpoint MD-2P Humidity Generator, Thunder Scientific class | Humidity | 0 | Issued at start | Hygrometer | OIRM |
 | 1 | Arsia Fieldworks FM-3 Field Meter | Handheld meter | 1 | Bram | Thermometer chain, robot soil probes | #2, or OIRM |
 | 7 | Wren & Dufour WD-1 Reference Gauge | Pressure gauge | 1 | Bram | Tire, dome pressure | #6, or OIRM |
 | 5 | Turnwright TW-6 Torque Standard | Torque | 2 | Bram | Wrench, robot grip | OIRM |
@@ -447,7 +447,9 @@ Ryan chose milestone-sized PRs, worked one at a time in one session, each second
 
 1. **Calibration core.** Sensor registry in `GameState` (replacing the hardcoded ids in `get_sensor()`, `_on_time_advanced()` and `_run_audit()`); the rotary table and humidity chamber as Tier 0 standards on the existing three sensors; the new record fields (`standard_id`, U, TUR, acceptance limit, result); the uncertainty budget, RSS acceptance limit and 2:1 floor; hidden standard error carried into the unit; bench time.
 2. **OIRM and traceability.** Certificates, the drop-pod courier, traceability chains on the bench and audit screens, recall with impact threshold and cascade, the Tier 1 gate on a clean audit.
-3. **Equipment tiers and new sensors.** The seven instruments as data (working names), tire and dome pressure, terrarium thermometer, relay timebase, field meter; Kestrel's uncertified standards; Tier 2 and 3 gates.
+3. **Equipment tiers and new sensors**, split in two by Ryan (2026-11-22, see [`decisions.md`](../decisions.md)):
+   - **3a.** The five new sensors (tire and dome pressure, terrarium thermometer, relay timebase, field meter) and Tier 1: Bram sells the FM-3 field meter and the WD-1 reference gauge after the first clean audit.
+   - **3b.** The Tier 2 and 3 instruments, Kestrel's uncertified standards and their gates.
 4. **Skills.** All six skills, starting at level 1, XP from existing calls, the level curve.
 5. **Robots.** Trellis build, commissioning, job cards, robot audits and the interlock fine, plus the Neon concept sheet.
 
@@ -475,7 +477,7 @@ Every open question was answered. Numbering matches the earlier questions, which
 18. **MPE form:** one value computed at a fixed test point per instrument.
 19. **Grace audit:** does not count as clean; Tier 1 needs an audit with zero violations.
 
-Still open: every **[PLACEHOLDER]** number, the fictional names and specs for the two Tier 0 standards, and the **[VERIFY]** items in §1.4.
+Still open: every **[PLACEHOLDER]** number, the specs for the two Tier 0 standards (names picked 2026-11-22, see `docs/decisions.md`), and the **[VERIFY]** items in §1.4.
 
 ## 7. Sources for the [CITED] values
 
