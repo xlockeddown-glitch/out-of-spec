@@ -50,9 +50,9 @@ emission = Color(0.3, 0.85, 1, 1)
 emission_energy_multiplier = 2.0
 
 [sub_resource type="StandardMaterial3D" id="MatScreen"]
-albedo_color = Color(0.2, 0.6, 0.3, 1)
+albedo_color = Color(0.13, 0.5, 0.45, 1)
 emission_enabled = true
-emission = Color(0.3, 1, 0.5, 1)
+emission = Color(0.22, 0.88, 0.78, 1)
 emission_energy_multiplier = 1.5
 
 [sub_resource type="BoxShape3D" id="TerrariumShape"]
@@ -65,7 +65,7 @@ radius = 0.3
 size = Vector3(2, 1, 1.4)
 
 [sub_resource type="BoxShape3D" id="AirlockShape"]
-size = Vector3(1.8, 2.8, 0.6)
+size = Vector3(3, 3.1, 0.6)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status"]
 content_margin_left = 20.0
@@ -242,8 +242,8 @@ size = Vector3(1, 0.4, 0.05)
 material = SubResource("MatScreen")
 
 [node name="ScreenLight" type="OmniLight3D" parent="CalStation"]
-position = Vector3(0, 0.4, 0.8)
-light_color = Color(0.3, 1, 0.5, 1)
+position = Vector3(-0.45, 0.35, 0.5)
+light_color = Color(0.22, 0.88, 0.78, 1)
 light_energy = 0.6
 omni_range = 2.0
 
@@ -278,7 +278,7 @@ material = SubResource("MatCyanGlow")
 
 [node name="AirlockClick" type="Area3D" parent="Airlock"]
 unique_name_in_owner = true
-position = Vector3(0, 1.3, 0.2)
+position = Vector3(0, 1.45, 0.2)
 collision_layer = 8
 collision_mask = 0
 script = ExtResource("3_click")
@@ -384,3 +384,30 @@ script = ExtResource("5_slot")
 model_path = "res://assets/voxels/curlyhair.glb"
 model_scale = 0.1
 greybox = [NodePath("../Abdomen"), NodePath("../Cephalothorax"), NodePath("../Legs")]
+
+[node name="RoomModel" type="Node3D" parent="Room" node_paths=PackedStringArray("greybox")]
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/dome_room.glb"
+model_scale = 0.2
+greybox = [NodePath("../Floor"), NodePath("../BackWall"), NodePath("../LeftWall"), NodePath("../RightWall"), NodePath("../../Airlock/Frame"), NodePath("../../Airlock/Door")]
+
+[node name="LeftBenchModel" type="Node3D" parent="." node_paths=PackedStringArray("greybox")]
+position = Vector3(-3, 0, 0)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/dome_bench.glb"
+model_scale = 0.1
+greybox = [NodePath("../LeftBench")]
+
+[node name="RightBenchModel" type="Node3D" parent="." node_paths=PackedStringArray("greybox")]
+position = Vector3(3, 0, 0)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/dome_bench.glb"
+model_scale = 0.1
+greybox = [NodePath("../RightBench")]
+
+[node name="StationModel" type="Node3D" parent="CalStation" node_paths=PackedStringArray("greybox")]
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/cal_station.glb"
+model_scale = 0.1
+greybox = [NodePath("../Body"), NodePath("../Screen")]
+

@@ -301,45 +301,177 @@ def ore_fissure() -> Model:
 
 # ------------------------------------------------------- drop-pod, AUD-1T
 def drop_pod() -> Model:
-    """12 x 16 x 12 voxels at 0.2 m. Hatch faces +Z."""
+    """After Neon's concept sheet. 18 x 21 x 18 voxels at 0.2 m. Square hull with
+    chamfered slate corner struts, a scorched lower band, a stepped pyramid nose with
+    a teal beacon, a +Z hatch with a glowing amber outline, and four splayed legs."""
     m = Model("drop_pod")
-    ORANGE, STRUT = "#E85D25", "#4F5D73"
-    for x, z in ((-5, -5), (3, -5), (-5, 3), (3, 3)):
-        m.box("hull", x, x + 1, 0, 0, z, z + 1, SHADOW)
-        m.box("hull", x, x + 1, 1, 3, z, z + 1, STRUT)
-    for y in (2, 3):
-        m.disc_y("hull", 0, 0, 5.0, y, SHADOW)  # heat shield skirt
-    for y in range(4, 12):
-        m.disc_y("hull", 0, 0, 5.9, y, STRUT if y in (4, 11) else ORANGE)
-    for y, r in ((12, 5.0), (13, 4.0), (14, 2.8)):
-        m.disc_y("hull", 0, 0, r, y, ORANGE)
-    m.box("hull", -1, 0, 14, 14, -1, 0, STRUT)
-    m.box("emit_beacon", -1, 0, 15, 15, -1, 0, TEAL)
-    # hatch on +Z with a glowing amber seam
-    m.box("hull", -2, 1, 5, 9, 5, 5, STRUT)
+    ORANGE, ORANGE2, STRUT, SCORCH, HANDLE = "#E85D25", "#C94E1E", "#4F5D73", "#2A211C", "#3A4150"
+    m.box("hull", -5, 4, 3, 12, -5, 4, ORANGE)
+    for x, z in ((-5, -5), (-5, 4), (4, -5), (4, 4)):      # chamfer the hull corners
+        m.clear_box(x, x, 3, 12, z, z)
+    for y in range(3, 6):                                    # scorched lower band
+        for x in range(-5, 5):
+            for z in range(-5, 5):
+                if (x, y, z) in m.voxels and (x in (-5, 4) or z in (-5, 4) or x in (-4, 3) and z in (-4, 3)):
+                    m.put("hull", x, y, z, SCORCH if (x + z + y) % 3 else "#3A2A20")
+    m.box("hull", -4, 3, 2, 2, -4, 3, SCORCH)               # heat-shield base
+    for x, z in ((-6, -6), (-6, 4), (4, -6), (4, 4)):        # slate corner struts with caps
+        m.box("hull", x, x + 1, 3, 13, z, z + 1, STRUT)
+    for i, half in enumerate((4.5, 3.5, 3.0, 2.5, 2.0, 1.5, 1.0)):  # stepped pyramid nose
+        lo, hi = math.floor(-half), math.ceil(half) - 1
+        m.box("hull", lo, hi, 13 + i, 13 + i, lo, hi, ORANGE if i % 2 == 0 else ORANGE2)
+    m.box("emit_beacon", -1, 0, 20, 20, -1, 0, TEAL)
+    # hatch on +Z: amber outline, orange door, slate handle
     for x in range(-3, 3):
-        m.put("emit_hatch", x, 4, 6, AMBER)
-        m.put("emit_hatch", x, 10, 6, AMBER)
-    for y in range(4, 11):
-        m.put("emit_hatch", -3, y, 6, AMBER)
-        m.put("emit_hatch", 2, y, 6, AMBER)
+        m.put("emit_hatch", x, 5, 5, AMBER)
+        m.put("emit_hatch", x, 11, 5, AMBER)
+    for y in range(5, 12):
+        m.put("emit_hatch", -3, y, 5, AMBER)
+        m.put("emit_hatch", 2, y, 5, AMBER)
+    m.box("hull", -2, 1, 6, 10, 5, 5, ORANGE2)
+    m.box("hull", 1, 1, 8, 8, 5, 5, HANDLE)
+    # raised side panel on -X
+    m.box("hull", -6, -6, 6, 10, -2, 1, ORANGE2)
+    # four splayed landing legs: orange upper, slate lower, orange foot pads
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            # line(thick=2) grows toward +X/+Z, so shift the -X/-Z legs out by one
+            ox, oz = (-1 if sx < 0 else 0), (-1 if sz < 0 else 0)
+            top = (sx * 4.5 + ox, 7, sz * 4.5 + oz)
+            knee = (sx * 6.5 + ox, 3, sz * 6.5 + oz)
+            foot = (sx * 7.5, 0, sz * 7.5)
+            m.line("hull", top, knee, ORANGE, thick=2)
+            m.line("hull", knee, foot, STRUT, thick=2)
+            fx, fz = math.floor(foot[0]), math.floor(foot[2])
+            m.box("hull", fx - 1, fx + 1, 0, 0, fz - 1, fz + 1, ORANGE)
     return m
 
 
 def aud1t() -> Model:
-    """4 x 5 x 4 voxels at 0.2 m, center origin. One amber eye on +Z."""
-    m = Model("aud1t", offset=(0.0, -0.5, 0.0))
-    WHITE = "#F0F4F8"
-    m.box("shell", -2, 1, -1, 1, -2, 1, WHITE)
-    for x in (-2, 1):
-        for z in (-2, 1):
-            m.clear(x, 1, z)
-    m.box("shell", -1, 0, 2, 2, -1, 0, WHITE)
-    m.box("shell", -2, 1, 0, 0, 1, 1, SHADOW)  # visor band around the eye
-    m.box("emit_eye", -1, 0, 0, 0, 1, 1, AMBER)
-    m.box("shell", -1, 0, -2, -2, -1, 0, SHADOW)
-    for x, z in ((-2, -1), (1, -1), (-1, -2), (0, 1)):
+    """After Neon's concept sheet. 5 x 5 x 5 voxels at 0.2 m, center origin. Rounded
+    white shell, a dark visor band with ONE amber cross-shaped eye, teal lift ring."""
+    m = Model("aud1t", offset=(-0.5, -0.5, -0.5))
+    WHITE, WHITE2 = "#F0F4F8", "#D8DEE6"
+    m.box("shell", -2, 2, -1, 2, -2, 2, WHITE)
+    for x in (-2, 2):
+        for z in (-2, 2):
+            m.clear(x, 2, z)
+            m.clear(x, -1, z)
+    m.box("shell", -1, 1, 2, 2, -1, 1, WHITE2)                # top bevel
+    m.box("shell", -2, 2, -1, 1, 2, 2, SHADOW)                # visor band across the front
+    m.clear(-2, -1, 2)                                        # keep the rounded bottom corners
+    m.clear(2, -1, 2)
+    for x, y in ((1, 0), (0, 0), (2, 0), (1, 1), (1, -1)):    # the one eye, off-center like the sheet
+        m.put("emit_eye", x, y, 2, AMBER)
+    m.box("shell", -1, 1, -2, -2, -1, 1, WHITE2)
+    for x, z in ((-1, -1), (0, -1), (1, -1), (-1, 1), (0, 1), (1, 1), (-1, 0), (1, 0)):
         m.put("emit_lift_ring", x, -2, z, TEAL)
+    m.clear(0, -2, 0)
+    m.put("shell", 0, -2, 0, SHADOW)
+    return m
+
+
+# ------------------------------------------------------------- dome room
+def dome_room() -> Model:
+    """After Neon's dome-interior sheet. The habitat room shell at 0.2 m: arched,
+    ribbed vault (14 m wide, 5.6 m peak, 10 m deep, open at the front toward the
+    camera), back wall with a round airlock and a cyan ring, a door panel with teal
+    LEDs, and three amber pendant lamps. Origin = room origin (floor top at 0)."""
+    m = Model("dome_room")
+    FLOOR, SHELL, RIB, BACK, DOOR = "#6B7078", "#4A5262", "#3A4150", "#3F4756", "#2F3540"
+    a_in, b_in = 34.5, 27.0
+    m.box("floor", -35, 34, -1, -1, -20, 29, FLOOR)
+    for z in range(-20, 30, 5):
+        m.box("floor", -35, 34, -1, -1, z, z, "#62676F")      # floor seams
+    for z in range(-20, 30):
+        rib = z % 10 == 0 or z == 29
+        a_o, b_o = (36.5, 29.0) if rib else (35.5, 28.0)
+        a_i, b_i = (33.5, 26.0) if rib else (a_in, b_in)
+        for x in range(-37, 37):
+            for y in range(0, 30):
+                px, py = x + 0.5, y + 0.5
+                outer = px * px / (a_o * a_o) + py * py / (b_o * b_o) <= 1.0
+                inner = px * px / (a_i * a_i) + py * py / (b_i * b_i) <= 1.0
+                if outer and not inner:
+                    m.put("shell", x, y, z, RIB if rib else SHELL)
+    # back wall filling the arch, with vertical panel seams
+    for x in range(-35, 35):
+        for y in range(0, 28):
+            if (x + 0.5) ** 2 / a_in ** 2 + (y + 0.5) ** 2 / b_in ** 2 <= 1.0:
+                m.put("shell", x, y, -20, RIB if x % 7 == 0 else BACK)
+    # round airlock at (0, 1.4, -3.84) m: stepped frame, door, cyan ring, seam
+    cy = 7.0
+    for x in range(-10, 10):
+        for y in range(0, 17):
+            d = ((x + 0.5) ** 2 + (y + 0.5 - cy) ** 2) ** 0.5
+            if d <= 8.6:
+                if d > 7.6:
+                    m.put("shell", x, y, -19, RIB)
+                elif d > 6.6:
+                    m.put("emit_airlock_ring", x, y, -19, TEAL)
+                else:
+                    m.put("shell", x, y, -19, DOOR)
+    for y, x in ((1, 0), (2, 0), (3, -1), (4, -1), (5, 0), (6, 0), (7, -1), (8, -1), (9, 0), (10, 0), (11, -1), (12, -1)):
+        m.put("shell", x, y, -18, SHADOW)                     # jagged door seam
+    m.box("shell", 11, 12, 8, 10, -19, -19, SHADOW)           # door control panel
+    m.put("emit_panel", 12, 9, -18, TEAL)
+    m.put("emit_panel", 12, 8, -18, TEAL)
+    # three amber pendant lamps hung from the vault
+    for lx, lz in ((-15, 0), (0, -5), (15, 0)):
+        top = math.floor(b_in * math.sqrt(max(0.0, 1 - ((lx + 0.5) / a_in) ** 2)))
+        m.box("lamps", lx, lx, 21, top, lz, lz, SHADOW)
+        m.disc_y("lamps", lx + 0.5, lz + 0.5, 1.2, 20, "#8C96A6")
+        m.disc_y("emit_lamps", lx + 0.5, lz + 0.5, 2.2, 19, AMBER)
+        m.disc_y("emit_lamps", lx + 0.5, lz + 0.5, 1.6, 18, AMBER)
+    # (voxel centers land at x = -2.9, 0.1 and 3.1 m: 0.1 m off the bench centers, on purpose)
+    return m
+
+
+def dome_bench() -> Model:
+    """3.6 m x 1.0 m x 1.6 m work table at 0.1 m (matches the greybox benches): worn
+    steel top, slate legs and a lower shelf. Origin on the floor at the table center."""
+    m = Model("dome_bench")
+    TOP, LEG, SHELF = "#9AA0A8", "#4F5D73", "#3A4150"
+    m.box("bench", -18, 17, 9, 9, -8, 7, TOP)
+    m.box("bench", -18, 17, 8, 8, -8, -8, LEG)
+    m.box("bench", -18, 17, 8, 8, 7, 7, LEG)
+    for x in (-17, 15):
+        for z in (-7, 5):
+            m.box("bench", x, x + 1, 0, 8, z, z + 1, LEG)
+    m.box("bench", -17, 16, 3, 3, -7, 6, SHELF)
+    m.box("bench", -14, -9, 4, 5, -6, -2, "#5A5F68")  # a crate on the shelf
+    return m
+
+
+def cal_station() -> Model:
+    """The calibration bench kit at 0.1 m, after Neon's dome sheet. Origin on the
+    bench top at the station center: a reference standard with a cyan screen, a clamp
+    stand holding the hygrometer under test (LED socket only), an encoder test jig,
+    a clipboard and a handheld meter with a teal readout."""
+    m = Model("cal_station")
+    CASE, STEEL, SLATE, WOOD, PAPER = "#D4D9DE", "#8C96A6", "#4F5D73", "#8B6A3F", "#E2E8F0"
+    # reference standard (CRT-style case) facing +Z
+    m.box("kit", -7, -3, 0, 5, -4, 0, CASE)
+    m.box("kit", -7, -3, 1, 5, 0, 0, SHADOW)
+    m.box("emit_screen", -6, -4, 2, 4, 1, 1, TEAL)
+    m.box("kit", -7, -3, 0, 0, 1, 1, SHADOW)
+    # clamp stand with the hygrometer under test
+    m.box("kit", -1, 1, 0, 0, -3, -1, SHADOW)
+    m.box("kit", 0, 0, 1, 7, -2, -2, STEEL)
+    m.box("kit", 0, 3, 7, 7, -2, -2, STEEL)
+    m.box("kit", 3, 3, 6, 6, -2, -2, STEEL)
+    m.box("kit", 3, 4, 3, 5, -2, -1, CASE)
+    m.put("kit", 4, 4, -1, SHADOW)                     # LED socket (state is game-driven)
+    # steering-encoder test jig with a dial
+    m.box("kit", 2, 5, 0, 1, 0, 2, SLATE)
+    m.disc_y("kit", 3.5, 1.5, 1.0, 2, STEEL)
+    # clipboard with a calibration sticker
+    m.box("kit", -2, 1, 0, 0, 1, 3, WOOD)
+    m.box("kit", -2, 0, 1, 1, 1, 3, PAPER)
+    m.put("kit", 0, 1, 1, "#C9962E")
+    # handheld meter with a teal readout
+    m.box("kit", -7, -4, 0, 0, 2, 3, SLATE)
+    m.box("emit_meter", -6, -5, 1, 1, 2, 2, TEAL)
     return m
 
 
@@ -414,6 +546,7 @@ MODELS = [
     (lambda: tractor(False), 0.1), (lambda: tractor(True), 0.1),
     (terrarium, 0.1), (curlyhair, 0.1), (bram_bay, 0.2), (ore_fissure, 0.2),
     (drop_pod, 0.2), (aud1t, 0.2), (relay_mast, 0.5),
+    (dome_room, 0.2), (dome_bench, 0.1), (cal_station, 0.1),
 ]
 
 

@@ -186,7 +186,7 @@ material = SubResource("MatCyanGlow")
 
 [node name="DropPod" type="Node3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("drone")]
 visible = false
-position = Vector3(-3, 0, 13.5)
+position = Vector3(-3, 0, 14)
 script = ExtResource("9_pod")
 drone = NodePath("AUD1T")
 
