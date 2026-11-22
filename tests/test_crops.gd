@@ -168,8 +168,8 @@ func test_excursion_between_mornings_makes_crop_off_spec() -> String:
 	return ""
 
 
-## GPT review 1: broke after fines with nothing growing or to sell, Lin fronts
-## one seed and takes its cost out of that crop's sale.
+## GPT reviews 1-2: broke after fines, Lin fronts each seed and takes its cost
+## out of that crop's sale.
 func test_lin_fronts_a_seed_when_broke() -> String:
 	var gs: GameStateScript = _make_state()
 	gs.credits = -50
@@ -182,18 +182,19 @@ func test_lin_fronts_a_seed_when_broke() -> String:
 	var credits_after_plant: int = gs.credits
 	_grow(gs, int(gs.crop(seed)["growth_days"]))
 	gs.harvest_crop(CELL)
+	gs.harvest_crop(other)
 	var paid: int = gs.sell_harvest_to_lin()
-	var expected: int = int(gs.crop(seed)["base_sell_credits"]) - cost
+	var expected: int = 2 * (int(gs.crop(seed)["base_sell_credits"]) - cost)
 	var credits_end: int = gs.credits
 	_done(gs)
 	if first != "":
 		return "Lin must front the first seed when broke, got '%s'." % first
-	if second == "":
-		return "Lin fronts one seed at a time; a second planting while broke must fail."
+	if second != "":
+		return "Lin must front every seed while broke, got '%s'." % second
 	if credits_after_plant != -50:
 		return "A fronted seed must not charge credits, credits are %d." % credits_after_plant
 	if paid != expected or credits_end != -50 + expected:
-		return "Lin must pay the base price less the fronted %d CR (%d CR), paid %d." % [cost, expected, paid]
+		return "Lin must pay the base price less the fronted %d CR per crop (%d CR), paid %d." % [cost, expected, paid]
 	return ""
 
 
@@ -261,4 +262,44 @@ func test_planting_is_recorded_before_the_seed_charge() -> String:
 	_done(gs)
 	if seen != [true]:
 		return "credits_changed must fire once, after the planting is recorded, saw %s." % [seen]
+	return ""
+
+
+## GPT review 2: a clock jump across 06:00 (a bench calibration) is split at
+## the morning, so growth and drift are judged as at 06:00.
+func test_clock_jump_across_morning_is_split() -> String:
+	var gs: GameStateScript = _make_state()
+	var mornings: Array[float] = []
+	var steps: Array[float] = []
+	var on_day: Callable = func(_day: int) -> void: mornings.append(GameClock.elapsed_days)
+	var on_step: Callable = func(d: float) -> void: steps.append(d)
+	GameClock.day_started.connect(on_day)
+	GameClock.time_advanced.connect(on_step)
+	GameClock.elapsed_days = 0.9
+	GameClock.advance(0.3)
+	GameClock.day_started.disconnect(on_day)
+	GameClock.time_advanced.disconnect(on_step)
+	var end: float = GameClock.elapsed_days
+	_done(gs)
+	if mornings.size() != 1 or absf(mornings[0] - 1.0) > 1e-9:
+		return "day_started must fire once with the clock at 06:00, saw %s." % [mornings]
+	if steps.size() != 2 or absf(steps[0] - 0.1) > 1e-9 or absf(end - 1.2) > 1e-9:
+		return "The jump must split into 0.1 d before the morning and the rest after, saw %s ending at %s." % [steps, end]
+	return ""
+
+
+## GPT review 2: the crop wilts as soon as an excursion costs its grade, not
+## the following morning.
+func test_excursion_marks_crop_at_once() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.seed_crop_id = "lensberry"
+	gs.plant_crop(CELL)
+	var signals: Array[int] = [0]
+	gs.crops_changed.connect(func() -> void: signals[0] += 1)
+	gs.get_sensor(gs.SOIL_PROBE_ID).error = float(gs.crop("lensberry")["tolerance_band"]) * 100.0 + 1.0
+	gs._on_time_advanced(0.0)
+	var marked: bool = gs.plantings[CELL].get("out_today", false)
+	_done(gs)
+	if not marked or signals[0] != 1:
+		return "An excursion must mark the crop and signal once, marked %s, signals %d." % [marked, signals[0]]
 	return ""

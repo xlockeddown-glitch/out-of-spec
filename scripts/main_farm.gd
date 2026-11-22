@@ -173,7 +173,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _is_key(event: InputEvent, keycode: Key) -> bool:
 	var key := event as InputEventKey
-	return key != null and key.pressed and not key.echo and key.keycode == keycode
+	if key == null or not key.pressed or key.echo:
+		return false
+	# The key's label, or the character it typed: on German QWERTZ, [ and ]
+	# are AltGr+8 and AltGr+9, whose keycode stays 8 and 9.
+	return key.keycode == keycode or (key.unicode > 0
+		and String.chr(key.unicode).to_upper().unicode_at(0) == keycode)
 
 
 func _sell_to_lin() -> void:

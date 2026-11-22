@@ -1426,9 +1426,9 @@ func crop_name(crop_id: String) -> String:
 
 
 ## Plants `crop_id` (default: the current seed) on a tilled, empty cell.
-## Returns "" or the reason not. With too few credits for the seed and nothing
-## growing or waiting to sell, Lin fronts the seed and takes its cost out of
-## that crop's sale, so fines can't lock the player out of farming.
+## Returns "" or the reason not. With too few credits for the seed, Lin
+## fronts it and takes its cost out of that crop's sale, so fines can't lock
+## the player out of farming.
 func plant_crop(cell: Vector3i, crop_id: String = "") -> String:
 	if crop_id == "":
 		crop_id = current_seed()
@@ -1441,8 +1441,6 @@ func plant_crop(cell: Vector3i, crop_id: String = "") -> String:
 	var cost: int = seed_cost(crop_id)
 	var advance: int = 0
 	if credits < cost:
-		if not plantings.is_empty() or not harvest_bin.is_empty():
-			return "%s seed costs %s CR; you have %s CR." % [crop_name(crop_id), SP811.integer(cost), SP811.integer(credits)]
 		advance = cost
 	# Write the planting before any signal, so listeners see the cell occupied.
 	plantings[cell] = {
@@ -1497,10 +1495,14 @@ func is_soil_in_band(cell: Vector3i) -> bool:
 ## whenever the probe drifts or is calibrated and when a set point changes, so
 ## an excursion between mornings still counts against that day.
 func _note_soil_excursions() -> void:
+	var changed: bool = false
 	for cell: Variant in plantings:
 		var planting: Dictionary = plantings[cell]
 		if not planting.get("out_today", false) and not is_crop_ready(cell) and not is_soil_in_band(cell):
 			planting["out_today"] = true
+			changed = true
+	if changed:
+		crops_changed.emit()
 
 
 ## Each morning: a growing crop counts a day out of band if its soil left the
@@ -1518,7 +1520,8 @@ func _grow_crops() -> void:
 		if planting.get("out_today", false):
 			planting["out_of_band_days"] = int(planting["out_of_band_days"]) + 1
 			planting["out_today"] = false
-		var age: float = GameClock.elapsed_days - float(planting.get("planted_at", GameClock.elapsed_days))
+		var morning: float = floorf(GameClock.elapsed_days)
+		var age: float = morning - float(planting.get("planted_at", morning))
 		if age >= float(planting["days_grown"]) + 1.0 - GROWTH_DAY_MIN:
 			planting["days_grown"] = int(planting["days_grown"]) + 1
 	crops_changed.emit()
@@ -1588,7 +1591,7 @@ func sell_harvest_to_lin() -> int:
 	var note: String = ("" if off_spec == 0
 		else " %s off spec, paid at the reduced price." % SP811.integer(off_spec))
 	if advanced > 0:
-		note += " Less the %s CR of seed I fronted you." % SP811.integer(advanced)
+		note += " That's after taking out the %s CR of seed I fronted you." % SP811.integer(advanced)
 	post_phone("LIN: Bought %s crops for %s CR.%s" % [SP811.integer(count), SP811.integer(total), note])
 	return total
 

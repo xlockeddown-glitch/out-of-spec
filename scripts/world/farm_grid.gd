@@ -91,7 +91,7 @@ func refresh_crops() -> void:
 
 func _crop_model_path(cell: Vector3i) -> String:
 	var planting: Dictionary = GameState.plantings[cell]
-	if int(planting["out_of_band_days"]) > 0:
+	if int(planting["out_of_band_days"]) > 0 or planting.get("out_today", false):
 		return CROP_WILTED_MODEL
 	if GameState.is_crop_ready(cell):
 		return CROP_STAGE_MODEL % 3

@@ -95,6 +95,9 @@ var _applied_throttle: float = 0.0
 var _applied_steer: float = 0.0
 var _frames: Array[UplinkFrame] = []
 var _commands: Array[UplinkCommand] = []
+## Seed selected when the till key went down; a C pressed before the next
+## physics tick must not change it.
+var _till_seed: String = ""
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 
 
@@ -118,6 +121,11 @@ func _exit_tree() -> void:
 	GameState.has_rover_transform = true
 
 
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"rover_till", false):
+		_till_seed = GameState.current_seed()
+
+
 func _physics_process(delta: float) -> void:
 	_uplink_clock += delta
 	_update_line_of_sight(delta)
@@ -130,7 +138,10 @@ func _physics_process(delta: float) -> void:
 
 ## Queue a one-shot command. It executes after the current uplink lag.
 func queue_command(command: Command) -> void:
-	var seed_id: String = GameState.current_seed() if command == Command.TILL else ""
+	var seed_id: String = ""
+	if command == Command.TILL:
+		seed_id = _till_seed if _till_seed != "" else GameState.current_seed()
+		_till_seed = ""
 	_commands.append(UplinkCommand.new(_uplink_clock, command, seed_id))
 
 
