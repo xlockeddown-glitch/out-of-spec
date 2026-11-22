@@ -295,3 +295,62 @@ func test_remote_zero_blocks_the_next_bench_lengthening() -> String:
 	if record["interval_days"] > initial:
 		return "A bench pass right after an untraceable zero must not lengthen the interval."
 	return ""
+
+
+func test_displays_show_the_observed_error() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var unit: DriftingSensor = gs.hygrometer
+	var standard: DriftingSensor = gs.get_sensor(unit.calibrated_by)
+	_set_day(unit.cal_due_day)
+	# A standard off by 1.5 × the unit's MPE: the bench passes the unit, which is
+	# then truly out of tolerance while its display reads in band.
+	standard.max_error = INF  # a standard this far off is past its normal clamp
+	standard.error = unit.mpe * 1.5
+	unit.error = standard.error
+	var record: Dictionary = gs.calibrate(gs.HYGROMETER_ID)
+	var observed: float = unit.observed_error
+	var observed_band: int = unit.get_observed_band()
+	var true_band: int = unit.get_band()
+	unit.error += 0.1  # drift after the calibration shows up in both
+	var drifted: float = unit.observed_error - observed
+	GameClock.elapsed_days = saved
+	gs.free()
+	if absf(observed - record["as_left"]) > EPS:
+		return "Right after a calibration the display must read the as-left (%s), got %s." % [record["as_left"], observed]
+	if observed_band != DriftingSensor.Band.IN_BAND or true_band != DriftingSensor.Band.OUT_OF_TOLERANCE:
+		return "A bad standard must leave the display in band while the unit is truly out of tolerance."
+	if absf(drifted - 0.1) > EPS:
+		return "Drift after the calibration must show on the display."
+	return ""
+
+
+func test_remote_zero_keeps_the_bench_offset() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var unit: DriftingSensor = gs.steering
+	var standard: DriftingSensor = gs.get_sensor(unit.calibrated_by)
+	_set_day(unit.cal_due_day)
+	standard.max_error = INF
+	standard.error = 0.3
+	gs.calibrate(gs.STEERING_ID)  # bench zero against a standard off by 0.3
+	unit.error += 0.5
+	var observed_before: float = unit.observed_error
+	var seen: Array[float] = []
+	var listener: Callable = func(_e: float, _b: int) -> void: seen.append(unit.observed_error)
+	unit.error_changed.connect(listener)
+	var record: Dictionary = gs.calibrate(gs.STEERING_ID, "You", false)  # remote zero
+	unit.error_changed.disconnect(listener)
+	var offset: float = unit.reference_offset
+	var true_error: float = unit.error
+	GameClock.elapsed_days = saved
+	gs.free()
+	if absf(record["as_found"] - observed_before) > EPS:
+		return "The remote zero's as-found must be the observed error (%s), got %s." % [observed_before, record["as_found"]]
+	if absf(offset - 0.3) > EPS:
+		return "The remote zero must keep the bench offset, got %s." % offset
+	if absf(true_error - 0.3) > unit.as_left_residual + EPS:
+		return "After a remote zero the true error must stay near the bad standard's 0.3, got %s." % true_error
+	if seen.is_empty() or absf(seen[-1] - record["as_left"]) > EPS:
+		return "error_changed listeners must read the new observed value during the zero."
+	return ""

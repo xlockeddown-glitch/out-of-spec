@@ -53,13 +53,14 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
-	var band: int = GameState.hygrometer.get_band()
+	var band: int = GameState.hygrometer.get_observed_band()
 	var color: Color = DriftingSensor.band_color(band)
 	var lit: bool = band != DriftingSensor.Band.OUT_OF_TOLERANCE or fmod(_time * BLINK_HZ, 1.0) < 0.5
 	_led_mat.albedo_color = color
 	_led_mat.emission = color if lit else Color.BLACK
 	if heat_lamp:
-		heat_lamp.light_color = LAMP_HARSH if band == DriftingSensor.Band.OUT_OF_TOLERANCE else LAMP_WARM
+		var climate_bad: bool = GameState.hygrometer.get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE
+		heat_lamp.light_color = LAMP_HARSH if climate_bad else LAMP_WARM
 
 
 func _on_molt_changed(_progress: float, _stage: int) -> void:

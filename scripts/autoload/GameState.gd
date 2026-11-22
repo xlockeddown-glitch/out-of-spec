@@ -229,7 +229,10 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 	var standard: DriftingSensor = get_sensor(budget["standard_id"]) if not budget.is_empty() else null
 	var today: int = GameClock.get_day_index()
 	var on_time: bool = not sensor.is_overdue(today)
-	var zeroed: Dictionary = sensor.zero(standard.error if standard else 0.0)
+	# Without a standard the unit is zeroed against its own idea of zero, which
+	# still carries the offset from its last bench calibration: the as-found is
+	# the observed error and a bad standard stays hidden (Ryan, 2026-11-22).
+	var zeroed: Dictionary = sensor.zero(standard.error if standard else sensor.reference_offset)
 	var as_found: float = zeroed["as_found"]
 	var as_left: float = zeroed["as_left"]
 	var as_found_ok: bool = absf(as_found) <= sensor.mpe

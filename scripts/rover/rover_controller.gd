@@ -132,14 +132,16 @@ func get_current_lag() -> float:
 	return base_lag * GameState.get_relay_lag_multiplier()
 
 
+## Observed band, for the HUD (Ryan, 2026-11-22: displays show what the bench
+## last measured, so a bad standard can fool the player).
 func get_drift_band() -> DriftingSensor.Band:
-	return steering.get_band()
+	return steering.get_observed_band()
 
 
 ## Re-emit current state, e.g. right after a HUD connects.
 func broadcast_state() -> void:
 	uplink_changed.emit(has_line_of_sight, link_quality, get_current_lag())
-	drift_changed.emit(steering_drift_deg, get_drift_band())
+	drift_changed.emit(steering.observed_error, get_drift_band())
 
 
 # --- Uplink -----------------------------------------------------------------
@@ -228,8 +230,9 @@ func _zero_steering() -> void:
 	steering_zeroed.emit(GameState.calibrate(GameState.STEERING_ID, "You", false))
 
 
-func _on_steering_error_changed(error: float, band: int) -> void:
-	drift_changed.emit(error, band)
+func _on_steering_error_changed(_error: float, _band: int) -> void:
+	# The HUD gets the observed error; the steering pull keeps the true one.
+	drift_changed.emit(steering.observed_error, get_drift_band())
 
 
 # --- Tilling ----------------------------------------------------------------
