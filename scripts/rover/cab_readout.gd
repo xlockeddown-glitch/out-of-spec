@@ -13,7 +13,7 @@ const BLINK_HZ: float = 2.5
 @export var model_slot: ModelSlot
 ## Rover-local center on the voxel tractor roof (1.5 m top). Placement choice,
 ## not from a spec: checked visible from the iso camera at all 8 headings.
-@export var model_position: Vector3 = Vector3(0.35, 1.55, -0.1)
+@export var model_position: Vector3 = Vector3(0.3, 1.55, -0.2)
 ## Rover-local center on the greybox cab roof (1.65 m top), used without a model.
 @export var greybox_position: Vector3 = Vector3(0.4, 1.7, 0.1)
 
