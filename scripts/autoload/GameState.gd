@@ -38,6 +38,10 @@ const INSTRUMENT_NAMES: Dictionary = {
 const PLAYTEST_MOLT_SECONDS: float = 20.0
 ## Pre-molt visual state starts at this progress.
 const PRE_MOLT_AT: float = 0.8
+## In-game days the shed exuvia stays in the enclosure after the spool is
+## taken (Ryan's call: 1, gone the next morning). The spider stays in its
+## burrow (hidden) until then, since the two can't share the tank floor.
+const EXUVIA_LINGER_DAYS: int = 1
 ## The dome hygrometer starts out of tolerance ("gold sticker expired at 03:00")
 ## so the first dome visit has something to calibrate. |error| = MPE * this.
 const HYGROMETER_START_ERROR_RATIO: float = 1.12
@@ -50,6 +54,9 @@ var hygrometer: DriftingSensor
 var dome_species_id: StringName = &"curlyhair"
 var molt_progress: float = 0.0
 var molt_stage: MoltStage = MoltStage.ACTIVE
+## Day index on whose morning the exuvia from the last spool pickup is gone
+## (0 = no exuvia lingering).
+var exuvia_until_day: int = 0
 var optical_silk_spools: int = 0
 var relay_slotted: bool = false
 ## Species that spun the spool now in the relay (its lag_reduction_pct stacks).
@@ -370,6 +377,12 @@ func is_spool_ready() -> bool:
 	return molt_stage == MoltStage.MOLTED
 
 
+## The exuvia shows while molted and for EXUVIA_LINGER_DAYS after the spool is
+## taken (it goes at the start of the day after that).
+func is_exuvia_visible() -> bool:
+	return molt_stage == MoltStage.MOLTED or GameClock.get_day_index() < exuvia_until_day
+
+
 func _tick_molt(delta: float) -> void:
 	if molt_stage == MoltStage.MOLTED or is_molt_paused():
 		return
@@ -389,6 +402,7 @@ func collect_spool() -> bool:
 		return false
 	optical_silk_spools += 1
 	_spool_species.append(dome_species_id)
+	exuvia_until_day = GameClock.get_day_index() + EXUVIA_LINGER_DAYS
 	molt_progress = 0.0
 	molt_stage = MoltStage.ACTIVE
 	silk_changed.emit(optical_silk_spools)
