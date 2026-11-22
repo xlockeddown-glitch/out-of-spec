@@ -92,6 +92,7 @@ func test_job_needs_a_standard_of_its_discipline() -> String:
 	var refused: String = gs.accept_job(0)
 	gs.owned_standards["reference_gauge"] = 0
 	var accepted: String = gs.accept_job(0)
+	gs.credibility = 60
 	var tight: Dictionary = _template(gs, "dome1_cabin_transducer")
 	var tight_problem: String = gs.job_accept_problem(tight)
 	_done(gs)
@@ -123,25 +124,83 @@ func test_clean_job_pays_in_full_with_a_bonus() -> String:
 	return ""
 
 
-func test_late_job_pays_less_and_costs_credibility() -> String:
+func test_late_is_judged_when_the_bench_work_ends() -> String:
 	var gs: GameStateScript = _make_state()
 	var job_id: String = _take(gs, "lin_soil_probe")
 	var due: int = int(gs.active_job(job_id)["due_day"])
-	GameClock.elapsed_days = float(due + 1)
-	while GameClock.get_day_index() <= due:
-		GameClock.elapsed_days += 1.0
-	var result: Dictionary = gs.complete_job(job_id)
+	# Midday on the due day: on time.
+	GameClock.elapsed_days = float(due - 1) + 0.5
+	var midday: Dictionary = gs.complete_job(job_id)
+	# Started 10 min before 06:00 at the end of the due day, it ends late.
+	var late_id: String = _take(gs, "lin_soil_probe")
+	gs.active_job(late_id)["due_day"] = due
+	GameClock.elapsed_days = float(due) - 10.0 / 1440.0
+	var credits_before: int = gs.credits
+	var points_before: int = gs.credibility
+	var late: Dictionary = gs.complete_job(late_id)
+	var paid: int = gs.credits - credits_before
+	var moved: int = gs.credibility - points_before
 	var pay: int = int(_template(gs, "lin_soil_probe")["pay"])
 	var cut: int = _cfg(gs, "late_pay_cut_pct")
 	var points: int = _cfg(gs, "late_job_points")
-	var credibility: int = gs.credibility
 	_done(gs)
-	if result.get("on_time", true):
-		return "A job finished after its due day must be late."
-	if int(result["pay"]) != roundi(pay * (100 - cut) / 100.0):
-		return "A late job must pay %d %% less, got %d of %d CR." % [cut, result["pay"], pay]
-	if credibility != 30 + points:
-		return "A late job must cost %d credibility, now %d." % [points, credibility]
+	if not midday.get("on_time", false):
+		return "A job finished on its due day must be on time, got %s." % midday
+	if late.get("on_time", true) or int(late["day"]) != due + 1:
+		return "Work that ends after the due day must be late, got %s." % late
+	if paid != roundi(pay * (100 - cut) / 100.0) or int(late["pay"]) != paid:
+		return "A late job must pay %d %% less, paid %d of %d CR." % [cut, paid, pay]
+	if moved != points:
+		return "A late job must cost %d credibility, moved %d." % [points, moved]
+	return ""
+
+
+func test_late_and_untraceable_cuts_multiply() -> String:
+	var gs: GameStateScript = _make_state()
+	var job_id: String = _take(gs, "relay_inclinometer")
+	var due: int = int(gs.active_job(job_id)["due_day"])
+	GameClock.elapsed_days = float(due) + 0.25
+	gs.get_sensor("rotary_table").cal_due_day = GameClock.get_day_index() - 1
+	var result: Dictionary = gs.complete_job(job_id)
+	var pay: float = float(_template(gs, "relay_inclinometer")["pay"])
+	var keep: float = (100 - _cfg(gs, "late_pay_cut_pct")) / 100.0 * (100 - _cfg(gs, "untraceable_pay_cut_pct")) / 100.0
+	var points: int = _cfg(gs, "late_job_points") + _cfg(gs, "untraceable_job_points")
+	var credits: int = gs.credits
+	var credibility: int = gs.credibility
+	var text: String = gs.job_result_text(result)
+	_done(gs)
+	if credits != roundi(pay * keep) or credibility != 30 + points:
+		return "Late and untraceable must pay %d CR and cost %d, got %d CR, %d." % [
+			roundi(pay * keep), points, credits, credibility - 30]
+	if text.find("LATE and NOT TRACEABLE") < 0:
+		return "The phone line must name both problems, got '%s'." % text
+	return ""
+
+
+func test_work_that_would_end_after_the_cutoff_is_refused() -> String:
+	var gs: GameStateScript = _make_state()
+	var job_id: String = _take(gs, "lin_soil_probe")
+	var due: int = int(gs.active_job(job_id)["due_day"])
+	var grace: int = _cfg(gs, "late_grace_days")
+	GameClock.elapsed_days = float(due + grace) - 10.0 / 1440.0
+	var result: Dictionary = gs.complete_job(job_id)
+	var still: bool = not gs.active_job(job_id).is_empty()
+	_done(gs)
+	if result.get("ok", true) or str(result.get("reason", "")).find("Not enough time") < 0:
+		return "Work ending after the customer cancels must be refused, got %s." % result
+	if not still:
+		return "A refused job must stay active."
+	return ""
+
+
+func test_score_cap_is_what_the_result_reports() -> String:
+	var gs: GameStateScript = _make_state(99)
+	var job_id: String = _take(gs, "lin_soil_probe")
+	var result: Dictionary = gs.complete_job(job_id)
+	var text: String = gs.job_result_text(result)
+	_done(gs)
+	if int(result["points"]) != 1 or text.find("credibility +1") < 0:
+		return "At 99 points a clean job must report +1, got '%s'." % text
 	return ""
 
 
@@ -154,8 +213,11 @@ func test_overdue_standard_makes_job_untraceable() -> String:
 	var cut: int = _cfg(gs, "untraceable_pay_cut_pct")
 	var points: int = _cfg(gs, "untraceable_job_points")
 	var credibility: int = gs.credibility
+	var credits: int = gs.credits
 	var text: String = gs.job_result_text(result)
 	_done(gs)
+	if credits != int(result.get("pay", -1)):
+		return "The credits paid must match the result, %d vs %s." % [credits, result.get("pay")]
 	if result.get("traceable", true):
 		return "A job against an overdue standard must not be traceable."
 	if int(result["pay"]) != roundi(pay * (100 - cut) / 100.0) or credibility != 30 + points:
@@ -199,23 +261,64 @@ func test_abandoned_job_is_cancelled_after_grace() -> String:
 	return ""
 
 
-func test_accepted_job_leaves_the_board_and_caps_active() -> String:
+func test_accepted_offer_leaves_the_board_and_caps_active() -> String:
 	var gs: GameStateScript = _make_state()
 	var max_active: int = _cfg(gs, "max_active")
-	for i: int in max_active:
-		if _take(gs, "lin_soil_probe") == "":
-			_done(gs)
-			return "Job %d of %d must be accepted." % [i + 1, max_active]
-	gs.job_board.clear()
-	gs.job_board.append(_template(gs, "relay_inclinometer"))
-	var problem: String = gs.accept_job(0)
 	gs.refresh_job_board(1)
+	var size: int = gs.job_board.size()
+	var first_id: String = str(gs.job_board[0]["id"])
+	var problem: String = gs.accept_job(0)
+	var left: int = gs.job_board.size()
+	var still_offered: bool = false
+	for job: Dictionary in gs.job_board:
+		still_offered = still_offered or job["id"] == first_id
+	for i: int in max_active - 1:
+		gs.accept_job(0)
+	var over: String = gs.accept_job(0) if not gs.job_board.is_empty() else "board empty"
+	_done(gs)
+	if problem != "" or left != size - 1 or still_offered:
+		return "An accepted offer must leave the board, problem '%s', %d -> %d." % [problem, size, left]
+	if over == "":
+		return "No more than %d jobs may be active." % max_active
+	return ""
+
+
+func test_job_taken_today_is_not_reposted_on_promotion() -> String:
+	var gs: GameStateScript = _make_state(58)
+	var day: int = GameClock.get_day_index()
+	gs.refresh_job_board(day)
+	var taken_id: String = str(gs.job_board[0]["id"])
+	gs.job_board[0]["bench_minutes"] = 0
+	gs.accept_job(0)
+	var job_id: String = str(gs.active_jobs[-1]["job_id"])
+	# Finishing it clean (+2) promotes the lab to Accredited.
+	gs.complete_job(job_id)
+	var band: String = gs.credibility_band()
+	var rebuilt: bool = gs._board_band == gs.credibility_band_index()
 	var reposted: bool = false
 	for job: Dictionary in gs.job_board:
-		reposted = reposted or job["id"] == "lin_soil_probe"
+		reposted = reposted or job["id"] == taken_id
 	_done(gs)
-	if problem == "":
-		return "No more than %d jobs may be active." % max_active
+	if band != "Accredited":
+		return "58 points plus a clean job must reach Accredited, got %s." % band
 	if reposted:
-		return "A job already accepted must not be offered again."
+		return "A job taken today must not be offered again today."
+	if not rebuilt:
+		return "A promotion must rebuild the board with the new band's jobs."
+	return ""
+
+
+func test_accept_checks_band_and_a_standard_here() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.job_board.append(_template(gs, "relay_inclinometer"))
+	gs.at_oirm["rotary_table"] = GameClock.get_day_index() + 3
+	var away: String = gs.accept_job(0)
+	gs.at_oirm.erase("rotary_table")
+	gs.change_credibility(-5)
+	var dropped: String = gs.job_accept_problem(_template(gs, "relay_inclinometer"))
+	_done(gs)
+	if away.find("OIRM") < 0:
+		return "A job must not be accepted while its only standard is at OIRM, got '%s'." % away
+	if dropped.find("TRUSTED") < 0:
+		return "A lab that fell to Provisional must not accept a Trusted job, got '%s'." % dropped
 	return ""

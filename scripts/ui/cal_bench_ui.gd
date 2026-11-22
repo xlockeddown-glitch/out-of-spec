@@ -44,6 +44,7 @@ func _ready() -> void:
 	_close_button.pressed.connect(close)
 	GameState.drop_pod_changed.connect(_on_pod_or_oirm_changed.unbind(1))
 	GameState.oirm_changed.connect(_on_pod_or_oirm_changed)
+	GameState.jobs_changed.connect(_on_jobs_changed)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -86,6 +87,21 @@ func close() -> void:
 func _on_pod_or_oirm_changed() -> void:
 	if visible and _is_standard(_current_id):
 		_on_instrument_selected(_ids.find(_current_id))
+
+
+## Jobs accepted, finished, cancelled or gone late: rebuild the list and keep
+## the selection. A selected job that is gone shows as no longer active.
+func _on_jobs_changed() -> void:
+	if not visible:
+		return
+	_rebuild_list()
+	var index: int = _ids.find(_current_id)
+	_instrument_option.select(index)
+	if _current_id.begins_with(JOB_PREFIX):
+		if index >= 0:
+			_on_instrument_selected(index)
+		else:
+			_show_job({})
 
 
 func _is_standard(instrument_id: String) -> bool:
@@ -176,7 +192,7 @@ func _show_job(job: Dictionary) -> void:
 	_left_band.text = ""
 	_result_label.remove_theme_color_override("font_color")
 	if job.is_empty():
-		_mpe_label.text = "Job finished."
+		_mpe_label.text = "This job is no longer active."
 		_standard_label.text = ""
 		_calibrate_button.disabled = true
 		return

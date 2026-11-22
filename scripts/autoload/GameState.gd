@@ -158,6 +158,14 @@ var active_jobs: Array[Dictionary] = []
 ## One result per finished job (see complete_job).
 var job_log: Array[Dictionary] = []
 var _next_job_number: int = 1
+## The day today's board was built, the band it was built for, and the
+## templates accepted off it that day (not offered again until tomorrow).
+var _board_day: int = -1
+var _board_band: int = -1
+var _board_taken: Array[String] = []
+## True while the morning runs, so credibility changes then don't rebuild the
+## board before the audit is in.
+var _morning: bool = false
 
 ## Income milestone (Ryan, 2026-11-22): crops on tilled cells, auto-irrigated
 ## to a set point as the soil probe reads it, sold to Lin.
@@ -476,13 +484,16 @@ func _on_day_started(day: int) -> void:
 	_post_morning_dispatch(day)
 	# Courier returns land in the morning, before an audit that day.
 	_receive_oirm_returns(day)
+	_morning = true
 	_charge_overdue_credibility(day)
 	_expire_jobs(day)
-	refresh_job_board(day)
 	_grow_crops()
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)
+	_morning = false
+	# After the audit, so the board matches the band the lab ends the morning in.
+	refresh_job_board(day)
 
 
 ## One morning dispatch per day, no repeats until the whole deck is used.
@@ -1215,6 +1226,9 @@ func reset_credibility() -> void:
 	contract_run = 0
 	job_board.clear()
 	active_jobs.clear()
+	_board_day = -1
+	_board_band = -1
+	_board_taken.clear()
 
 
 func credibility_band_index(points: int = -1) -> int:
@@ -1256,7 +1270,9 @@ func change_credibility(points: int) -> void:
 	if index > _best_band:
 		_best_band = index
 		post_phone("OIRM: Lab credibility raised to %s." % credibility_band().to_upper())
-		# A new band opens its jobs now rather than next morning.
+	# A band change (up or down) changes the jobs on offer now, not next
+	# morning; the morning builds its board after the audit.
+	if index != _board_band and not _morning and _board_day >= 0:
 		refresh_job_board(GameClock.get_day_index())
 	if contract_state == "" and index >= _contract_offer_band_index():
 		_offer_first_contract()
@@ -1465,6 +1481,9 @@ func job_standards(job: Dictionary) -> Array[String]:
 
 ## Why `job` can't be accepted now, or "".
 func job_accept_problem(job: Dictionary) -> String:
+	var band_name: String = str(job.get("min_band", ""))
+	if _band_index_named(band_name) > credibility_band_index():
+		return "Needs %s credibility." % band_name.to_upper()
 	var max_active: int = maxi(int(_jobs_number("max_active", 2.0)), 1)
 	if active_jobs.size() >= max_active:
 		return "You already have %s jobs to finish." % SP811.integer(active_jobs.size())
@@ -1472,6 +1491,8 @@ func job_accept_problem(job: Dictionary) -> String:
 		var tier: int = int(job.get("min_tier", 0))
 		return "Needs your own %s standard%s." % [job.get("discipline", "?"),
 			" (Tier %s or better)" % SP811.integer(tier) if tier > 0 else ""]
+	if job_bench_standard(job) == "":
+		return job_bench_problem(job)
 	return ""
 
 
@@ -1484,6 +1505,7 @@ func accept_job(index: int) -> String:
 	if problem != "":
 		return problem
 	job_board.remove_at(index)
+	_board_taken.append(str(offer.get("id", "")))
 	var today: int = GameClock.get_day_index()
 	var job: Dictionary = offer.duplicate(true)
 	job["job_id"] = "JOB-%04d" % _next_job_number
@@ -1517,6 +1539,9 @@ func job_bench_standard(job: Dictionary) -> String:
 ## Why `job` can't be done at the bench now, or "".
 func job_bench_problem(job: Dictionary) -> String:
 	if job_bench_standard(job) != "":
+		var cutoff: int = int(job.get("due_day", 0)) + maxi(int(_jobs_number("late_grace_days", 3.0)), 0)
+		if job_finish_day(job) > cutoff:
+			return "Not enough time: %s cancels at 06:00 on day %s." % [job.get("customer", "?"), SP811.integer(cutoff + 1)]
 		return ""
 	var owned: Array[String] = job_standards(job)
 	if owned.is_empty():
@@ -1524,11 +1549,17 @@ func job_bench_problem(job: Dictionary) -> String:
 	return "The %s is at OIRM until day %s." % [instrument_name(owned[0], true), SP811.integer(int(at_oirm[owned[0]]))]
 
 
+## The day the bench work on `job` would end if started now.
+func job_finish_day(job: Dictionary) -> int:
+	return floori(GameClock.elapsed_days + float(job.get("bench_minutes", 0.0)) / 1440.0) + 1
+
+
 ## Calibrates the customer's item at the bench against the best standard for
-## the job. Pays the job's price, cut if it is late (after due_day) or not
-## traceable (the standard is overdue); each costs credibility, and a clean,
-## on-time job earns a little. The bench time then passes on the clock.
-## Returns { ok, reason } on failure, else the result written to job_log.
+## the job. The bench time passes first; the job is late if the work ends
+## after due_day, and not traceable if the standard was overdue when the work
+## began. Each cuts the pay and costs credibility; a clean, on-time job earns
+## a little. Returns { ok, reason } on failure, else the result written to
+## job_log.
 func complete_job(job_id: String) -> Dictionary:
 	var job: Dictionary = active_job(job_id)
 	if job.is_empty():
@@ -1537,9 +1568,15 @@ func complete_job(job_id: String) -> Dictionary:
 	if problem != "":
 		return { "ok": false, "reason": problem }
 	var standard_id: String = job_bench_standard(job)
+	var traceable: bool = not get_sensor(standard_id).is_overdue(GameClock.get_day_index())
+	# Off the active list first, so mornings during the bench time don't
+	# cancel it; then the work takes its time.
+	active_jobs.erase(job)
+	var minutes: float = float(job.get("bench_minutes", 0.0))
+	if minutes > 0.0:
+		GameClock.advance(minutes / 1440.0)
 	var today: int = GameClock.get_day_index()
 	var on_time: bool = today <= int(job["due_day"])
-	var traceable: bool = not get_sensor(standard_id).is_overdue(today)
 	var offered: int = int(job.get("pay", 0))
 	var pay: float = float(offered)
 	var points: int = 0
@@ -1551,7 +1588,6 @@ func complete_job(job_id: String) -> Dictionary:
 		points += int(_jobs_number("untraceable_job_points", -5.0))
 	if on_time and traceable:
 		points = int(_jobs_number("clean_job_points", 2.0))
-	active_jobs.erase(job)
 	var result: Dictionary = {
 		"ok": true,
 		"job_id": job_id,
@@ -1564,15 +1600,16 @@ func complete_job(job_id: String) -> Dictionary:
 		"offered": offered,
 		"pay": roundi(pay),
 		"points": points,
-		"bench_minutes": float(job.get("bench_minutes", 0.0)),
+		"bench_minutes": minutes,
 	}
 	job_log.append(result)
 	add_credits(result["pay"])
+	# Report the change the score actually made (it stops at 0 and the maximum).
+	var before: int = credibility
 	change_credibility(points)
+	result["points"] = credibility - before
 	post_phone(job_result_text(result))
 	jobs_changed.emit()
-	if result["bench_minutes"] > 0.0:
-		GameClock.advance(result["bench_minutes"] / 1440.0)
 	return result
 
 
@@ -1607,12 +1644,16 @@ func _expire_jobs(day: int) -> void:
 ## them by day, skipping any already accepted.
 func refresh_job_board(day: int) -> void:
 	job_board.clear()
+	if day != _board_day:
+		_board_day = day
+		_board_taken.clear()
 	var band: int = credibility_band_index()
+	_board_band = band
 	var eligible: Array[Dictionary] = []
 	for template: Dictionary in _job_templates():
 		if _band_index_named(str(template.get("min_band", ""))) > band:
 			continue
-		var taken: bool = false
+		var taken: bool = str(template.get("id", "")) in _board_taken
 		for job: Dictionary in active_jobs:
 			taken = taken or job.get("id", "") == template.get("id", "")
 		if not taken:

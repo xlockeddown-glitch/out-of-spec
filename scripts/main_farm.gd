@@ -50,6 +50,11 @@ func _ready() -> void:
 	_hud.buy_standard_pressed.connect(_try_buy_standard)
 	_hud.accept_job_pressed.connect(_try_accept_job)
 	GameState.jobs_changed.connect(_refresh_jobs_hud)
+	# Buying or sending away a standard, or a band change, changes which
+	# offers can be accepted.
+	GameState.upgrades_changed.connect(_refresh_jobs_hud)
+	GameState.oirm_changed.connect(_refresh_jobs_hud)
+	GameState.credibility_changed.connect(_refresh_jobs_hud.unbind(1))
 
 	# Replay the persistent phone log first, so fresh SYS lines land on top of it.
 	for line: String in GameState.phone_log.slice(-LOG_REPLAY_LINES):
