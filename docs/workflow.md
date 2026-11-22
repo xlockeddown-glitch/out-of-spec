@@ -56,6 +56,8 @@ When Ryan uploads a `.vox` generator script (with or without renders):
 
 Ryan's packs are **inspiration and style reference**, not a list of things that must be placed. Use a model in a scene where it fits; "not placed yet" is not a to-do. When asking a model for new visuals, cite the packs (their palettes, voxel sizes and sheets) along with the [voxel global rules](art/voxel_models.md#global-rules) so new art matches.
 
+**What to ask for next (Ryan, 2026-11-22).** Requests for new art go first to things the game already has or the next milestones will use: the instruments in the [equipment spec](design/equipment_skills_robots.md#14-the-seven-instruments) (Tier 0 standards first, then the next milestone's tier), the makers' and OIRM's props (nameplates, transit cases), and the canon characters. The order follows the [build order](design/equipment_skills_robots.md#5-build-order-milestone-prs-decided). Gemini's replies are concept and grids only; each one still goes through §4's steps and a review before it lands.
+
 ## 5. Progress updates
 
 - **Screenshots now and then.** When something visible changes (a new model in a scene, a new screen or HUD text), send Ryan a screenshot or render with the update. Not every commit; one per visible milestone is enough.
