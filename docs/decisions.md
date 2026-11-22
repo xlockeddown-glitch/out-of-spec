@@ -462,3 +462,14 @@ Agent's notes (flagged for Ryan, not his words):
 - One build at a time. The lab's areas keep working while it grows.
 - The job board still shows jobs the lab can't take, with the reason, so the player sees what a bigger lab would open up.
 - The plan board is on the dome's back wall, right of the airlock. The lab's spaces line the back wall: a cabinet per space, labelled by area; free spaces are bare pads; spaces being built or cleared show amber.
+
+## 2026-11-22: After the lab
+
+### Ryan chose
+
+- Next: groundwork for online co-op.
+- Keep every lab rule as built: the starting lab's 3 spaces, free fit-out, clearing at any lab size, pressure, electrical and temperature jobs needing a fitted-out space, and the area cap per lab size.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Groundwork goes one PR per README "known exception". First: seeded randomness. The farm has one `world_seed`; morning dispatches, audit footers, Bram's lines and every sensor's drift direction and as-left residual come from it, so a new co-op farm started from the same seed plays out the same. Joining mid-game will also need the generator states and sensor signs, which comes with host save/load. Bram's bay lines draw from the shared generator too; in co-op the host should run them.

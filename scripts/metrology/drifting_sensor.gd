@@ -97,8 +97,17 @@ var _sign: float = 1.0
 var _rng := RandomNumberGenerator.new()
 
 
+## Until reseed() runs, the sign comes from an unseeded generator. Sensors in
+## GameState.sensors are always reseeded from the world seed; one built
+## elsewhere is not deterministic until reseed() is called.
 func _init() -> void:
-	_rng.randomize()
+	_sign = _random_sign()
+
+
+## Restarts this sensor's randomness (drift direction, as-left residuals)
+## from `p_seed`. GameState derives it from the world seed.
+func reseed(p_seed: int) -> void:
+	_rng.seed = p_seed
 	_sign = _random_sign()
 
 

@@ -137,6 +137,12 @@ var audit_grace_used: bool = false
 var _cal_index_at_last_audit: int = 0
 var _dispatch_deck: Array[Dictionary] = []
 
+## The farm's one seed (co-op: the host's, sent to joining players). All
+## simulation randomness comes from it: `rng` here, and each sensor's own
+## generator, reseeded from it per instrument.
+var world_seed: int = 0
+var rng := RandomNumberGenerator.new()
+
 ## Farm persistence across swaps.
 var rover_transform: Transform3D = Transform3D.IDENTITY
 var has_rover_transform: bool = false
@@ -198,6 +204,8 @@ const OFFSET_CURRENT: int = -2147483648
 
 
 func _ready() -> void:
+	# A new farm gets a new seed once; everything random follows from it.
+	set_world_seed(int(Time.get_unix_time_from_system() * 1000.0) ^ Time.get_ticks_usec())
 	build_registry()
 	# The hygrometer's sticker already expired (due day 0), so it is overdue
 	# and out of tolerance until calibrated; everything else starts in date.
@@ -246,12 +254,43 @@ func build_registry() -> void:
 		sensors[id] = sensor
 		if sensor.role == "standard" and sensor.tier <= 0:
 			owned_standards[id] = 0
+	_seed_sensors()
 	steering = sensors.get(STEERING_ID)
 	hygrometer = sensors.get(HYGROMETER_ID)
 	_issue_founding_certificates()
 	reset_lab()
 	if steering == null or hygrometer == null:
 		push_error("GameState: %s needs %s and %s." % [DRIFT_TABLE, STEERING_ID, HYGROMETER_ID])
+
+
+## Sets the farm's seed: the shared generator and every sensor restart from it.
+func set_world_seed(p_seed: int) -> void:
+	world_seed = p_seed
+	rng.seed = p_seed
+	_seed_sensors()
+
+
+## Each sensor gets its own stable seed from the world seed and its id, so
+## adding an instrument doesn't change the others' rolls.
+func _seed_sensors() -> void:
+	for id: Variant in sensors:
+		(sensors[id] as DriftingSensor).reseed(hash("%d:%s" % [world_seed, str(id)]))
+
+
+## Shuffles `list` in place with the farm's generator (Fisher–Yates).
+func _shuffle(list: Array) -> void:
+	for i: int in range(list.size() - 1, 0, -1):
+		var j: int = rng.randi_range(0, i)
+		var held: Variant = list[i]
+		list[i] = list[j]
+		list[j] = held
+
+
+## A random entry of `list` from the farm's generator (null if empty).
+func _pick(list: Array) -> Variant:
+	if list.is_empty():
+		return null
+	return list[rng.randi_range(0, list.size() - 1)]
 
 
 func get_sensor(instrument_id: String) -> DriftingSensor:
@@ -522,7 +561,7 @@ func _on_day_started(day: int) -> void:
 func _post_morning_dispatch(day: int) -> void:
 	if _dispatch_deck.is_empty():
 		_dispatch_deck = DataManager.get_records(DISPATCH_TABLE, "morning_dispatches")
-		_dispatch_deck.shuffle()
+		_shuffle(_dispatch_deck)
 	if _dispatch_deck.is_empty():
 		return
 	var entry: Dictionary = _dispatch_deck.pop_back()
@@ -610,7 +649,7 @@ func _run_audit(day: int) -> void:
 	else:
 		add_credits(-int(report["total_fine"]))
 		var fines: Array[Dictionary] = DataManager.get_records(DISPATCH_TABLE, "audit_fines")
-		var footer: String = fines.pick_random().get("snarky_footer", "") if not fines.is_empty() else ""
+		var footer: String = (_pick(fines) as Dictionary).get("snarky_footer", "") if not fines.is_empty() else ""
 		post_phone("TOTAL FINE %s CR. Balance %s CR. %s" % [SP811.integer(report["total_fine"]), SP811.integer(credits), footer])
 	_update_clean_audit_gate(report)
 	_credibility_after_audit(report)
@@ -1109,7 +1148,7 @@ func bram_line(section: String) -> String:
 	var lines: Variant = DataManager.get_value(DISPATCH_TABLE, "npcs/bram/" + section)
 	if typeof(lines) != TYPE_ARRAY or (lines as Array).is_empty():
 		return ""
-	return str((lines as Array).pick_random())
+	return str(_pick(lines as Array))
 
 
 func _on_day_started_regrow() -> void:
