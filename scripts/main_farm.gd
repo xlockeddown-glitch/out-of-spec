@@ -74,9 +74,11 @@ func _on_zero_pressed() -> void:
 
 
 func _on_steering_zeroed(record: Dictionary) -> void:
-	_hud.push_log("As-found %s°  As-left %s°  Next due day %d (%d d)" % [
-		SP811.signed(record.get("as_found", 0.0)), SP811.signed(record.get("as_left", 0.0)),
-		record.get("due_day", 0), record.get("interval_days", 0)])
+	var schedule: String = ("No standard: not a calibration, still due day %d" % record.get("due_day", 0)
+		if not record.get("traceable", true)
+		else "Next due day %d (%d d)" % [record.get("due_day", 0), record.get("interval_days", 0)])
+	_hud.push_log("As-found %s°  As-left %s°  %s" % [
+		SP811.signed(record.get("as_found", 0.0)), SP811.signed(record.get("as_left", 0.0)), schedule])
 
 
 func _on_slot_spool_pressed() -> void:

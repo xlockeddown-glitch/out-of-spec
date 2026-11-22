@@ -7,6 +7,11 @@ extends RefCounted
 ## as-found error, leaves a small as-left residual, and re-rolls the direction:
 ## the root cause is never fixed, so it comes back, maybe the other way.
 ##
+## A reference standard is a DriftingSensor too (`role` "standard"). Zeroing
+## against a standard compares to a reference that is itself off by its own
+## error, so that error is carried into the unit and stays hidden
+## (docs/design/equipment_skills_robots.md section 1.5).
+##
 ## Band uses the guard band from sensor_drift_config.json:
 ##   |error| / MPE <= acceptance_ratio -> IN_BAND
 ##   <= 1.0                            -> GUARDBAND
@@ -23,6 +28,24 @@ const CONFIG_TABLE: StringName = &"sensor_drift_config"
 
 var instrument_id: String = ""
 var error_unit: String = ""
+## "unit" (audited, calibrated at the bench) or "standard" (a Tier 0 reference).
+var role: String = "unit"
+var display_name: String = ""
+var short_name: String = ""
+## One digit of the reading, in `error_unit` (0 = not set).
+var resolution: float = 0.0
+## Id of the standard this unit is calibrated against ("" = none).
+var calibrated_by: String = ""
+## Game minutes one bench calibration takes.
+var bench_minutes: float = 0.0
+## Standards only: confidence the spec (`mpe`) is stated at, in percent;
+## <= 0 means none stated, so the spec is treated as rectangular.
+var spec_confidence_pct: float = 0.0
+## Standards only: expanded uncertainty on the standard's certificate, and its k.
+var certificate_uncertainty: float = 0.0
+var certificate_k: float = 2.0
+## Starting calibration interval in days (0 = the global initial interval).
+var initial_interval_days: int = 0
 ## Maximum permissible error, in `error_unit`.
 var mpe: float = 1.0
 var acceptance_ratio: float = 0.8
@@ -74,6 +97,19 @@ static func from_config(p_instrument_id: String, p_max_error: float = INF) -> Dr
 		sensor.usage_drift_rate = DataManager.get_number(CONFIG_TABLE, base + "/usage_drift_rate", 0.0)
 	if DataManager.get_value(CONFIG_TABLE, base + "/as_left_residual") != null:
 		sensor.as_left_residual = DataManager.get_number(CONFIG_TABLE, base + "/as_left_residual", 0.0)
+	sensor.role = str(DataManager.get_value(CONFIG_TABLE, base + "/role", sensor.role))
+	sensor.display_name = str(DataManager.get_value(CONFIG_TABLE, base + "/display_name", p_instrument_id))
+	sensor.short_name = str(DataManager.get_value(CONFIG_TABLE, base + "/short_name", sensor.display_name))
+	sensor.resolution = DataManager.get_number(CONFIG_TABLE, base + "/resolution", 0.0)
+	sensor.calibrated_by = str(DataManager.get_value(CONFIG_TABLE, base + "/calibrated_by", ""))
+	sensor.bench_minutes = DataManager.get_number(CONFIG_TABLE, base + "/bench_minutes", 0.0)
+	# null (no stated confidence) leaves 0.0, which means rectangular.
+	var confidence: Variant = DataManager.get_value(CONFIG_TABLE, base + "/spec_confidence_pct")
+	if typeof(confidence) == TYPE_FLOAT or typeof(confidence) == TYPE_INT:
+		sensor.spec_confidence_pct = float(confidence)
+	sensor.certificate_uncertainty = DataManager.get_number(CONFIG_TABLE, base + "/certificate_uncertainty", 0.0)
+	sensor.certificate_k = DataManager.get_number(CONFIG_TABLE, base + "/certificate_k", 2.0)
+	sensor.initial_interval_days = int(DataManager.get_number(CONFIG_TABLE, base + "/initial_interval_days", 0.0))
 	sensor.acceptance_ratio = DataManager.get_number(
 		CONFIG_TABLE, "guardband/green/max_error_ratio_inclusive", sensor.acceptance_ratio)
 	return sensor
@@ -89,13 +125,19 @@ func add_usage(amount: float) -> void:
 		error += _sign * usage_drift_rate * amount
 
 
-## Zeroes the instrument. Returns { "as_found": float, "as_left": float }.
-func zero() -> Dictionary:
-	var as_found: float = error
+## Zeroes the instrument against a reference whose own true error is
+## `reference_error` (0.0 = a perfect reference). Returns the observed values,
+## { "as_found": float, "as_left": float }: as-found is error - reference_error.
+## After adjustment the true error is reference_error + residual, so a standard
+## that is off moves the unit by the same amount without showing it.
+func zero(reference_error: float = 0.0) -> Dictionary:
+	var as_found: float = error - reference_error
 	_sign = _random_sign()
-	error = _rng.randf_range(-as_left_residual, as_left_residual)
-	zeroed.emit(as_found, error)
-	return { "as_found": as_found, "as_left": error }
+	var residual: float = _rng.randf_range(-as_left_residual, as_left_residual)
+	error = reference_error + residual
+	var as_left: float = error - reference_error
+	zeroed.emit(as_found, as_left)
+	return { "as_found": as_found, "as_left": as_left }
 
 
 func is_overdue(day: int) -> bool:
@@ -123,21 +165,22 @@ func band_for(value: float) -> Band:
 ## Human-readable signed value in this instrument's unit, per NIST SP 811:
 ## U+2212 minus, no space before the plane-angle degree, a space before %, and
 ## no "RH" qualifier on the % symbol (use quantity_name() in the label instead).
-func format_value(value: float) -> String:
+## `decimals` < 0 uses the unit's default (2, or 3 for other units).
+func format_value(value: float, decimals: int = -1) -> String:
 	match error_unit:
 		"degrees":
-			return SP811.signed(value, 2) + "°"
+			return SP811.signed(value, decimals if decimals >= 0 else 2) + "°"
 		"percentage_points_rh":
-			return SP811.signed(value, 2) + " %"
+			return SP811.signed(value, decimals if decimals >= 0 else 2) + " %"
 		_:
-			return "%s %s" % [SP811.signed(value, 3), error_unit]
+			return "%s %s" % [SP811.signed(value, decimals if decimals >= 0 else 3), error_unit]
 
 
 ## The quantity the error is in, for labels ("relative humidity").
 func quantity_name() -> String:
 	match error_unit:
 		"degrees":
-			return "steering angle"
+			return "angle"
 		"percentage_points_rh":
 			return "relative humidity"
 		_:

@@ -1,24 +1,69 @@
 {
   "instruments": {
     "hygrometer": {
+      "role": "unit",
+      "display_name": "Terrarium Hygrometer",
+      "short_name": "Hygrometer",
       "error_unit": "percentage_points_rh",
       "daily_drift_rate": 0.3,
       "max_permissible_error": 5.0,
-      "as_left_residual": 0.2
+      "as_left_residual": 0.2,
+      "resolution": 0.1,
+      "calibrated_by": "humidity_generator",
+      "bench_minutes": 90
     },
     "rover_steering_encoder": {
+      "role": "unit",
+      "display_name": "Rover Steering Encoder",
+      "short_name": "Steering",
       "error_unit": "degrees",
       "daily_drift_rate": 0.12,
       "usage_drift_rate": 0.03,
       "usage_unit": "metre_driven",
       "max_permissible_error": 4.0,
-      "as_left_residual": 0.2
+      "as_left_residual": 0.2,
+      "resolution": 0.1,
+      "calibrated_by": "rotary_table",
+      "bench_minutes": 30
     },
     "relay_dish_azimuth": {
+      "role": "unit",
+      "display_name": "Relay Dish Azimuth",
+      "short_name": "Dish azimuth",
       "error_unit": "degrees",
       "daily_drift_rate": 0.06,
-      "max_permissible_error": 0.45
-    }
+      "max_permissible_error": 0.45,
+      "resolution": 0.01,
+      "calibrated_by": "rotary_table",
+      "bench_minutes": 45
+    },
+    "rotary_table": {
+      "role": "standard",
+      "display_name": "Rotary Table",
+      "short_name": "Rotary table",
+      "error_unit": "degrees",
+      "daily_drift_rate": 0.0005,
+      "max_permissible_error": 0.05,
+      "spec_confidence_pct": null,
+      "certificate_uncertainty": 0.02,
+      "certificate_k": 2,
+      "initial_interval_days": 30,
+      "_note": "Tier 0 angle standard (Ryan, 2026-11-22). Working name; the fictional maker name and every number here are game placeholders, not from a datasheet. spec_confidence_pct null = no stated confidence, so the spec is rectangular (half-width / √3)."
+    },
+    "humidity_generator": {
+      "role": "standard",
+      "display_name": "Humidity Generator Chamber",
+      "short_name": "Humidity chamber",
+      "error_unit": "percentage_points_rh",
+      "daily_drift_rate": 0.005,
+      "max_permissible_error": 0.5,
+      "spec_confidence_pct": null,
+      "certificate_uncertainty": 0.3,
+      "certificate_k": 2,
+      "initial_interval_days": 30,
+      "_note": "Tier 0 humidity standard, two-pressure generator class (Ryan, 2026-11-22). Working name; the fictional maker name and every number here are game placeholders, not from a datasheet."
+    },
+    "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, not audited until OIRM certificates land (milestone 2). resolution (one digit of the unit under test), bench_minutes and the standards' specs are placeholders (docs/design/equipment_skills_robots.md section 1.5)."
   },
   "guardband": {
     "green": {
@@ -54,5 +99,11 @@
     "lengthen_days": 2,
     "shorten_days": 2,
     "_note": "Interval adjustment (Ryan, 2026-11-21): as-found out of tolerance shortens the interval; an on-time calibration that passes lengthens it; a late pass keeps it. Day counts are placeholders."
+  },
+  "calibration_uncertainty": {
+    "coverage_factor": 2,
+    "tur_floor": 2.0,
+    "tur_clean": 4.0,
+    "_note": "U = k × RSS of u_spec, u_cert, u_res, u_op, u_robot. TUR = MPE / U. Acceptance limit A = √(MPE² − U²). Below tur_floor the bench refuses; tur_clean is the 4:1 mark (Ryan, 2026-11-22, Q5, Q7, Q13)."
   }
 }
