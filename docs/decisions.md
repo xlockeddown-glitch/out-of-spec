@@ -2,6 +2,14 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-22: Standard workflow
+
+- Questions to Ryan are multiple choice (2 to 4 options) with a write-in (Ryan).
+- Design questions offer "Ask other models first": 2 to 4 other models get the same brief, the asking agent moderates their answers and comes back with updated or new choices (Ryan).
+- Send a screenshot now and then when something visible changes, and the next roadmap questions after each milestone (Ryan).
+- Ryan's art packs are inspiration and style reference; use them where they fit and cite them when asking for new visuals (Ryan).
+- The process lives in `docs/workflow.md`.
+
 ## 2026-11-22: Pack 3 models (spider, wilting, irrigation)
 
 Ryan's calls on the three Pack 3 models:

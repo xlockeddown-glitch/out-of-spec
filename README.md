@@ -6,6 +6,8 @@ Desktop (1920x1080, Steam/PC) chunky 3D voxel life-sim: satellite-linked remote 
 
 Read this before you start, and again before you open or merge a PR. It keeps long autonomous sessions on track. If a rule here disagrees with a doc it links to, the linked doc wins.
 
+The process (asking Ryan multiple-choice questions with a write-in, asking 2 to 4 other models and moderating their answers, the path from idea to merge, art uploads, progress updates) is in [`docs/workflow.md`](docs/workflow.md).
+
 ### Ground rules (every task)
 
 - **Never invent specs.** Numbers come from `data/`, a cited source, or Ryan. If you need a value nobody has given, use a clearly marked placeholder and list it as an open question. Flag every assumption in the PR description.
@@ -20,7 +22,7 @@ Read this before you start, and again before you open or merge a PR. It keeps lo
   - Keep randomness in seeded `RandomNumberGenerator`s owned by the simulation, never the global `randf()`, `shuffle()` or `pick_random()`.
   - Drive the simulation from `GameClock` (`time_advanced`, `day_started`), not `_process` delta.
   - Known exceptions, to fix in the co-op milestone: `rover_controller.gd` (saves `GameState.rover_transform`, adds steering usage directly), `farm_grid.gd` (writes `GameState.tilled_cells`), the global-RNG `shuffle()` and `pick_random()` calls in `GameState.gd`, the unseeded `randomize()` in `drifting_sensor.gd`, molt timing on real seconds, the hard-coded "You" for `performed_by` in `calibrate()` and its rover caller, and the `DriftingSensor` objects held in `GameState` (they need a to/from-dictionary form).
-- **Ask when unsure.** Design calls, names and numbers are Ryan's to make. If reviewers disagree, ask Ryan.
+- **Ask when unsure.** Design calls, names and numbers are Ryan's to make. Ask as in [Asking Ryan](docs/workflow.md#1-asking-ryan): 2 to 4 choices plus a write-in, with "Ask other models first" offered on design calls. If reviewers disagree, ask Ryan.
 
 ### Shortcuts by task
 
@@ -36,6 +38,7 @@ Read this before you start, and again before you open or merge a PR. It keeps lo
 | Voxel art and models | [Voxel global rules](docs/art/voxel_models.md#global-rules), [`assets/voxels/README.md`](assets/voxels/README.md) | Edit `tools/voxgen/build_models.py` (layer grids in `tools/voxgen/sheets/`) and rebuild; commit `.glb`, `.glb.import` and `.vox` together. Glowing parts are objects named `emit_*`; state LEDs stay out of the model. Soil tiles: see the README there |
 | Lore, characters, species | [`docs/canon.md`](docs/canon.md) | The art bibles in `docs/design/` are sources, but canon wins |
 | Reviewing another model's PR | [Before a PR leaves draft](#before-a-pr-leaves-draft), the doc for its task type | Check rules against the linked docs; flag invented numbers; report blockers, minors and nits |
+| Questions for Ryan, other models' input | [`docs/workflow.md`](docs/workflow.md) | Log each answer in `docs/decisions.md` with its date |
 | Playtest and export builds | [`docs/playtest.md`](docs/playtest.md), [Windows export](#windows-export) | Debug builds only: F9 skips to the next morning |
 
 ### Before a PR leaves draft
@@ -88,6 +91,7 @@ docs/design/     concept blueprint, art bible, Week 2 board (ignored by Godot vi
 docs/canon.md      which design source wins (merged art bibles)
 docs/sp811.md      NIST SP 811 rules for player-facing text
 docs/decisions.md  design calls that shape code and data
+docs/workflow.md   how we work: questions, other models, PR flow, updates
 docs/art/          voxel model spec and art sources
 docs/playtest.md   first playtest script
 docs/design/equipment_skills_robots.md  test equipment, OIRM, skills, robots
