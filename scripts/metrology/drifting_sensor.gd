@@ -154,6 +154,46 @@ static func from_config(p_instrument_id: String, p_max_error: float = INF) -> Dr
 	return sensor
 
 
+## The sensor's live state as plain data (JSON-safe), for host save and for
+## sending a farm to a joining player. Everything else comes from the config,
+## so restore onto a sensor built by from_config() with the same id.
+## The generator state is a string: JSON numbers can't hold all 64 bits.
+## Write it with JSON.stringify(..., full_precision = true); floats then come back to within about 1e-17.
+func to_dict() -> Dictionary:
+	return {
+		"instrument_id": instrument_id,
+		"error": error,
+		"reference_offset": reference_offset,
+		"cal_interval_days": cal_interval_days,
+		"cal_due_day": cal_due_day,
+		"last_cal_day": last_cal_day,
+		"sign": _sign,
+		"rng_seed": str(_rng.seed),
+		"rng_state": str(_rng.state),
+	}
+
+
+## Restores what to_dict() wrote. Keys that are missing keep their current
+## values; a dictionary for another instrument is refused (returns false).
+func apply_dict(data: Dictionary) -> bool:
+	if str(data.get("instrument_id", instrument_id)) != instrument_id:
+		push_warning("DriftingSensor: state for '%s' can't load into '%s'." % [data.get("instrument_id"), instrument_id])
+		return false
+	if data.has("rng_seed"):
+		_rng.seed = str(data["rng_seed"]).to_int()
+	if data.has("rng_state"):
+		_rng.state = str(data["rng_state"]).to_int()
+	if data.has("sign"):
+		_sign = -1.0 if float(data["sign"]) < 0.0 else 1.0
+	cal_interval_days = int(data.get("cal_interval_days", cal_interval_days))
+	cal_due_day = int(data.get("cal_due_day", cal_due_day))
+	last_cal_day = int(data.get("last_cal_day", last_cal_day))
+	# Set before error so error_changed listeners read the restored observed value.
+	reference_offset = float(data.get("reference_offset", reference_offset))
+	error = float(data.get("error", error))
+	return true
+
+
 func advance_days(days: float) -> void:
 	if days > 0.0 and daily_drift_rate > 0.0:
 		error += _sign * daily_drift_rate * days
