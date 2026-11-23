@@ -856,3 +856,14 @@ Agent's notes (flagged for Ryan, not his words):
 
 - Ryan answered the agent's question, whether to keep the loose FM-3 model (field_meter_fm3.glb) in the build now that its carry case has replaced it on the calibration bench, or remove it.
 - It stays in the build, unplaced, so it is ready if the FM-3 is shown out of its case later, for example in the field.
+
+## 2026-11-22: The molt runs on the game clock
+
+### Ryan chose
+
+- "Co-op groundwork (Recommended)": the README's known exceptions, one PR each.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The molt takes 40 game minutes, the same 20 s at the default pace. `PLAYTEST_MOLT_DAYS` in `GameState` replaces the 20 s constant.
+- Time jumps now count: a bench calibration or the F9 skip advances the molt, and can finish it, if the sensors are still within MPE after the jump. A paused clock pauses the molt. Open for Ryan: whether jumps should count.

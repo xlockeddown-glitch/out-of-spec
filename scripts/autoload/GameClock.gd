@@ -30,8 +30,7 @@ func _process(delta: float) -> void:
 
 ## Moves time forward. Drift and day_started follow from this. A jump across
 ## 06:00 is split at each morning, so day_started sees the clock and the drift
-## exactly as they were at 06:00. (Molt still runs on real seconds in
-## GameState for the 20 s playtest.)
+## exactly as they were at 06:00.
 func advance(delta_days: float) -> void:
 	if delta_days <= 0.0:
 		return

@@ -46,12 +46,12 @@ func test_thermometer_pauses_molt_only_in_service() -> String:
 		problem = "Thermometer within MPE must drop out of the reason, got '%s'." % gs.molt_pause_reason()
 	gs.hygrometer.error = 0.0
 	var before: float = gs.molt_progress
-	gs._tick_molt(1.0)
+	gs._tick_molt(0.001)
 	if problem == "" and (gs.is_molt_paused() or gs.molt_progress <= before):
 		problem = "Both within MPE: the molt must advance."
 	thermo.error = thermo.mpe * 2.0
 	before = gs.molt_progress
-	gs._tick_molt(1.0)
+	gs._tick_molt(0.001)
 	if problem == "" and gs.molt_progress != before:
 		problem = "Thermometer past MPE must stop the molt ticking."
 	gs.free()

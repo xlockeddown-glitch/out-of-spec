@@ -55,9 +55,10 @@ const GROWTH_DAY_MIN: float = 0.5
 const PHONE_LOG_MAX: int = 40
 
 # --- Playtest tuning (Week 2 board: keep the loop under two minutes) ---------
-## Seconds for a full molt while the hygrometer stays within MPE.
-## Replace with the species' molt_days on the GameClock once Week 3 lands.
-const PLAYTEST_MOLT_SECONDS: float = 20.0
+## Game days for a full molt while the terrarium sensors stay within MPE:
+## 40 game minutes, which is 20 s at the default 720 s per day.
+## Replace with the species' molt_days once Week 3 lands.
+const PLAYTEST_MOLT_DAYS: float = 40.0 / 1440.0
 ## Pre-molt visual state starts at this progress.
 const PRE_MOLT_AT: float = 0.8
 ## In-game days the shed exuvia stays in the enclosure after the spool is
@@ -236,10 +237,6 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if OS.is_debug_build() and key and key.pressed and not key.echo and key.physical_keycode == KEY_F9:
 		GameClock.skip_to_next_morning()
-
-
-func _process(delta: float) -> void:
-	_tick_molt(delta)
 
 
 # --- Instruments --------------------------------------------------------------
@@ -577,6 +574,7 @@ func _on_time_advanced(delta_days: float) -> void:
 	for id: Variant in sensors:
 		if is_in_service(str(id)):
 			(sensors[id] as DriftingSensor).advance_days(delta_days)
+	_tick_molt(delta_days)
 	_note_soil_excursions()
 	if drop_pod_present and GameClock.elapsed_days >= _drop_pod_departure_at:
 		drop_pod_present = false
@@ -1280,10 +1278,10 @@ func is_exuvia_visible() -> bool:
 	return molt_stage == MoltStage.MOLTED or GameClock.get_day_index() < exuvia_until_day
 
 
-func _tick_molt(delta: float) -> void:
+func _tick_molt(delta_days: float) -> void:
 	if molt_stage == MoltStage.MOLTED or is_molt_paused():
 		return
-	molt_progress = minf(1.0, molt_progress + delta / PLAYTEST_MOLT_SECONDS)
+	molt_progress = minf(1.0, molt_progress + delta_days / PLAYTEST_MOLT_DAYS)
 	if molt_progress >= 1.0:
 		molt_stage = MoltStage.MOLTED
 	elif molt_progress >= PRE_MOLT_AT:
