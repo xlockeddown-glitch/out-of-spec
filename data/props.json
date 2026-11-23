@@ -47,5 +47,13 @@
   "dry_well_calibrator": {
     "display_name": "Dry-Well Calibrator",
     "description": "Temperature reference: a heated metal block with a well for the probe under test."
+  },
+  "px1_rotary_table": {
+    "display_name": "PX-1 Rotary Table",
+    "description": "Angle reference: it turns to set angles, and the steering encoder on the jig is checked against them."
+  },
+  "md2p_humidity_generator": {
+    "display_name": "MD-2P Humidity Generator",
+    "description": "Humidity reference: it makes air at a set relative humidity for the hygrometer under test."
   }
 }

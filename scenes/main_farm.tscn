@@ -112,6 +112,9 @@ size = Vector3(0.7, 1.4, 0.7)
 [sub_resource type="BoxShape3D" id="Inspect_steering_encoder_jig"]
 size = Vector3(0.6, 0.4, 0.6)
 
+[sub_resource type="BoxShape3D" id="Inspect_px1_rotary_table"]
+size = Vector3(0.6, 0.3, 0.6)
+
 [sub_resource type="BoxShape3D" id="Inspect_irrigation_junction"]
 size = Vector3(1.2, 0.8, 1.2)
 
@@ -343,6 +346,22 @@ prop_id = "steering_encoder_jig"
 
 [node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/FieldCalPad/EncoderJig/Inspect"]
 shape = SubResource("Inspect_steering_encoder_jig")
+
+[node name="RotaryTable" type="Node3D" parent="WorldView/WorldViewport/World/FieldCalPad"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -2.6, 0, 1)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/px1_rotary_table.glb"
+model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/FieldCalPad/RotaryTable"]
+position = Vector3(0, 0.15, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "px1_rotary_table"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/FieldCalPad/RotaryTable/Inspect"]
+shape = SubResource("Inspect_px1_rotary_table")
 
 [node name="DropPod" type="Node3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("drone")]
 visible = false
