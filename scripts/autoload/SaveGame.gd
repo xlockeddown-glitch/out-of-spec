@@ -77,7 +77,9 @@ func start_new(path: String = DEFAULT_PATH) -> String:
 	if problem != "":
 		moved.reverse()
 		for pair: PackedStringArray in moved:
-			DirAccess.rename_absolute(pair[1], pair[0])
+			# Stops at one that fails: the next could replace a farm still there.
+			if DirAccess.rename_absolute(pair[1], pair[0]) != OK:
+				break
 		for leftover: String in [fresh, fresh + ".tmp"]:
 			if FileAccess.file_exists(leftover):
 				DirAccess.remove_absolute(leftover)

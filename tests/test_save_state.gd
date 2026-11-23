@@ -404,8 +404,10 @@ func _failed_new_farm() -> String:
 	# A folder in the save's place: the last step, placing the new farm, fails.
 	DirAccess.make_dir_absolute(PATH)
 	var problem: String = SaveGame.start_new(PATH)
+	var opened: bool = SaveGame.farm_open
+	SaveGame.farm_open = false
 	DirAccess.remove_absolute(PATH)
-	if problem == "" or SaveGame.farm_open:
+	if problem == "" or opened:
 		return "The new farm must not open."
 	for pair: Array in [[".old", 1], [".bak", 2]]:
 		if SaveGame.read_file(PATH + pair[0]).get("data", {}).get("farm", {}).get("credits") != pair[1]:
