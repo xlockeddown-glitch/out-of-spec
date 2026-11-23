@@ -2,7 +2,7 @@ extends Node
 ## Live simulation state that must survive scene swaps. Autoloaded as `GameState`.
 ##
 ## Scenes read from and write to this; they never own sensor/molt/inventory
-## state themselves. Ticks in _process, so the dome keeps simulating while
+## state themselves. Ticks on GameClock, so the dome keeps simulating while
 ## you're on the farm and vice versa.
 
 signal molt_changed(progress: float, stage: int)
@@ -225,6 +225,7 @@ func _ready() -> void:
 	hygrometer.error = hygrometer.mpe * HYGROMETER_START_ERROR_RATIO
 	hygrometer.cal_due_day = 0
 	GameClock.time_advanced.connect(_on_time_advanced)
+	GameClock.clock_ran.connect(_tick_molt)
 	GameClock.day_started.connect(_on_day_started)
 	GameClock.day_started.connect(_on_day_started_regrow.unbind(1))
 	credits = int(DataManager.get_number(ECONOMY_TABLE, "starting_credits", 0.0))
@@ -574,7 +575,6 @@ func _on_time_advanced(delta_days: float) -> void:
 	for id: Variant in sensors:
 		if is_in_service(str(id)):
 			(sensors[id] as DriftingSensor).advance_days(delta_days)
-	_tick_molt(delta_days)
 	_note_soil_excursions()
 	if drop_pod_present and GameClock.elapsed_days >= _drop_pod_departure_at:
 		drop_pod_present = false

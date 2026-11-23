@@ -861,9 +861,10 @@ Agent's notes (flagged for Ryan, not his words):
 
 ### Ryan chose
 
-- "Co-op groundwork (Recommended)": the README's known exceptions, one PR each.
+- "Co-op groundwork (Recommended)"
 
 ### Agent's notes (flagged for Ryan, not his words)
 
+- The option was the README's known exceptions, one PR each. This is the last one.
 - The molt takes 40 game minutes, the same 20 s at the default pace. `PLAYTEST_MOLT_DAYS` in `GameState` replaces the 20 s constant.
-- Time jumps now count: a bench calibration or the F9 skip advances the molt, and can finish it, if the sensors are still within MPE after the jump. A paused clock pauses the molt. Open for Ryan: whether jumps should count.
+- Time jumps (a bench calibration, the F9 skip) don't advance the molt, as before: the molt follows `GameClock.clock_ran`, not `time_advanced`. The hygrometer's bench job takes 90 min, so counting it would finish a 40 min molt at once. A paused clock now pauses the molt. Open for Ryan: whether jumps should count.

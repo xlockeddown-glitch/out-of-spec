@@ -9,6 +9,9 @@ extends Node
 signal time_advanced(delta_days: float)
 ## Fires at each morning after day 1 (day 1 is "already started" at boot).
 signal day_started(day_index: int)
+## Emitted after time_advanced when the clock ran on its own for a frame, and
+## not for time jumps (a bench job, the F9 skip). The molt follows this.
+signal clock_ran(delta_days: float)
 
 const DAY_START_HOUR: float = 6.0
 const HOURS_PER_DAY: float = 24.0
@@ -25,7 +28,10 @@ var elapsed_days: float = 0.0
 func _process(delta: float) -> void:
 	if paused or seconds_per_day <= 0.0:
 		return
-	advance(delta / seconds_per_day)
+	var delta_days: float = delta / seconds_per_day
+	advance(delta_days)
+	if delta_days > 0.0:
+		clock_ran.emit(delta_days)
 
 
 ## Moves time forward. Drift and day_started follow from this. A jump across
