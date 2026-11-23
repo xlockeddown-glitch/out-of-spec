@@ -5,6 +5,10 @@ extends Node
 
 ## Phone-log lines replayed into the HUD when the farm loads.
 const LOG_REPLAY_LINES: int = 6
+## A clicked prop's text stays in the hover label this long, like the dome's toast.
+const INSPECT_SECONDS: float = 3.0
+## Long descriptions stay up longer.
+const INSPECT_SECONDS_PER_CHAR: float = 0.04
 
 var _had_los: bool = true
 var _last_band: int = DriftingSensor.Band.IN_BAND
@@ -19,6 +23,8 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 @onready var _cal_pad: ParkingPad = %FieldCalPad
 
 var _bram_line: String = ""
+## Seconds left showing a clicked prop's text in the hover label.
+var _inspect_left: float = 0.0
 ## Ryan (2026-11-22): buying a standard takes two presses. The first press
 ## (key or button) arms the offer and shows the price; a second press on the
 ## same offer buys it. Leaving the bay or pressing another offer re-arms.
@@ -37,7 +43,9 @@ func _ready() -> void:
 	_hud.enter_dome_pressed.connect(_go_to_dome)
 	_airlock.clicked.connect(_go_to_dome)
 	for prop: Inspectable in get_tree().get_nodes_in_group(Inspectable.GROUP):
-		prop.inspected.connect(_hud.push_log)
+		# Not the phone log: it keeps only a few lines, and prop clicks would
+		# push dispatches and audits out of it.
+		prop.inspected.connect(_show_inspect)
 	# Bound methods so the autoload drops them when this scene is freed.
 	GameState.silk_changed.connect(_on_silk_changed)
 	GameState.relay_changed.connect(_on_relay_changed)
@@ -73,10 +81,18 @@ func _ready() -> void:
 	_refresh_jobs_hud()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	_hud.set_clock(GameClock.format_now())
+	if _inspect_left > 0.0:
+		_inspect_left -= delta
+		return
 	var hovered: Clickable = Clickable.hovered
 	_hover_hint.text = hovered.hint if hovered else ""
+
+
+func _show_inspect(text: String) -> void:
+	_hover_hint.text = text
+	_inspect_left = maxf(INSPECT_SECONDS, text.length() * INSPECT_SECONDS_PER_CHAR)
 
 
 func _on_uplink_changed(has_los: bool, quality: float, lag_s: float) -> void:
