@@ -1,4 +1,4 @@
-[gd_scene load_steps=34 format=3]
+[gd_scene load_steps=35 format=3]
 
 [ext_resource type="Script" path="res://scripts/dome/dome_interior.gd" id="1_dome"]
 [ext_resource type="Script" path="res://scripts/dome/terrarium.gd" id="2_terr"]
@@ -118,6 +118,9 @@ size = Vector3(0.35, 0.15, 0.3)
 
 [sub_resource type="BoxShape3D" id="Inspect_dry_well_calibrator"]
 size = Vector3(0.25, 0.35, 0.25)
+
+[sub_resource type="BoxShape3D" id="Inspect_md2p_humidity_generator"]
+size = Vector3(0.7, 1.2, 0.6)
 
 [node name="DomeInterior" type="Node3D"]
 script = ExtResource("1_dome")
@@ -613,6 +616,22 @@ prop_id = "env_chamber_cart"
 
 [node name="Shape" type="CollisionShape3D" parent="EnvChamberCartModel/Inspect"]
 shape = SubResource("Inspect_env_chamber_cart")
+
+[node name="HumidityGeneratorModel" type="Node3D" parent="."]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 1.5, 0, -1.2)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/md2p_humidity_generator.glb"
+model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="HumidityGeneratorModel"]
+position = Vector3(0, 0.6, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "md2p_humidity_generator"
+
+[node name="Shape" type="CollisionShape3D" parent="HumidityGeneratorModel/Inspect"]
+shape = SubResource("Inspect_md2p_humidity_generator")
 
 [node name="StationModel" type="Node3D" parent="CalStation" node_paths=PackedStringArray("greybox")]
 script = ExtResource("5_slot")

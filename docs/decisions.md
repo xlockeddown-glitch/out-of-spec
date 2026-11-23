@@ -770,3 +770,18 @@ Agent's notes (flagged for Ryan, not his words):
 - Glowing tokens are their own emit_* parts: the PX-1 and MD-2P displays and the case screen in teal, the MD-2P standby LED in amber.
 - The FM-3 case skips the dark border pass ("Answer A"). The case is small, and the pass around its 2-voxel screen painted 14 of its 43 voxels dark, including half the meter, so the case read as a black box. Gemini already set the screen on dark foam. This is an exception to Ryan's rule, so it is his call: the skip is one line (BORDER_SKIP in build_models.py) and can come out.
 - The Brazilian black is very dark (near-black body, blue-grey hairs); it reads in the dome's light but may need a lift if it sits in shadow.
+
+## 2026-11-22: Place the PX-1 and MD-2P
+
+### Ryan chose
+
+- "Yes"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan answered the agent's question, whether to place the new models in the scenes: the tarantulas in the terrarium and the instruments in the dome. This entry places the two instruments that have a clear home.
+- The PX-1 rotary table sits on the field calibration pad, 1 m in front of the encoder jig, since steering is calibrated on that jig against the PX-1.
+- The MD-2P humidity generator stands on the dome floor, left of the calibration bench, since it is the hygrometer's humidity reference.
+- Both can be clicked to inspect. New text in data/props.json: the PX-1 is the "Angle reference" and the MD-2P the "Humidity reference".
+- The two tarantulas are not placed. The dome keeps one species (the Curlyhair), and tarantulas can't share a tank, so they need either their own small tanks or a later species choice. Left for Ryan.
+- The FM-3 carry case is not placed. A loose FM-3 already sits on the bench, so placing the case would show the meter twice. Swapping the loose meter for the case is left for Ryan.
