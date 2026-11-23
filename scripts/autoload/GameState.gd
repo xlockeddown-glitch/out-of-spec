@@ -153,8 +153,9 @@ var world_seed: int = 0
 var rng := RandomNumberGenerator.new()
 
 ## Farm persistence across swaps.
-var rover_transform: Transform3D = Transform3D.IDENTITY
-var has_rover_transform: bool = false
+## rover id -> Transform3D where it was parked. Rovers belong to the farm, not
+## to a player. Change it with park_rover().
+var rover_transforms: Dictionary = {}
 ## Vector3i -> true for every tilled soil cell.
 var tilled_cells: Dictionary = {}
 
@@ -1088,6 +1089,24 @@ func buy_wide_treads() -> String:
 func add_tire_usage(meters: float) -> void:
 	if is_in_service(TIRE_ID):
 		get_sensor(TIRE_ID).add_usage(meters)
+
+
+## Distance a rover drove this tick: wears the steering encoder and the tire
+## gauge. There is one of each, whichever rover drove.
+func add_rover_usage(meters: float) -> void:
+	steering.add_usage(meters)
+	add_tire_usage(meters)
+
+
+## Remembers where a rover is parked, so it is still there when the farm scene
+## loads again.
+func park_rover(rover_id: String, at: Transform3D) -> void:
+	rover_transforms[rover_id] = at
+
+
+## Where `rover_id` was parked; `fallback` if it has not been parked yet.
+func parked_rover_transform(rover_id: String, fallback: Transform3D = Transform3D.IDENTITY) -> Transform3D:
+	return rover_transforms.get(rover_id, fallback)
 
 
 ## Tier 1 standards Bram stocks, in data order (owned ones included).
