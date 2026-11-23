@@ -822,3 +822,15 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - Ryan answered the agent's question, whether to keep the FM-3 carry case at half size (0.05 m voxels, 0.3 m wide) or build it at the art loop's full 0.1 m (0.6 m wide). It stays at half size, so the previous entry's size is now his call, not only the agent's.
+
+## 2026-11-22: Lighten the Brazilian black
+
+### Ryan chose
+
+- "Lighten"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan answered the agent's question, whether to lighten the Brazilian black tarantula's palette so it shows up in its small tank, or leave it dark.
+- Gemini's near-black body (#0E1117) read as a dark hole behind the tank's tinted glass. The body is now charcoal slate (#4A5468, with #363E4C for the darker cells), and the steel-blue sheen on the legs and back is lighter (#7C90AE and #AABCD4). The colors are the agent's choice, kept cool and grey so it still reads as a black tarantula, not as a grey one.
+- The voxel grid is unchanged; only the colors moved. The sheet keeps Gemini's original colors in its header for the record.
