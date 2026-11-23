@@ -2251,19 +2251,23 @@ func soil_moisture(cell: Vector3i) -> float:
 
 ## What the plot's soil probe reads at a cell, in percent water by volume:
 ## the true moisture plus the probe's error, to its resolution. Irrigation
-## holds this at the set point, so a drifted probe still reads on target.
+## holds this at the set point (when the set point less the error stays within
+## 0 % to 100 %), so a drifted probe still reads on target.
 func soil_probe_reading(cell: Vector3i) -> float:
 	var probe: DriftingSensor = get_sensor(SOIL_PROBE_ID)
-	var reading: float = soil_moisture(cell) * 100.0 + (probe.error if probe != null else 0.0)
-	var step: float = probe.resolution if probe != null and probe.resolution > 0.0 else 0.1
-	return snappedf(reading, step)
+	if probe == null:
+		return soil_moisture(cell) * 100.0
+	var reading: float = soil_moisture(cell) * 100.0 + probe.error
+	return snappedf(reading, probe.resolution) if probe.resolution > 0.0 else reading
 
 
-## The soil probe's readout for its inspect text: each planted cell's reading
-## (the first few, then a count of the rest), then its calibration due day. "Reads beans (1, 2) 32.0 %. Cal due day 9."
+## Planted cells the soil probe's readout lists before "N more".
 const SOIL_PROBE_TEXT_CELLS: int = 4
 
 
+## The soil probe's readout for its inspect text: each planted cell's reading
+## (the first few, then a count of the rest), then its calibration due day.
+## "Reads beans (1, 2) 32.0 %. Cal due day 9."
 func soil_probe_text() -> String:
 	var readings: PackedStringArray = []
 	for cell: Vector3i in plantings:

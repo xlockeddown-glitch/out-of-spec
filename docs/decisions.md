@@ -740,5 +740,5 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - This is the soil probe half of "both" (the clamp stand entry above is the other half). Clicking the soil moisture probe on the farm now adds the probe's reading for each planted cell after its description, for example "Reads biscuit reed (0, 2) 40.0 %", then "Cal due day 5." or "CAL OVERDUE (due day 5)." With nothing planted it says "Nothing planted to read."
-- The reading is what the probe shows, true moisture plus its error, to its 0.1 % resolution. Irrigation holds that reading at the set point, so a drifted probe still reads on target while the soil is off by the error. That is the point: the probe cannot tell you it has drifted; only calibration can.
+- The reading is what the probe shows, true moisture plus its error, to its 0.1 % resolution. Irrigation holds that reading at the set point (unless the set point less the error falls outside 0 % to 100 %, where the soil cannot follow), so a drifted probe still reads on target while the soil is off by the error. That is the point: the probe cannot tell you it has drifted; only calibration can.
 - The hover label lists the first 4 cells, then "N more", so a full plot does not run off the screen.

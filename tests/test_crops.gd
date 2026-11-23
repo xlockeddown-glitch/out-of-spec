@@ -379,3 +379,29 @@ func test_soil_probe_reads_each_planting_at_its_set_point() -> String:
 		problem = "The readout must hold '%s' and the due day, got '%s'." % [want, text]
 	_done(gs)
 	return problem
+
+
+## The readout lists the first cells, counts the rest, and flags an overdue probe.
+func test_soil_probe_text_caps_cells_and_flags_overdue() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.credits = 100000
+	var problem: String = ""
+	var count: int = gs.SOIL_PROBE_TEXT_CELLS + 2
+	for x: int in count:
+		var cell := Vector3i(x, 0, 5)
+		gs.tilled_cells[cell] = true
+		var refused: String = gs.plant_crop(cell)
+		if problem == "" and refused != "":
+			problem = "Could not plant %s for the test: %s" % [cell, refused]
+	var probe: DriftingSensor = gs.get_sensor(gs.SOIL_PROBE_ID)
+	probe.cal_due_day = GameClock.get_day_index() - 1
+	var text: String = gs.soil_probe_text()
+	var listed: int = text.count(" %,") + text.count(" %.")
+	if problem == "" and not text.begins_with("Reads "):
+		problem = "The readout must start 'Reads ', got '%s'." % text
+	if problem == "" and (listed != gs.SOIL_PROBE_TEXT_CELLS or ", 2 more." not in text):
+		problem = "The readout must list %d cells then '2 more', got '%s'." % [gs.SOIL_PROBE_TEXT_CELLS, text]
+	if problem == "" and not text.ends_with("CAL OVERDUE (due day %d)." % probe.cal_due_day):
+		problem = "An overdue probe must say so, got '%s'." % text
+	_done(gs)
+	return problem
