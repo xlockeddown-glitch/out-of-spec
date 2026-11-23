@@ -767,7 +767,7 @@ ART_LOOP = {
     "mexican_redknee": ({"B1": "#2E2B30", "B2": "#473F3E", "C1": "#D8B794", "K1": "#D44E1C",
                          "K2": "#9A3A1E", "S": SHADOW}, "spider", {}),
     # Lightened for Ryan ("Lighten", 2026-11-22): Gemini's near-black read as a hole in the
-    # tank, so the body is charcoal slate and the sheen a lighter steel blue.
+    # tank, so the body is slate and the sheen a lighter steel blue.
     "brazilian_black": ({"K1": "#4A5468", "K2": "#363E4C", "S1": "#7C90AE", "S2": "#AABCD4",
                          "EY": "#D8E2F0"}, "spider", {}),
     "px1_rotary_table": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "P1": "#B8C4CE",
