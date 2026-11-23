@@ -296,6 +296,12 @@ script = ExtResource("12_slot")
 model_path = "res://assets/voxels/field_survey_tripod.glb"
 model_scale = 0.1
 
+[node name="EncoderJig" type="Node3D" parent="WorldView/WorldViewport/World/FieldCalPad"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -2.6, 0, 0)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/steering_encoder_jig.glb"
+model_scale = 0.1
+
 [node name="DropPod" type="Node3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("drone")]
 visible = false
 position = Vector3(-3, 0, 14)

@@ -652,3 +652,15 @@ Agent's notes (flagged for Ryan, not his words):
 - It stands just past the plot's front edge at (−7.8, −0.4, 12.5) m, on the irrigation junction's right with 0.45 m edge to edge between them, turned 180° so its dial faces the camera. The story has auto-irrigation trusting a soil-moisture probe, so it stands with the plot's water supply. Its footprint (x −7.95 m to −7.65 m, z 12.35 m to 12.65 m) is outside the soil tiles, so no crop cell holds it.
 - Its two spikes (0.4 m) are pushed into the ground, so the casing sits on the ground and it stands 0.6 m above it. It is at true size (0.3 m × 0.3 m footprint).
 - Set dressing only: no collision and no reading. The design doc has the probe as a sensor dropped for now, so it does not drift and needs no calibration; its specs stay [PLACEHOLDER].
+
+## 2026-11-22: Encoder jig beside the field calibration pad
+
+### Ryan chose
+
+- "Encoder jig"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next. This places the steering encoder jig, the last unplaced voxel model.
+- It is a child of the field calibration pad (`FieldCalPad/EncoderJig`) at (10.9, 0, 15) m in the farm, turned 180° so its spirit level faces the camera. Its footprint (x 10.6 m to 11.2 m, z 14.7 m to 15.3 m) is 0.3 m west of the pad's west edge, mirroring the tripod just off the pad's other side. It is clear of the plot (back edge z = 12 m) and fissure H (z from 17.6 m).
+- It is at true size (0.6 m × 0.6 m, 0.4 m tall). Set dressing only: no collision and no interaction. The design doc has a rotary table as the Tier 0 angle standard in place of the jig, so the steering calibration still runs as before.
