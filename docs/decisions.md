@@ -877,5 +877,5 @@ Agent's notes (flagged for Ryan, not his words):
 
 ### Agent's notes (flagged for Ryan, not his words)
 
-- The options were set dressing on the farm with no collision and no readings. The new ore fissure and "Leave them unplaced" were not picked, so the existing fissure stays as it is.
+- The agent asked which of the new art packs to place. The options were set dressing on the farm with no collision and no readings. The new ore fissure and "Leave them unplaced" were not picked, so the existing fissure stays as it is.
 - The spots and the Inspect texts are the agent's. The culvert bridge takes the place of one gulch tile.

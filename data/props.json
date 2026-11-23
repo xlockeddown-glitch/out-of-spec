@@ -74,18 +74,18 @@
   },
   "solar_array_skid": {
     "display_name": "Solar Skid",
-    "description": "A tilted solar array on a skid that can be dragged to a new spot."
+    "description": "A tilted solar array on a skid."
   },
   "portable_core_drill": {
     "display_name": "Core Drill",
-    "description": "A portable drill on legs, for cutting rock cores out of the plateau."
+    "description": "A portable core drill on legs."
   },
   "ore_sorting_skip": {
     "display_name": "Sorting Skip",
-    "description": "A hopper bin on skids, heaped with plateau rock and salvaged quartz."
+    "description": "A hopper bin on skids, heaped with plateau rock and quartz."
   },
   "seismic_thumper": {
     "display_name": "Seismic Thumper",
-    "description": "A hammer weight on guide rails, for knocking on the ground."
+    "description": "A hammer weight on guide rails."
   }
 }
