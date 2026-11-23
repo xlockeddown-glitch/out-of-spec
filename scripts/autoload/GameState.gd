@@ -2266,8 +2266,9 @@ const SOIL_PROBE_TEXT_CELLS: int = 4
 
 
 ## The soil probe's readout for its inspect text: each planted cell's reading
-## (the first few, then a count of the rest), then its calibration due day.
-## "Reads beans (1, 2) 32.0 %. Cal due day 9."
+## (the first few, then a count of the rest), then its drift and band and its
+## calibration due day.
+## "Reads beans (1, 2) 32.0 %. Drift +1.30 %, IN TOLERANCE. Cal due day 9."
 func soil_probe_text() -> String:
 	var readings: PackedStringArray = []
 	for cell: Vector3i in plantings:
@@ -2281,6 +2282,9 @@ func soil_probe_text() -> String:
 		else "Reads %s." % ", ".join(readings))
 	var probe: DriftingSensor = get_sensor(SOIL_PROBE_ID)
 	if probe != null:
+		# Like the dome's displays: the drift as the last reference saw it.
+		text += " Drift %s, %s." % [probe.format_value(probe.observed_error),
+			DriftingSensor.band_label(probe.get_observed_band())]
 		text += (" CAL OVERDUE (due day %d)." if probe.is_overdue(GameClock.get_day_index())
 			else " Cal due day %d.") % probe.cal_due_day
 	return text

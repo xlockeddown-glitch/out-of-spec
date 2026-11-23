@@ -396,12 +396,31 @@ func test_soil_probe_text_caps_cells_and_flags_overdue() -> String:
 	var probe: DriftingSensor = gs.get_sensor(gs.SOIL_PROBE_ID)
 	probe.cal_due_day = GameClock.get_day_index() - 1
 	var text: String = gs.soil_probe_text()
-	var listed: int = text.count(" %,") + text.count(" %.")
+	var listed: int = text.get_slice(" more.", 0).count(" %,")
 	if problem == "" and not text.begins_with("Reads "):
 		problem = "The readout must start 'Reads ', got '%s'." % text
 	if problem == "" and (listed != gs.SOIL_PROBE_TEXT_CELLS or ", 2 more." not in text):
 		problem = "The readout must list %d cells then '2 more', got '%s'." % [gs.SOIL_PROBE_TEXT_CELLS, text]
 	if problem == "" and not text.ends_with("CAL OVERDUE (due day %d)." % probe.cal_due_day):
 		problem = "An overdue probe must say so, got '%s'." % text
+	_done(gs)
+	return problem
+
+
+## Ryan (2026-11-22): "both". The readout flags the probe's drift and band, as
+## the dome's displays do, since its soil readings sit on the set point.
+func test_soil_probe_text_flags_drift_band() -> String:
+	var gs: GameStateScript = _make_state()
+	var probe: DriftingSensor = gs.get_sensor(gs.SOIL_PROBE_ID)
+	var problem: String = ""
+	for ratio: float in [0.5, 0.9, 1.5]:
+		probe.error = probe.mpe * ratio
+		var want: String = "Drift %s, %s." % [probe.format_value(probe.observed_error),
+			DriftingSensor.band_label(probe.get_observed_band())]
+		var text: String = gs.soil_probe_text()
+		if problem == "" and want not in text:
+			problem = "At %s × MPE the readout must hold '%s', got '%s'." % [ratio, want, text]
+	if problem == "" and "OUT OF TOLERANCE" not in gs.soil_probe_text():
+		problem = "Past MPE the readout must say OUT OF TOLERANCE."
 	_done(gs)
 	return problem
