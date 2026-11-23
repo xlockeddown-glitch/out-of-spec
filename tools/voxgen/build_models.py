@@ -757,8 +757,10 @@ ENV_STANDARDS = {
 # tarantulas sized like the Curlyhair, the PX-1 rotary table, the MD-2P humidity generator and
 # the FM-3 in its carry case. Palettes as Gemini gave them, except the case's meter: Gemini
 # made it orange (O1 #E85D25), but the game's FM-3 is Ryan's yellow (field_meter_fm3 Y1), so
-# O1 takes that yellow. Built and turned like the field props; each glowing token is its own
-# emit_* part. Built only: none is placed in a scene yet.
+# O1 takes that yellow; and Gemini lit its screen teal (G1), but Ryan dropped the glow
+# ("Drop", 2026-11-22), so G1 is the blank screen of his metrology pack (F1 #2E3844).
+# Built and turned like the field props; each glowing token is its own emit_* part.
+# Built only: none is placed in a scene yet.
 ART_LOOP = {
     "mexican_redknee": ({"B1": "#2E2B30", "B2": "#473F3E", "C1": "#D8B794", "K1": "#D44E1C",
                          "K2": "#9A3A1E", "S": SHADOW}, "spider", {}),
@@ -774,8 +776,8 @@ ART_LOOP = {
                                  "N1": "#C85A2A", "G1": TEAL, "G2": AMBER, "S": SHADOW}, "prop",
                                 {"G1": "emit_display", "G2": "emit_standby_led"}),
     "fm3_field_meter_case": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "B1": "#D9A13B",
-                              "O1": "#E5B53B", "C1": "#8A94A0", "P1": "#D1D5DB", "G1": TEAL,
-                              "S": SHADOW}, "prop", {"G1": "emit_screen"}),
+                              "O1": "#E5B53B", "C1": "#8A94A0", "P1": "#D1D5DB", "G1": "#2E3844",
+                              "S": SHADOW}, "prop", {}),
 }
 
 

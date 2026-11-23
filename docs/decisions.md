@@ -834,3 +834,14 @@ Agent's notes (flagged for Ryan, not his words):
 - Ryan answered the agent's question, whether to lighten the Brazilian black tarantula's palette so it shows up in its small tank, or leave it dark.
 - Gemini's near-black body (#0E1117) read as a dark hole behind the tank's tinted glass. The body is now charcoal slate (#4A5468, with #363E4C for the darker cells), and the steel-blue sheen on the legs and back is lighter (#7C90AE and #AABCD4). The colors are the agent's choice, kept cool and grey so it still reads as a black tarantula, not as a grey one.
 - The voxel grid is unchanged; only the colors moved. The sheet keeps Gemini's original colors in its header for the record.
+
+## 2026-11-22: Drop the FM-3 case's screen glow
+
+### Ryan chose
+
+- "Drop"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan answered the agent's question, whether the FM-3 carry case's screen should stop glowing teal, to match the other metrology props, or keep the glow.
+- Gemini had lit the meter's screen teal as its own glowing part. The screen is now the blank, unlit screen of Ryan's metrology pack (#2E3844), like the loose FM-3, the LS-85 reference meter and the hygrometer. The voxel grid is unchanged.
