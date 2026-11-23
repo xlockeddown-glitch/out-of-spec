@@ -16,7 +16,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 
 config/name="Out of Spec"
 config/description="Chunky voxel life-sim: satellite-linked remote farming/mining, tarantula terrariums, satirical metrology."
-run/main_scene="res://scenes/main_farm.tscn"
+run/main_scene="res://scenes/title_menu.tscn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 
 [autoload]

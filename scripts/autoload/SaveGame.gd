@@ -10,11 +10,112 @@ extends Node
 
 ## Emitted just before a save is taken, so scenes can park their rovers.
 signal saving
+## An autosave failed; `text` says why. Shown to the player.
+signal save_failed(text: String)
 
 const MAGIC: String = "OOSSAVE1"
 const VERSION: int = 1
 const DEFAULT_PATH: String = "user://farm.save"
 const HASH_BYTES: int = 32
+
+## True once a farm was opened from the title menu. A scene run on its own (the
+## editor, tests) never autosaves over the player's farm.
+var farm_open: bool = false
+var _autosave_queued: bool = false
+
+
+func _ready() -> void:
+	GameClock.day_started.connect(_on_day_started.unbind(1))
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST and farm_open:
+		_autosave()
+
+
+## Each morning. Deferred, because a bench job can cross 06:00 partway through
+## its own changes.
+func _on_day_started() -> void:
+	if farm_open and not _autosave_queued:
+		_autosave_queued = true  # one write, however many mornings a job crosses
+		_autosave.call_deferred()
+
+
+func _autosave() -> void:
+	_autosave_queued = false
+	if not farm_open:
+		return
+	var problem: String = write()
+	if problem != "":
+		push_warning("SaveGame: " + problem)
+		save_failed.emit("SAVE FAILED: " + problem)
+
+
+## Starts a new farm and saves it. A saved farm already there is kept beside it
+## as ".old". Returns "" or why not; on a problem no farm opens and the saved
+## farm stays where it was.
+func start_new(path: String = DEFAULT_PATH) -> String:
+	farm_open = false
+	GameClock.elapsed_days = 0.0
+	GameState.new_farm()
+	# Written whole before anything is moved, so a full disk costs nothing.
+	var fresh: String = path + ".new"
+	if FileAccess.file_exists(fresh):
+		DirAccess.remove_absolute(fresh)
+	var problem: String = write(fresh)
+	if problem == "":
+		problem = read_file(fresh).get("problem", "")
+	var moved: Array[PackedStringArray] = []
+	if problem == "":
+		problem = _set_aside(path, moved)
+	if problem == "":
+		var error: Error = DirAccess.rename_absolute(fresh, path)
+		if error != OK:
+			problem = "Could not place %s (error %d)." % [path, error]
+	if problem != "":
+		moved.reverse()
+		for pair: PackedStringArray in moved:
+			DirAccess.rename_absolute(pair[1], pair[0])
+		if FileAccess.file_exists(fresh):
+			DirAccess.remove_absolute(fresh)
+		return problem
+	# Last: the old farm's other files must not back up the new one.
+	for leftover: String in [path + ".tmp", path + ".bak"]:
+		if FileAccess.file_exists(leftover):
+			DirAccess.remove_absolute(leftover)
+	farm_open = true
+	return ""
+
+
+## Opens the saved farm. Returns "" or why not.
+func continue_farm(path: String = DEFAULT_PATH) -> String:
+	var problem: String = read(path)
+	farm_open = problem == ""
+	return problem
+
+
+## The day a save's data is on.
+func day_of(data: Dictionary) -> int:
+	return floori(data["clock"]["elapsed_days"]) + 1
+
+
+## Moves the farm's files out of a new farm's way: the one that loads to ".old",
+## one that doesn't to ".unreadable". A second one that loads is left in place.
+## Adds [from, to] to `moved` for each.
+func _set_aside(path: String, moved: Array[PackedStringArray]) -> String:
+	var old_taken: bool = false
+	for file_path: String in _candidates(path):
+		var target: String = _unreadable_path(path)
+		if read_file(file_path).has("data"):
+			if old_taken:
+				continue
+			target = path + ".old"
+			old_taken = true
+		var error: Error = DirAccess.rename_absolute(file_path, target)
+		if error != OK:
+			return "Could not set aside %s (error %d)." % [file_path, error]
+		moved.append(PackedStringArray([file_path, target]))
+	return ""
 
 
 ## Everything a save holds, as plain data.
@@ -114,17 +215,28 @@ func exists(path: String = DEFAULT_PATH) -> bool:
 	return not _candidates(path).is_empty()
 
 
-## Loads the farm, or the save before it if the newest is missing or won't load.
-## Returns "" or why it failed; on a problem nothing changes.
-func read(path: String = DEFAULT_PATH) -> String:
-	var first_problem: String = ""
+## What Continue would load: { data }, with { problem } too when the newest save
+## won't load and one before it is used instead; { problem } alone when none
+## loads; {} when there is no save.
+func check(path: String = DEFAULT_PATH) -> Dictionary:
+	var found: Dictionary = {}
 	for file_path: String in _candidates(path):
 		var result: Dictionary = read_file(file_path)
 		if result.has("data"):
-			return restore(result["data"])
-		if first_problem == "":
-			first_problem = result["problem"]
-	return first_problem if first_problem != "" else "There is no saved farm."
+			found["data"] = result["data"]
+			break
+		if not found.has("problem"):
+			found["problem"] = result["problem"]
+	return found
+
+
+## Loads what check() found. Returns "" or why it failed; on a problem nothing
+## changes.
+func read(path: String = DEFAULT_PATH) -> String:
+	var found: Dictionary = check(path)
+	if found.has("data"):
+		return restore(found["data"])
+	return found.get("problem", "There is no saved farm.")
 
 
 ## { data } from a save file that can load, or { problem }.

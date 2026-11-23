@@ -892,3 +892,15 @@ Agent's notes (flagged for Ryan, not his words):
 - The file is Godot's binary form without objects, not JSON, because Godot's JSON rounds numbers and a loaded farm must continue exactly as the saved one would. It carries a format version and a SHA-256 check of its contents.
 - One save slot for now. Open for Ryan: more slots.
 - This change only adds the save code. Nothing in the game saves or loads yet.
+
+## 2026-11-22: The game opens on a title menu
+
+### Ryan chose
+
+- "Save and load (Recommended)"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The menu offers Continue (with the saved day), New farm and Quit. The clock is stopped there. Look and wording are the agent's [PLACEHOLDER].
+- The farm saves each morning and when the window closes. There is no manual save and no way back to the menu yet. Open for Ryan: both.
+- A new farm asks first when there is a saved one, then keeps that one as `farm.save.old` (one only; an earlier one is replaced). Nothing in the game opens it again.

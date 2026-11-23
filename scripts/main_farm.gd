@@ -57,6 +57,7 @@ func _ready() -> void:
 	GameState.silk_changed.connect(_on_silk_changed)
 	GameState.relay_changed.connect(_on_relay_changed)
 	GameState.phone_message.connect(_hud.push_log)
+	SaveGame.save_failed.connect(_hud.push_log)
 	GameState.credits_changed.connect(_on_credits_changed)
 	GameState.ore_changed.connect(_on_ore_changed)
 	GameState.credibility_changed.connect(_on_credibility_changed)

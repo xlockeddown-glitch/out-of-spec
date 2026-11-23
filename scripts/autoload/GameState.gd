@@ -219,17 +219,36 @@ const OFFSET_CURRENT: int = -2147483648
 
 
 func _ready() -> void:
-	# A new farm gets a new seed once; everything random follows from it.
-	set_world_seed(int(Time.get_unix_time_from_system() * 1000.0) ^ Time.get_ticks_usec())
+	_set_up_farm(_new_seed())
+	GameClock.time_advanced.connect(_on_time_advanced)
+	GameClock.clock_ran.connect(_tick_molt)
+	GameClock.day_started.connect(_on_day_started)
+	GameClock.day_started.connect(_on_day_started_regrow.unbind(1))
+
+
+## Replaces this farm with a new one. Set GameClock to 0 days first.
+func new_farm() -> void:
+	var fresh: Node = (get_script() as GDScript).new()
+	fresh._set_up_farm(_new_seed())
+	var problem: String = farm_from_dict(fresh.farm_to_dict())
+	fresh.free()
+	if problem != "":
+		push_error("GameState: the new farm did not load: " + problem)
+
+
+## A new farm gets a new seed once; everything random follows from it.
+static func _new_seed() -> int:
+	return int(Time.get_unix_time_from_system() * 1000.0) ^ Time.get_ticks_usec()
+
+
+## A farm's first morning, on a GameState that holds nothing yet.
+func _set_up_farm(p_seed: int) -> void:
+	set_world_seed(p_seed)
 	build_registry()
 	# The hygrometer's sticker already expired (due day 0), so it is overdue
 	# and out of tolerance until calibrated; everything else starts in date.
 	hygrometer.error = hygrometer.mpe * HYGROMETER_START_ERROR_RATIO
 	hygrometer.cal_due_day = 0
-	GameClock.time_advanced.connect(_on_time_advanced)
-	GameClock.clock_ran.connect(_tick_molt)
-	GameClock.day_started.connect(_on_day_started)
-	GameClock.day_started.connect(_on_day_started_regrow.unbind(1))
 	credits = int(DataManager.get_number(ECONOMY_TABLE, "starting_credits", 0.0))
 	reset_credibility()
 	_post_morning_dispatch(1)  # day 1 is already under way at boot

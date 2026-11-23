@@ -44,6 +44,7 @@ func _ready() -> void:
 		prop.inspected.connect(_toast)
 	GameState.calibration_recorded.connect(_on_calibration_recorded)
 	GameState.phone_message.connect(_on_phone_message)
+	SaveGame.save_failed.connect(_toast)
 	# An audit posts several phone lines in one frame; this fires after them,
 	# so the toast ends on a summary that names the failing instruments.
 	GameState.audit_completed.connect(_on_audit_completed)

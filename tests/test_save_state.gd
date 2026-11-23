@@ -47,7 +47,7 @@ func _worn() -> GameStateScript:
 
 
 func _clean_files() -> void:
-	for suffix: String in ["", ".bak", ".tmp", ".unreadable", ".unreadable2"]:
+	for suffix: String in ["", ".bak", ".tmp", ".unreadable", ".unreadable2", ".old", ".new", ".new.tmp"]:
 		if FileAccess.file_exists(PATH + suffix):
 			DirAccess.remove_absolute(PATH + suffix)
 
@@ -230,6 +230,68 @@ func _bad_files() -> String:
 	return ""
 
 
+func test_new_farm_starts_over_and_sets_the_old_one_aside() -> String:
+	return _with_live(_new_farm)
+
+
+func _new_farm() -> String:
+	GameClock.elapsed_days = 8.5
+	GameState.credits = -1234
+	GameState.tilled_cells[Vector3i(1, 0, 1)] = true
+	GameState.steering.add_usage(1.0e5)
+	var old_seed: int = GameState.world_seed
+	SaveGame.write(PATH)
+	SaveGame.write(PATH)
+	var problem: String = SaveGame.start_new(PATH)
+	SaveGame.farm_open = false
+	if problem != "":
+		return problem
+	var expected: GameStateScript = GameStateScript.new()
+	expected._set_up_farm(GameState.world_seed)
+	problem = _differs(expected.farm_to_dict(), GameState.farm_to_dict(), "in a new farm")
+	expected.free()
+	if problem != "":
+		return problem
+	if GameState.world_seed == old_seed or GameClock.elapsed_days != 0.0:
+		return "A new farm needs its own seed and day 1."
+	var old: Dictionary = SaveGame.read_file(PATH + ".old")
+	if not old.has("data") or old["data"]["farm"]["credits"] != -1234 or SaveGame.day_of(old["data"]) != 9:
+		return "The old farm must be kept."
+	if FileAccess.file_exists(PATH + ".bak"):
+		return "The old farm's backup must not back up the new farm."
+	return ""
+
+
+func test_the_menu_hears_about_a_save_that_does_not_load() -> String:
+	return _with_live(_menu_check)
+
+
+func _menu_check() -> String:
+	if not SaveGame.check(PATH).is_empty():
+		return "No save, nothing to check."
+	GameState.credits = 5
+	SaveGame.write(PATH)
+	SaveGame.write(PATH)
+	if SaveGame.check(PATH).has("problem"):
+		return "A good save has no problem."
+	# Whole and undamaged, but not a farm that can load.
+	var data: Dictionary = SaveGame.snapshot()
+	data["farm"].erase("credits")
+	SaveGame._write_data(data, PATH)
+	SaveGame._write_data(data, PATH)
+	var found: Dictionary = SaveGame.check(PATH)
+	if not found.has("data") or not found.has("problem") or found["data"]["farm"]["credits"] != 5:
+		return "The backup must be offered, with the problem."
+	DirAccess.remove_absolute(PATH + ".bak")
+	found = SaveGame.check(PATH)
+	if found.has("data") or not found.has("problem"):
+		return "With no backup there is only the problem."
+	GameState.credits = 6
+	if SaveGame.continue_farm(PATH) == "" or SaveGame.farm_open or GameState.credits != 6:
+		return "A farm that can't load must not open."
+	return ""
+
+
 func _damage(path: String) -> void:
 	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
 	file.store_string("damaged")
@@ -285,3 +347,43 @@ func _rover_load() -> String:
 	var parked: Vector3 = GameState.parked_rover_transform(rover.rover_id).origin
 	rover.free()
 	return "" if at == spot.origin and parked == at else "A load must move the rover and keep the place it is parked (%s, %s)." % [at, parked]
+
+
+func test_a_new_farm_that_fails_leaves_the_saved_one_alone() -> String:
+	return _with_live(_new_farm_fails)
+
+
+func _new_farm_fails() -> String:
+	for credits: int in [10, 20]:
+		GameState.credits = credits
+		SaveGame.write(PATH)
+	# A folder in the way stops the write (.new.tmp) or the move aside (.old).
+	for blocked: String in [PATH + ".new.tmp", PATH + ".old"]:
+		DirAccess.make_dir_absolute(blocked)
+		var problem: String = SaveGame.start_new(PATH)
+		DirAccess.remove_absolute(blocked)
+		if problem == "" or SaveGame.farm_open:
+			return "A new farm must not open with %s blocked." % blocked
+		if SaveGame.read_file(PATH).get("data", {}).get("farm", {}).get("credits") != 20:
+			return "The saved farm must stay, with %s blocked." % blocked
+		if SaveGame.read_file(PATH + ".bak").get("data", {}).get("farm", {}).get("credits") != 10:
+			return "The backup must stay, with %s blocked." % blocked
+	# The second move fails: the first one is undone.
+	_damage(PATH)
+	DirAccess.make_dir_absolute(PATH + ".old")
+	var problem: String = SaveGame.start_new(PATH)
+	DirAccess.remove_absolute(PATH + ".old")
+	if problem == "" or not FileAccess.file_exists(PATH) or FileAccess.file_exists(PATH + ".unreadable"):
+		return "A move aside must be undone when a later one fails."
+	return ""
+
+
+func test_only_an_open_farm_autosaves_each_morning() -> String:
+	var queued: Array[bool] = []
+	for open: bool in [false, true]:
+		SaveGame.farm_open = open
+		SaveGame._on_day_started()
+		queued.append(SaveGame._autosave_queued)
+	# The queued call runs later, when no farm is open: it must write nothing.
+	SaveGame.farm_open = false
+	return "" if queued == [false, true] else "Only an open farm may queue an autosave: %s" % [queued]
