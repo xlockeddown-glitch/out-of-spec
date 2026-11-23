@@ -21,6 +21,8 @@ signal oirm_changed
 signal credibility_changed(points: int)
 ## A crop was planted, grew, or was harvested (income milestone).
 signal crops_changed
+## A soil cell was tilled.
+signal soil_tilled(cell: Vector3i)
 ## The job board or the accepted jobs changed (paid calibration jobs).
 signal jobs_changed
 ## The lab grew, a build started or finished, or an area changed.
@@ -2254,6 +2256,16 @@ func seed_cost(crop_id: String) -> int:
 
 func crop_name(crop_id: String) -> String:
 	return str(crop(crop_id).get("name", crop_id))
+
+
+## Records a cell as tilled, so it stays tilled across scene swaps. Returns
+## false if it already was. The grid decides whether the cell is soil.
+func till(cell: Vector3i) -> bool:
+	if tilled_cells.has(cell):
+		return false
+	tilled_cells[cell] = true
+	soil_tilled.emit(cell)
+	return true
 
 
 ## Plants `crop_id` (default: the current seed) on a tilled, empty cell.
