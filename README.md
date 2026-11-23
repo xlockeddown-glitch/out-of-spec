@@ -62,7 +62,7 @@ An agent may merge a PR once all five hold and nothing in it waits on Ryan. Othe
 
 ## Run
 
-Open `project.godot` in Godot 4.7 and press F5. Main scene: `scenes/main_farm.tscn`; dome: `scenes/dome_interior.tscn`.
+Open `project.godot` in Godot 4.7 and press F5. The farm saves each morning and when the window closes, to `user://farm.save`; a scene run on its own (F6) never saves. Main scene: `scenes/title_menu.tscn` (continue or new farm); farm: `scenes/main_farm.tscn`; dome: `scenes/dome_interior.tscn`.
 
 | Input | Action |
 |---|---|

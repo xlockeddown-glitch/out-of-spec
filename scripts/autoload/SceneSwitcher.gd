@@ -5,6 +5,7 @@ extends CanvasLayer
 signal scene_swapped(path: String)
 
 const FARM_SCENE: String = "res://scenes/main_farm.tscn"
+const TITLE_SCENE: String = "res://scenes/title_menu.tscn"
 const DOME_SCENE: String = "res://scenes/dome_interior.tscn"
 const FADE_SECONDS: float = 0.1  # each way; ~0.2 s total per the Week 2 board
 
@@ -29,6 +30,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func toggle_farm_dome() -> void:
 	var current: Node = get_tree().current_scene
+	if current != null and current.scene_file_path == TITLE_SCENE:
+		return  # no farm is open yet
 	var on_dome: bool = current != null and current.scene_file_path == DOME_SCENE
 	swap_to(FARM_SCENE if on_dome else DOME_SCENE)
 

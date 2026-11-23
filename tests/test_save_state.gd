@@ -47,7 +47,7 @@ func _worn() -> GameStateScript:
 
 
 func _clean_files() -> void:
-	for suffix: String in ["", ".bak", ".tmp", ".unreadable"]:
+	for suffix: String in ["", ".bak", ".tmp", ".unreadable", ".old"]:
 		if FileAccess.file_exists(PATH + suffix):
 			DirAccess.remove_absolute(PATH + suffix)
 
@@ -222,4 +222,66 @@ func _bad_files() -> String:
 	SaveGame.write(PATH)
 	if FileAccess.file_exists(PATH + ".bak") or not FileAccess.file_exists(PATH + ".unreadable"):
 		return "A file that won't load must be set aside, not become the backup."
+	return ""
+
+
+func test_new_farm_starts_over_and_sets_the_old_one_aside() -> String:
+	return _with_live(_new_farm)
+
+
+func _new_farm() -> String:
+	GameClock.elapsed_days = 8.5
+	GameState.credits = -1234
+	GameState.tilled_cells[Vector3i(1, 0, 1)] = true
+	GameState.steering.add_usage(1.0e5)
+	var old_seed: int = GameState.world_seed
+	SaveGame.write(PATH)
+	SaveGame.write(PATH)
+	var problem: String = SaveGame.start_new(PATH)
+	SaveGame.farm_open = false
+	if problem != "":
+		return problem
+	var expected: GameStateScript = GameStateScript.new()
+	expected._set_up_farm(GameState.world_seed)
+	problem = _differs(expected.farm_to_dict(), GameState.farm_to_dict(), "in a new farm")
+	expected.free()
+	if problem != "":
+		return problem
+	if GameState.world_seed == old_seed or GameClock.elapsed_days != 0.0:
+		return "A new farm needs its own seed and day 1."
+	var old: Dictionary = SaveGame.read_file(PATH + ".old")
+	if not old.has("data") or old["data"]["farm"]["credits"] != -1234 or SaveGame.day_of(old["data"]) != 9:
+		return "The old farm must be kept."
+	if FileAccess.file_exists(PATH + ".bak"):
+		return "The old farm's backup must not back up the new farm."
+	return ""
+
+
+func test_the_menu_hears_about_a_save_that_does_not_load() -> String:
+	return _with_live(_menu_check)
+
+
+func _menu_check() -> String:
+	if not SaveGame.check(PATH).is_empty():
+		return "No save, nothing to check."
+	GameState.credits = 5
+	SaveGame.write(PATH)
+	SaveGame.write(PATH)
+	if SaveGame.check(PATH).has("problem"):
+		return "A good save has no problem."
+	# Whole and undamaged, but not a farm that can load.
+	var data: Dictionary = SaveGame.snapshot()
+	data["farm"].erase("credits")
+	SaveGame._write_data(data, PATH)
+	SaveGame._write_data(data, PATH)
+	var found: Dictionary = SaveGame.check(PATH)
+	if not found.has("data") or not found.has("problem") or found["data"]["farm"]["credits"] != 5:
+		return "The backup must be offered, with the problem."
+	DirAccess.remove_absolute(PATH + ".bak")
+	found = SaveGame.check(PATH)
+	if found.has("data") or not found.has("problem"):
+		return "With no backup there is only the problem."
+	GameState.credits = 6
+	if SaveGame.continue_farm(PATH) == "" or SaveGame.farm_open or GameState.credits != 6:
+		return "A farm that can't load must not open."
 	return ""
