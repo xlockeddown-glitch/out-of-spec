@@ -106,6 +106,8 @@ var _commands: Array[UplinkCommand] = []
 ## pressed before the tick can't change them and no press is lost.
 ## Each entry is {"seed": String, "offset": int}.
 var _till_presses: Array[Dictionary] = []
+## Where the scene puts this rover, for a farm that has not parked it yet.
+var _start_transform: Transform3D
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 
 
@@ -116,8 +118,10 @@ func _ready() -> void:
 	steering.error_changed.connect(_on_steering_error_changed)
 	GameState.upgrades_changed.connect(_apply_upgrades)
 	SaveGame.saving.connect(_park)
+	GameState.farm_loaded.connect(_unpark)
 	_apply_upgrades()
-	global_transform = GameState.parked_rover_transform(rover_id, global_transform)
+	_start_transform = global_transform
+	_unpark()
 	if satellite_relay == null:
 		push_warning("%s: no SatelliteRelay linked; uplink will read as occluded." % name)
 	if soil_grid == null:
@@ -126,6 +130,10 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	_park()
+
+
+func _unpark() -> void:
+	global_transform = GameState.parked_rover_transform(rover_id, _start_transform)
 
 
 func _park() -> void:

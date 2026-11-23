@@ -29,6 +29,16 @@ func snapshot() -> Dictionary:
 ## Restores snapshot(). Returns "" or why not; on a problem nothing changes.
 ## Scenes must reload afterward (they read GameState when they open).
 func restore(data: Dictionary) -> String:
+	var problem: String = data_problem(data)
+	if problem != "":
+		return problem
+	# The clock first, so listeners see the loaded day.
+	GameClock.elapsed_days = data["clock"]["elapsed_days"]
+	return GameState.farm_from_dict(data["farm"])
+
+
+## Why `data` can't load, or "" if it can. Changes nothing.
+func data_problem(data: Dictionary) -> String:
 	var clock: Variant = data.get("clock")
 	var farm: Variant = data.get("farm")
 	if typeof(clock) != TYPE_DICTIONARY or typeof(farm) != TYPE_DICTIONARY:
@@ -36,18 +46,18 @@ func restore(data: Dictionary) -> String:
 	var elapsed: Variant = clock.get("elapsed_days")
 	if typeof(elapsed) != TYPE_FLOAT or not is_finite(elapsed) or elapsed < 0.0:
 		return "The save's clock is bad."
-	var problem: String = GameState.farm_dict_problem(farm)
-	if problem != "":
-		return problem
-	# The clock first, so listeners see the loaded day.
-	GameClock.elapsed_days = elapsed
-	return GameState.farm_from_dict(farm)
+	return GameState.farm_dict_problem(farm)
 
 
 ## Saves the farm. The save before it is kept beside it as ".bak". Returns ""
 ## or why it failed.
 func write(path: String = DEFAULT_PATH) -> String:
-	return _write_data(snapshot(), path)
+	var data: Dictionary = snapshot()
+	# A farm that could not load again must not replace one that can.
+	var problem: String = data_problem(data)
+	if problem != "":
+		return "The farm can't be saved: " + problem
+	return _write_data(data, path)
 
 
 func _write_data(data: Dictionary, path: String) -> String:
@@ -68,36 +78,56 @@ func _write_data(data: Dictionary, path: String) -> String:
 	if FileAccess.file_exists(path):
 		# A file this game can't read (damaged, or from a newer version) is set
 		# aside: it must not replace a good backup, or be lost.
-		var aside: String = ".bak" if read_file(path).has("data") else ".unreadable"
-		var aside_error: Error = DirAccess.rename_absolute(path, path + aside)
+		var aside: String = path + ".bak" if read_file(path).has("data") else _unreadable_path(path)
+		var aside_error: Error = DirAccess.rename_absolute(path, aside)
 		if aside_error != OK:
 			return "Could not back up %s (error %d)." % [path, aside_error]
+	# Stopped here, the farm is in the temporary file; _candidates() finds it.
 	var move_error: Error = DirAccess.rename_absolute(temp, path)
 	if move_error != OK:
 		return "Could not replace %s (error %d)." % [path, move_error]
 	return ""
 
 
-## True if there is a save or a backup to load.
+## A name for a file that can't be read. One set aside earlier is kept.
+func _unreadable_path(path: String) -> String:
+	var aside: String = path + ".unreadable"
+	var number: int = 2
+	while FileAccess.file_exists(aside):
+		aside = "%s.unreadable%d" % [path, number]
+		number += 1
+	return aside
+
+
+## The files that can hold the farm, newest first. The temporary file counts
+## only while the save is missing: a write stopped between its two renames.
+func _candidates(path: String) -> Array[String]:
+	var found: Array[String] = []
+	for file_path: String in [path, path + ".tmp", path + ".bak"]:
+		if FileAccess.file_exists(file_path) and not (file_path == path + ".tmp" and path in found):
+			found.append(file_path)
+	return found
+
+
+## True if there is a save, or a file that stands in for one, to try.
 func exists(path: String = DEFAULT_PATH) -> bool:
-	return FileAccess.file_exists(path) or FileAccess.file_exists(path + ".bak")
+	return not _candidates(path).is_empty()
 
 
-## Loads the farm, or the backup if the save is missing or won't load.
+## Loads the farm, or the save before it if the newest is missing or won't load.
 ## Returns "" or why it failed; on a problem nothing changes.
 func read(path: String = DEFAULT_PATH) -> String:
-	var problem: String = _read_one(path)
-	if problem != "" and FileAccess.file_exists(path + ".bak") and _read_one(path + ".bak") == "":
-		return ""
-	return problem
+	var first_problem: String = ""
+	for file_path: String in _candidates(path):
+		var result: Dictionary = read_file(file_path)
+		if result.has("data"):
+			return restore(result["data"])
+		if first_problem == "":
+			first_problem = result["problem"]
+	return first_problem if first_problem != "" else "There is no saved farm."
 
 
-func _read_one(path: String) -> String:
-	var result: Dictionary = read_file(path)
-	return restore(result["data"]) if result.has("data") else str(result["problem"])
-
-
-## { data } from a save file, or { problem }.
+## { data } from a save file that can load, or { problem }.
 func read_file(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return { "problem": "%s does not exist." % path }
@@ -114,6 +144,9 @@ func read_file(path: String) -> Dictionary:
 	var data: Variant = bytes_to_var(payload)
 	if typeof(data) != TYPE_DICTIONARY:
 		return { "problem": "%s holds no farm." % path }
+	var problem: String = data_problem(data)
+	if problem != "":
+		return { "problem": "%s can't load: %s" % [path, problem] }
 	return { "data": data }
 
 
