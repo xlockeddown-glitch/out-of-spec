@@ -170,6 +170,8 @@ func _on_instrument_selected(index: int) -> void:
 
 
 func _show_send() -> void:
+	if GameState.is_relay_disciplined(_current_id):
+		return  # it never goes to OIRM
 	_send_button.show()
 	_send_button.text = ("SEND TO OIRM (%s CR)" % SP811.integer(GameState.oirm_fee()) if GameState.drop_pod_present
 		else "SEND BY COURIER (%s CR)" % SP811.integer(GameState.oirm_fee() + GameState.oirm_courier_surcharge()))
@@ -196,7 +198,12 @@ func _show_standard(sensor: DriftingSensor) -> void:
 	_calibrate_button.hide()
 	_result_label.remove_theme_color_override("font_color")
 	var today: int = GameClock.get_day_index()
-	if GameState.at_oirm.has(_current_id):
+	if sensor.relay_disciplined:
+		var locked: bool = GameState.is_relay_locked(_current_id)
+		_found_band.text = "LOCKED" if locked else "HOLDOVER"
+		_result_label.text = ("Locked to OIRM time over the relay." if locked
+			else "No line of sight to the relay: in holdover. %s" % _due_text(sensor, today))
+	elif GameState.at_oirm.has(_current_id):
 		_result_label.text = "At OIRM. Back on day %d." % GameState.at_oirm[_current_id]
 	elif not GameState.drop_pod_present:
 		_result_label.text = "No drop pod today. By courier it is back on day %d (fee + %s CR surcharge), or wait for the day %d pod (fee only). %s" % [

@@ -62,6 +62,8 @@ var maker: String = ""
 ## Who sells it: "bram" or "kestrel"; "" = not sold (or only by contract).
 var seller: String = ""
 var certificate_prefix: String = ""
+## Standards only: locked to OIRM time through the orbital relay (the Rb-2D).
+var relay_disciplined: bool = false
 ## Maximum permissible error, in `error_unit`.
 var mpe: float = 1.0
 var acceptance_ratio: float = 0.8
@@ -150,6 +152,7 @@ static func from_config(p_instrument_id: String, p_max_error: float = INF) -> Dr
 	sensor.price_credits = int(DataManager.get_number(CONFIG_TABLE, base + "/price_credits", 0.0))
 	sensor.price_ore = int(DataManager.get_number(CONFIG_TABLE, base + "/price_ore", 0.0))
 	sensor.seller = str(DataManager.get_value(CONFIG_TABLE, base + "/seller", ""))
+	sensor.relay_disciplined = DataManager.get_value(CONFIG_TABLE, base + "/relay_disciplined", false) == true
 	sensor.maker = str(DataManager.get_value(CONFIG_TABLE, base + "/maker", ""))
 	sensor.certificate_prefix = str(DataManager.get_value(CONFIG_TABLE, base + "/certificate_prefix", ""))
 	sensor.acceptance_ratio = DataManager.get_number(

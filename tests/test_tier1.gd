@@ -79,7 +79,7 @@ func test_buy_standard_gate_cost_and_certificate() -> String:
 	elif problem == "" and gs.buy_standard(FM3) == "":
 		problem = "The same standard can't be bought twice."
 	elif problem == "" and gs.unit_ids().has("relay_timebase"):
-		problem = "The relay timebase has no standard until M3b."
+		problem = "The relay timebase has no standard until the Rb-2D arrives."
 	var chain: Dictionary = gs.traceability_chain(FM3)
 	if problem == "" and (not chain["traceable"] or not str(chain["text"]).contains("Arsia Fieldworks")):
 		problem = "FM-3 must trace through its maker to OIRM: %s" % chain
@@ -111,7 +111,7 @@ func test_out_of_service_units_do_not_drift() -> String:
 	if problem == "" and absf(absf(dome.error) - dome.daily_drift_rate) > 1.0e-9:
 		problem = "The dome gauge must drift once the WD-1 is on the colony, got %s." % dome.error
 	if problem == "" and gs.get_sensor("relay_timebase").error != 0.0:
-		problem = "The relay timebase stays out of service until M3b."
+		problem = "The relay timebase stays out of service until the Rb-2D arrives."
 	gs.free()
 	return problem
 
