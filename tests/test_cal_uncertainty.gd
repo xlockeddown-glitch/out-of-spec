@@ -181,7 +181,7 @@ func test_remote_zero_is_untraceable() -> String:
 	var before_interval: int = gs.steering.cal_interval_days
 	var before_due: int = gs.steering.cal_due_day
 	var before_last: int = gs.steering.last_cal_day
-	var record: Dictionary = gs.calibrate(gs.STEERING_ID, "You", false)
+	var record: Dictionary = gs.calibrate(gs.STEERING_ID, gs.local_player_id, false)
 	var after_error: float = gs.steering.error
 	var schedule_kept: bool = (gs.steering.cal_interval_days == before_interval
 		and gs.steering.cal_due_day == before_due and gs.steering.last_cal_day == before_last)
@@ -268,7 +268,7 @@ func test_remote_zero_blocks_the_next_bench_lengthening() -> String:
 	_set_day(unit.cal_due_day)
 	standard.error = 0.0
 	unit.error = unit.mpe * 2.0
-	gs.calibrate(gs.STEERING_ID, "You", false)  # remote zero hides the FAIL
+	gs.calibrate(gs.STEERING_ID, gs.local_player_id, false)  # remote zero hides the FAIL
 	var record: Dictionary = gs.calibrate(gs.STEERING_ID)  # on-time bench pass
 	GameClock.elapsed_days = saved
 	gs.free()
@@ -321,7 +321,7 @@ func test_remote_zero_keeps_the_bench_offset() -> String:
 	var seen: Array[float] = []
 	var listener: Callable = func(_e: float, _b: int) -> void: seen.append(unit.observed_error)
 	unit.error_changed.connect(listener)
-	var record: Dictionary = gs.calibrate(gs.STEERING_ID, "You", false)  # remote zero
+	var record: Dictionary = gs.calibrate(gs.STEERING_ID, gs.local_player_id, false)  # remote zero
 	unit.error_changed.disconnect(listener)
 	var offset: float = unit.reference_offset
 	var true_error: float = unit.error

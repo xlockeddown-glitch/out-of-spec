@@ -198,7 +198,7 @@ func test_contract_offer_run_and_reset() -> String:
 	gs.calibrate(UNIT)
 	if problem == "" and gs.contract_run != 2:
 		problem = "A repeat within the interval must not count, got %d." % gs.contract_run
-	_calibrate_after_interval(gs, "Manager")
+	_calibrate_after_interval(gs, gs.MANAGER_ID)
 	if problem == "" and gs.contract_run != 2:
 		problem = "The Manager's calibration must not count toward the run, got %d." % gs.contract_run
 	gs.get_sensor(UNIT).cal_due_day = DAY - 1

@@ -39,6 +39,11 @@ const DRIFT_TABLE: StringName = &"sensor_drift_config"
 const DISPATCH_TABLE: StringName = &"dialogue_dispatches"
 const CROPS_TABLE: StringName = &"crops"
 const SOIL_PROBE_ID: String = "soil_probe"
+## Who did a calibration when it wasn't a player: the manager's grace cal.
+## Player ids must never be this or LEGACY_LOCAL_PERFORMER.
+const MANAGER_ID: String = "Manager"
+## What calibration records said before players had ids.
+const LEGACY_LOCAL_PERFORMER: String = "You"
 ## Set-point step for [ and ], as a volumetric fraction (1 %).
 const SETPOINT_STEP: float = 0.01
 ## Moisture exactly on a band edge counts as in band despite float rounding.
@@ -62,6 +67,10 @@ const EXUVIA_LINGER_DAYS: int = 1
 const HYGROMETER_START_ERROR_RATIO: float = 1.12
 ## Clamp on |error| as a multiple of MPE.
 const MAX_ERROR_MPE_MULTIPLE: float = 3.0
+
+## Id of the player on this machine, used wherever something belongs to a
+## person. Co-op will assign one per player.
+var local_player_id: String = "player_1"
 
 ## Every instrument in sensor_drift_config/instruments, units and standards,
 ## in data order: instrument_id -> DriftingSensor. Built by build_registry().
@@ -391,6 +400,15 @@ func instrument_name(instrument_id: String, full: bool = false) -> String:
 	return sensor.display_name if full else sensor.short_name
 
 
+## Name to show for a calibration record's `performed_by`: "You" for the local
+## player (and for records made before ids), otherwise the id itself.
+## Other players' display names come with co-op.
+func performer_name(performed_by: String) -> String:
+	if performed_by == "" or performed_by == local_player_id or performed_by == LEGACY_LOCAL_PERFORMER:
+		return LEGACY_LOCAL_PERFORMER
+	return performed_by
+
+
 ## Uncertainty budget for calibrating `instrument_id` against its standard
 ## right now (see CalUncertainty.budget). Empty if it has no standard.
 func calibration_budget(instrument_id: String) -> Dictionary:
@@ -417,8 +435,11 @@ func calibration_budget(instrument_id: String) -> Dictionary:
 ## zero is untraceable: it adjusts the unit but is not a calibration, so the
 ## interval, due day and last calibration day stay as they were.
 ## `bench_minutes` is copied onto the record (0 off the bench).
-func calibrate(instrument_id: String, performed_by: String = "You", use_standard: bool = true,
+## `performed_by` is a player id or MANAGER_ID; "" means the local player.
+func calibrate(instrument_id: String, performed_by: String = "", use_standard: bool = true,
 		bench_minutes: float = 0.0) -> Dictionary:
+	if performed_by == "":
+		performed_by = local_player_id
 	var sensor: DriftingSensor = get_sensor(instrument_id)
 	if sensor == null:
 		push_warning("GameState.calibrate: unknown instrument '%s'." % instrument_id)
@@ -534,13 +555,14 @@ func calibrate(instrument_id: String, performed_by: String = "You", use_standard
 
 ## The player's bench calibration: calibrate() against the standard, then the
 ## bench time passes on the game clock (instruments keep drifting meanwhile).
-## The record gains "bench_minutes". A refused calibration takes no time.
-func calibrate_at_bench(instrument_id: String) -> Dictionary:
+## The record gains "bench_minutes". `performed_by` is as in calibrate(). A
+## refused calibration takes no time.
+func calibrate_at_bench(instrument_id: String, performed_by: String = "") -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(instrument_id)
 	if sensor == null:
 		return {}
 	var minutes: float = sensor.bench_minutes
-	var record: Dictionary = calibrate(instrument_id, "You", true, minutes)
+	var record: Dictionary = calibrate(instrument_id, performed_by, true, minutes)
 	if record.is_empty() or record.get("refused", false):
 		return record
 	if minutes > 0.0:
@@ -734,8 +756,8 @@ func _apply_audit_grace(report: Dictionary) -> void:
 			# without one (untraceable) rather than claim a calibration that didn't happen.
 			# Standards are only calibrated at OIRM, so theirs are waived as they are.
 			if get_sensor(line["instrument_id"]).role != "standard" \
-					and calibrate(line["instrument_id"], "Manager").get("refused", false):
-				calibrate(line["instrument_id"], "Manager", false)
+					and calibrate(line["instrument_id"], MANAGER_ID).get("refused", false):
+				calibrate(line["instrument_id"], MANAGER_ID, false)
 			line["fine"] = 0
 			line["waived"] = true
 			if get_sensor(line["instrument_id"]).role == "standard":
@@ -1436,7 +1458,7 @@ func _excused_until_audit(unit_id: String, day: int) -> bool:
 func _credibility_after_calibration(record: Dictionary) -> void:
 	if record.get("standard_overdue", false):
 		change_credibility(int(_cred_number("overdue_standard_used_points", -5.0)))
-	if contract_state != "active" or record.get("performed_by", "") == "Manager":
+	if contract_state != "active" or record.get("performed_by", "") == MANAGER_ID:
 		return
 	var needed: int = contract_run_needed()
 	var good: bool = record.get("on_time", false) and record.get("traceable", false)
