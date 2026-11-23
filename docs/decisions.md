@@ -727,6 +727,6 @@ Agent's notes (flagged for Ryan, not his words):
 
 ### Agent's notes (flagged for Ryan, not his words)
 
-- Ryan's answer was to "soil probe reads the plot, or the bench's dead upright strip". This entry covers the strip; the soil probe gets its own entry and PR.
-- The strip is the clamp stand in the calibration station model, holding the hygrometer under test. It now has its own box in the bench click area (0.5 m × 0.6 m × 0.2 m, from the deck up to the stand's crossbar), so clicking it opens the calibration bench like the rest of the station.
-- Measured by casting a picking ray every 2 px from the dome camera: the dry well, chilled-mirror hygrometer and field meter keep the same pixel counts as before (288, 309 and 96), so the new box hides none of them. The box's back corner shows a few pixels past the crossbar against the wall.
+- Ryan answered the agent's question, whether the soil probe should read the plot or the bench's dead upright strip be fixed. This entry covers the strip; the soil probe gets its own entry and PR.
+- The strip is the clamp stand in the calibration station model, holding the hygrometer under test. It now has its own box in the bench click area (0.5 m × 0.6 m × 0.2 m, from the deck up to the stand's crossbar), so clicking it opens the calibration bench like the rest of the station. This reverses the inspectable props entry, which left the strip out so it would not hide the dry well; the new box sits at least 0.37 m from the dry well.
+- Measured by casting a picking ray every 2 px from the dome camera: the dry well, chilled-mirror hygrometer and field meter keep the same pixel counts with and without the box (288, 309 and 96 at this step, so they differ from the inspectable props entry's counts), so the new box hides none of them. The box is flush with the crossbar's top and back; it reaches 0.1 m in front of it and past its end, where the hygrometer clamp sits.
