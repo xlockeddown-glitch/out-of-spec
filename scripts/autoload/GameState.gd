@@ -345,11 +345,11 @@ const FIELD_CAL_IDS: Array[String] = [TIRE_ID, STEERING_ID]
 
 ## FIELD_CAL_IDS whose standard is on the colony.
 func field_cal_ready() -> Array[String]:
-	var ready: Array[String] = []
+	var offered: Array[String] = []
 	for id: String in FIELD_CAL_IDS:
 		if is_in_service(id):
-			ready.append(id)
-	return ready
+			offered.append(id)
+	return offered
 
 
 func _ids_with_role(role: String) -> Array[String]:

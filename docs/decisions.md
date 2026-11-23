@@ -715,6 +715,6 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - This is the second half of "both" (the first is the phone-log entry above). Parking on the farm's field calibration pad and pressing E now calibrates the steering encoder on the encoder jig against the PX-1 rotary table, then the tire gauge against the WD-1 if it is owned. Before, the pad did only the tire gauge and steering was calibrated only at the dome bench, which still works.
-- It is the same calibration as at the bench: same standard, uncertainty budget, refusals, result and bench time (30 min for steering, on the game clock). The rover must be stopped on the pad.
+- It is the same calibration as at the bench: same standard, uncertainty budget, refusals, result and bench time (30 min for steering [PLACEHOLDER], on the game clock). The rover must be stopped on the pad.
 - The PX-1 is a Tier 0 standard the colony starts with, so steering is offered from day 1. Instruments without a standard are skipped, and the entry line says the tire gauge still needs the WD-1.
 - The list of pad instruments is `GameState.FIELD_CAL_IDS`, with a test that steering is offered alone before the WD-1 and with the tire gauge after.

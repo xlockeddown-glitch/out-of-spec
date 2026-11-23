@@ -261,13 +261,16 @@ func _on_ore_changed(ore: int) -> void:
 		_refresh_bram()
 
 
+const NO_FIELD_STANDARD: String = "FIELD CAL PAD: no reference standard on the colony for the pad's instruments."
+
+
 func _on_rover_entered_cal_pad() -> void:
-	var ready: Array[String] = GameState.field_cal_ready()
-	if ready.is_empty():
-		_hud.push_log("FIELD CAL PAD: no standard on the colony yet. Bram sells the WD-1 for the tire gauge.")
+	var offered: Array[String] = GameState.field_cal_ready()
+	if offered.is_empty():
+		_hud.push_log(NO_FIELD_STANDARD)
 		return
 	var names: PackedStringArray = []
-	for id: String in ready:
+	for id: String in offered:
 		names.append(GameState.instrument_name(id).to_lower())
 	var line: String = "FIELD CAL PAD: press E to calibrate %s." % " and ".join(names)
 	if not GameState.is_in_service(GameState.TIRE_ID):
@@ -279,8 +282,11 @@ func _try_field_cal() -> void:
 	if not _rover.is_stopped():
 		_hud.push_log("FIELD CAL PAD: stop the rover on the pad first.")
 		return
-	# The entry line already says which instruments still lack a standard.
-	for id: String in GameState.field_cal_ready():
+	var offered: Array[String] = GameState.field_cal_ready()
+	if offered.is_empty():
+		_hud.push_log(NO_FIELD_STANDARD)
+		return
+	for id: String in offered:
 		_field_cal_one(id)
 
 
