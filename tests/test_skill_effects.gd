@@ -149,4 +149,5 @@ func _check_text(gs: GameStateScript) -> String:
 		_level(gs, id, gs.max_skill_level())
 		if not gs.skill_text(id).contains("top level"):
 			return gs.skill_text(id)
-	return "" if not gs.skill_effects_text("husbandry").contains("Level 3") else "A reached unlock shows no level."
+	# At the top level every unlock is open, so none says the level it opens at.
+	return "" if not gs.skill_effects_text("husbandry").contains("Level 3") else "An open unlock must not say its level."

@@ -135,8 +135,7 @@ func _check_audit(gs: GameStateScript) -> String:
 	for line: String in gs.phone_log:
 		if line.contains("HM-3") and line.contains("certificate missing") and line.contains("OVERDUE"):
 			return ""
-	return "The audit must flag it: %s" % "
-".join(gs.phone_log)
+	return "The audit must flag it: %s" % "\n".join(gs.phone_log)
 
 
 func test_contract_closes_when_bought() -> String:
@@ -172,3 +171,27 @@ func _check_jobs(gs: GameStateScript) -> String:
 		return "A certified WD-1 must come before an uncertified HB-700: %s" % [gs.job_standards(job)]
 	gs.oirm_calibrate(HB700, GameClock.get_day_index())
 	return "" if gs.job_standards(job)[0] == HB700 else "Certified, the higher tier comes first."
+
+
+func test_an_uncertified_standard_survives_a_save_and_costs_credibility() -> String:
+	return _run(_check_uncertified_lasts)
+
+
+func _check_uncertified_lasts(gs: GameStateScript) -> String:
+	_open_tier2(gs)
+	gs.buy_from_kestrel(HM3)
+	if gs.farm_from_dict(gs.farm_to_dict()) != "" or gs.standard_problem(HM3) != "without a certificate":
+		return "A loaded farm's HM-3 must still have no certificate."
+	# In date except the HM-3, so only it is charged.
+	var day: int = GameClock.get_day_index()
+	for id: String in gs.unit_ids() + gs.standard_ids():
+		if id != HM3:
+			gs.get_sensor(id).cal_due_day = day + 10
+	gs.reset_credibility()
+	var start: int = gs.credibility
+	gs._charge_overdue_credibility(day)
+	if gs.credibility != start:
+		return "The night it is bought costs nothing."
+	gs._charge_overdue_credibility(day + 1)
+	var each: int = int(gs._cred_number("overdue_points_per_instrument_day", 0.0))
+	return "" if each != 0 and gs.credibility == start + each else "From the next day it counts as one overdue instrument."

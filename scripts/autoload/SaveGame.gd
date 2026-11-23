@@ -17,6 +17,8 @@ const MAGIC: String = "OOSSAVE1"
 const VERSION: int = 1
 const DEFAULT_PATH: String = "user://farm.save"
 const HASH_BYTES: int = 32
+## An earlier ".old", held until the new farm is in place.
+const PREVIOUS_OLD: String = ".old.prev"
 
 ## True once a farm was opened from the title menu. A scene run on its own (the
 ## editor, tests) never autosaves over the player's farm.
@@ -75,12 +77,15 @@ func start_new(path: String = DEFAULT_PATH) -> String:
 	if problem != "":
 		moved.reverse()
 		for pair: PackedStringArray in moved:
-			DirAccess.rename_absolute(pair[1], pair[0])
-		if FileAccess.file_exists(fresh):
-			DirAccess.remove_absolute(fresh)
+			# Stops at one that fails: the next could replace a farm still there.
+			if DirAccess.rename_absolute(pair[1], pair[0]) != OK:
+				break
+		for leftover: String in [fresh, fresh + ".tmp"]:
+			if FileAccess.file_exists(leftover):
+				DirAccess.remove_absolute(leftover)
 		return problem
 	# Last: the old farm's other files must not back up the new one.
-	for leftover: String in [path + ".tmp", path + ".bak"]:
+	for leftover: String in [path + ".tmp", path + ".bak", path + PREVIOUS_OLD]:
 		if FileAccess.file_exists(leftover):
 			DirAccess.remove_absolute(leftover)
 	farm_open = true
@@ -111,6 +116,12 @@ func _set_aside(path: String, moved: Array[PackedStringArray]) -> String:
 				continue
 			target = path + ".old"
 			old_taken = true
+			if FileAccess.file_exists(target):
+				var previous: String = path + PREVIOUS_OLD
+				var previous_error: Error = DirAccess.rename_absolute(target, previous)
+				if previous_error != OK:
+					return "Could not set aside %s (error %d)." % [target, previous_error]
+				moved.append(PackedStringArray([target, previous]))
 		var error: Error = DirAccess.rename_absolute(file_path, target)
 		if error != OK:
 			return "Could not set aside %s (error %d)." % [file_path, error]

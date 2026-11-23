@@ -203,8 +203,7 @@ func _toast(text: String) -> void:
 	# after the same time jump) both stay on screen.
 	var frame: int = Engine.get_process_frames()
 	if frame == _toast_frame and _toast_left > 0.0:
-		_hint_label.text += "
-" + text
+		_hint_label.text += "\n" + text
 	else:
 		_hint_label.text = text
 	_toast_frame = frame

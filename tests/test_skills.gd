@@ -198,3 +198,39 @@ func _check_save(gs: GameStateScript) -> String:
 	data.erase("player_skill_xp")
 	data.erase("farm_skill_xp")
 	return "" if gs.farm_from_dict(data) == "" and gs.skill_xp("instrumentation") == 0 else "An older save starts at no XP."
+
+
+func test_xp_is_announced_and_keyed_by_player() -> String:
+	return _run(_check_announced)
+
+
+func _check_announced(gs: GameStateScript) -> String:
+	var seen: Array = []
+	gs.skill_xp_changed.connect(func(player: String, skill: String) -> void: seen.append([player, skill]))
+	gs.local_player_id = "player_2"
+	gs.till(Vector3i(1, 0, 1))
+	gs.buy_standard(FM3)
+	if seen != [["player_2", "field_ops"], ["", "instrumentation"]]:
+		return "Each gain must be announced: %s" % [seen]
+	var data: Dictionary = gs.farm_to_dict()
+	gs.local_player_id = "player_1"
+	if gs.farm_from_dict(data) != "" or gs.local_player_id != "player_1" or gs.skill_xp("field_ops") != 0:
+		return "A save must not change who plays here, or whose XP it is."
+	return "" if gs.skill_xp("field_ops", "player_2") == _xp("till") else "The saved player's XP must stay theirs."
+
+
+func test_late_but_in_tolerance() -> String:
+	return _run(_check_late)
+
+
+func _check_late(gs: GameStateScript) -> String:
+	gs.buy_standard(WD1)
+	var tire: DriftingSensor = gs.get_sensor(gs.TIRE_ID)
+	tire.last_cal_day = -1
+	tire.cal_due_day = 0
+	tire.error = 0.0
+	var record: Dictionary = gs.calibrate(gs.TIRE_ID)
+	var clean: int = _xp("calibrate_clean_tur") if record["tur"] >= CalUncertainty.tur_clean() else 0
+	if gs.skill_xp("calibration") != _xp("calibrate_player") or gs.skill_xp("uncertainty") != clean:
+		return "Late, and in tolerance: no find, not on time: %s" % gs.player_skill_xp
+	return ""
