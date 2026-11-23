@@ -1139,7 +1139,7 @@ func _sync_robot_sensors(of_robots: Dictionary) -> void:
 
 
 ## Why a save's robots can't load, or "".
-static func _robots_dict_problem(saved: Dictionary) -> String:
+func _robots_dict_problem(saved: Dictionary) -> String:
 	for id: Variant in saved:
 		var robot: Variant = saved[id]
 		if typeof(id) != TYPE_STRING or id == "" or "@" in id:
@@ -1149,6 +1149,8 @@ static func _robots_dict_problem(saved: Dictionary) -> String:
 		for key: String in ["frame", "name", "state", "ordered_by"]:
 			if typeof(robot.get(key)) != TYPE_STRING:
 				return "Robot '%s' has no %s." % [id, key]
+		if robot_frame(robot["frame"]).is_empty():
+			return "Robot '%s' has an unknown frame." % id
 		if not robot["state"] in ROBOT_STATES or typeof(robot.get("done_day")) != TYPE_INT:
 			return "Robot '%s' has a bad state or done_day." % id
 	return ""
@@ -1215,7 +1217,10 @@ func build_robot(frame_id: String, player_id: String = "") -> String:
 		optical_silk_spools -= 1
 		_spool_species.pop_front()
 	silk_changed.emit(optical_silk_spools)
-	var id: String = "%s-%d" % [frame.get("id_prefix", "R"), robots.size() + 1]
+	var number: int = robots.size() + 1
+	while robots.has("%s-%d" % [frame.get("id_prefix", "R"), number]):
+		number += 1
+	var id: String = "%s-%d" % [frame.get("id_prefix", "R"), number]
 	robots[id] = {
 		"frame": frame_id,
 		"name": "%s %s" % [frame.get("display_name", frame_id), id],

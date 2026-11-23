@@ -237,7 +237,7 @@ func _check_loads(gs: GameStateScript, other: GameStateScript, data: Dictionary,
 		return "A loaded sensor must drift like the saved one."
 	if gs.farm_from_dict(data) != "" or gs.get_sensor(SENSORS[3]) != held or held.error != error:
 		return "A sensor the farm already has is restored in place."
-	for change: Array in [["state", "flying"], ["state", 1], ["done_day", 1.5], ["frame", null], ["name", 3], ["ordered_by", 3]]:
+	for change: Array in [["state", "flying"], ["state", 1], ["done_day", 1.5], ["frame", null], ["frame", "no_such_frame"], ["name", 3], ["ordered_by", 3]]:
 		var bad: Dictionary = data.duplicate(true)
 		bad["robots"]["TR-1"][change[0]] = change[1]
 		if gs.farm_dict_problem(bad) == "":
@@ -255,3 +255,18 @@ func _check_loads(gs: GameStateScript, other: GameStateScript, data: Dictionary,
 		return "A save without robots has none."
 	# And a farm with no robots checks an incoming robot's sensors too.
 	return "A bad robot sensor must be refused." if other.farm_dict_problem(broken) == "" else ""
+
+
+func test_new_robot_keeps_existing_ids() -> String:
+	return _run(_check_ids)
+
+
+func _check_ids(gs: GameStateScript) -> String:
+	_built(gs)
+	gs.robots["TR-2"] = gs.robots["TR-1"]
+	gs.robots.erase("TR-1")
+	gs.farm_skill_xp["robotics"] = 1000000.0
+	var problem: String = gs.build_robot("trellis")
+	if problem != "":
+		return problem
+	return "" if gs.robots.size() == 2 and gs.robots["TR-2"]["state"] == "commissioning" else "A new robot must not replace one."
