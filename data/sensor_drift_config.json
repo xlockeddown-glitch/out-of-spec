@@ -187,7 +187,7 @@
       "seller": "kestrel",
       "maker": "Halvorsen-Mbeki",
       "certificate_prefix": "HM",
-      "_note": "Tier 2 (spec section 1.4 #3): calibrates the FM-3 on the bench. Sold by Kestrel, who does not trade yet, so it can't be bought for now. The MPE is the cited best-case DC voltage class spec, 6 µV/V (1 year, 95 %), at the 10 V test point; the floor and other ranges are not modeled. Certificate uncertainty, drift (MPE in about 120 days), resolution, price and interval are [PLACEHOLDER]."
+      "_note": "Tier 2 (spec section 1.4 #3): calibrates the FM-3 on the bench. Sold by Kestrel on solar flare nights, with no certificate. The MPE is the cited best-case DC voltage class spec, 6 µV/V (1 year, 95 %), at the 10 V test point; the floor and other ranges are not modeled. Certificate uncertainty, drift (MPE in about 120 days), resolution, price and interval are [PLACEHOLDER]."
     },
     "torque_standard": {
       "role": "standard",
@@ -230,7 +230,7 @@
       "maker": "Hellas Basin Controls",
       "certificate_prefix": "HB",
       "takes_over": ["dome_pressure"],
-      "_note": "Tier 3 bench pressure controller (spec section 1.4 #6), offered early and at a discount by the first OIRM credibility contract (Ryan, 2026-11-22). Cited class spec: 0.008 % of reading (Mensor CPC8000 IntelliScale), about 0.008 kPa at a 100 kPa dome reading; the 0.01 kPa MPE rounds that up and is [PLACEHOLDER], as are the certificate uncertainty, drift (MPE in about 120 days), price and interval. takes_over: units whose standard becomes this one when it is bought (the dome gauge, which only reaches 3.11:1 against the WD-1). The tire gauge stays on the WD-1 for field calibration. It also calibrates the WD-1 on the bench. Outside the contract it is Kestrel's to sell [ASSUMPTION], who does not trade yet."
+      "_note": "Tier 3 bench pressure controller (spec section 1.4 #6), offered early and at a discount by the first OIRM credibility contract (Ryan, 2026-11-22). Cited class spec: 0.008 % of reading (Mensor CPC8000 IntelliScale), about 0.008 kPa at a 100 kPa dome reading; the 0.01 kPa MPE rounds that up and is [PLACEHOLDER], as are the certificate uncertainty, drift (MPE in about 120 days), price and interval. takes_over: units whose standard becomes this one when it is bought (the dome gauge, which only reaches 3.11:1 against the WD-1). The tire gauge stays on the WD-1 for field calibration. It also calibrates the WD-1 on the bench. Outside the contract it is Kestrel's to sell [ASSUMPTION]."
     },
     "rubidium_reference": {
       "role": "standard",
@@ -307,6 +307,13 @@
     "aud1t_tire_limit_kpa": 6.9,
     "aud1t_tire_credits": 20,
     "_note": "suspect_cal_credits: a unit whose calibration was made suspect by a recall and not redone before the audit (milestone 2). Placeholder. aud1t_tire_*: AUD-1T measures the rover tires on audit day (Ryan, 2026-11-22: 'AUD-1T's own line'); tires are filled to what the tire gauge reads, so they sit off the set point by minus the gauge's true error. [PLACEHOLDER] limit 6.9 kPa (1 psi, about 2 x the gauge MPE) and 20 CR petty fine are the agent's picks, not researched; tune in playtest."
+  },
+  "flares": {
+    "first_day": 10,
+    "period_days": 7,
+    "start_hour": 20,
+    "duration_hours": 6,
+    "_note": "Solar flare nights, when Kestrel trades. A fixed schedule by the clock; every number is [PLACEHOLDER]. A flare has to end before the next 06:00."
   },
   "oirm": {
     "fee_credits": 150,

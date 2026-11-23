@@ -246,6 +246,8 @@ func _show_job(job: Dictionary) -> void:
 
 
 func _due_text(sensor: DriftingSensor, today: int) -> String:
+	if sensor.role == "standard" and not GameState.certificates.has(_current_id):
+		return "Work done with it is not traceable until OIRM has certified it."
 	return ("OVERDUE since day %d." % (sensor.cal_due_day + 1) if sensor.is_overdue(today)
 		else "Due day %d." % sensor.cal_due_day)
 

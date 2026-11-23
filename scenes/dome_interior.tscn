@@ -1,4 +1,4 @@
-[gd_scene load_steps=37 format=3]
+[gd_scene load_steps=39 format=3]
 
 [ext_resource type="Script" path="res://scripts/dome/dome_interior.gd" id="1_dome"]
 [ext_resource type="Script" path="res://scripts/dome/terrarium.gd" id="2_terr"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/world/model_slot.gd" id="5_slot"]
 [ext_resource type="Script" path="res://scripts/dome/lab_floor.gd" id="6_lab"]
 [ext_resource type="Script" path="res://scripts/ui/plan_board_ui.gd" id="7_plan"]
+[ext_resource type="Script" path="res://scripts/ui/kestrel_ui.gd" id="8_kestrel"]
 [ext_resource type="Script" path="res://scripts/world/inspectable.gd" id="30_inspect"]
 
 [sub_resource type="Environment" id="Env"]
@@ -87,6 +88,9 @@ emission_energy_multiplier = 0.25
 
 [sub_resource type="BoxShape3D" id="AirlockShape"]
 size = Vector3(3, 3.1, 0.6)
+
+[sub_resource type="BoxShape3D" id="KestrelShape"]
+size = Vector3(0.9, 0.8, 0.7)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status"]
 content_margin_left = 20.0
@@ -389,6 +393,42 @@ hint = "Dome plan board: grow and lay out the lab"
 [node name="Shape" type="CollisionShape3D" parent="PlanBoard/PlanBoardClick"]
 shape = SubResource("PlanBoardShape")
 
+[node name="Kestrel" type="Node3D" parent="."]
+unique_name_in_owner = true
+visible = false
+position = Vector3(-1.15, 0, -2.6)
+
+[node name="Crate" type="CSGBox3D" parent="Kestrel"]
+position = Vector3(0, 0.35, 0)
+size = Vector3(0.8, 0.7, 0.6)
+material = SubResource("MatMetal")
+
+[node name="Lid" type="CSGBox3D" parent="Kestrel"]
+position = Vector3(0, 0.72, 0)
+size = Vector3(0.7, 0.04, 0.5)
+material = SubResource("MatScreen")
+
+[node name="Label" type="Label3D" parent="Kestrel"]
+position = Vector3(0, 1.05, 0)
+pixel_size = 0.004
+billboard = 1
+modulate = Color(0.22, 0.88, 0.78, 1)
+text = "KESTREL"
+font_size = 48
+outline_size = 8
+
+[node name="KestrelClick" type="Area3D" parent="Kestrel"]
+unique_name_in_owner = true
+position = Vector3(0, 0.4, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("3_click")
+hint = "Kestrel: reference standards, no certificates"
+enabled = false
+
+[node name="Shape" type="CollisionShape3D" parent="Kestrel/KestrelClick"]
+shape = SubResource("KestrelShape")
+
 [node name="UI" type="CanvasLayer" parent="."]
 
 [node name="StatusPanel" type="PanelContainer" parent="UI"]
@@ -496,6 +536,16 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("7_plan")
+
+[node name="KestrelUI" type="Control" parent="UI"]
+unique_name_in_owner = true
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("8_kestrel")
 
 [node name="TankModel" type="Node3D" parent="Terrarium" node_paths=PackedStringArray("greybox")]
 script = ExtResource("5_slot")
