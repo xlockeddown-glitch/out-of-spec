@@ -53,6 +53,9 @@ class UplinkCommand:
 		offset_steps = p_offset_steps
 
 
+## Key of this rover in GameState.rover_transforms.
+@export var rover_id: String = "rover_1"
+
 @export_group("Scene Links")
 @export var satellite_relay: SatelliteRelay
 @export var soil_grid: FarmGrid
@@ -113,8 +116,7 @@ func _ready() -> void:
 	steering.error_changed.connect(_on_steering_error_changed)
 	GameState.upgrades_changed.connect(_apply_upgrades)
 	_apply_upgrades()
-	if GameState.has_rover_transform:
-		global_transform = GameState.rover_transform
+	global_transform = GameState.parked_rover_transform(rover_id, global_transform)
 	if satellite_relay == null:
 		push_warning("%s: no SatelliteRelay linked; uplink will read as occluded." % name)
 	if soil_grid == null:
@@ -122,8 +124,7 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
-	GameState.rover_transform = global_transform
-	GameState.has_rover_transform = true
+	GameState.park_rover(rover_id, global_transform)
 
 
 func _input(event: InputEvent) -> void:
@@ -252,8 +253,7 @@ func _drive(delta: float) -> void:
 	move_and_slide()
 	# Horizontal displacement actually achieved; pushing into a rock adds no drift.
 	var driven: float = Vector2(global_position.x - before.x, global_position.z - before.z).length()
-	steering.add_usage(driven)
-	GameState.add_tire_usage(driven)
+	GameState.add_rover_usage(driven)
 
 
 func _zero_steering() -> void:
