@@ -1,6 +1,6 @@
 crystal_ore_fissure_depleted - 10 x 10 x 8 (depleted plateau fissure). From Ryan's Mining & Crystal Extraction generator (0.2 m voxels), 2026-11-22.
 X: 0..9 left to right, Y: 9..0 rear (+Y) to front (-Y), first row = highest Y.
-Palette: P1 = #A8422B, P2 = #8E3522, P3 = #6E2617, P4 = #5E2214, EC = #38E1C6, Q1 = #2A8F85, A1 = #5C6B73, S = #1D222B
+Palette: P1 = #A8422B, P2 = #8E3522, P3 = #6E2617, P4 = #5E2214, A1 = #5C6B73, S = #1D222B
 
 Z = 0
 Y=09  .. P3 P3 P3 P3 P3 P3 P3 P3 ..
