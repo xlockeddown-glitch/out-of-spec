@@ -679,3 +679,17 @@ Agent's notes (flagged for Ryan, not his words):
 - Props covered: in the farm the survey tripod, encoder jig, irrigation junction, soil probe, water cistern, harvest crate and shipping pallet; in the dome the environmental chamber and the reference multimeter on its lid. The chamber's click box stops 1.5 m up so it does not cover the meter.
 - Left out: the field meter, hygrometer and dry well on the dome bench. They sit inside the bench's click box (which opens the calibration bench), and the picking ray stops at the first box it enters, so they cannot be inspected until that box is shrunk.
 - The farm gains a hover name in the world view's bottom-left corner, in teal. The dome already showed hover hints.
+
+## 2026-11-22: Inspect the bench instruments
+
+### Ryan chose
+
+- "Bench instruments too"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to what to do after props became inspectable. The FM-3 field meter, chilled-mirror hygrometer and dry-well calibrator on the dome's calibration bench now show their names on hover and add "Name: description" to the dome toast on click, like the other props.
+- The bench's single click box covered all three, so it is now three boxes fitted to the bench: the left tower, the deck under the instruments (0.2 m tall, up to the instruments' bases), and the bench body below. Clicking anywhere else on the bench still opens the calibration bench.
+- Measured by casting a picking ray every 2 px from the dome camera: the dry well is clickable on 639 of the 639 pixels it covers with the bench box removed, the hygrometer on 680 of 680, and the field meter on 215 of 220.
+- The station's thin upright strip behind the instruments is left out of the bench boxes so it does not hide the dry well; clicking that strip does nothing.
+- The descriptions say what each instrument is and hold no specs.
