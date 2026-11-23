@@ -64,7 +64,8 @@ func test_budget_matches_the_formula() -> String:
 	var u_spec: float = CalUncertainty.spec_to_standard(standard.mpe, standard.spec_confidence_pct)
 	var u_cert: float = standard.certificate_uncertainty / standard.certificate_k
 	var u_res: float = CalUncertainty.resolution_to_standard(unit.resolution)
-	var expanded: float = CalUncertainty.coverage_factor() * sqrt(u_spec * u_spec + u_cert * u_cert + u_res * u_res)
+	var u_op: float = unit.mpe * DataManager.get_number(DRIFT, "calibration_uncertainty/operator_fraction_of_mpe", -1.0)
+	var expanded: float = CalUncertainty.coverage_factor() * sqrt(u_spec * u_spec + u_cert * u_cert + u_res * u_res + u_op * u_op)
 	if absf(budget["expanded_uncertainty"] - expanded) > EPS:
 		return "U must be k × RSS of the terms: expected %s, got %s." % [expanded, budget["expanded_uncertainty"]]
 	if absf(budget["tur"] - unit.mpe / expanded) > EPS:

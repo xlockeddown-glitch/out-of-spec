@@ -965,3 +965,19 @@ Agent's notes (flagged for Ryan, not his words):
 - The farm's save keeps every player's own XP by player id, so a new farm starts at level 1. How a guest's skills travel with them is open for Ryan.
 - Paid jobs, crops and OIRM trips give no XP; the design lists none. Open for Ryan.
 - Instrumentation is to gate Tier 2 at level 3 (150 XP), and buying the Tier 1 standards gives 15 each. Whether that can be reached in play is open before the gate goes in.
+
+## 2026-11-22: Skills take effect
+
+### Ryan chose
+
+- "Milestone 4 skills"
+- "Placeholder and go (Recommended)"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Level effects follow §2.3 of the design: bench time, as-left error, operator uncertainty, molt time and steering drift from driving, in `data/skills.json`. Level 1 is the base; all numbers [PLACEHOLDER]. Husbandry 3 shows the molt on the field phone; Uncertainty 5 shows the uncertainty budget on the bench.
+- An unskilled operator adds u_op = 5 % of the unit's MPE [PLACEHOLDER]. That lowers every bench TUR a little (no TUR can be over 10:1) until the Uncertainty skill shrinks it. OIRM's own calibrations are not affected.
+- Bench time also applies to paid jobs. The as-left effect needs a standard, so the remote zero is unchanged.
+- Not built, because players already have them: TUR on the bench at Uncertainty 2, two instruments per bench visit at Calibration 3, two fissures per drilling trip at Field Ops 4. Taking them away to give them back is Ryan's call.
+- Not built: the Instrumentation tier gates (levels 1, 3 and 6). Level 3 needs 150 XP, and the few standards a farm can buy before Tier 2 give 15 each, so the gate could hold a farm back for a long time. Robotics waits for robots.
+- K opens the skills view, on the farm and in the dome [PLACEHOLDER key].

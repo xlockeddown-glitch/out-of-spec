@@ -1,5 +1,5 @@
 {
-  "_note": "Player skills (docs/design/equipment_skills_robots.md section 2). scope player: each player has their own; farm: one shared by the whole farm [ASSUMPTION]. Total XP to reach level n = base_xp × (n − 1) × n / 2. Every number is a [PLACEHOLDER]. Robotics has no XP source until robots arrive (milestone 5).",
+  "_note": "Player skills (docs/design/equipment_skills_robots.md section 2). scope player: each player has their own; farm: one shared by the whole farm [ASSUMPTION]. Total XP to reach level n = base_xp × (n − 1) × n / 2. effects: each level above 1 cuts the base by per_level of it, down to floor (both fractions of the base). unlocks: the level that shows more. Every number is a [PLACEHOLDER]. Robotics has no XP source until robots arrive (milestone 5).",
   "level_curve": { "max_level": 10, "base_xp": 50 },
   "skills": [
     { "id": "calibration", "display_name": "Calibration", "scope": "player" },
@@ -21,5 +21,16 @@
     { "id": "slot_spool", "skill": "husbandry", "xp": 5 },
     { "id": "mine_fissure", "skill": "field_ops", "xp": 2 },
     { "id": "till", "skill": "field_ops", "xp": 1 }
+  ],
+  "effects": [
+    { "id": "bench_time", "display_name": "Bench time", "skill": "calibration", "per_level": 0.08, "floor": 0.0 },
+    { "id": "as_left_residual", "display_name": "As-left error", "skill": "calibration", "per_level": 0.05, "floor": 0.5 },
+    { "id": "operator_uncertainty", "display_name": "Operator uncertainty", "skill": "uncertainty", "per_level": 0.1, "floor": 0.3 },
+    { "id": "molt_time", "display_name": "Molt time", "skill": "husbandry", "per_level": 0.03, "floor": 0.0 },
+    { "id": "steering_usage", "display_name": "Steering drift from driving", "skill": "field_ops", "per_level": 0.03, "floor": 0.0 }
+  ],
+  "unlocks": [
+    { "id": "molt_on_phone", "display_name": "Molt progress on the field phone", "skill": "husbandry", "level": 3 },
+    { "id": "budget_view", "display_name": "Uncertainty budget on the bench", "skill": "uncertainty", "level": 5 }
   ]
 }

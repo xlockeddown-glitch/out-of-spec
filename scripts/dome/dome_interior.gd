@@ -2,7 +2,7 @@ extends Node3D
 ## Composition root for the dome interior: wires clickables to GameState,
 ## the bench UI, and the scene switcher, and refreshes the status panel.
 
-const DEFAULT_HINT: String = "Click the bench to calibrate  ·  Plan board: grow the lab  ·  Airlock or Tab: back to farm"
+const DEFAULT_HINT: String = "Click the bench to calibrate  ·  Plan board: grow the lab  ·  K: skills  ·  Airlock or Tab: back to farm"
 const TOAST_SECONDS: float = 3.0
 ## Long messages (dispatches, audit lines) stay up longer.
 const TOAST_SECONDS_PER_CHAR: float = 0.04
@@ -42,6 +42,7 @@ func _ready() -> void:
 	_bench.clicked.connect(_bench_ui.open)
 	_plan_board.clicked.connect(_plan_board_ui.open)
 	_kestrel_click.clicked.connect(_kestrel_ui.open)
+	$UI.add_child(SkillsUI.new())
 	_airlock.clicked.connect(func() -> void: SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE))
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)
@@ -49,6 +50,7 @@ func _ready() -> void:
 		prop.inspected.connect(_toast)
 	GameState.calibration_recorded.connect(_on_calibration_recorded)
 	GameState.phone_message.connect(_on_phone_message)
+	GameState.skill_leveled.connect(_on_skill_leveled)
 	SaveGame.save_failed.connect(_toast)
 	# An audit posts several phone lines in one frame; this fires after them,
 	# so the toast ends on a summary that names the failing instruments.
@@ -87,13 +89,7 @@ func _refresh_status() -> void:
 			"TEMPERATURE", _temp_label, _temp_band_label)
 
 	_molt_bar.value = GameState.molt_progress
-	match GameState.molt_stage:
-		GameState.MoltStage.MOLTED:
-			_molt_label.text = "MOLTED: optical silk spool ready"
-		_:
-			var stage: String = "PRE-MOLT" if GameState.molt_stage == GameState.MoltStage.PRE_MOLT else "MOLT"
-			_molt_label.text = (stage + " PAUSED: " + GameState.molt_pause_reason() if GameState.is_molt_paused()
-				else "%s  %d %%" % [stage, roundi(GameState.molt_progress * 100.0)])
+	_molt_label.text = GameState.molt_text()
 	_silk_label.text = "SILK SPOOLS %d   RELAY: %s" % [
 		GameState.optical_silk_spools, "OPTICAL SILK" if GameState.relay_slotted else "STOCK"]
 
@@ -111,6 +107,11 @@ func _show_reading(sensor: DriftingSensor, ideal: Variant, unit: String, title: 
 		else "cal due day %d" % sensor.cal_due_day)
 	band_label.text = "%s  ·  %s" % [DriftingSensor.band_label(band), due_text]
 	band_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
+
+
+func _on_skill_leveled(player_id: String, skill_id: String, _level: int) -> void:
+	if not _holding_audit and (player_id == "" or player_id == GameState.local_player_id):
+		_toast("SKILL UP: %s. K shows skills." % GameState.skill_text(skill_id))
 
 
 func _on_terrarium_clicked() -> void:

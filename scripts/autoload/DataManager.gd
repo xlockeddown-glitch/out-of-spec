@@ -54,6 +54,8 @@ const RECORD_SECTIONS: Dictionary = {
 	&"skills": {
 		"skills": ["display_name", "scope"],
 		"xp_sources": ["skill", "xp"],
+		"effects": ["display_name", "skill", "per_level"],
+		"unlocks": ["display_name", "skill", "level"],
 	},
 }
 

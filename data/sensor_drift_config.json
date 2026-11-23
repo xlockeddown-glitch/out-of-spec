@@ -338,6 +338,7 @@
     "coverage_factor": 2,
     "tur_floor": 2.0,
     "tur_clean": 4.0,
-    "_note": "U = k × RSS of u_spec, u_cert, u_res, u_op, u_robot. TUR = MPE / U. Acceptance limit A = √(MPE² − U²). Below tur_floor the bench refuses; tur_clean is the 4:1 mark (Ryan, 2026-11-22, Q5, Q7, Q13)."
+    "operator_fraction_of_mpe": 0.05,
+    "_note": "operator_fraction_of_mpe [PLACEHOLDER]: u_op of an unskilled operator, as a fraction of the unit's MPE; the Uncertainty skill shrinks it. U = k × RSS of u_spec, u_cert, u_res, u_op, u_robot. TUR = MPE / U. Acceptance limit A = √(MPE² − U²). Below tur_floor the bench refuses; tur_clean is the 4:1 mark (Ryan, 2026-11-22, Q5, Q7, Q13)."
   }
 }

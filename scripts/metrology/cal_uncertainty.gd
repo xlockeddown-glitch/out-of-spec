@@ -9,7 +9,8 @@ extends RefCounted
 ##   acceptance limit A = √(MPE² − U²)
 ##   |as-found| <= A: pass;  A < |as-found| <= MPE: indeterminate;  > MPE: fail
 ##
-## u_op and u_robot are 0 until skills (milestone 4) and robots (milestone 5).
+## u_op comes from the operator's Uncertainty skill; u_robot is 0 until robots
+## (milestone 5).
 
 const CONFIG_TABLE: StringName = &"sensor_drift_config"
 const PASS: String = "pass"
