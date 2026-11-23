@@ -37,12 +37,14 @@ func _notification(what: int) -> void:
 ## its own changes.
 func _on_day_started() -> void:
 	if farm_open and not _autosave_queued:
-		_autosave_queued = true
+		_autosave_queued = true  # one write, however many mornings a job crosses
 		_autosave.call_deferred()
 
 
 func _autosave() -> void:
 	_autosave_queued = false
+	if not farm_open:
+		return
 	var problem: String = write()
 	if problem != "":
 		push_warning("SaveGame: " + problem)
@@ -50,16 +52,39 @@ func _autosave() -> void:
 
 
 ## Starts a new farm and saves it. A saved farm already there is kept beside it
-## as ".old". Returns "" or why not; on a problem no farm opens.
+## as ".old". Returns "" or why not; on a problem no farm opens and the saved
+## farm stays where it was.
 func start_new(path: String = DEFAULT_PATH) -> String:
-	var problem: String = _set_aside(path)
-	if problem != "":
-		return problem
+	farm_open = false
 	GameClock.elapsed_days = 0.0
 	GameState.new_farm()
-	problem = write(path)
-	farm_open = problem == ""
-	return problem
+	# Written whole before anything is moved, so a full disk costs nothing.
+	var fresh: String = path + ".new"
+	if FileAccess.file_exists(fresh):
+		DirAccess.remove_absolute(fresh)
+	var problem: String = write(fresh)
+	if problem == "":
+		problem = read_file(fresh).get("problem", "")
+	var moved: Array[PackedStringArray] = []
+	if problem == "":
+		problem = _set_aside(path, moved)
+	if problem == "":
+		var error: Error = DirAccess.rename_absolute(fresh, path)
+		if error != OK:
+			problem = "Could not place %s (error %d)." % [path, error]
+	if problem != "":
+		moved.reverse()
+		for pair: PackedStringArray in moved:
+			DirAccess.rename_absolute(pair[1], pair[0])
+		if FileAccess.file_exists(fresh):
+			DirAccess.remove_absolute(fresh)
+		return problem
+	# Last: the old farm's other files must not back up the new one.
+	for leftover: String in [path + ".tmp", path + ".bak"]:
+		if FileAccess.file_exists(leftover):
+			DirAccess.remove_absolute(leftover)
+	farm_open = true
+	return ""
 
 
 ## Opens the saved farm. Returns "" or why not.
@@ -75,20 +100,21 @@ func day_of(data: Dictionary) -> int:
 
 
 ## Moves the farm's files out of a new farm's way: the one that loads to ".old",
-## one that doesn't to ".unreadable".
-func _set_aside(path: String) -> String:
+## one that doesn't to ".unreadable". A second one that loads is left in place.
+## Adds [from, to] to `moved` for each.
+func _set_aside(path: String, moved: Array[PackedStringArray]) -> String:
 	var old_taken: bool = false
 	for file_path: String in _candidates(path):
-		var error: Error = OK
-		if not read_file(file_path).has("data"):
-			error = DirAccess.rename_absolute(file_path, _unreadable_path(path))
-		elif old_taken:
-			error = DirAccess.remove_absolute(file_path)
-		else:
-			error = DirAccess.rename_absolute(file_path, path + ".old")
+		var target: String = _unreadable_path(path)
+		if read_file(file_path).has("data"):
+			if old_taken:
+				continue
+			target = path + ".old"
 			old_taken = true
+		var error: Error = DirAccess.rename_absolute(file_path, target)
 		if error != OK:
 			return "Could not set aside %s (error %d)." % [file_path, error]
+		moved.append(PackedStringArray([file_path, target]))
 	return ""
 
 

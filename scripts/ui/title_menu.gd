@@ -116,8 +116,13 @@ func _start_new() -> void:
 
 func _open(problem: String) -> void:
 	if problem != "":
-		_main_buttons.visible = true
-		_confirm_buttons.visible = false
+		# Built again: the saved farm may not be what it was.
+		for child: Node in get_children():
+			remove_child(child)
+			child.queue_free()
+		_save = SaveGame.check()
+		_build()
+		_show_main()
 		_note.text = problem
 		return
 	_starting = true
