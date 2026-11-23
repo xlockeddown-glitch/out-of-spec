@@ -433,6 +433,11 @@ func farm_dict_problem(data: Dictionary) -> String:
 		for entry: Dictionary in data[pair[0]]:
 			if typeof(entry.get(pair[1])) != TYPE_STRING:
 				return "'%s' has an entry with no %s." % pair
+	for own: Variant in data.get("player_skill_xp", {}).values():
+		if typeof(own) != TYPE_DICTIONARY or not _holds_only_ints(own):
+			return "'player_skill_xp' has a player whose XP is not whole numbers."
+	if not _holds_only_ints(data.get("farm_skill_xp", {})):
+		return "'farm_skill_xp' has XP that is not a whole number."
 	for id: Variant in data["sensors"]:
 		var state: Variant = data["sensors"][id]
 		if typeof(state) != TYPE_DICTIONARY:
@@ -444,6 +449,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if sensors.has(str(id)) and not DriftingSensor.from_config(str(id)).apply_dict(state):
 			return "Sensor '%s' can't load." % id
 	return ""
+
+
+static func _holds_only_ints(values: Dictionary) -> bool:
+	return values.values().all(func(value: Variant) -> bool: return value is int)
 
 
 static func _has_nan(value: Variant) -> bool:
@@ -1878,7 +1887,8 @@ func is_molt_paused() -> bool:
 ## "relative humidity". Empty while the molt can advance.
 func molt_pause_causes() -> PackedStringArray:
 	var causes: PackedStringArray = []
-	if is_in_service(THERMOMETER_ID) 			and get_sensor(THERMOMETER_ID).get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE:
+	if is_in_service(THERMOMETER_ID) \
+			and get_sensor(THERMOMETER_ID).get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE:
 		causes.append("temperature")
 	if hygrometer.get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE:
 		causes.append("humidity")

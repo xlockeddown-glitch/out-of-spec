@@ -70,7 +70,7 @@ func _check_gate(gs: GameStateScript) -> String:
 	gs.oirm_calibrate(TW6, 7)
 	if gs.tier_problem(HB700) != "":
 		return "An OIRM-certified Tier 2 standard must open Tier 3: " + gs.tier_problem(HB700)
-	gs.get_sensor(TW6).cal_due_day = 6
+	gs.get_sensor(TW6).cal_due_day = GameClock.get_day_index() - 1
 	if gs.tier_problem(HB700) == "":
 		return "An overdue Tier 2 standard must not count."
 	if gs.standard_purchase_problem(RB) != "Bram doesn't stock that.":
@@ -149,3 +149,45 @@ func _check_save(gs: GameStateScript) -> String:
 	gs.rover_uplinks = {}
 	gs.farm_from_dict(data)
 	return "" if gs.traceable_lab and gs.rover_uplinks == { "rover_1": false } else "The gate and uplinks must survive a save."
+
+
+func test_the_morning_locks_before_it_charges() -> String:
+	return _run(_check_morning)
+
+
+func _check_morning(gs: GameStateScript) -> String:
+	var rb: DriftingSensor = _give_rb(gs)
+	var day: int = 8  # no audit; cal_due_day + 1 is the day a holdover lapses
+	for id: String in gs.unit_ids():
+		gs.get_sensor(id).cal_due_day = day + 10
+	GameClock.elapsed_days = float(day - 1)
+	gs.reset_credibility()
+	var start: int = gs.credibility
+	rb.cal_due_day = day - 1
+	gs.set_rover_uplink("rover_1", true)
+	gs._on_day_started(day)
+	if gs.credibility != start or rb.is_overdue(day) or "\n".join(gs.phone_log).contains("out of lock too long"):
+		return "A locked Rb-2D must be in date before the morning's charge."
+	rb.cal_due_day = day
+	gs.set_rover_uplink("rover_1", false)
+	GameClock.elapsed_days = float(day)
+	gs._on_day_started(day + 1)
+	if gs.credibility >= start or not "\n".join(gs.phone_log).contains("out of lock too long"):
+		return "Out of lock it must lapse and be charged the same morning."
+	return ""
+
+
+func test_two_whole_audits_sign_the_lab_off() -> String:
+	return _run(_check_two_audits)
+
+
+func _check_two_audits(gs: GameStateScript) -> String:
+	for day: int in [10, 15]:
+		GameClock.elapsed_days = float(day - 1)
+		for id: String in gs.unit_ids():
+			gs.get_sensor(id).error = 0.0
+			gs.get_sensor(id).cal_due_day = day + 10
+		if gs.traceable_lab:
+			return "One clean audit must not sign the lab off."
+		gs._run_audit(day)
+	return "" if gs.traceable_lab and gs.clean_audit_streak == 2 else "Two clean audits must: %s" % [gs.audit_log]

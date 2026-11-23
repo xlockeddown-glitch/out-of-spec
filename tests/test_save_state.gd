@@ -47,7 +47,7 @@ func _worn() -> GameStateScript:
 
 
 func _clean_files() -> void:
-	for suffix: String in ["", ".bak", ".tmp", ".unreadable", ".unreadable2", ".old", ".new", ".new.tmp"]:
+	for suffix: String in ["", ".bak", ".tmp", ".unreadable", ".unreadable2", ".old", ".old.prev", ".new", ".new.tmp"]:
 		if FileAccess.file_exists(PATH + suffix):
 			DirAccess.remove_absolute(PATH + suffix)
 
@@ -149,7 +149,8 @@ func test_bad_data_is_refused_whole() -> String:
 			["cal_log", [{}]], ["certificate_log", [{ "standard_id": 4 }]], ["phone_log", [{}]],
 			["molt_progress", NAN], ["cal_log", [{ "instrument_id": "x", "mpe": NAN }]],
 			["plantings", { Vector3i.ZERO: { "deep": [NAN] } }], ["rng_state", 1.5], ["sensors", []],
-			["sensors", { sensor_id: { "error": NAN } }], ["sensors", { sensor_id: 3 }]]:
+			["player_skill_xp", { "player_1": 5 }], ["player_skill_xp", { "player_1": { "calibration": "many" } }],
+			["farm_skill_xp", { "husbandry": [] }], ["sensors", { sensor_id: { "error": NAN } }], ["sensors", { sensor_id: 3 }]]:
 		var bad: Dictionary = good.duplicate(true)
 		bad[change[0]] = change[1]
 		bads.append(bad)
@@ -387,3 +388,44 @@ func test_only_an_open_farm_autosaves_each_morning() -> String:
 	# The queued call runs later, when no farm is open: it must write nothing.
 	SaveGame.farm_open = false
 	return "" if queued == [false, true] else "Only an open farm may queue an autosave: %s" % [queued]
+
+
+func test_a_failed_new_farm_keeps_the_older_one() -> String:
+	return _with_live(_failed_new_farm)
+
+
+func _failed_new_farm() -> String:
+	GameState.credits = 1
+	SaveGame.write(PATH)
+	DirAccess.rename_absolute(PATH, PATH + ".old")
+	GameState.credits = 2
+	SaveGame.write(PATH)
+	DirAccess.rename_absolute(PATH, PATH + ".bak")
+	# A folder in the save's place: the last step, placing the new farm, fails.
+	DirAccess.make_dir_absolute(PATH)
+	var problem: String = SaveGame.start_new(PATH)
+	DirAccess.remove_absolute(PATH)
+	if problem == "" or SaveGame.farm_open:
+		return "The new farm must not open."
+	for pair: Array in [[".old", 1], [".bak", 2]]:
+		if SaveGame.read_file(PATH + pair[0]).get("data", {}).get("farm", {}).get("credits") != pair[1]:
+			return "The %s file must be put back." % pair[0]
+	for suffix: String in [".old.prev", ".new", ".new.tmp"]:
+		if FileAccess.file_exists(PATH + suffix):
+			return "A %s file is left behind." % suffix
+	problem = SaveGame.start_new(PATH)
+	SaveGame.farm_open = false
+	if problem != "" or FileAccess.file_exists(PATH + ".old.prev"):
+		return "Started for real, the older farm makes way: " + problem
+	return "" if SaveGame.read_file(PATH + ".old")["data"]["farm"]["credits"] == 2 else "The last farm must be the one kept."
+
+
+func test_the_title_menu_note() -> String:
+	var menu: GDScript = preload("res://scripts/ui/title_menu.gd")
+	if menu.note_for({}) != "" or menu.note_for({ "data": {} }) != "":
+		return "Nothing to say without a problem."
+	var with_backup: String = menu.note_for({ "data": {}, "problem": "Bad." })
+	var without: String = menu.note_for({ "problem": "Bad." })
+	if not with_backup.contains("Bad.") or not with_backup.contains("Continue") or not without.contains("Bad.") or without.contains("Continue"):
+		return "%s / %s" % [with_backup, without]
+	return ""
