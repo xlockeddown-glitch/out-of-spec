@@ -5,9 +5,9 @@ extends Control
 ## CALIBRATE runs GameState.calibrate_at_bench(): the unit is compared with
 ## its standard, the As-Found is judged pass / indeterminate / fail against
 ## the acceptance limit and MPE, and the bench time passes on the clock.
-## Standards are listed too (milestone 2): they can't be calibrated here, only
-## sent to OIRM (drop pod, or courier on other days), so the button becomes SEND. Each
-## instrument shows its traceability chain under the standard line.
+## Standards are listed too (milestone 2): they can be sent to OIRM (drop pod, or
+## courier on other days), and calibrated here if the colony has the standard
+## that calibrates them. Each instrument shows its traceability chain under the standard line.
 ## Accepted customer jobs are listed too ("job:" ids): CALIBRATE FOR CUSTOMER
 ## runs GameState.complete_job() against the best standard for the job.
 
@@ -21,6 +21,8 @@ var _current_id: String = ""
 ## Budget and acceptance limit of the selected instrument against its standard.
 var _budget: Dictionary = {}
 var _limit: float = 0.0
+## Standards only: sends the selected one to OIRM.
+var _send_button := Button.new()
 
 @onready var _instrument_option: OptionButton = %InstrumentOption
 @onready var _found_value: Label = %FoundValue
@@ -41,6 +43,11 @@ func _ready() -> void:
 	_rebuild_list()
 	_instrument_option.item_selected.connect(_on_instrument_selected)
 	_calibrate_button.pressed.connect(_on_calibrate_pressed)
+	_send_button.custom_minimum_size = _calibrate_button.custom_minimum_size
+	_send_button.size_flags_horizontal = _calibrate_button.size_flags_horizontal
+	_send_button.hide()
+	_calibrate_button.add_sibling(_send_button)
+	_send_button.pressed.connect(_on_send_pressed)
 	_close_button.pressed.connect(close)
 	GameState.drop_pod_changed.connect(_on_pod_or_oirm_changed.unbind(1))
 	GameState.oirm_changed.connect(_on_pod_or_oirm_changed)
@@ -122,6 +129,8 @@ func _is_standard(instrument_id: String) -> bool:
 
 func _on_instrument_selected(index: int) -> void:
 	_current_id = _ids[index]
+	_calibrate_button.show()
+	_send_button.hide()
 	if _current_id.begins_with(JOB_PREFIX):
 		_show_job(GameState.active_job(_current_id.trim_prefix(JOB_PREFIX)))
 		return
@@ -129,8 +138,10 @@ func _on_instrument_selected(index: int) -> void:
 	if sensor == null:
 		return
 	if sensor.role == "standard":
-		_show_standard(sensor)
-		return
+		_show_send()
+		if not GameState.has_bench_reference(_current_id) or GameState.at_oirm.has(_current_id):
+			_show_standard(sensor)
+			return
 	_calibrate_button.text = CALIBRATE_TEXT
 	_budget = GameState.calibration_budget(_current_id)
 	_limit = _budget.get("acceptance_limit", sensor.mpe)
@@ -138,7 +149,7 @@ func _on_instrument_selected(index: int) -> void:
 		meter.mpe = sensor.mpe
 		meter.acceptance_ratio = _limit / sensor.mpe if sensor.mpe > 0.0 else 1.0
 	_mpe_label.text = "%s   MPE ±%s" % [sensor.quantity_title(), _unsigned(sensor, sensor.mpe)]
-	_standard_label.text = _standard_text(_current_id) + "\n" + _chain_text(_current_id)
+	_standard_label.text = _reference_text(_current_id)
 	# What the bench would read: the unit's error seen through the standard's.
 	var standard: DriftingSensor = GameState.get_sensor(_budget.get("standard_id", ""))
 	_show_as_found(sensor, sensor.error - (standard.error if standard else 0.0))
@@ -158,8 +169,15 @@ func _on_instrument_selected(index: int) -> void:
 			GameState.instrument_name(standard_id, true), GameState.at_oirm[standard_id], _result_label.text]
 
 
-## A standard has no reference on this bench: its error is unknown until OIRM
-## measures it. Shows its certificate, chain and the send button.
+func _show_send() -> void:
+	_send_button.show()
+	_send_button.text = ("SEND TO OIRM (%s CR)" % SP811.integer(GameState.oirm_fee()) if GameState.drop_pod_present
+		else "SEND BY COURIER (%s CR)" % SP811.integer(GameState.oirm_fee() + GameState.oirm_courier_surcharge()))
+	_send_button.disabled = GameState.at_oirm.has(_current_id)
+
+
+## A standard with no reference on this bench: its error is unknown until OIRM
+## measures it. Shows its certificate, chain and the send button only.
 func _show_standard(sensor: DriftingSensor) -> void:
 	_budget = {}
 	_limit = sensor.mpe
@@ -172,15 +190,12 @@ func _show_standard(sensor: DriftingSensor) -> void:
 	_standard_label.text = _certificate_text(_current_id) + "\n" + _chain_text(_current_id)
 	for label: Label in [_found_value, _left_value]:
 		label.text = "--"
-	_found_band.text = "NO REFERENCE ON SITE"
+	_found_band.text = "AT OIRM" if GameState.at_oirm.has(_current_id) else "NO REFERENCE ON SITE"
 	_found_band.remove_theme_color_override("font_color")
 	_left_band.text = ""
-	var courier_fee: int = GameState.oirm_fee() + GameState.oirm_courier_surcharge()
-	_calibrate_button.text = ("SEND TO OIRM (%s CR)" % SP811.integer(GameState.oirm_fee()) if GameState.drop_pod_present
-		else "SEND BY COURIER (%s CR)" % SP811.integer(courier_fee))
+	_calibrate_button.hide()
 	_result_label.remove_theme_color_override("font_color")
 	var today: int = GameClock.get_day_index()
-	_calibrate_button.disabled = GameState.at_oirm.has(_current_id)
 	if GameState.at_oirm.has(_current_id):
 		_result_label.text = "At OIRM. Back on day %d." % GameState.at_oirm[_current_id]
 	elif not GameState.drop_pod_present:
@@ -218,8 +233,9 @@ func _show_job(job: Dictionary) -> void:
 	var today: int = GameClock.get_day_index()
 	_result_label.text = problem if problem != "" else "%s. Pays %s CR on time and traceable; late or with an overdue standard it pays less and costs credibility." % [
 		GameState.active_job_text(job), SP811.integer(int(job.get("pay", 0)))]
-	if standard_id != "" and GameState.get_sensor(standard_id).is_overdue(today):
-		_result_label.text += " The standard is OVERDUE: this job would not be traceable."
+	var trouble: String = GameState.standard_problem(standard_id) if standard_id != "" else ""
+	if trouble != "":
+		_result_label.text += " The standard is %s: this job would not be traceable." % trouble.to_upper()
 
 
 func _due_text(sensor: DriftingSensor, today: int) -> String:
@@ -235,7 +251,7 @@ func _certificate_text(instrument_id: String) -> String:
 	var sensor: DriftingSensor = GameState.get_sensor(instrument_id)
 	var found: String = (("founding stock, no as-found on file" if cert.get("founding", false)
 			else "new from %s, no as-found on file" % cert.get("issuer", "the maker")) if cert["as_found"] == null
-		else "as-found %s (%s)" % [sensor.format_value(float(cert["as_found"]), 3),
+		else "as-found %s (%s)" % [sensor.format_value(float(cert["as_found"]), maxi(3, sensor.display_decimals)),
 			"in tolerance" if cert["as_found_in_tolerance"] else "OUT OF TOLERANCE"])
 	return "Certificate %s, day %d: %s, U ±%s (k = %s)" % [
 		cert["id"], cert["day"], found, _unsigned_precise(sensor, cert["expanded_uncertainty"]),
@@ -259,15 +275,6 @@ func _on_calibrate_pressed() -> void:
 		if result.get("ok", false):
 			# Done: keep the pay and credibility shown, not "no longer active".
 			_current_id = ""
-		return
-	if _is_standard(_current_id):
-		var sent: Dictionary = GameState.send_to_oirm(_current_id)
-		if not sent["ok"]:
-			_result_label.text = "NOT SENT: " + str(sent["reason"])
-			_result_label.add_theme_color_override(
-				"font_color", DriftingSensor.band_color(DriftingSensor.Band.OUT_OF_TOLERANCE))
-		else:
-			_on_instrument_selected(_ids.find(_current_id))
 		return
 	var record: Dictionary = GameState.calibrate_at_bench(_current_id)
 	if record.is_empty():
@@ -298,6 +305,17 @@ func _on_calibrate_pressed() -> void:
 	if record.get("standard_overdue", false):
 		band = DriftingSensor.Band.GUARDBAND
 		_result_label.text = "STANDARD OVERDUE: unit adjusted, NOT TRACEABLE. Not a calibration; still due day %d. Send the standard to OIRM." % record["due_day"]
+	elif record.get("standard_problem", "") != "":
+		band = DriftingSensor.Band.GUARDBAND
+		_result_label.text = "STANDARD %s: unit adjusted, NOT TRACEABLE. Not a calibration; still due day %d." % [
+			str(record["standard_problem"]).to_upper(), record["due_day"]]
+	elif sensor.role == "standard":
+		band = (DriftingSensor.Band.OUT_OF_TOLERANCE if result == CalUncertainty.FAIL
+			else DriftingSensor.Band.GUARDBAND if result == CalUncertainty.INDETERMINATE else DriftingSensor.Band.IN_BAND)
+		_result_label.text = "AS-FOUND: %s. In-house certificate %s.%s Due day %d. Bench time %d min." % [
+			result.to_upper(), record.get("certificate", "?"),
+			" Work done with it is recalled; see the phone." if result == CalUncertainty.FAIL else "",
+			record["due_day"], roundi(record.get("bench_minutes", 0.0))]
 	elif result == CalUncertainty.FAIL:
 		band = DriftingSensor.Band.OUT_OF_TOLERANCE
 		_result_label.text = "AS-FOUND OUT OF TOLERANCE: FAIL. Interval shortened, logged for audit. " + interval_note
@@ -311,7 +329,17 @@ func _on_calibrate_pressed() -> void:
 	else:
 		_result_label.text = "AS-FOUND WITHIN ACCEPTANCE LIMIT, LATE: PASS. Interval unchanged. " + interval_note
 	_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
-	_standard_label.text = _standard_text(_current_id) + "\n" + _chain_text(_current_id)
+	_standard_label.text = _reference_text(_current_id)
+
+
+func _on_send_pressed() -> void:
+	var sent: Dictionary = GameState.send_to_oirm(_current_id)
+	if sent["ok"]:
+		_on_instrument_selected(_ids.find(_current_id))
+		return
+	_result_label.text = "NOT SENT: " + str(sent["reason"])
+	_result_label.add_theme_color_override(
+		"font_color", DriftingSensor.band_color(DriftingSensor.Band.OUT_OF_TOLERANCE))
 
 
 func _show_as_found(sensor: DriftingSensor, value: float) -> void:
@@ -347,11 +375,19 @@ func _last_record_text(instrument_id: String) -> String:
 		verdict += ", SUSPECT (recalled)"
 	elif record.get("standard_overdue", false):
 		verdict += ", STANDARD OVERDUE: NOT TRACEABLE"
+	elif record.get("standard_problem", "") != "":
+		verdict += ", STANDARD %s: NOT TRACEABLE" % str(record["standard_problem"]).to_upper()
 	elif not record.get("traceable", true):
 		verdict += ", NO STANDARD"
 	return "Last cal: day %d by %s, as-found %s (%s). %s" % [
 		record["day"], GameState.performer_name(record.get("performed_by", "")), sensor.format_value(record["as_found"] as float),
 		verdict, due]
+
+
+## The standard used and the chain; for a standard its own certificate first.
+func _reference_text(instrument_id: String) -> String:
+	var text: String = _standard_text(instrument_id) + "\n" + _chain_text(instrument_id)
+	return _certificate_text(instrument_id) + "\n" + text if _is_standard(instrument_id) else text
 
 
 ## "Standard: Pavonis Indexworks PX-1 Rotary Table   U ±0.0x°   TUR 47:1   Limit ±0.9x°"
@@ -370,9 +406,9 @@ func _standard_text(instrument_id: String) -> String:
 		_unsigned_precise(sensor, budget["acceptance_limit"])]
 
 
-## Three decimals, one more than the live reading, so small U values don't read as 0.
+## Three decimals or more, so small U values don't read as 0.
 func _unsigned_precise(sensor: DriftingSensor, value: float) -> String:
-	return sensor.format_value(value, 3).trim_prefix("+")
+	return sensor.format_value(value, maxi(3, sensor.display_decimals)).trim_prefix("+")
 
 
 func _unsigned(sensor: DriftingSensor, value: float) -> String:

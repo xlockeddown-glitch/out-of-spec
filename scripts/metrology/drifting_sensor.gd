@@ -59,6 +59,8 @@ var display_decimals: int = -1
 var price_credits: int = 0
 var price_ore: int = 0
 var maker: String = ""
+## Who sells it: "bram" or "kestrel"; "" = not sold (or only by contract).
+var seller: String = ""
 var certificate_prefix: String = ""
 ## Maximum permissible error, in `error_unit`.
 var mpe: float = 1.0
@@ -147,6 +149,7 @@ static func from_config(p_instrument_id: String, p_max_error: float = INF) -> Dr
 	sensor.display_decimals = int(DataManager.get_number(CONFIG_TABLE, base + "/display_decimals", -1.0))
 	sensor.price_credits = int(DataManager.get_number(CONFIG_TABLE, base + "/price_credits", 0.0))
 	sensor.price_ore = int(DataManager.get_number(CONFIG_TABLE, base + "/price_ore", 0.0))
+	sensor.seller = str(DataManager.get_value(CONFIG_TABLE, base + "/seller", ""))
 	sensor.maker = str(DataManager.get_value(CONFIG_TABLE, base + "/maker", ""))
 	sensor.certificate_prefix = str(DataManager.get_value(CONFIG_TABLE, base + "/certificate_prefix", ""))
 	sensor.acceptance_ratio = DataManager.get_number(
@@ -207,7 +210,9 @@ func apply_dict(data: Dictionary) -> bool:
 	cal_interval_days = int(data.get("cal_interval_days", cal_interval_days))
 	cal_due_day = int(data.get("cal_due_day", cal_due_day))
 	last_cal_day = int(data.get("last_cal_day", last_cal_day))
-	calibrated_by = data.get("calibrated_by", calibrated_by)
+	# A save from before the instrument had a standard keeps the one in the data.
+	if data.get("calibrated_by", "") != "":
+		calibrated_by = data["calibrated_by"]
 	usage_drift_rate = float(data.get("usage_drift_rate", usage_drift_rate))
 	# Set before error so error_changed listeners read the restored observed value.
 	var offset_before: float = reference_offset
@@ -322,6 +327,8 @@ func quantity_name() -> String:
 			return "temperature"
 		"V":
 			return "DC voltage"
+		"N·m":
+			return "torque"
 		"fractional_e6":
 			return "fractional frequency"
 		_:
