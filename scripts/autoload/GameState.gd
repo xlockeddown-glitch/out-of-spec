@@ -302,15 +302,18 @@ func sensors_to_dict() -> Dictionary:
 
 
 ## Restores sensors_to_dict() onto the registry. Ids no longer in the data are
-## skipped with a warning; sensors missing from `data` keep their state.
+## skipped with a warning; sensors missing from `data` keep their state. Call
+## set_world_seed() before this, never after: it reseeds every sensor.
 func sensors_from_dict(data: Dictionary) -> void:
 	for key: Variant in data:
 		var sensor: DriftingSensor = sensors.get(str(key))
 		if sensor == null:
 			push_warning("GameState: saved sensor '%s' is not in %s; skipped." % [key, DRIFT_TABLE])
 			continue
-		if typeof(data[key]) == TYPE_DICTIONARY:
-			sensor.apply_dict(data[key])
+		if typeof(data[key]) != TYPE_DICTIONARY:
+			push_warning("GameState: saved sensor '%s' is not a dictionary; skipped." % key)
+			continue
+		sensor.apply_dict(data[key])
 
 
 func get_sensor(instrument_id: String) -> DriftingSensor:

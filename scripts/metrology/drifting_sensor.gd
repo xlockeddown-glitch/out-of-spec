@@ -155,10 +155,13 @@ static func from_config(p_instrument_id: String, p_max_error: float = INF) -> Dr
 
 
 ## The sensor's live state as plain data (JSON-safe), for host save and for
-## sending a farm to a joining player. Everything else comes from the config,
-## so restore onto a sensor built by from_config() with the same id.
+## sending a farm to a joining player. It includes what purchases change on a
+## sensor (the standard a take-over moves it to, the wide treads' drift rate).
+## Everything else comes from the config, so restore onto a sensor built by
+## from_config() with the same id.
 ## The generator state is a string: JSON numbers can't hold all 64 bits.
-## Write it with JSON.stringify(..., full_precision = true); floats then come back to within about 1e-17.
+## Write it with JSON.stringify(..., full_precision = true); floats can still
+## change in the last few bits.
 func to_dict() -> Dictionary:
 	return {
 		"instrument_id": instrument_id,
@@ -167,6 +170,8 @@ func to_dict() -> Dictionary:
 		"cal_interval_days": cal_interval_days,
 		"cal_due_day": cal_due_day,
 		"last_cal_day": last_cal_day,
+		"calibrated_by": calibrated_by,
+		"usage_drift_rate": usage_drift_rate,
 		"sign": _sign,
 		"rng_seed": str(_rng.seed),
 		"rng_state": str(_rng.state),
@@ -174,11 +179,25 @@ func to_dict() -> Dictionary:
 
 
 ## Restores what to_dict() wrote. Keys that are missing keep their current
-## values; a dictionary for another instrument is refused (returns false).
+## values. A dictionary for another instrument, or with any value of the wrong
+## type, is refused whole: nothing changes and it returns false.
 func apply_dict(data: Dictionary) -> bool:
 	if str(data.get("instrument_id", instrument_id)) != instrument_id:
 		push_warning("DriftingSensor: state for '%s' can't load into '%s'." % [data.get("instrument_id"), instrument_id])
 		return false
+	for key: String in ["error", "reference_offset", "cal_interval_days", "cal_due_day", "last_cal_day",
+			"usage_drift_rate", "sign"]:
+		if data.has(key) and not typeof(data[key]) in [TYPE_FLOAT, TYPE_INT]:
+			push_warning("DriftingSensor: %s state has a bad '%s'; not loaded." % [instrument_id, key])
+			return false
+	for key: String in ["rng_seed", "rng_state"]:
+		if data.has(key) and not (typeof(data[key]) == TYPE_STRING and (data[key] as String).is_valid_int()):
+			push_warning("DriftingSensor: %s state has a bad '%s'; not loaded." % [instrument_id, key])
+			return false
+	if data.has("calibrated_by") and typeof(data["calibrated_by"]) != TYPE_STRING:
+		push_warning("DriftingSensor: %s state has a bad 'calibrated_by'; not loaded." % instrument_id)
+		return false
+	# Setting the seed resets the generator, so the state goes in after it.
 	if data.has("rng_seed"):
 		_rng.seed = str(data["rng_seed"]).to_int()
 	if data.has("rng_state"):
@@ -188,9 +207,16 @@ func apply_dict(data: Dictionary) -> bool:
 	cal_interval_days = int(data.get("cal_interval_days", cal_interval_days))
 	cal_due_day = int(data.get("cal_due_day", cal_due_day))
 	last_cal_day = int(data.get("last_cal_day", last_cal_day))
+	calibrated_by = data.get("calibrated_by", calibrated_by)
+	usage_drift_rate = float(data.get("usage_drift_rate", usage_drift_rate))
 	# Set before error so error_changed listeners read the restored observed value.
+	var offset_before: float = reference_offset
 	reference_offset = float(data.get("reference_offset", reference_offset))
+	var before: float = error
 	error = float(data.get("error", error))
+	if error == before and reference_offset != offset_before:
+		# The setter skips unchanged values, but the observed error moved.
+		error_changed.emit(error, get_band())
 	return true
 
 
