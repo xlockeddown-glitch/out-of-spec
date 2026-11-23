@@ -693,3 +693,15 @@ Agent's notes (flagged for Ryan, not his words):
 - Measured by casting a picking ray every 2 px from the dome camera: the dry well is clickable on 639 of the 639 pixels it covers with the bench box removed, the hygrometer on 680 of 680, and the field meter on 215 of 220.
 - The station's thin upright strip behind the instruments is left out of the bench boxes so it does not hide the dry well; clicking that strip does nothing.
 - The descriptions say what each instrument is and hold no specs.
+
+## 2026-11-22: Keep prop clicks out of the phone log
+
+### Ryan chose
+
+- "both"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to whether to keep prop clicks from pushing lines off the phone log or to have the encoder jig run the steering calibration; "both" covers this entry and the next.
+- The phone log shows only its last 8 lines, so a few prop clicks could push a dispatch or an audit out of view. In the farm, a clicked prop's "Name: description" now shows in the hover label at the world view's bottom-left instead, for 3 s or 0.04 s per character if longer (the dome toast's timing). Hovering resumes after that.
+- The hover label now wraps long text. Nothing changes in the dome, which already used its toast.
