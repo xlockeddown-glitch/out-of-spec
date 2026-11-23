@@ -802,6 +802,18 @@ MINING = {
                                      "rock", {}, 0.2),
 }
 
+# Ryan's Outdoor Infrastructure pack (2026-11-22): a weather mast and a solar skid (0.1 m voxels),
+# and a culvert bridge for dry_gulch_straight (0.2 m, like the gulch). Colors are his own; P1 and
+# P2 match the boulders' PLATEAU colors and S is SHADOW. Nothing is lit, none is placed yet.
+OUTDOOR = {
+    "plateau_weather_mast": ({"C1": "#EBF0F5", "C2": "#8D99AE", "M3": "#2E3844", "B1": "#D9A13B",
+                              "S": SHADOW}, "prop", {}, 0.1),
+    "gulch_culvert_bridge": ({"P2": PLATEAU[1], "D1": "#C26B4A", "M1": "#4A607A", "M3": "#2E3844",
+                              "W1": "#8C6742", "S": SHADOW}, "prop", {}, 0.2),
+    "solar_array_skid": ({"M3": "#2E3844", "M2": "#6C7A89", "PV": "#243B55", "P1": PLATEAU[0],
+                          "B1": "#D9A13B", "S": SHADOW}, "prop", {}, 0.1),
+}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop",
@@ -852,6 +864,7 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, ENV_STANDARDS[n])), 0.025) for n in ENV_STANDARDS],
     *[((lambda n=n: prop_sheet(n, *ART_LOOP[n])), 0.1) for n in ART_LOOP],
     *[((lambda n=n: prop_sheet(n, *MINING[n][:3])), MINING[n][3]) for n in MINING],
+    *[((lambda n=n: prop_sheet(n, *OUTDOOR[n][:3])), OUTDOOR[n][3]) for n in OUTDOOR],
 ]
 
 

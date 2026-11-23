@@ -45,6 +45,9 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `seismic_thumper.glb` | Survey thumper with a yellow hammer weight, 0.8 m × 0.8 m × 1.0 m tall; not placed in any scene yet | 0.1 m voxels, origin at ground level. Built from Ryan's Mining & Crystal Extraction grid (`tools/voxgen/sheets/seismic_thumper.txt`). |
 | `crystal_ore_fissure.glb` | Active crystal fissure, 2.0 m × 2.0 m × 1.6 m tall (does not replace `ore_fissure.glb`); not placed in any scene yet | 0.2 m voxels, origin at ground level; crystals are `emit_crystals`. Built from Ryan's Mining & Crystal Extraction grid (`tools/voxgen/sheets/crystal_ore_fissure.txt`). |
 | `crystal_ore_fissure_depleted.glb` | The same fissure mined out, gray stubs, 1.0 m tall; not placed in any scene yet | 0.2 m voxels, origin at ground level. Built from Ryan's Mining & Crystal Extraction grid (`tools/voxgen/sheets/crystal_ore_fissure_depleted.txt`). |
+| `plateau_weather_mast.glb` | Weather mast, 1.8 m tall; not placed in any scene yet | 0.1 m voxels, origin at ground level. Built from Ryan's Outdoor Infrastructure grid (`tools/voxgen/sheets/plateau_weather_mast.txt`). |
+| `gulch_culvert_bridge.glb` | Culvert bridge for the straight gulch, 2.0 m × 2.0 m × 1.2 m tall; not placed in any scene yet | 0.2 m voxels, origin at the base. Built from Ryan's Outdoor Infrastructure grid (`tools/voxgen/sheets/gulch_culvert_bridge.txt`). |
+| `solar_array_skid.glb` | Tilted solar panel on a skid, 1.2 m tall; not placed in any scene yet | 0.1 m voxels, origin at ground level. Built from Ryan's Outdoor Infrastructure grid (`tools/voxgen/sheets/solar_array_skid.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.025 m, 0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 
