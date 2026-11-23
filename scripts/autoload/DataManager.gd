@@ -28,6 +28,7 @@ const DATA_FILES: Dictionary = {
 	&"items": "res://data/items.json",
 	&"economy": "res://data/economy.json",
 	&"props": "res://data/props.json",
+	&"skills": "res://data/skills.json",
 }
 
 ## Table -> { section -> required fields (besides "id") }.
@@ -50,6 +51,10 @@ const RECORD_SECTIONS: Dictionary = {
 	&"items": {},
 	&"economy": {},
 	&"props": {},
+	&"skills": {
+		"skills": ["display_name", "scope"],
+		"xp_sources": ["skill", "xp"],
+	},
 }
 
 var is_loaded: bool = false

@@ -1,0 +1,25 @@
+{
+  "_note": "Player skills (docs/design/equipment_skills_robots.md section 2). scope player: each player has their own; farm: one shared by the whole farm [ASSUMPTION]. Total XP to reach level n = base_xp × (n − 1) × n / 2. Every number is a [PLACEHOLDER]. Robotics has no XP source until robots arrive (milestone 5).",
+  "level_curve": { "max_level": 10, "base_xp": 50 },
+  "skills": [
+    { "id": "calibration", "display_name": "Calibration", "scope": "player" },
+    { "id": "uncertainty", "display_name": "Uncertainty", "scope": "player" },
+    { "id": "instrumentation", "display_name": "Instrumentation", "scope": "farm" },
+    { "id": "robotics", "display_name": "Robotics", "scope": "farm" },
+    { "id": "husbandry", "display_name": "Husbandry", "scope": "farm" },
+    { "id": "field_ops", "display_name": "Field Ops", "scope": "player" }
+  ],
+  "xp_sources": [
+    { "id": "calibrate_player", "skill": "calibration", "xp": 10 },
+    { "id": "calibrate_found_oot", "skill": "calibration", "xp": 5 },
+    { "id": "calibrate_on_time", "skill": "uncertainty", "xp": 5 },
+    { "id": "calibrate_clean_tur", "skill": "uncertainty", "xp": 5 },
+    { "id": "clean_audit", "skill": "uncertainty", "xp": 20 },
+    { "id": "buy_standard", "skill": "instrumentation", "xp": 15 },
+    { "id": "calibrate_standard", "skill": "instrumentation", "xp": 20 },
+    { "id": "collect_spool", "skill": "husbandry", "xp": 10 },
+    { "id": "slot_spool", "skill": "husbandry", "xp": 5 },
+    { "id": "mine_fissure", "skill": "field_ops", "xp": 2 },
+    { "id": "till", "skill": "field_ops", "xp": 1 }
+  ]
+}

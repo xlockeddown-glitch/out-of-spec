@@ -29,6 +29,10 @@ signal soil_tilled(cell: Vector3i)
 signal jobs_changed
 ## The lab grew, a build started or finished, or an area changed.
 signal lab_changed
+## A skill gained XP. `player_id` is "" for a farm skill.
+signal skill_xp_changed(player_id: String, skill_id: String)
+## A skill reached a new level. `player_id` is "" for a farm skill.
+signal skill_leveled(player_id: String, skill_id: String, level: int)
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -42,6 +46,7 @@ const ECONOMY_TABLE: StringName = &"economy"
 const DRIFT_TABLE: StringName = &"sensor_drift_config"
 const DISPATCH_TABLE: StringName = &"dialogue_dispatches"
 const CROPS_TABLE: StringName = &"crops"
+const SKILLS_TABLE: StringName = &"skills"
 const SOIL_PROBE_ID: String = "soil_probe"
 ## Who did a calibration when it wasn't a player: the manager's grace cal.
 ## Player ids must never be this or LEGACY_LOCAL_PERFORMER.
@@ -220,6 +225,10 @@ var seed_crop_id: String = ""
 ## Irrigation offset (in SETPOINT_STEP steps) that new plantings start with,
 ## so a player who knows the probe's error can correct for it before planting.
 var planting_offset_steps: int = 0
+## Player id -> { skill id: XP }, for the skills each player has of their own.
+var player_skill_xp: Dictionary = {}
+## Skill id -> XP, for the skills the whole farm shares.
+var farm_skill_xp: Dictionary = {}
 ## Passed as plant_crop's offset to mean "use planting_offset_steps now".
 const OFFSET_CURRENT: int = -2147483648
 
@@ -373,7 +382,7 @@ const SAVED_FIELDS: Array[String] = [
 ]
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
-const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks"]
+const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -777,6 +786,7 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 	calibration_recorded.emit(record)
 	_note_soil_excursions()
 	_credibility_after_calibration(record)
+	_xp_after_calibration(record)
 	return record
 
 
@@ -880,7 +890,7 @@ func kestrel_purchase_problem(standard_id: String) -> String:
 ## Buys a standard from Kestrel. Returns "" on success, or the reason it can't
 ## happen. It comes with no certificate, so it is due at OIRM at once, and work
 ## done with it is not traceable until OIRM has certified it.
-func buy_from_kestrel(standard_id: String) -> String:
+func buy_from_kestrel(standard_id: String, player_id: String = "") -> String:
 	var problem: String = kestrel_purchase_problem(standard_id)
 	if problem != "":
 		return problem
@@ -893,9 +903,106 @@ func buy_from_kestrel(standard_id: String) -> String:
 		contract_state = "fulfilled"
 		credibility_changed.emit(credibility)
 		post_phone("OIRM CONTRACT closed: the %s is already on the colony." % instrument_name(standard_id))
+	_award_xp("buy_standard", player_id)
 	upgrades_changed.emit()
 	oirm_changed.emit()
 	return ""
+
+
+# --- Skills (section 2) -------------------------------------------------------
+
+func skill_ids() -> Array[String]:
+	var out: Array[String] = []
+	for skill: Dictionary in DataManager.get_records(SKILLS_TABLE, "skills"):
+		out.append(str(skill["id"]))
+	return out
+
+
+## True for a skill the whole farm shares; false for one each player has.
+func is_farm_skill(skill_id: String) -> bool:
+	return DataManager.get_record(SKILLS_TABLE, skill_id, "skills").get("scope", "") == "farm"
+
+
+## `player_id` "" means the local player; it makes no difference to a farm skill.
+func skill_xp(skill_id: String, player_id: String = "") -> int:
+	if is_farm_skill(skill_id):
+		return int(farm_skill_xp.get(skill_id, 0))
+	var own: Dictionary = player_skill_xp.get(local_player_id if player_id == "" else player_id, {})
+	return int(own.get(skill_id, 0))
+
+
+func skill_level(skill_id: String, player_id: String = "") -> int:
+	return _level_for_xp(skill_xp(skill_id, player_id))
+
+
+func max_skill_level() -> int:
+	return int(DataManager.get_number(SKILLS_TABLE, "level_curve/max_level", 10.0))
+
+
+## Total XP that reaches `level`: base × (level − 1) × level / 2.
+func xp_for_level(level: int) -> int:
+	return roundi(DataManager.get_number(SKILLS_TABLE, "level_curve/base_xp", 50.0) * (level - 1) * level / 2.0)
+
+
+func _level_for_xp(xp: int) -> int:
+	var level: int = 1
+	while level < max_skill_level() and xp >= xp_for_level(level + 1):
+		level += 1
+	return level
+
+
+## Gives the XP of one source in data/skills.json to the acting player, or to
+## the farm for a farm skill. The manager earns none.
+func _award_xp(source_id: String, player_id: String = "") -> void:
+	if player_id == MANAGER_ID:
+		return
+	if player_id == "":
+		player_id = local_player_id
+	var source: Dictionary = DataManager.get_record(SKILLS_TABLE, source_id, "xp_sources")
+	var skill: String = str(source.get("skill", ""))
+	var gained: int = int(source.get("xp", 0))
+	if gained <= 0 or DataManager.get_record(SKILLS_TABLE, skill, "skills").is_empty():
+		return
+	var farm: bool = is_farm_skill(skill)
+	var before: int = skill_xp(skill, player_id)
+	if farm:
+		farm_skill_xp[skill] = before + gained
+	else:
+		if not player_skill_xp.has(player_id):
+			player_skill_xp[player_id] = {}
+		player_skill_xp[player_id][skill] = before + gained
+	var owner_id: String = "" if farm else player_id
+	skill_xp_changed.emit(owner_id, skill)
+	var level: int = _level_for_xp(before + gained)
+	if level > _level_for_xp(before):
+		skill_leveled.emit(owner_id, skill, level)
+
+
+## XP for a calibration (section 2.2). An untraceable one, or one made before
+## the instrument has run half its interval, gives none, so it can't be repeated
+## for XP.
+func _xp_after_calibration(record: Dictionary) -> void:
+	if not record["traceable"] or int(record["days_in_service"]) < ceili(int(record["previous_interval_days"]) / 2.0):
+		return
+	var player: String = record["performed_by"]
+	_award_xp("calibrate_player", player)
+	if not record["as_found_in_tolerance"]:
+		_award_xp("calibrate_found_oot", player)
+	if record["on_time"]:
+		_award_xp("calibrate_on_time", player)
+	if float(record["tur"]) >= CalUncertainty.tur_clean():
+		_award_xp("calibrate_clean_tur", player)
+	if get_sensor(record["instrument_id"]).role == "standard":
+		_award_xp("calibrate_standard", player)
+
+
+## A clean audit is everyone's: each player on the farm gets its XP [ASSUMPTION].
+func _award_clean_audit_xp() -> void:
+	var players: Array = player_skill_xp.keys()
+	if not local_player_id in players:
+		players.append(local_player_id)
+	for player: Variant in players:
+		_award_xp("clean_audit", str(player))
 
 
 # --- Relay lock (section 1.4 #4, section 1.7) ---------------------------------
@@ -1114,6 +1221,7 @@ func _update_clean_audit_gate(report: Dictionary) -> void:
 		return
 	clean_audit_streak += 1
 	report["clean"] = true
+	_award_clean_audit_xp()
 	if not tier1_unlocked:
 		tier1_unlocked = true
 		post_phone("VANCE: First clean audit on file. Tier 1 equipment is cleared for purchase.")
@@ -1458,11 +1566,12 @@ func is_fissure_available(fissure_id: StringName) -> bool:
 	return GameClock.get_day_index() >= int(mined_fissures[fissure_id]) + regrow
 
 
-func mine_fissure(fissure_id: StringName) -> bool:
+func mine_fissure(fissure_id: StringName, player_id: String = "") -> bool:
 	if not is_fissure_available(fissure_id):
 		return false
 	mined_fissures[fissure_id] = GameClock.get_day_index()
 	crystal_ore += 1
+	_award_xp("mine_fissure", player_id)
 	ore_changed.emit(crystal_ore)
 	fissures_changed.emit()
 	return true
@@ -1614,7 +1723,7 @@ func _purchase_problem(standard_id: String) -> String:
 ## the reason it can't happen. It arrives with a maker's certificate traceable
 ## to OIRM, valid for its first interval, and puts the units it calibrates in
 ## service (due one interval from today, with no calibration on record yet).
-func buy_standard(standard_id: String) -> String:
+func buy_standard(standard_id: String, player_id: String = "") -> String:
 	var problem: String = standard_purchase_problem(standard_id)
 	if problem != "":
 		return problem
@@ -1635,6 +1744,7 @@ func buy_standard(standard_id: String) -> String:
 	if standard_id == contract_standard_id() and contract_state == "complete":
 		contract_state = "fulfilled"
 		credibility_changed.emit(credibility)
+	_award_xp("buy_standard", player_id)
 	upgrades_changed.emit()
 	oirm_changed.emit()
 	return ""
@@ -1759,7 +1869,7 @@ func _tick_molt(delta_days: float) -> void:
 
 
 ## Picks up the spool from a molted enclosure and starts the next molt cycle.
-func collect_spool() -> bool:
+func collect_spool(player_id: String = "") -> bool:
 	if not is_spool_ready():
 		return false
 	optical_silk_spools += 1
@@ -1767,6 +1877,7 @@ func collect_spool() -> bool:
 	exuvia_until_day = GameClock.get_day_index() + EXUVIA_LINGER_DAYS
 	molt_progress = 0.0
 	molt_stage = MoltStage.ACTIVE
+	_award_xp("collect_spool", player_id)
 	silk_changed.emit(optical_silk_spools)
 	molt_changed.emit(molt_progress, molt_stage)
 	return true
@@ -1778,12 +1889,13 @@ func can_slot_spool() -> bool:
 	return optical_silk_spools > 0 and not relay_slotted
 
 
-func slot_spool_into_relay() -> bool:
+func slot_spool_into_relay(player_id: String = "") -> bool:
 	if not can_slot_spool():
 		return false
 	optical_silk_spools -= 1
 	slotted_spool_species = _spool_species.pop_front() if not _spool_species.is_empty() else dome_species_id
 	relay_slotted = true
+	_award_xp("slot_spool", player_id)
 	silk_changed.emit(optical_silk_spools)
 	relay_changed.emit(relay_slotted)
 	return true
@@ -2727,10 +2839,11 @@ func crop_name(crop_id: String) -> String:
 
 ## Records a cell as tilled, so it stays tilled across scene swaps. Returns
 ## false if it already was. The grid decides whether the cell is soil.
-func till(cell: Vector3i) -> bool:
+func till(cell: Vector3i, player_id: String = "") -> bool:
 	if tilled_cells.has(cell):
 		return false
 	tilled_cells[cell] = true
+	_award_xp("till", player_id)
 	soil_tilled.emit(cell)
 	return true
 
