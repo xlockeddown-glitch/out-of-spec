@@ -24,6 +24,10 @@ TEAL, AMBER, RED, SHADOW = "#38E1C6", "#F5A623", "#FF5A5F", "#1D222B"
 # border. Ryan's cutoff: emit_* parts of at most 9 voxels. Today's lit parts are
 # 1-9 or 22+ voxels, so any value from 9 to 21 borders the same parts.
 BORDER_MAX_PART_VOXELS = 9
+# Models the border pass skips. The FM-3 case is 6 x 4 x 3 voxels: the pass would paint both
+# meter voxels and most of the shell around its 2-voxel screen, and Gemini already set the
+# screen on dark foam (S).
+BORDER_SKIP = {"fm3_field_meter_case"}
 
 
 # ---------------------------------------------------------------- tractor
@@ -749,25 +753,51 @@ ENV_STANDARDS = {
                                   "F1": "#2E3844", "B1": "#D9A13B", "S": SHADOW},
 }
 
+# The Gemini art loop's batch (2026-11-22, 0.1 m voxels, Ryan: "All five"): two more live
+# tarantulas sized like the Curlyhair, the PX-1 rotary table, the MD-2P humidity generator and
+# the FM-3 in its carry case. Palettes as Gemini gave them, except the case's meter: Gemini
+# made it orange (O1 #E85D25), but the game's FM-3 is Ryan's yellow (field_meter_fm3 Y1), so
+# O1 takes that yellow. Built and turned like the field props; each glowing token is its own
+# emit_* part. Built only: none is placed in a scene yet.
+ART_LOOP = {
+    "mexican_redknee": ({"B1": "#2E2B30", "B2": "#473F3E", "C1": "#D8B794", "K1": "#D44E1C",
+                         "K2": "#9A3A1E", "S": SHADOW}, "spider", {}),
+    "brazilian_black": ({"K1": "#0E1117", "K2": SHADOW, "S1": "#324058", "S2": "#586E8C",
+                         "EY": "#9AB0CC"}, "spider", {}),
+    "px1_rotary_table": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "P1": "#B8C4CE",
+                          "B1": "#D9A13B", "GT": TEAL, "S": SHADOW}, "prop",
+                         {"GT": "emit_display"}),
+    "md2p_humidity_generator": ({"C1": "#6C7A89", "C2": "#4A607A", "M3": "#2E3844",
+                                 "M4": "#9AA5B1", "B1": "#E0A96D", "W1": "#4A7A82",
+                                 "N1": "#C85A2A", "G1": TEAL, "G2": AMBER, "S": SHADOW}, "prop",
+                                {"G1": "emit_display", "G2": "emit_standby_led"}),
+    "fm3_field_meter_case": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "B1": "#D9A13B",
+                              "O1": "#E5B53B", "C1": "#8A94A0", "P1": "#D1D5DB", "G1": TEAL,
+                              "S": SHADOW}, "prop", {"G1": "emit_screen"}),
+}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
-                     colors: dict[str, str], part: str = "prop") -> Model:
+                     colors: dict[str, str], part: str = "prop",
+                     parts: dict[str, str] | None = None) -> Model:
     """cells: {(x, y, z): token} in sheet axes (X right, Y back, Z up). Sheet (x, y, z) goes
-    to Godot (w-1-x, z, y), so sheet Y=0 (the front) lands at -z after the offset."""
+    to Godot (w-1-x, z, y), so sheet Y=0 (the front) lands at -z after the offset. `parts`
+    puts some tokens in their own part (an emit_* part glows); the rest go in `part`."""
     m = Model(name, offset=(-w / 2.0, 0.0, -d / 2.0))
     for (x, y, z), token in cells.items():
-        m.put(part, w - 1 - x, z, y, colors[token])
+        m.put((parts or {}).get(token, part), w - 1 - x, z, y, colors[token])
     return m
 
 
-def prop_sheet(name: str, colors: dict[str, str] | None = None, part: str = "prop") -> Model:
+def prop_sheet(name: str, colors: dict[str, str] | None = None, part: str = "prop",
+               parts: dict[str, str] | None = None) -> Model:
     """Built voxel for voxel from Gemini's layer grid in sheets/<name>.txt."""
     layers = token_sheet(f"{name}.txt")
     w, d = len(layers[0][0]), len(layers[0])
     cells = {(x, d - 1 - row_i, z): cell
              for z, rows in layers.items() for row_i, row in enumerate(rows)
              for x, cell in enumerate(row) if cell != ".."}
-    return front_to_minus_z(name, cells, w, d, colors or FIELD_PROPS[name], part)
+    return front_to_minus_z(name, cells, w, d, colors or FIELD_PROPS[name], part, parts)
 
 
 MODELS = [
@@ -794,6 +824,7 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, METROLOGY_LAB[n][0])), METROLOGY_LAB[n][1]) for n in METROLOGY_LAB],
     (lambda: prop_sheet("env_chamber_cart", ENV_CHAMBER), 0.1),
     *[((lambda n=n: prop_sheet(n, ENV_STANDARDS[n])), 0.025) for n in ENV_STANDARDS],
+    *[((lambda n=n: prop_sheet(n, *ART_LOOP[n])), 0.1) for n in ART_LOOP],
 ]
 
 
@@ -806,7 +837,7 @@ def main() -> None:
     (OUT / "source").mkdir(parents=True, exist_ok=True)
     for build, voxel_m in MODELS:
         m = build()
-        bordered = m.border_lit(SHADOW, BORDER_MAX_PART_VOXELS)
+        bordered = 0 if m.name in BORDER_SKIP else m.border_lit(SHADOW, BORDER_MAX_PART_VOXELS)
         m.write_glb(OUT / f"{m.name}.glb")
         m.write_vox(OUT / "source" / f"{m.name}.vox")
         w, h, d = m.size()
