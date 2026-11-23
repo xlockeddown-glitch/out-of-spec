@@ -22,6 +22,7 @@ The process (asking Ryan multiple-choice questions with a write-in, asking 2 to 
   - Keep randomness in seeded `RandomNumberGenerator`s owned by the simulation, never the global `randf()`, `shuffle()` or `pick_random()`. Use `GameState.rng` (seeded from `GameState.world_seed`) or give the object its own generator reseeded from the world seed, as `DriftingSensor.reseed()` does.
   - Drive the simulation from `GameClock` (`time_advanced`, `day_started`), not `_process` delta.
   - Calibration records name a player by `GameState.local_player_id`; `GameState.performer_name()` gives the name to show. `DriftingSensor` state saves with `to_dict()`/`apply_dict()` (all of it: `GameState.sensors_to_dict()`).
+  - The whole farm saves with `GameState.farm_to_dict()`/`farm_from_dict()`, and `SaveGame` writes it to a file. List every new `GameState` variable in `SAVED_FIELDS`, `SAVED_LATER` or `NOT_SAVED`; a test fails until you do.
 - **Ask when unsure.** Design calls, names and numbers are Ryan's to make. Ask as in [Asking Ryan](docs/workflow.md#1-asking-ryan): 2 to 4 choices plus a write-in, with "Ask other models first" offered on design calls. If reviewers disagree, ask Ryan.
 
 ### Shortcuts by task
@@ -83,7 +84,7 @@ scenes/          playable scenes
 scripts/         GDScript (autoload/, rover/, world/, camera/, ui/)
 ui/              UI scenes (field phone HUD)
 data/            JSON game data, loaded by the DataManager autoload
-scripts/autoload/   DataManager, GameClock, GameState (live state across scenes), SceneSwitcher
+scripts/autoload/   DataManager, GameClock, GameState (live state across scenes), SaveGame, SceneSwitcher
 scripts/metrology/  DriftingSensor: shared instrument drift + guard-band status
 scripts/dome/       dome interior + terrarium visuals
 assets/voxels/   MagicaVoxel exports (Week 4)

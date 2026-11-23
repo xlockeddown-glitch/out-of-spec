@@ -879,3 +879,16 @@ Agent's notes (flagged for Ryan, not his words):
 
 - The agent asked which of the new art packs to place. The options were set dressing on the farm with no collision and no readings. The new ore fissure and "Leave them unplaced" were not picked, so the existing fissure stays as it is.
 - The spots and the Inspect texts are the agent's. The culvert bridge takes the place of one gulch tile.
+
+## 2026-11-22: The farm saves to one file
+
+### Ryan chose
+
+- "Save and load (Recommended)"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The host's game writes one farm file, `user://farm.save`. The save before it is kept beside it as `.bak`, and loading falls back to it if the newer file is missing or won't load. A file the game can't read is set aside as `.unreadable` (numbered if there is one already), not deleted.
+- The file is Godot's binary form without objects, not JSON, because Godot's JSON rounds numbers and a loaded farm must continue exactly as the saved one would. It carries a format version and a SHA-256 check of its contents.
+- One save slot for now. Open for Ryan: more slots.
+- This change only adds the save code. Nothing in the game saves or loads yet.
