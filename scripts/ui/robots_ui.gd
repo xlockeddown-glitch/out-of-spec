@@ -106,6 +106,7 @@ func _add_robot_rows(id: String) -> void:
 				robot["name"], SP811.integer(robot["done_day"])], TEXT, 20))
 		"released":
 			_rows.add_child(PlanBoardUI._label("%s: released" % robot["name"], TEAL, 20))
+			_add_card_rows(id)
 		_:
 			_rows.add_child(PlanBoardUI._label("%s: commissioning" % robot["name"], AMBER, 20))
 			for sensor_id: String in GameState.robot_sensor_ids(id):
@@ -116,6 +117,34 @@ func _add_robot_rows(id: String) -> void:
 			release.set_meta(&"row", id)
 			release.pressed.connect(_on_release_pressed.bind(id))
 			_rows.add_child(release)
+
+
+## A released robot's job cards, top to bottom, then the cards it can be given.
+func _add_card_rows(id: String) -> void:
+	var cards: Array = GameState.robot_cards(id)
+	for i: int in cards.size():
+		_add_card_button("REMOVE CARD %s: %s" % [SP811.integer(i + 1), GameState.robot_card_text(cards[i])],
+			"%s remove %d" % [id, i], GameState.remove_robot_card.bind(id, i), "Card removed.")
+	if cards.size() >= GameState.robot_card_slots():
+		return
+	_add_card_button("ADD CARD: WATER all plots at 06:00 every day", id + " clock",
+		GameState.add_robot_card.bind(id, "clock"), "Card added.")
+	_add_card_button("ADD CARD: WATER all plots when the soil reads off target", id + " soil",
+		GameState.add_robot_card.bind(id, "soil"), "Card added.")
+
+
+func _add_card_button(text: String, row: String, action: Callable, done: String) -> void:
+	var button: Button = PlanBoardUI._button(text)
+	button.set_meta(&"row", row)
+	button.pressed.connect(_on_card_pressed.bind(row, action, done))
+	_rows.add_child(button)
+
+
+func _on_card_pressed(row: String, action: Callable, done: String) -> void:
+	_armed_id = ""
+	_show_result(action.call(), done)
+	_refresh()
+	_focus_row(row)
 
 
 func _on_order_pressed(id: String) -> void:
