@@ -191,6 +191,8 @@ func broadcast_state() -> void:
 
 func _update_line_of_sight(delta: float) -> void:
 	var los: bool = _raycast_to_relay()
+	if satellite_relay != null:
+		GameState.set_rover_uplink(rover_id, los)
 	var target_quality: float = 1.0 if los else occluded_link_quality
 	var new_quality: float = move_toward(link_quality, target_quality, link_slew_per_s * delta)
 	if los == has_line_of_sight and is_equal_approx(new_quality, link_quality):

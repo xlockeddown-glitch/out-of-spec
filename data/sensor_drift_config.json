@@ -92,9 +92,9 @@
       "as_left_residual": 0.02,
       "resolution": 0.01,
       "display_decimals": 2,
-      "calibrated_by": "",
+      "calibrated_by": "rubidium_reference",
       "bench_minutes": 60,
-      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: fractional frequency scaled by 10⁻⁶. The game MPE of ±1.0 × 10⁻⁶ and readout step of 0.01 × 10⁻⁶ are proposed limits for a Stratum 3 OCXO (CTS Model 137 class, ±0.5 × 10⁻⁶ annual aging) read on a reciprocal counter (Keysight 53230A class). Drift is a game pace. Its standard, the Rb-2D, comes in M3b; until then it is out of service: it does not drift and is not audited."
+      "_note": "M3a, researched 2026-11-22 then [PLACEHOLDER] until playtest: fractional frequency scaled by 10⁻⁶. The game MPE of ±1.0 × 10⁻⁶ and readout step of 0.01 × 10⁻⁶ are proposed limits for a Stratum 3 OCXO (CTS Model 137 class, ±0.5 × 10⁻⁶ annual aging) read on a reciprocal counter (Keysight 53230A class). Drift is a game pace. Its standard, the Rb-2D, is not sold yet; until the colony has one it is out of service: it does not drift and is not audited."
     },
     "rotary_table": {
       "role": "standard",
@@ -162,9 +162,11 @@
       "price_credits": 400,
       "price_ore": 3,
       "seller": "bram",
+      "calibrated_by": "pressure_controller",
+      "bench_minutes": 60,
       "maker": "Wren & Dufour",
       "certificate_prefix": "WD",
-      "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #7). Researched 2026-11-22: WIKA CPG1500 class precision digital test gauge, 0 kPa to 250 kPa, ±0.05 % of span (0.125 kPa) with the measuring rate at up to three readings per second; 0.01 kPa display. WIKA states the accuracy at k = 2, which the game enters as spec_confidence_pct 95. The 0.03 kPa certificate uncertainty (k = 2) is an estimated lab budget: a Mensor CPC8000-class controller adds about 0.020 kPa, the rest is readout and repeatability. Drift takes it to its MPE in about 120 days (Ryan, 2026-11-22); WIKA recommends a one-year calibration interval, depending on use. Price and interval are game balance [PLACEHOLDER]."
+      "_note": "Tier 1, sold by Bram after the first clean audit (spec section 1.4 #7). Researched 2026-11-22: WIKA CPG1500 class precision digital test gauge, 0 kPa to 250 kPa, ±0.05 % of span (0.125 kPa) with the measuring rate at up to three readings per second; 0.01 kPa display. WIKA states the accuracy at k = 2, which the game enters as spec_confidence_pct 95. The 0.03 kPa certificate uncertainty (k = 2) is an estimated lab budget: a Mensor CPC8000-class controller adds about 0.020 kPa, the rest is readout and repeatability. Drift takes it to its MPE in about 120 days (Ryan, 2026-11-22); WIKA recommends a one-year calibration interval, depending on use. Price and interval are game balance [PLACEHOLDER]. With an HB-700 on the colony it can also be calibrated on the bench (60 min [PLACEHOLDER])."
     },
     "multi_source_calibrator": {
       "role": "standard",
@@ -224,10 +226,33 @@
       "display_decimals": 3,
       "price_credits": 1600,
       "price_ore": 4,
+      "seller": "kestrel",
       "maker": "Hellas Basin Controls",
       "certificate_prefix": "HB",
       "takes_over": ["dome_pressure"],
-      "_note": "Tier 3 bench pressure controller (spec section 1.4 #6), offered early and at a discount by the first OIRM credibility contract (Ryan, 2026-11-22). Cited class spec: 0.008 % of reading (Mensor CPC8000 IntelliScale), about 0.008 kPa at a 100 kPa dome reading; the 0.01 kPa MPE rounds that up and is [PLACEHOLDER], as are the certificate uncertainty, drift (MPE in about 120 days), price and interval. takes_over: units whose standard becomes this one when it is bought (the dome gauge, which only reaches 3.11:1 against the WD-1). The tire gauge stays on the WD-1 for field calibration."
+      "_note": "Tier 3 bench pressure controller (spec section 1.4 #6), offered early and at a discount by the first OIRM credibility contract (Ryan, 2026-11-22). Cited class spec: 0.008 % of reading (Mensor CPC8000 IntelliScale), about 0.008 kPa at a 100 kPa dome reading; the 0.01 kPa MPE rounds that up and is [PLACEHOLDER], as are the certificate uncertainty, drift (MPE in about 120 days), price and interval. takes_over: units whose standard becomes this one when it is bought (the dome gauge, which only reaches 3.11:1 against the WD-1). The tire gauge stays on the WD-1 for field calibration. It also calibrates the WD-1 on the bench. Outside the contract it is Kestrel's to sell [ASSUMPTION], who does not trade yet."
+    },
+    "rubidium_reference": {
+      "role": "standard",
+      "tier": 3,
+      "relay_disciplined": true,
+      "display_name": "Qureshi & Hale Rb-2D Rubidium Reference",
+      "short_name": "Rb-2D rubidium reference",
+      "error_unit": "fractional_e6",
+      "daily_drift_rate": 0.000002,
+      "max_permissible_error": 0.0003,
+      "spec_confidence_pct": null,
+      "certificate_uncertainty": 0.0001,
+      "certificate_k": 2,
+      "initial_interval_days": 3,
+      "resolution": 0.00001,
+      "display_decimals": 5,
+      "price_credits": 2000,
+      "price_ore": 5,
+      "seller": "orin",
+      "maker": "Qureshi & Hale",
+      "certificate_prefix": "QH",
+      "_note": "Tier 3 (spec section 1.4 #4): calibrates the relay timebase. relay_disciplined: while some rover has line of sight to the relay it is locked to OIRM time and does not drift; otherwise it is in holdover, drifts at its aging rate, and its certificate lapses after initial_interval_days (3 [PLACEHOLDER]) until it locks again. It never goes to OIRM. Cited class spec: aging under 2 × 10⁻¹² per day (typical), and under 3 × 10⁻¹⁰ over 0 °C to 50 °C, used here as the MPE. Certificate uncertainty, resolution, display and price are [PLACEHOLDER]. Old Orin supplies it [ASSUMPTION]; Orin is not in the game, so it can't be bought yet."
     },
     "soil_probe": {
       "role": "unit",

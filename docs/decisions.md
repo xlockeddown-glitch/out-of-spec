@@ -919,3 +919,18 @@ Agent's notes (flagged for Ryan, not his words):
 - The FM-3 can now be calibrated on the bench against the HM-3. It gets an in-house certificate (prefix IH), keeps its interval as at OIRM [ASSUMPTION], and an out-of-tolerance as-found starts a recall. Standards don't count toward OIRM's contract run.
 - A standard whose certificate is recalled is suspect, and work done with it is not traceable, until it is calibrated again. The same goes for one adjusted against an untraceable reference.
 - [PLACEHOLDER]: HM-3 900 CR + 4 ore, U 0.00003 V, 0.00006 V MPE at a 10 V point; TW-6 700 CR + 3 ore, U 0.1 N·m, 0.25 N·m MPE at a 100 N·m point; 30-day intervals; drift to MPE in about 120 days; 60 bench minutes for the FM-3.
+
+## 2026-11-22: Tier 3 standards and the relay lock
+
+### Ryan chose
+
+- "Milestone 3b"
+- "Placeholder and go (Recommended)"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Tier 3 opens with Vance's traceable lab sign-off (two clean audits in a row, kept for good) and a Tier 2 standard with a current OIRM certificate. The Instrumentation 6 part comes with skills. An HB-700 won by contract still skips the gate.
+- The Rb-2D is in the data as Orin's and the HB-700 as Kestrel's [ASSUMPTION]. Neither trades yet, so the Rb-2D can't be had and the timebase stays out of service. Open for Ryan: who sells them.
+- The Rb-2D is locked while any rover has line of sight to the relay, by its last report (so also while the farm view is closed) [ASSUMPTION]. Locked: no drift, always in date. In holdover it drifts by aging; after 3 days [PLACEHOLDER] its certificate lapses until it locks again.
+- The WD-1 can be calibrated on the bench against the HB-700 (60 min [PLACEHOLDER]).
+- Other [PLACEHOLDER]: Rb-2D 2000 CR + 5 ore, U 0.0001 × 10⁻⁶. Its MPE, 0.0003 × 10⁻⁶, is the cited temperature spec.

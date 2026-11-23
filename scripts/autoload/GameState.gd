@@ -125,6 +125,10 @@ var suspect_units: Dictionary = {}
 var clean_audit_streak: int = 0
 ## Tier 1 equipment gate: the first audit with zero violations (Q19).
 var tier1_unlocked: bool = false
+## Tier 3 equipment gate: Vance's "traceable lab" sign-off, for good.
+var traceable_lab: bool = false
+## Rover id -> whether it last had line of sight to the relay.
+var rover_uplinks: Dictionary = {}
 var _next_certificate_number: int = 1
 ## Standards on the colony: id -> day acquired. Tier 0 from day 0; Tier 1+
 ## once bought from Bram (milestone 3a).
@@ -369,7 +373,7 @@ const SAVED_FIELDS: Array[String] = [
 ]
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
-const SAVED_LATER: Array[String] = []
+const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -810,14 +814,72 @@ func calibrate_at_bench(instrument_id: String, performed_by: String = "") -> Dic
 
 
 func _on_time_advanced(delta_days: float) -> void:
+	_hold_relay_lock()
 	for id: Variant in sensors:
-		if is_in_service(str(id)):
+		if is_in_service(str(id)) and not is_relay_locked(str(id)):
 			(sensors[id] as DriftingSensor).advance_days(delta_days)
 	_note_soil_excursions()
 	if drop_pod_present and GameClock.elapsed_days >= _drop_pod_departure_at:
 		drop_pod_present = false
 		drop_pod_changed.emit(false)
 		post_phone("AUD-1T: Departing. Please remain compliant in our absence.")
+
+
+# --- Relay lock (section 1.4 #4, section 1.7) ---------------------------------
+
+## A rover reports its line of sight to the relay here.
+func set_rover_uplink(rover_id: String, has_los: bool) -> void:
+	if rover_uplinks.has(rover_id) and (rover_uplinks[rover_id] == true) == has_los:
+		return
+	rover_uplinks[rover_id] = has_los
+	_hold_relay_lock()
+
+
+## True while the orbital relay passes OIRM time: some rover sees it, or no
+## rover has reported yet [ASSUMPTION].
+func relay_has_los() -> bool:
+	return rover_uplinks.is_empty() or true in rover_uplinks.values()
+
+
+func is_relay_disciplined(standard_id: String) -> bool:
+	var sensor: DriftingSensor = get_sensor(standard_id)
+	return sensor != null and sensor.relay_disciplined
+
+
+## True for an owned relay-disciplined standard that is locked right now. It
+## does not drift; without the lock it is in holdover and drifts by aging.
+func is_relay_locked(standard_id: String) -> bool:
+	return is_relay_disciplined(standard_id) and owned_standards.has(standard_id) and relay_has_los()
+
+
+## A locked standard is held to OIRM time and its certificate stays in date. In
+## holdover nothing renews the certificate, so it lapses after the interval.
+func _hold_relay_lock() -> void:
+	if not relay_has_los():
+		return
+	var today: int = GameClock.get_day_index()
+	for id: String in standard_ids():
+		var sensor: DriftingSensor = sensors[id]
+		if not sensor.relay_disciplined or not certificates.has(id):
+			continue
+		var lapsed: bool = sensor.is_overdue(today)
+		sensor.error = 0.0
+		sensor.cal_due_day = today + sensor.cal_interval_days
+		if certificates[id]["due_day"] != sensor.cal_due_day:
+			# A copy: the certificate log keeps the one that was issued.
+			certificates[id] = certificates[id].duplicate()
+			certificates[id]["due_day"] = sensor.cal_due_day
+		if lapsed:
+			post_phone("OIRM: %s locked to the relay again. Its certificate is valid." % instrument_name(id, true))
+			oirm_changed.emit()
+
+
+func _note_holdover_lapses(day: int) -> void:
+	for id: String in standard_ids():
+		var sensor: DriftingSensor = sensors[id]
+		if sensor.relay_disciplined and day == sensor.cal_due_day + 1:
+			post_phone("OIRM: %s out of lock too long. Its certificate has lapsed until it locks to the relay again." % instrument_name(id, true))
+			oirm_changed.emit()
 
 
 # --- Phone, dispatches, audits ------------------------------------------------
@@ -839,6 +901,8 @@ func _on_day_started(day: int) -> void:
 	# Courier returns land in the morning, before an audit that day.
 	_receive_oirm_returns(day)
 	_finish_lab_build(day)
+	_hold_relay_lock()
+	_note_holdover_lapses(day)
 	_morning = true
 	_charge_overdue_credibility(day)
 	_expire_jobs(day)
@@ -980,6 +1044,9 @@ func _update_clean_audit_gate(report: Dictionary) -> void:
 	if not tier1_unlocked:
 		tier1_unlocked = true
 		post_phone("VANCE: First clean audit on file. Tier 1 equipment is cleared for purchase.")
+	if not traceable_lab and clean_audit_streak >= 2:
+		traceable_lab = true
+		post_phone("VANCE: Two clean audits in a row. Signed off as a traceable lab.")
 
 
 ## Turns this audit's fines into a one-time warning. The manager calibrates
@@ -1142,6 +1209,8 @@ func send_to_oirm(standard_id: String) -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	if sensor == null or sensor.role != "standard":
 		return { "ok": false, "reason": "Only reference standards go to OIRM." }
+	if sensor.relay_disciplined:
+		return { "ok": false, "reason": "The %s gets OIRM time over the relay; it never goes to OIRM." % instrument_name(standard_id, true) }
 	if not owned_standards.has(standard_id):
 		return { "ok": false, "reason": "The %s is not on the colony." % instrument_name(standard_id, true) }
 	if at_oirm.has(standard_id):
@@ -1269,6 +1338,9 @@ func traceability_chain(instrument_id: String) -> Dictionary:
 		var cert: Dictionary = certificates.get(instrument_id, {})
 		if cert.is_empty():
 			return { "traceable": false, "text": "%s: no certificate" % name }
+		if sensor.relay_disciplined and standard_problem(instrument_id) == "":
+			return { "traceable": true, "text": "%s ← %s ← OIRM time" % [name, "relay lock" if is_relay_locked(instrument_id)
+				else "holdover (good to day %d)" % sensor.cal_due_day] }
 		if sensor.is_overdue(today):
 			return { "traceable": false, "text": "%s ← %s lapsed (due day %d)" % [name, cert["id"], cert["due_day"]] }
 		if suspect_units.has(instrument_id):
@@ -1382,21 +1454,36 @@ func has_oirm_account() -> bool:
 func tier_problem(standard_id: String) -> String:
 	if not tier1_unlocked:
 		return "Tier 1 equipment needs a clean audit on file first."
-	if get_sensor(standard_id).tier >= 2 and not _is_contract_stock(standard_id) and not has_oirm_account():
-		return "Tier 2 equipment needs an OIRM account: send a standard you bought for its first OIRM calibration."
+	var tier: int = get_sensor(standard_id).tier
+	if tier < 2 or _is_contract_stock(standard_id):
+		return ""
+	if not has_oirm_account():
+		return "Tier %d equipment needs an OIRM account: send a standard you bought for its first OIRM calibration." % tier
+	if tier >= 3 and not traceable_lab:
+		return "Tier 3 equipment needs Vance's traceable lab sign-off: two clean audits in a row."
+	if tier >= 3 and not _has_oirm_certified_tier2():
+		return "Tier 3 equipment needs a Tier 2 standard with a current OIRM certificate."
 	return ""
+
+
+func _has_oirm_certified_tier2() -> bool:
+	for id: String in standard_ids():
+		if (sensors[id] as DriftingSensor).tier == 2 and not at_oirm.has(id) and standard_problem(id) == "" \
+				and certificates[id].get("issuer", "") == "OIRM":
+			return true
+	return false
 
 
 func _is_bram_stock(standard_id: String) -> bool:
 	return (sensors[standard_id] as DriftingSensor).seller == "bram" or _is_contract_stock(standard_id)
 
 
-## Standards Bram stocks, in data order (owned ones included). Tier 2 shows
-## once its gate is open.
+## Standards Bram stocks, in data order (owned ones included). Tier 2 and up
+## show once their gate is open.
 func bram_catalog() -> Array[String]:
 	var ids: Array[String] = []
 	for id: String in all_standard_ids():
-		if _is_bram_stock(id) and ((sensors[id] as DriftingSensor).tier < 2 or _is_contract_stock(id) or has_oirm_account()):
+		if _is_bram_stock(id) and ((sensors[id] as DriftingSensor).tier < 2 or owned_standards.has(id) or tier_problem(id) == ""):
 			ids.append(id)
 	return ids
 
