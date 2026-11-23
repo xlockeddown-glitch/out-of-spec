@@ -949,3 +949,19 @@ Agent's notes (flagged for Ryan, not his words):
 - They read true but have no certificate [ASSUMPTION]. They count as overdue from the next day until sent to OIRM, so the audit flags them and they cost credibility daily. Work done before the first OIRM certificate stays untraceable after it.
 - Buying the HB-700 from Kestrel while the OIRM contract is open closes the contract.
 - Kestrel shows as a placeholder crate by the airlock.
+
+## 2026-11-22: Skills earn XP and levels
+
+### Ryan chose
+
+- "Milestone 4 skills"
+- "Placeholder and go (Recommended)"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The six skills, their XP and the level curve are in `data/skills.json`, from §2 of the design; all numbers [PLACEHOLDER]. Levels do nothing yet.
+- Which skill goes where ("both", from the co-op direction): Calibration, Uncertainty and Field Ops are each player's own. Instrumentation, Robotics and Husbandry are the farm's, because what they improve is shared [ASSUMPTION]. A clean audit gives its XP to every player the farm's save knows [ASSUMPTION].
+- A calibration that is not traceable (the remote zero included) gives no XP, besides the design's rule for one made too soon [ASSUMPTION]. After an untraceable zero, the next traceable calibration still gives XP.
+- The farm's save keeps every player's own XP by player id, so a new farm starts at level 1. How a guest's skills travel with them is open for Ryan.
+- Paid jobs, crops and OIRM trips give no XP; the design lists none. Open for Ryan.
+- Instrumentation is to gate Tier 2 at level 3 (150 XP), and buying the Tier 1 standards gives 15 each. Whether that can be reached in play is open before the gate goes in.
