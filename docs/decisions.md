@@ -934,3 +934,18 @@ Agent's notes (flagged for Ryan, not his words):
 - The Rb-2D is locked while any rover has line of sight to the relay, by its last report (so also while the farm view is closed) [ASSUMPTION]. Locked: no drift, always in date. In holdover it drifts by aging; after 3 days [PLACEHOLDER] its certificate lapses until it locks again.
 - The WD-1 can be calibrated on the bench against the HB-700 (60 min [PLACEHOLDER]).
 - Other [PLACEHOLDER]: Rb-2D 2000 CR + 5 ore, U 0.0001 × 10⁻⁶. Its MPE, 0.0003 × 10⁻⁶, is the cited temperature spec.
+
+## 2026-11-22: Kestrel and uncertified standards
+
+### Ryan chose
+
+- "Milestone 3b"
+- "Placeholder and go (Recommended)"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Kestrel trades at the dome airlock on solar flare nights only: from day 10, every 7 days, 20:00 to 02:00 [PLACEHOLDER]. The schedule follows the clock. Flares do nothing else yet, and the story's dropped uplink is left out.
+- Kestrel sells the HM-3 and, outside the contract, the HB-700, at list price behind the same tier gates. A contract HB-700 stays Bram's.
+- They read true but have no certificate [ASSUMPTION]. They count as overdue from the next day until sent to OIRM, so the audit flags them and they cost credibility daily. Work done before the first OIRM certificate stays untraceable after it.
+- Buying the HB-700 from Kestrel while the OIRM contract is open closes the contract.
+- Kestrel shows as a placeholder crate by the airlock.

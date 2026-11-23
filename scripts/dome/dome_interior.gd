@@ -15,6 +15,10 @@ const TOAST_SECONDS_PER_CHAR: float = 0.04
 @onready var _plan_board: Clickable = %PlanBoardClick
 @onready var _plan_board_ui: PlanBoardUI = %PlanBoardUI
 
+@onready var _kestrel: Node3D = %Kestrel
+@onready var _kestrel_click: Clickable = %KestrelClick
+@onready var _kestrel_ui: KestrelUI = %KestrelUI
+
 @onready var _clock_label: Label = %ClockLabel
 @onready var _species_label: Label = %SpeciesLabel
 @onready var _hygro_label: Label = %HygroLabel
@@ -37,6 +41,7 @@ func _ready() -> void:
 	get_viewport().physics_object_picking = true
 	_bench.clicked.connect(_bench_ui.open)
 	_plan_board.clicked.connect(_plan_board_ui.open)
+	_kestrel_click.clicked.connect(_kestrel_ui.open)
 	_airlock.clicked.connect(func() -> void: SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE))
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)
@@ -55,6 +60,11 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_refresh_status()
+	_kestrel.visible = GameState.kestrel_present()
+	if _kestrel_click.enabled != _kestrel.visible:
+		_kestrel_click.enabled = _kestrel.visible
+		if Clickable.hovered == _kestrel_click:
+			Clickable.hovered = null
 	if _toast_left > 0.0:
 		_toast_left -= delta
 	else:

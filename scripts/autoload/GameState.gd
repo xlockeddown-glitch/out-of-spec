@@ -819,10 +819,83 @@ func _on_time_advanced(delta_days: float) -> void:
 		if is_in_service(str(id)) and not is_relay_locked(str(id)):
 			(sensors[id] as DriftingSensor).advance_days(delta_days)
 	_note_soil_excursions()
+	_note_flare_start(delta_days)
 	if drop_pod_present and GameClock.elapsed_days >= _drop_pod_departure_at:
 		drop_pod_present = false
 		drop_pod_changed.emit(false)
 		post_phone("AUD-1T: Departing. Please remain compliant in our absence.")
+
+
+# --- Kestrel (section 1.7) ----------------------------------------------------
+
+func _flare_number(key: String, fallback: float) -> float:
+	return DataManager.get_number(DRIFT_TABLE, "flares/" + key, fallback)
+
+
+## True if a solar flare comes on this day's night. The schedule follows the
+## clock alone, so it needs no saving.
+func is_flare_day(day: int) -> bool:
+	var since: int = day - int(_flare_number("first_day", 10.0))
+	return since >= 0 and since % maxi(int(_flare_number("period_days", 7.0)), 1) == 0
+
+
+## When this day's flare starts, in elapsed days.
+func _flare_start(day: int) -> float:
+	return GameClock.elapsed_at_hour(day, _flare_number("start_hour", 20.0))
+
+
+## Kestrel is at the dome only while a flare lasts.
+func kestrel_present() -> bool:
+	var day: int = GameClock.get_day_index()
+	if not is_flare_day(day):
+		return false
+	var since: float = GameClock.elapsed_days - _flare_start(day)
+	return since >= 0.0 and since < _flare_number("duration_hours", 6.0) / GameClock.HOURS_PER_DAY
+
+
+func _note_flare_start(delta_days: float) -> void:
+	if kestrel_present() and GameClock.elapsed_days - delta_days < _flare_start(GameClock.get_day_index()):
+		post_phone("Solar flare tonight. Kestrel is at the dome airlock.")
+
+
+## Standards Kestrel sells, in data order (owned ones included). A standard
+## earned by the OIRM contract is Bram's to sell.
+func kestrel_catalog() -> Array[String]:
+	var ids: Array[String] = []
+	for id: String in all_standard_ids():
+		if (sensors[id] as DriftingSensor).seller == "kestrel" and not _is_contract_stock(id):
+			ids.append(id)
+	return ids
+
+
+## Why Kestrel can't sell this standard right now, or "" if it's for sale.
+func kestrel_purchase_problem(standard_id: String) -> String:
+	if not kestrel_present():
+		return "Kestrel only comes on solar flare nights."
+	if not standard_id in kestrel_catalog():
+		return "Kestrel doesn't have that."
+	return _purchase_problem(standard_id)
+
+
+## Buys a standard from Kestrel. Returns "" on success, or the reason it can't
+## happen. It comes with no certificate, so it is due at OIRM at once, and work
+## done with it is not traceable until OIRM has certified it.
+func buy_from_kestrel(standard_id: String) -> String:
+	var problem: String = kestrel_purchase_problem(standard_id)
+	if problem != "":
+		return problem
+	var sensor: DriftingSensor = get_sensor(standard_id)
+	_take_standard(standard_id)
+	sensor.cal_due_day = GameClock.get_day_index()
+	post_phone("KESTREL: One %s. No certificate. Just a number you can poke.%s" % [
+		sensor.short_name, _put_units_in_service(standard_id)[1]])
+	if standard_id == contract_standard_id() and contract_state == "active":
+		contract_state = "fulfilled"
+		credibility_changed.emit(credibility)
+		post_phone("OIRM CONTRACT closed: the %s is already on the colony." % instrument_name(standard_id))
+	upgrades_changed.emit()
+	oirm_changed.emit()
+	return ""
 
 
 # --- Relay lock (section 1.4 #4, section 1.7) ---------------------------------
@@ -1521,6 +1594,11 @@ func standard_purchase_problem(standard_id: String) -> String:
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	if sensor == null or sensor.role != "standard" or not _is_bram_stock(standard_id):
 		return "Bram doesn't stock that."
+	return _purchase_problem(standard_id)
+
+
+func _purchase_problem(standard_id: String) -> String:
+	var sensor: DriftingSensor = get_sensor(standard_id)
 	if owned_standards.has(standard_id):
 		return "The %s is already on the colony." % sensor.short_name
 	var gate: String = tier_problem(standard_id)
@@ -1541,20 +1619,47 @@ func buy_standard(standard_id: String) -> String:
 	if problem != "":
 		return problem
 	var sensor: DriftingSensor = get_sensor(standard_id)
-	add_credits(-standard_price_credits(standard_id))
-	crystal_ore -= sensor.price_ore
-	ore_changed.emit(crystal_ore)
 	var today: int = GameClock.get_day_index()
-	owned_standards[standard_id] = today
 	# New from the maker: adjusted against their own OIRM-traceable reference.
-	var zeroed: Dictionary = sensor.zero(0.0)
-	sensor.cal_interval_days = sensor.initial_interval_days if sensor.initial_interval_days > 0 \
-		else int(_interval_cfg("initial_days", 5.0))
+	var zeroed: Dictionary = _take_standard(standard_id)
 	sensor.cal_due_day = today + sensor.cal_interval_days
-	sensor.last_cal_day = today
 	var prefix: String = sensor.certificate_prefix if sensor.certificate_prefix != "" else "MKR"
 	var issuer: String = sensor.maker if sensor.maker != "" else "the maker"
 	var cert: Dictionary = _issue_certificate(standard_id, today, null, zeroed["as_left"], false, issuer, prefix)
+	var service: Array = _put_units_in_service(standard_id)
+	var text: String = "BRAM: One %s, still in the crate. Certificate %s from %s, good to day %d." % [
+		sensor.short_name, cert["id"], issuer, cert["due_day"]]
+	if service[0] != "":
+		text += " Calibrate the %s against it before Vance's next visit." % service[0]
+	post_phone(text + service[1])
+	if standard_id == contract_standard_id() and contract_state == "complete":
+		contract_state = "fulfilled"
+		credibility_changed.emit(credibility)
+	upgrades_changed.emit()
+	oirm_changed.emit()
+	return ""
+
+
+## Pays for a standard and puts it on the colony, reading true. Returns the
+## zeroing.
+func _take_standard(standard_id: String) -> Dictionary:
+	var sensor: DriftingSensor = get_sensor(standard_id)
+	add_credits(-standard_price_credits(standard_id))
+	crystal_ore -= sensor.price_ore
+	ore_changed.emit(crystal_ore)
+	owned_standards[standard_id] = GameClock.get_day_index()
+	sensor.cal_interval_days = sensor.initial_interval_days if sensor.initial_interval_days > 0 \
+		else int(_interval_cfg("initial_days", 5.0))
+	var zeroed: Dictionary = sensor.zero(0.0)
+	sensor.last_cal_day = GameClock.get_day_index()
+	return zeroed
+
+
+## Puts the units a bought standard calibrates in service (due one interval
+## from today). Returns their names, and a line about the units it takes over
+## from another standard.
+func _put_units_in_service(standard_id: String) -> Array:
+	var today: int = GameClock.get_day_index()
 	var units: PackedStringArray = []
 	# A unit this standard takes over was already in service: it moves to the
 	# new standard but keeps its due day.
@@ -1576,22 +1681,13 @@ func buy_standard(standard_id: String) -> String:
 		# Put in service today: the first calibration is not interval evidence.
 		unit.last_cal_day = today
 		units.append(_mid_sentence(unit.short_name))
-	var text: String = "BRAM: One %s, still in the crate. Certificate %s from %s, good to day %d." % [
-		sensor.short_name, cert["id"], issuer, cert["due_day"]]
-	if not units.is_empty():
-		text += " Calibrate the %s against it before Vance's next visit." % " and the ".join(units)
+	var taken_text: String = ""
 	if not taken.is_empty():
 		var taken_names: PackedStringArray = []
 		for id: String in taken:
 			taken_names.append(_mid_sentence(instrument_name(id)))
-		text += " The %s now calibrates against it." % " and the ".join(taken_names)
-	post_phone(text)
-	if standard_id == contract_standard_id() and contract_state == "complete":
-		contract_state = "fulfilled"
-		credibility_changed.emit(credibility)
-	upgrades_changed.emit()
-	oirm_changed.emit()
-	return ""
+		taken_text = " The %s now calibrates against it." % " and the ".join(taken_names)
+	return [" and the ".join(units), taken_text]
 
 
 func bram_line(section: String) -> String:
@@ -1930,7 +2026,7 @@ func _band_index_named(band_name: String) -> int:
 func _offer_first_contract() -> void:
 	var standard: String = contract_standard_id()
 	var sensor: DriftingSensor = get_sensor(standard)
-	if sensor == null:
+	if sensor == null or owned_standards.has(standard):
 		return
 	contract_state = "active"
 	contract_run = 0
@@ -1971,7 +2067,7 @@ func jobs_open_band() -> String:
 
 
 ## Owned standards that can do `job` (its discipline, at its tier or better),
-## best first: in date before overdue, then the higher tier.
+## best first: those that give a traceable result, then the higher tier.
 func job_standards(job: Dictionary) -> Array[String]:
 	var ids: Array[String] = []
 	var listed: Variant = job_disciplines().get(str(job.get("discipline", "")), [])
@@ -1982,12 +2078,10 @@ func job_standards(job: Dictionary) -> Array[String]:
 		var sensor: DriftingSensor = get_sensor(id)
 		if sensor != null and owned_standards.has(id) and sensor.tier >= int(job.get("min_tier", 0)):
 			ids.append(id)
-	var today: int = GameClock.get_day_index()
 	ids.sort_custom(func(a: String, b: String) -> bool:
-		var a_late: bool = get_sensor(a).is_overdue(today)
-		var b_late: bool = get_sensor(b).is_overdue(today)
-		if a_late != b_late:
-			return not a_late
+		var a_good: bool = standard_problem(a) == ""
+		if a_good != (standard_problem(b) == ""):
+			return a_good
 		return get_sensor(a).tier > get_sensor(b).tier)
 	return ids
 
@@ -2086,7 +2180,8 @@ func complete_job(job_id: String) -> Dictionary:
 	if problem != "":
 		return { "ok": false, "reason": problem }
 	var standard_id: String = job_bench_standard(job)
-	var traceable: bool = standard_problem(standard_id) == ""
+	var fault: String = standard_problem(standard_id)
+	var traceable: bool = fault == ""
 	# The work takes its time. The job stays active, marked at the bench, so a
 	# morning during it neither cancels it nor offers it again.
 	var minutes: float = float(job.get("bench_minutes", 0.0))
@@ -2118,6 +2213,7 @@ func complete_job(job_id: String) -> Dictionary:
 		"day": today,
 		"on_time": on_time,
 		"traceable": traceable,
+		"standard_problem": fault,
 		"offered": offered,
 		"pay": roundi(pay),
 		"points": points,
@@ -2140,7 +2236,7 @@ func job_result_text(result: Dictionary) -> String:
 	if not result["on_time"]:
 		problems.append("LATE")
 	if not result["traceable"]:
-		problems.append("NOT TRACEABLE (%s overdue)" % _model_name(result["standard_id"]))
+		problems.append("NOT TRACEABLE (%s %s)" % [_model_name(result["standard_id"]), result.get("standard_problem", "overdue")])
 	var points: int = result["points"]
 	return "%s done for %s: %s CR%s, credibility %s%s." % [
 		result["job_id"], result["customer"], SP811.integer(result["pay"]),
