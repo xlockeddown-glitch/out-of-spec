@@ -9,6 +9,8 @@ const LOG_REPLAY_LINES: int = 6
 const INSPECT_SECONDS: float = 3.0
 ## Long descriptions stay up longer.
 const INSPECT_SECONDS_PER_CHAR: float = 0.04
+## The prop whose inspect text also carries the plot's soil readings.
+const SOIL_PROBE_PROP: String = "soil_moisture_probe"
 
 var _had_los: bool = true
 var _last_band: int = DriftingSensor.Band.IN_BAND
@@ -45,7 +47,12 @@ func _ready() -> void:
 	for prop: Inspectable in get_tree().get_nodes_in_group(Inspectable.GROUP):
 		# Not the phone log: it keeps only a few lines, and prop clicks would
 		# push dispatches and audits out of it.
-		prop.inspected.connect(_show_inspect)
+		if prop.prop_id == SOIL_PROBE_PROP:
+			# Ryan (2026-11-22): "both". The probe also reads out the plot.
+			prop.inspected.connect(func(text: String) -> void:
+				_show_inspect(text + " " + GameState.soil_probe_text()))
+		else:
+			prop.inspected.connect(_show_inspect)
 	# Bound methods so the autoload drops them when this scene is freed.
 	GameState.silk_changed.connect(_on_silk_changed)
 	GameState.relay_changed.connect(_on_relay_changed)

@@ -357,3 +357,51 @@ func test_plant_uses_the_offset_sent_with_the_command() -> String:
 	if absf(setpoint - expected) > 1e-9:
 		return "Set point must use the +4 offset sent with the command, got %s." % setpoint
 	return ""
+
+
+## Ryan (2026-11-22): "both". Clicking the soil probe reads out the plot:
+## irrigation holds its reading at the set point, even with the probe drifted.
+func test_soil_probe_reads_each_planting_at_its_set_point() -> String:
+	var gs: GameStateScript = _make_state()
+	var problem: String = ""
+	var empty: String = gs.soil_probe_text()
+	if not empty.begins_with("Nothing planted"):
+		problem = "With nothing planted the probe must say so, got '%s'." % empty
+	gs.plant_crop(CELL)
+	gs.get_sensor(gs.SOIL_PROBE_ID).error = 1.3
+	var setpoint: float = float(gs.plantings[CELL]["setpoint"]) * 100.0
+	var reading: float = gs.soil_probe_reading(CELL)
+	if problem == "" and not is_equal_approx(reading, snappedf(setpoint, 0.1)):
+		problem = "The probe must read the set point %s %%, got %s %%." % [setpoint, reading]
+	var text: String = gs.soil_probe_text()
+	var want: String = "(%d, %d) %s %%" % [CELL.x, CELL.z, SP811.number(reading, 1)]
+	if problem == "" and (want not in text or "due day" not in text):
+		problem = "The readout must hold '%s' and the due day, got '%s'." % [want, text]
+	_done(gs)
+	return problem
+
+
+## The readout lists the first cells, counts the rest, and flags an overdue probe.
+func test_soil_probe_text_caps_cells_and_flags_overdue() -> String:
+	var gs: GameStateScript = _make_state()
+	gs.credits = 100000
+	var problem: String = ""
+	var count: int = gs.SOIL_PROBE_TEXT_CELLS + 2
+	for x: int in count:
+		var cell := Vector3i(x, 0, 5)
+		gs.tilled_cells[cell] = true
+		var refused: String = gs.plant_crop(cell)
+		if problem == "" and refused != "":
+			problem = "Could not plant %s for the test: %s" % [cell, refused]
+	var probe: DriftingSensor = gs.get_sensor(gs.SOIL_PROBE_ID)
+	probe.cal_due_day = GameClock.get_day_index() - 1
+	var text: String = gs.soil_probe_text()
+	var listed: int = text.count(" %,") + text.count(" %.")
+	if problem == "" and not text.begins_with("Reads "):
+		problem = "The readout must start 'Reads ', got '%s'." % text
+	if problem == "" and (listed != gs.SOIL_PROBE_TEXT_CELLS or ", 2 more." not in text):
+		problem = "The readout must list %d cells then '2 more', got '%s'." % [gs.SOIL_PROBE_TEXT_CELLS, text]
+	if problem == "" and not text.ends_with("CAL OVERDUE (due day %d)." % probe.cal_due_day):
+		problem = "An overdue probe must say so, got '%s'." % text
+	_done(gs)
+	return problem
