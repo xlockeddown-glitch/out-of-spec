@@ -157,3 +157,18 @@ func _check_contract(gs: GameStateScript) -> String:
 	gs.contract_state = ""
 	gs._offer_first_contract()
 	return "" if gs.contract_state == "" else "It must not be offered when the HB-700 is owned."
+
+
+func test_jobs_prefer_a_certified_standard() -> String:
+	return _run(_check_jobs)
+
+
+func _check_jobs(gs: GameStateScript) -> String:
+	gs.buy_standard("reference_gauge")
+	gs.owned_standards[HB700] = GameClock.get_day_index()
+	gs.get_sensor(HB700).cal_due_day = GameClock.get_day_index()
+	var job: Dictionary = { "discipline": "pressure" }
+	if gs.job_standards(job) != (["reference_gauge", HB700] as Array[String]):
+		return "A certified WD-1 must come before an uncertified HB-700: %s" % [gs.job_standards(job)]
+	gs.oirm_calibrate(HB700, GameClock.get_day_index())
+	return "" if gs.job_standards(job)[0] == HB700 else "Certified, the higher tier comes first."

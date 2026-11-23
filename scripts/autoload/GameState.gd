@@ -2067,7 +2067,7 @@ func jobs_open_band() -> String:
 
 
 ## Owned standards that can do `job` (its discipline, at its tier or better),
-## best first: in date before overdue, then the higher tier.
+## best first: those that give a traceable result, then the higher tier.
 func job_standards(job: Dictionary) -> Array[String]:
 	var ids: Array[String] = []
 	var listed: Variant = job_disciplines().get(str(job.get("discipline", "")), [])
@@ -2078,12 +2078,10 @@ func job_standards(job: Dictionary) -> Array[String]:
 		var sensor: DriftingSensor = get_sensor(id)
 		if sensor != null and owned_standards.has(id) and sensor.tier >= int(job.get("min_tier", 0)):
 			ids.append(id)
-	var today: int = GameClock.get_day_index()
 	ids.sort_custom(func(a: String, b: String) -> bool:
-		var a_late: bool = get_sensor(a).is_overdue(today)
-		var b_late: bool = get_sensor(b).is_overdue(today)
-		if a_late != b_late:
-			return not a_late
+		var a_good: bool = standard_problem(a) == ""
+		if a_good != (standard_problem(b) == ""):
+			return a_good
 		return get_sensor(a).tier > get_sensor(b).tier)
 	return ids
 
@@ -2182,7 +2180,8 @@ func complete_job(job_id: String) -> Dictionary:
 	if problem != "":
 		return { "ok": false, "reason": problem }
 	var standard_id: String = job_bench_standard(job)
-	var traceable: bool = standard_problem(standard_id) == ""
+	var fault: String = standard_problem(standard_id)
+	var traceable: bool = fault == ""
 	# The work takes its time. The job stays active, marked at the bench, so a
 	# morning during it neither cancels it nor offers it again.
 	var minutes: float = float(job.get("bench_minutes", 0.0))
@@ -2214,6 +2213,7 @@ func complete_job(job_id: String) -> Dictionary:
 		"day": today,
 		"on_time": on_time,
 		"traceable": traceable,
+		"standard_problem": fault,
 		"offered": offered,
 		"pay": roundi(pay),
 		"points": points,
@@ -2236,7 +2236,7 @@ func job_result_text(result: Dictionary) -> String:
 	if not result["on_time"]:
 		problems.append("LATE")
 	if not result["traceable"]:
-		problems.append("NOT TRACEABLE (%s overdue)" % _model_name(result["standard_id"]))
+		problems.append("NOT TRACEABLE (%s %s)" % [_model_name(result["standard_id"]), result.get("standard_problem", "overdue")])
 	var points: int = result["points"]
 	return "%s done for %s: %s CR%s, credibility %s%s." % [
 		result["job_id"], result["customer"], SP811.integer(result["pay"]),
