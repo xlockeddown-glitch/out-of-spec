@@ -689,7 +689,7 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - Ryan's answer was to what to do after props became inspectable. The FM-3 field meter, chilled-mirror hygrometer and dry-well calibrator on the dome's calibration bench now show their names on hover and add "Name: description" to the dome toast on click, like the other props.
-- The bench's single click box covered all three, so it is now three boxes fitted to the bench: the left tower, the deck under the instruments (0.2 m tall, up to the instruments' bases), and the bench body below. Clicking anywhere else on the bench still opens the calibration bench.
+- The bench's single click box covered all three, so it is now three boxes fitted to the bench: the left tower with its screen, the deck under the instruments (0.2 m tall, up to the instruments' bases), and the bench body below. Clicking those still opens the calibration bench. The empty space just above the deck between the instruments no longer does.
 - Measured by casting a picking ray every 2 px from the dome camera: the dry well is clickable on 639 of the 639 pixels it covers with the bench box removed, the hygrometer on 680 of 680, and the field meter on 215 of 220.
 - The station's thin upright strip behind the instruments is left out of the bench boxes so it does not hide the dry well; clicking that strip does nothing.
 - The descriptions say what each instrument is and hold no specs.

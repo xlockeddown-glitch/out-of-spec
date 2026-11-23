@@ -1,4 +1,4 @@
-[gd_scene load_steps=34 format=3]
+[gd_scene load_steps=33 format=3]
 
 [ext_resource type="Script" path="res://scripts/dome/dome_interior.gd" id="1_dome"]
 [ext_resource type="Script" path="res://scripts/dome/terrarium.gd" id="2_terr"]
