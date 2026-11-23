@@ -785,3 +785,17 @@ Agent's notes (flagged for Ryan, not his words):
 - Both can be clicked to inspect. New text in data/props.json: the PX-1 is the "Angle reference" and the MD-2P the "Humidity reference".
 - The two tarantulas are not placed. The dome keeps one species (the Curlyhair), and tarantulas can't share a tank, so they need either their own small tanks or a later species choice. Left for Ryan.
 - The FM-3 carry case is not placed. A loose FM-3 already sits on the bench, so placing the case would show the meter twice. Swapping the loose meter for the case is left for Ryan.
+
+## 2026-11-22: Give the two new tarantulas their own small tanks
+
+### Ryan chose
+
+- "Own small tanks"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan answered the agent's question, whether the Mexican redknee and Brazilian black tarantulas should get their own small tanks or stay unplaced (the dome keeps one species, and tarantulas can't share a tank).
+- Each small tank is the dome's terrarium model at half size (0.7 m wide), on the left bench either side of the main terrarium: the redknee on the left, the Brazilian black on the right. Each spider is at half size too, so it sits in its tank as the Curlyhair does in the big one.
+- The small tanks are decor you can click to inspect. They have no humidity, molt or silk of their own; the game still tracks only the Curlyhair.
+- New text in data/props.json names each species with its scientific name from data/tarantula_species.json.
+- The Brazilian black is near-black and hard to see at this size; it may need a lighter palette later.

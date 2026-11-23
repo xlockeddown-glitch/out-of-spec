@@ -36,6 +36,14 @@
     "display_name": "Reference Meter",
     "description": "Bench reference meter, resting on the chamber's lid."
   },
+  "mexican_redknee_tank": {
+    "display_name": "Mexican Redknee",
+    "description": "Brachypelma hamorii, in a small tank of its own: tarantulas don't share a tank."
+  },
+  "brazilian_black_tank": {
+    "display_name": "Brazilian Black",
+    "description": "Grammostola pulchra, in a small tank of its own: tarantulas don't share a tank."
+  },
   "field_meter_fm3": {
     "display_name": "FM-3 Field Meter",
     "description": "Handheld field meter, lying face up on the bench mat."
