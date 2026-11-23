@@ -63,5 +63,29 @@
   "md2p_humidity_generator": {
     "display_name": "MD-2P Humidity Generator",
     "description": "Humidity reference: it makes air at a set relative humidity for the hygrometer under test."
+  },
+  "gulch_culvert_bridge": {
+    "display_name": "Culvert Bridge",
+    "description": "A plank deck over a corrugated culvert in the dry gulch."
+  },
+  "plateau_weather_mast": {
+    "display_name": "Weather Mast",
+    "description": "Weather instruments on a pole: a louvered sensor shield on the mast and instruments on top."
+  },
+  "solar_array_skid": {
+    "display_name": "Solar Skid",
+    "description": "A tilted solar array on a skid that can be dragged to a new spot."
+  },
+  "portable_core_drill": {
+    "display_name": "Core Drill",
+    "description": "A portable drill on legs, for cutting rock cores out of the plateau."
+  },
+  "ore_sorting_skip": {
+    "display_name": "Sorting Skip",
+    "description": "A hopper bin on skids, heaped with plateau rock and salvaged quartz."
+  },
+  "seismic_thumper": {
+    "display_name": "Seismic Thumper",
+    "description": "A hammer weight on guide rails, for knocking on the ground."
   }
 }

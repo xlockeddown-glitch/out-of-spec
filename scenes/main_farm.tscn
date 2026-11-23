@@ -121,6 +121,24 @@ size = Vector3(1.2, 0.8, 1.2)
 [sub_resource type="BoxShape3D" id="Inspect_soil_moisture_probe"]
 size = Vector3(0.3, 0.6, 0.3)
 
+[sub_resource type="BoxShape3D" id="Inspect_gulch_culvert_bridge"]
+size = Vector3(2, 1.2, 2)
+
+[sub_resource type="BoxShape3D" id="Inspect_plateau_weather_mast"]
+size = Vector3(1.0, 1.8, 1.0)
+
+[sub_resource type="BoxShape3D" id="Inspect_solar_array_skid"]
+size = Vector3(1.6, 1.2, 1.2)
+
+[sub_resource type="BoxShape3D" id="Inspect_portable_core_drill"]
+size = Vector3(1.2, 1.6, 1.2)
+
+[sub_resource type="BoxShape3D" id="Inspect_ore_sorting_skip"]
+size = Vector3(1.4, 1.0, 1.2)
+
+[sub_resource type="BoxShape3D" id="Inspect_seismic_thumper"]
+size = Vector3(0.8, 1.0, 0.8)
+
 [sub_resource type="BoxShape3D" id="Inspect_water_cistern"]
 size = Vector3(1.6, 1.8, 1.6)
 
@@ -698,6 +716,86 @@ prop_id = "water_cistern"
 [node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/WaterCisternModel/Inspect"]
 shape = SubResource("Inspect_water_cistern")
 
+[node name="WeatherMastModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 5.5, 0, 16.5)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_weather_mast.glb"
+model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/WeatherMastModel"]
+position = Vector3(0, 0.9, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "plateau_weather_mast"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/WeatherMastModel/Inspect"]
+shape = SubResource("Inspect_plateau_weather_mast")
+
+[node name="SolarSkidModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -9.5, 0, 17)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/solar_array_skid.glb"
+model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/SolarSkidModel"]
+position = Vector3(0, 0.6, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "solar_array_skid"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/SolarSkidModel/Inspect"]
+shape = SubResource("Inspect_solar_array_skid")
+
+[node name="CoreDrillModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -17.5, 0, 5.4)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/portable_core_drill.glb"
+model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/CoreDrillModel"]
+position = Vector3(0, 0.8, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "portable_core_drill"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/CoreDrillModel/Inspect"]
+shape = SubResource("Inspect_portable_core_drill")
+
+[node name="SortingSkipModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -14, 0, 1)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/ore_sorting_skip.glb"
+model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/SortingSkipModel"]
+position = Vector3(0, 0.5, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "ore_sorting_skip"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/SortingSkipModel/Inspect"]
+shape = SubResource("Inspect_ore_sorting_skip")
+
+[node name="ThumperModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -17, 0, -4.6)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/seismic_thumper.glb"
+model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/ThumperModel"]
+position = Vector3(0, 0.5, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "seismic_thumper"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/ThumperModel/Inspect"]
+shape = SubResource("Inspect_seismic_thumper")
+
 [node name="Clutter" type="Node3D" parent="WorldView/WorldViewport/World"]
 
 [node name="ScrubBushA" type="Node3D" parent="WorldView/WorldViewport/World/Clutter"]
@@ -788,11 +886,21 @@ script = ExtResource("12_slot")
 model_path = "res://assets/voxels/dry_gulch_straight.glb"
 model_scale = 0.2
 
-[node name="GulchTileD" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
+[node name="CulvertBridge" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, -0.4, -25)
 script = ExtResource("12_slot")
-model_path = "res://assets/voxels/dry_gulch_straight.glb"
+model_path = "res://assets/voxels/gulch_culvert_bridge.glb"
 model_scale = 0.2
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/Gulch/CulvertBridge"]
+position = Vector3(0, 0.6, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "gulch_culvert_bridge"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Gulch/CulvertBridge/Inspect"]
+shape = SubResource("Inspect_gulch_culvert_bridge")
 
 [node name="GulchTileE" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, -0.4, -25)
