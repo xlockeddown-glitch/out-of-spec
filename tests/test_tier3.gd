@@ -91,6 +91,8 @@ func _check_lock(gs: GameStateScript) -> String:
 	gs.set_rover_uplink("rover_1", true)
 	GameClock.elapsed_days = 16.0
 	gs._on_time_advanced(10.0)
+	if gs.certificate_log[-1]["due_day"] == gs.certificates[RB]["due_day"]:
+		return "The log must keep the certificate as issued."
 	if rb.error != 0.0 or rb.cal_due_day != 17 + rb.cal_interval_days or gs.certificates[RB]["due_day"] != rb.cal_due_day:
 		return "Locked, it must not drift and must stay in date."
 	if gs.calibration_budget(TIMEBASE).get("tur", 0.0) < 4.0 or not gs.calibrate(TIMEBASE).get("traceable", false):
@@ -133,3 +135,17 @@ func _check_wd1(gs: GameStateScript) -> String:
 	if gs.calibration_budget(WD1)["tur"] < 4.0 or not str(gs.calibrate(WD1).get("certificate", "")).begins_with("IH-"):
 		return "The HB-700 must certify the WD-1 on the bench."
 	return ""
+
+
+func test_gate_and_uplinks_are_saved() -> String:
+	return _run(_check_save)
+
+
+func _check_save(gs: GameStateScript) -> String:
+	gs.traceable_lab = true
+	gs.set_rover_uplink("rover_1", false)
+	var data: Dictionary = gs.farm_to_dict()
+	gs.traceable_lab = false
+	gs.rover_uplinks = {}
+	gs.farm_from_dict(data)
+	return "" if gs.traceable_lab and gs.rover_uplinks == { "rover_1": false } else "The gate and uplinks must survive a save."

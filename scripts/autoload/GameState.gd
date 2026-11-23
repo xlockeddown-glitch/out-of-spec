@@ -865,7 +865,10 @@ func _hold_relay_lock() -> void:
 		var lapsed: bool = sensor.is_overdue(today)
 		sensor.error = 0.0
 		sensor.cal_due_day = today + sensor.cal_interval_days
-		certificates[id]["due_day"] = sensor.cal_due_day
+		if certificates[id]["due_day"] != sensor.cal_due_day:
+			# A copy: the certificate log keeps the one that was issued.
+			certificates[id] = certificates[id].duplicate()
+			certificates[id]["due_day"] = sensor.cal_due_day
 		if lapsed:
 			post_phone("OIRM: %s locked to the relay again. Its certificate is valid." % instrument_name(id, true))
 			oirm_changed.emit()
