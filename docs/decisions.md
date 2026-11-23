@@ -627,3 +627,15 @@ Agent's notes (flagged for Ryan, not his words):
 - Ten tiles stand in a row under a `PlateauRim` node, a 20 m run along X at z = −30 m (x −10 m to 10 m, z −31 m to −29 m). That is 3 m behind the gulch, so the two read as a wash at the foot of a mesa. Apart from the gulch, the nearest thing is fissure E, 8 m in front of the run.
 - Eight straight tiles are turned 180° so the cliff faces the camera. The west end has a corner tile turned 180° and the east end one turned −90°, so the steps and dust apron wrap round both ends. The tiles stand on the ground at true size (2.0 m tall); the ground is flat, so the plateau top is only the tiles' 1.2 m back strip and from behind the run reads as a wall.
 - The farm's default camera follows the rover, so the rim is in view only when the rover is near the back of the farm. Set dressing only: no collision, so the rover drives through it.
+
+## 2026-11-22: Dry well on the calibration bench
+
+### Ryan chose
+
+- "Dry well"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next. This places the dry-well calibrator, the second model from the Environmental Standards pack.
+- It sits in the back-right corner of the dome's calibration bench at (3.8, 0.9, −0.55) m, turned 180° so its keypad faces the camera. Its footprint (x 3.675 m to 3.925 m, z −0.675 m to −0.425 m) is inside the bench top and clear of the field meter in front of it (back edge near z = −0.33 m) and the calibration station model (right end at x = 3.5 m).
+- It is at true size (0.25 m × 0.25 m × 0.35 m tall). From the dome's camera it shows behind the field meter. Set dressing only: nothing in the game uses a temperature reference yet, and the bench's calibration still runs as before.
