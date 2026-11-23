@@ -350,7 +350,7 @@ func _last_record_text(instrument_id: String) -> String:
 	elif not record.get("traceable", true):
 		verdict += ", NO STANDARD"
 	return "Last cal: day %d by %s, as-found %s (%s). %s" % [
-		record["day"], record.get("performed_by", "You"), sensor.format_value(record["as_found"] as float),
+		record["day"], GameState.performer_name(record.get("performed_by", "")), sensor.format_value(record["as_found"] as float),
 		verdict, due]
 
 

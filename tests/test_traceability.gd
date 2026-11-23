@@ -444,7 +444,7 @@ func test_untraceable_adjustment_breaks_chain() -> String:
 	var problem: String = ""
 	if not gs.traceability_chain(gs.STEERING_ID)["traceable"]:
 		problem = "Setup: a fresh bench calibration must be traceable."
-	gs.calibrate(gs.STEERING_ID, "You", false)
+	gs.calibrate(gs.STEERING_ID, gs.local_player_id, false)
 	if problem == "" and gs.traceability_chain(gs.STEERING_ID)["traceable"]:
 		problem = "A remote zero after the last traceable calibration must break the chain."
 	gs.calibrate(gs.STEERING_ID)

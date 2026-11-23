@@ -259,7 +259,7 @@ func _drive(delta: float) -> void:
 func _zero_steering() -> void:
 	# Same calibration path as the bench, so the record lands in GameState.
 	# A remote zero has no standard: untraceable, judged against the MPE only.
-	steering_zeroed.emit(GameState.calibrate(GameState.STEERING_ID, "You", false))
+	steering_zeroed.emit(GameState.calibrate(GameState.STEERING_ID, GameState.local_player_id, false))
 
 
 func _on_steering_error_changed(_error: float, _band: int) -> void:
