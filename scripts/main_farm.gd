@@ -307,7 +307,7 @@ func _field_cal_one(id: String) -> void:
 	if record.get("refused", false):
 		_hud.push_log("FIELD CAL %s REFUSED: %s" % [label, str(record["reason"])])
 		return
-	var verdict: String = ("NOT TRACEABLE (standard overdue)" if record.get("standard_overdue", false)
+	var verdict: String = ("NOT TRACEABLE (standard %s)" % record["standard_problem"] if record.get("standard_problem", "") != ""
 		else str(record["result"]).to_upper())
 	_hud.push_log("FIELD CAL %s %s  As-found %s  As-left %s  Due day %d  (%d min)" % [
 		label, verdict, sensor.format_value(record["as_found"]), sensor.format_value(record["as_left"]),

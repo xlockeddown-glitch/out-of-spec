@@ -46,6 +46,8 @@ const SOIL_PROBE_ID: String = "soil_probe"
 ## Who did a calibration when it wasn't a player: the manager's grace cal.
 ## Player ids must never be this or LEGACY_LOCAL_PERFORMER.
 const MANAGER_ID: String = "Manager"
+## Issuer on a certificate from the colony's own bench.
+const IN_HOUSE: String = "in-house"
 ## What calibration records said before players had ids.
 const LEGACY_LOCAL_PERFORMER: String = "You"
 ## Set-point step for [ and ], as a volumetric fraction (1 %).
@@ -594,6 +596,46 @@ func calibration_budget(instrument_id: String) -> Dictionary:
 	return CalUncertainty.budget(sensor, standard)
 
 
+## True for a standard whose own reference is on the colony, so the bench can
+## calibrate it as well as OIRM.
+func has_bench_reference(standard_id: String) -> bool:
+	var sensor: DriftingSensor = get_sensor(standard_id)
+	return (sensor != null and sensor.role == "standard" and owned_standards.has(standard_id)
+		and owned_standards.has(sensor.calibrated_by))
+
+
+## Why the bench can't calibrate this instrument at all, or "".
+func _bench_problem(instrument_id: String) -> String:
+	var sensor: DriftingSensor = get_sensor(instrument_id)
+	var title: String = instrument_name(instrument_id, true)
+	if sensor.role == "standard":
+		if not instrument_id in standard_ids():
+			return "The %s is not on the colony yet." % title
+		if sensor.calibrated_by == "":
+			return "The %s is calibrated only at OIRM." % title
+		if at_oirm.has(instrument_id):
+			return "%s is at OIRM until day %d." % [title, at_oirm[instrument_id]]
+		if not sensor.calibrated_by in standard_ids():
+			return "The %s is not on the colony yet." % instrument_name(sensor.calibrated_by, true)
+	elif not is_in_service(instrument_id):
+		return ("%s has no standard on the colony yet." % title if sensor.calibrated_by == ""
+			else "The %s is not on the colony yet." % instrument_name(sensor.calibrated_by, true))
+	return ""
+
+
+## Why a calibration made with this standard is not traceable right now, or "".
+func standard_problem(standard_id: String) -> String:
+	if not certificates.has(standard_id):
+		return "without a certificate"
+	if suspect_units.has(standard_id):
+		return "suspect"
+	if _untraceable_since_cal.has(standard_id):
+		return "adjusted untraceably"
+	if get_sensor(standard_id).is_overdue(GameClock.get_day_index()):
+		return "overdue"
+	return ""
+
+
 ## Zeroes an instrument and stores the record. Same path for the bench, the
 ## manager's grace calibration and the phone's remote ZERO STEERING, so every
 ## calibration lands in the log.
@@ -616,14 +658,14 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 	if sensor == null:
 		push_warning("GameState.calibrate: unknown instrument '%s'." % instrument_id)
 		return {}
-	if use_standard and sensor.role == "unit" and not is_in_service(instrument_id):
+	var missing: String = _bench_problem(instrument_id) if use_standard else ""
+	if missing != "":
 		return {
 			"instrument_id": instrument_id,
 			"refused": true,
 			"standard_id": sensor.calibrated_by,
 			"tur": 0.0,
-			"reason": ("%s has no standard on the colony yet." % instrument_name(instrument_id, true)
-				if sensor.calibrated_by == "" else "The %s is not on the colony yet." % instrument_name(sensor.calibrated_by, true)),
+			"reason": missing,
 		}
 	var budget: Dictionary = calibration_budget(instrument_id) if use_standard else {}
 	if budget.get("refused", false):
@@ -665,9 +707,11 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 	# least half its interval since the last calibration, so re-calibrating
 	# the same day can't farm longer intervals or erase a shortened one.
 	# A link in the chain needs a standard that was in date that day (section 1.7);
-	# with an overdue standard the zero adjusts the unit but is not a calibration.
+	# with an overdue standard (or one recalled, or without a certificate) the zero
+	# adjusts the unit but is not a calibration.
+	var standard_fault: String = standard_problem(standard.instrument_id) if standard else ""
 	var standard_overdue: bool = standard.is_overdue(today) if standard else false
-	var traceable: bool = standard != null and not standard_overdue
+	var traceable: bool = standard != null and standard_fault == ""
 	var previous_interval: int = sensor.cal_interval_days
 	var days_in_service: int = today - sensor.last_cal_day if sensor.last_cal_day >= 0 else previous_interval
 	var enough_service: bool = days_in_service >= ceili(previous_interval / 2.0)
@@ -678,7 +722,10 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 		_untraceable_since_cal.erase(instrument_id)
 	if traceable:
 		suspect_units.erase(instrument_id)  # redone after a recall
-		if result == CalUncertainty.FAIL:
+		# A standard's interval stays as it is, as at OIRM [ASSUMPTION].
+		if sensor.role == "standard":
+			pass
+		elif result == CalUncertainty.FAIL:
 			sensor.cal_interval_days = maxi(int(_interval_cfg("min_days", 2.0)),
 				previous_interval - int(_interval_cfg("shorten_days", 2.0)))
 		elif result == CalUncertainty.PASS and on_time and enough_service:
@@ -712,6 +759,8 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 		"traceable": traceable,
 		"bench_minutes": bench_minutes,
 		"standard_overdue": standard_overdue,
+		# "" unless the standard is why this is not traceable.
+		"standard_problem": standard_fault,
 		"standard_certificate": certificates.get(standard.instrument_id, {}).get("id", "") if standard else "",
 		# Set by recall() if the standard is later found out of tolerance and
 		# correcting for its error changes this result.
@@ -719,10 +768,28 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 	}
 	cal_log.append(record)
 	last_cal_records[instrument_id] = record
+	if sensor.role == "standard" and traceable:
+		_certify_on_bench(record)
 	calibration_recorded.emit(record)
 	_note_soil_excursions()
 	_credibility_after_calibration(record)
 	return record
+
+
+## A traceable bench calibration of a standard: it gets an in-house certificate,
+## and an out-of-tolerance as-found starts a recall, as at OIRM.
+func _certify_on_bench(record: Dictionary) -> void:
+	var id: String = record["instrument_id"]
+	var previous: Dictionary = certificates.get(id, {})
+	var cert: Dictionary = _issue_certificate(id, record["day"], record["as_found"], record["as_left"], false, IN_HOUSE, "IH")
+	cert["expanded_uncertainty"] = record["standard_uncertainty"]
+	cert["k"] = CalUncertainty.coverage_factor()
+	cert["reference_id"] = record["standard_id"]
+	cert["reference_certificate"] = record["standard_certificate"]
+	record["certificate"] = cert["id"]
+	if not cert["as_found_in_tolerance"]:
+		_recall_and_post(id, record["as_found"], int(previous.get("day", 0)))
+	oirm_changed.emit()
 
 
 ## The player's bench calibration: calibrate() against the standard, then the
@@ -926,7 +993,7 @@ func _apply_audit_grace(report: Dictionary) -> void:
 		if line["violation"]:
 			# The manager uses the bench standard; if the TUR refuses, they zero it
 			# without one (untraceable) rather than claim a calibration that didn't happen.
-			# Standards are only calibrated at OIRM, so theirs are waived as they are.
+			# Standards are waived as they are.
 			if get_sensor(line["instrument_id"]).role != "standard" \
 					and calibrate(line["instrument_id"], MANAGER_ID).get("refused", false):
 				calibrate(line["instrument_id"], MANAGER_ID, false)
@@ -1125,15 +1192,22 @@ func oirm_calibrate(standard_id: String, day: int) -> Dictionary:
 	post_phone("OIRM: %s returned with certificate %s. As-found %s (%s). Due day %d." % [
 		instrument_name(standard_id, true), cert["id"], sensor.format_value(zeroed["as_found"], 3),
 		"in tolerance" if cert["as_found_in_tolerance"] else "OUT OF TOLERANCE", cert["due_day"]])
+	# OIRM's own certificate clears whatever was wrong with the last one.
+	suspect_units.erase(standard_id)
+	_untraceable_since_cal.erase(standard_id)
 	if not cert["as_found_in_tolerance"]:
-		var flagged: Array[Dictionary] = recall(standard_id, zeroed["as_found"], int(previous.get("day", 0)))
-		var names: PackedStringArray = []
-		for record: Dictionary in flagged:
-			names.append("%s (day %d)" % [instrument_name(record["instrument_id"]), record["day"]])
-		post_phone("RECALL: %d calibration(s) made with it are suspect%s. Redo them before the next audit." % [
-			flagged.size(), (": " + ", ".join(names)) if not names.is_empty() else ""])
+		_recall_and_post(standard_id, zeroed["as_found"], int(previous.get("day", 0)))
 	oirm_changed.emit()
 	return cert
+
+
+func _recall_and_post(standard_id: String, standard_error: float, since_day: int) -> void:
+	var flagged: Array[Dictionary] = recall(standard_id, standard_error, since_day)
+	var names: PackedStringArray = []
+	for record: Dictionary in flagged:
+		names.append("%s (day %d)" % [instrument_name(record["instrument_id"]), record["day"]])
+	post_phone("RECALL: %d calibration(s) made with the %s are suspect%s. Redo them before the next audit." % [
+		flagged.size(), instrument_name(standard_id, true), (": " + ", ".join(names)) if not names.is_empty() else ""])
 
 
 ## Reverse traceability (section 1.6). `standard_error` is the standard's as-found
@@ -1142,13 +1216,17 @@ func oirm_calibrate(standard_id: String, day: int) -> Dictionary:
 ## only if the result changes (impact threshold). A suspect calibration of
 ## another standard cascades to that standard's own calibrations. Returns
 ## the records flagged, cascade included.
-func recall(standard_id: String, standard_error: float, since_day: int) -> Array[Dictionary]:
+## `certificate` limits it to work done while the standard was on that
+## certificate ("" = any); the cascade uses it.
+func recall(standard_id: String, standard_error: float, since_day: int, certificate: String = "") -> Array[Dictionary]:
 	var flagged: Array[Dictionary] = []
 	var today: int = GameClock.get_day_index()
 	for record: Dictionary in cal_log:
 		if record.get("standard_id", "") != standard_id or record.get("suspect", false):
 			continue
 		if int(record["day"]) < since_day or not record.get("traceable", false):
+			continue
+		if certificate != "" and record.get("standard_certificate", "") != certificate:
 			continue
 		# The standard's error in the unit's own quantity (section 1.5).
 		var instrument: DriftingSensor = get_sensor(record["instrument_id"])
@@ -1159,14 +1237,17 @@ func recall(standard_id: String, standard_error: float, since_day: int) -> Array
 			# A standard still passing can carry an error that a unit with a
 			# large sensitivity downstream cannot absorb: keep cascading.
 			if instrument and instrument.role == "standard":
-				flagged.append_array(recall(record["instrument_id"], carried, int(record["day"])))
+				flagged.append_array(recall(record["instrument_id"], carried, int(record["day"]), record.get("certificate", "")))
 			continue
 		record["suspect"] = true
 		record["suspect_result"] = rejudged
 		record["recalled_by"] = standard_id
 		flagged.append(record)
 		if instrument and instrument.role == "standard":
-			flagged.append_array(recall(record["instrument_id"], carried, int(record["day"])))
+			flagged.append_array(recall(record["instrument_id"], carried, int(record["day"]), record.get("certificate", "")))
+			# Suspect itself only while that certificate is its latest.
+			if record.get("certificate", "") != "" and record["certificate"] == certificates.get(record["instrument_id"], {}).get("id", ""):
+				suspect_units[record["instrument_id"]] = today
 		elif is_same(_last_traceable_record(record["instrument_id"]), record):
 			# A later good calibration already superseded an older suspect one.
 			suspect_units[record["instrument_id"]] = today
@@ -1190,6 +1271,13 @@ func traceability_chain(instrument_id: String) -> Dictionary:
 			return { "traceable": false, "text": "%s: no certificate" % name }
 		if sensor.is_overdue(today):
 			return { "traceable": false, "text": "%s ← %s lapsed (due day %d)" % [name, cert["id"], cert["due_day"]] }
+		if suspect_units.has(instrument_id):
+			return { "traceable": false, "text": "%s ← %s: SUSPECT, recalled day %d" % [name, cert["id"], suspect_units[instrument_id]] }
+		if _untraceable_since_cal.has(instrument_id):
+			return { "traceable": false, "text": "%s ← %s: adjusted since without a traceable standard" % [name, cert["id"]] }
+		if cert.has("reference_id"):
+			return { "traceable": true, "text": "%s ← %s (due day %d) ← %s (%s) ← OIRM" % [name, cert["id"], cert["due_day"],
+				instrument_name(cert["reference_id"]), cert["reference_certificate"]] }
 		# A maker's certificate traces through the maker's own lab to OIRM.
 		var via: String = "" if str(cert.get("issuer", "OIRM")) == "OIRM" else " ← " + str(cert["issuer"])
 		return { "traceable": true, "text": "%s ← %s (due day %d)%s ← OIRM" % [name, cert["id"], cert["due_day"], via] }
@@ -1280,11 +1368,35 @@ func parked_rover_transform(rover_id: String, fallback: Transform3D = Transform3
 	return rover_transforms.get(rover_id, fallback)
 
 
-## Tier 1 standards Bram stocks, in data order (owned ones included).
+## The OIRM account (section 1.7): opened by sending OIRM a standard that was
+## bought, for its first calibration there.
+func has_oirm_account() -> bool:
+	for trip: Dictionary in oirm_trips:
+		var sensor: DriftingSensor = get_sensor(trip["standard_id"])
+		if sensor != null and sensor.tier >= 1:
+			return true
+	return false
+
+
+## Why this standard's tier is not open yet, or "". Skill gates come later.
+func tier_problem(standard_id: String) -> String:
+	if not tier1_unlocked:
+		return "Tier 1 equipment needs a clean audit on file first."
+	if get_sensor(standard_id).tier >= 2 and not _is_contract_stock(standard_id) and not has_oirm_account():
+		return "Tier 2 equipment needs an OIRM account: send a standard you bought for its first OIRM calibration."
+	return ""
+
+
+func _is_bram_stock(standard_id: String) -> bool:
+	return (sensors[standard_id] as DriftingSensor).seller == "bram" or _is_contract_stock(standard_id)
+
+
+## Standards Bram stocks, in data order (owned ones included). Tier 2 shows
+## once its gate is open.
 func bram_catalog() -> Array[String]:
 	var ids: Array[String] = []
 	for id: String in all_standard_ids():
-		if (sensors[id] as DriftingSensor).tier == 1 or _is_contract_stock(id):
+		if _is_bram_stock(id) and ((sensors[id] as DriftingSensor).tier < 2 or _is_contract_stock(id) or has_oirm_account()):
 			ids.append(id)
 	return ids
 
@@ -1320,19 +1432,20 @@ func standard_price_text(standard_id: String) -> String:
 ## Why Bram can't sell this standard right now, or "" if he can.
 func standard_purchase_problem(standard_id: String) -> String:
 	var sensor: DriftingSensor = get_sensor(standard_id)
-	if sensor == null or sensor.role != "standard" or not (sensor.tier == 1 or _is_contract_stock(standard_id)):
+	if sensor == null or sensor.role != "standard" or not _is_bram_stock(standard_id):
 		return "Bram doesn't stock that."
 	if owned_standards.has(standard_id):
 		return "The %s is already on the colony." % sensor.short_name
-	if not tier1_unlocked:
-		return "Tier 1 equipment needs a clean audit on file first."
+	var gate: String = tier_problem(standard_id)
+	if gate != "":
+		return gate
 	if credits < standard_price_credits(standard_id) or crystal_ore < sensor.price_ore:
 		return "Costs %s; you have %s CR and %d crystal ore." % [
 			standard_price_text(standard_id), SP811.integer(credits), crystal_ore]
 	return ""
 
 
-## Buys a Tier 1 standard from Bram (section 1.7). Returns "" on success, or
+## Buys a standard from Bram (section 1.7). Returns "" on success, or
 ## the reason it can't happen. It arrives with a maker's certificate traceable
 ## to OIRM, valid for its first interval, and puts the units it calibrates in
 ## service (due one interval from today, with no calibration on record yet).
@@ -1650,6 +1763,8 @@ func _credibility_after_calibration(record: Dictionary) -> void:
 		change_credibility(int(_cred_number("overdue_standard_used_points", -5.0)))
 	if contract_state != "active" or record.get("performed_by", "") == MANAGER_ID:
 		return
+	if get_sensor(record["instrument_id"]).role == "standard":
+		return  # the run counts the colony's units
 	var needed: int = contract_run_needed()
 	var good: bool = record.get("on_time", false) and record.get("traceable", false)
 	# A repeat before the unit has run half its interval since its last
@@ -1884,7 +1999,7 @@ func complete_job(job_id: String) -> Dictionary:
 	if problem != "":
 		return { "ok": false, "reason": problem }
 	var standard_id: String = job_bench_standard(job)
-	var traceable: bool = not get_sensor(standard_id).is_overdue(GameClock.get_day_index())
+	var traceable: bool = standard_problem(standard_id) == ""
 	# The work takes its time. The job stays active, marked at the bench, so a
 	# morning during it neither cancels it nor offers it again.
 	var minutes: float = float(job.get("bench_minutes", 0.0))

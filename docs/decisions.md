@@ -904,3 +904,18 @@ Agent's notes (flagged for Ryan, not his words):
 - The menu offers Continue (with the saved day), New farm and Quit. The clock is stopped there. Look and wording are the agent's [PLACEHOLDER].
 - The farm saves each morning and when the window closes. There is no manual save and no way back to the menu yet. Open for Ryan: both.
 - A new farm asks first when there is a saved one, then keeps that one as `farm.save.old` (one only; an earlier one is replaced). Nothing in the game opens it again.
+
+## 2026-11-22: Tier 2 standards, and calibrating a standard on the bench
+
+### Ryan chose
+
+- "Milestone 3b"
+- "Placeholder and go (Recommended)"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The HM-3 and TW-6 are in the data. Tier 2 opens with an OIRM account, which sending a bought standard to OIRM opens. The Instrumentation 3 half of the gate comes with skills.
+- The HM-3 is Kestrel's to sell, so it can't be bought until Kestrel trades. The TW-6 is Bram's; nothing it calibrates exists yet.
+- The FM-3 can now be calibrated on the bench against the HM-3. It gets an in-house certificate (prefix IH), keeps its interval as at OIRM [ASSUMPTION], and an out-of-tolerance as-found starts a recall. Standards don't count toward OIRM's contract run.
+- A standard whose certificate is recalled is suspect, and work done with it is not traceable, until it is calibrated again. The same goes for one adjusted against an untraceable reference.
+- [PLACEHOLDER]: HM-3 900 CR + 4 ore, U 0.00003 V, 0.00006 V MPE at a 10 V point; TW-6 700 CR + 3 ore, U 0.1 N·m, 0.25 N·m MPE at a 100 N·m point; 30-day intervals; drift to MPE in about 120 days; 60 bench minutes for the FM-3.

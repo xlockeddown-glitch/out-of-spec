@@ -493,16 +493,17 @@ func test_bench_lists_standards_with_send_button() -> String:
 	var standard_id: String = GameState.standard_ids()[0]
 	bench.open(standard_id)
 	var button: Button = bench.get_node("%CalibrateButton")
+	var send: Button = bench._send_button
 	var standard_label: Label = bench.get_node("%StandardLabel")
 	var want: String = "SEND TO OIRM" if GameState.drop_pod_present else "SEND BY COURIER"
-	if not button.text.begins_with(want):
-		problem = "A standard must offer %s, got %s." % [want, button.text]
+	if button.visible or not send.visible or not send.text.begins_with(want):
+		problem = "A standard must offer only %s, got %s." % [want, send.text]
 	elif not standard_label.text.contains("OIRM-"):
 		problem = "A standard must show its certificate: %s" % standard_label.text
-	elif button.disabled != GameState.at_oirm.has(standard_id):
+	elif send.disabled != GameState.at_oirm.has(standard_id):
 		problem = "SEND must be enabled unless the standard is already away."
 	bench.open(GameState.STEERING_ID)
-	if problem == "" and (button.text != CalBenchUI.CALIBRATE_TEXT or not standard_label.text.contains("Chain")):
+	if problem == "" and (send.visible or not button.visible or button.text != CalBenchUI.CALIBRATE_TEXT or not standard_label.text.contains("Chain")):
 		problem = "A unit must show the calibrate button and its chain: %s / %s" % [button.text, standard_label.text]
 	var table_id: String = GameState.steering.calibrated_by
 	var was_away: bool = GameState.at_oirm.has(table_id)
