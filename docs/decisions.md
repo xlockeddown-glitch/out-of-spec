@@ -705,3 +705,16 @@ Agent's notes (flagged for Ryan, not his words):
 - Ryan's answer was to whether to keep prop clicks from pushing lines off the phone log or to have the encoder jig run the steering calibration; "both" covers this entry and the next.
 - The phone log shows only its last 8 lines, so a few prop clicks could push a dispatch or an audit out of view. In the farm, a clicked prop's "Name: description" now shows in the hover label at the world view's bottom-left instead, for 3 s or 0.04 s per character if longer (the dome toast's timing). Hovering resumes after that.
 - The hover label now wraps long text. Nothing changes in the dome, which already used its toast.
+
+## 2026-11-22: The encoder jig runs the steering calibration
+
+### Ryan chose
+
+- "both"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- This is the second half of "both" (the first is the phone-log entry above). Parking on the farm's field calibration pad and pressing E now calibrates the steering encoder on the encoder jig against the PX-1 rotary table, then the tire gauge against the WD-1 if it is owned. Before, the pad did only the tire gauge and steering was calibrated only at the dome bench, which still works.
+- It is the same calibration as at the bench: same standard, uncertainty budget, refusals, result and bench time (30 min for steering [PLACEHOLDER], on the game clock). The rover must be stopped on the pad.
+- The PX-1 is a Tier 0 standard the colony starts with, so steering is offered from day 1. Instruments without a standard are skipped, and the entry line says the tire gauge still needs the WD-1.
+- The list of pad instruments is `GameState.FIELD_CAL_IDS`, with a test that steering is offered alone before the WD-1 and with the tire gauge after.

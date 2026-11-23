@@ -183,3 +183,24 @@ func test_tire_limit_edge_and_compliant_line() -> String:
 	if not over_line.contains("%s kPa above set point" % SP811.number(limit + 0.1, 1)):
 		return "A fined offset must read past the limit, got '%s'." % over_line
 	return ""
+
+
+## Ryan (2026-11-22): "both". The field pad also calibrates the steering
+## encoder on the encoder jig, against the PX-1 rotary table the colony starts
+## with; the tire gauge joins once the WD-1 is bought.
+func test_field_pad_calibrates_steering_and_then_tires() -> String:
+	var gs: GameStateScript = _make_state()
+	var problem: String = ""
+	var offered: Array[String] = gs.field_cal_ready()
+	if offered != [gs.STEERING_ID]:
+		problem = "Before the WD-1 the pad must offer only steering, got %s." % [offered]
+	if problem == "" and gs.buy_standard(WD1) != "":
+		problem = "Could not buy the WD-1 for the test."
+	offered = gs.field_cal_ready()
+	if problem == "" and offered != [gs.TIRE_ID, gs.STEERING_ID]:
+		problem = "With the WD-1 the pad must offer the tire gauge then steering, got %s." % [offered]
+	var record: Dictionary = gs.calibrate_at_bench(gs.STEERING_ID)
+	if problem == "" and (record.is_empty() or record.get("refused", false)):
+		problem = "Steering calibration on the pad was refused: %s" % [record]
+	gs.free()
+	return problem
