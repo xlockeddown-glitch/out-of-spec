@@ -326,6 +326,143 @@ func sensors_from_dict(data: Dictionary) -> void:
 		sensor.apply_dict(data[key])
 
 
+# --- Save state ---------------------------------------------------------------
+
+## Every farm variable a save holds, besides the seed, the generator's state and
+## the sensors. A new shared variable goes here or in SAVED_LATER, or it is lost
+## on load (tests/test_save_state.gd fails until it is listed).
+const SAVED_FIELDS: Array[String] = [
+	"dome_species_id", "molt_progress", "molt_stage", "exuvia_until_day",
+	"optical_silk_spools", "relay_slotted", "slotted_spool_species", "_spool_species",
+	"cal_log", "_untraceable_since_cal", "certificate_log", "at_oirm", "oirm_trips",
+	"suspect_units", "clean_audit_streak", "tier1_unlocked", "_next_certificate_number",
+	"owned_standards", "credits", "phone_log", "audit_log", "offence_counts",
+	"drop_pod_present", "_drop_pod_departure_at", "crystal_ore", "mined_fissures",
+	"has_wide_treads", "audit_grace_used", "_cal_index_at_last_audit", "_dispatch_deck",
+	"rover_transforms", "tilled_cells", "credibility", "_best_band", "contract_state",
+	"contract_run", "job_board", "active_jobs", "job_log", "_next_job_number",
+	"_board_day", "_board_band", "_board_taken", "lab_size", "lab_areas", "lab_build",
+	"lab_layout", "plantings", "harvest_bin", "seed_crop_id", "planting_offset_steps",
+]
+## Variables added after save version 1. A save without one loads its declared
+## default instead of being refused.
+const SAVED_LATER: Array[String] = []
+## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
+## rebuilt from the logs, per machine, or only used within one call.
+const NOT_SAVED: Array[String] = [
+	"world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
+	"certificates", "local_player_id", "_morning", "_morning_notes",
+]
+
+
+## The whole farm as plain data (numbers, strings, arrays, dictionaries,
+## Vector3i, Transform3D). It is a copy: later play doesn't change it.
+func farm_to_dict() -> Dictionary:
+	var out: Dictionary = {
+		"world_seed": world_seed,
+		"rng_state": rng.state,
+		"sensors": sensors_to_dict(),
+	}
+	for field: String in SAVED_FIELDS + SAVED_LATER:
+		var value: Variant = get(field)
+		out[field] = value.duplicate(true) if value is Array or value is Dictionary else value
+	return out
+
+
+## Why `data` can't load, or "" if it can. Changes nothing.
+func farm_dict_problem(data: Dictionary) -> String:
+	for key: String in ["world_seed", "rng_state"]:
+		if typeof(data.get(key)) != TYPE_INT:
+			return "'%s' is missing or not an integer." % key
+	if typeof(data.get("sensors")) != TYPE_DICTIONARY:
+		return "'sensors' is missing or not a dictionary."
+	for field: String in SAVED_FIELDS + SAVED_LATER:
+		if not data.has(field):
+			if field in SAVED_LATER:
+				continue
+			return "'%s' is missing." % field
+		var mine: Variant = get(field)
+		var value: Variant = data[field]
+		if typeof(value) != typeof(mine):
+			return "'%s' has the wrong type." % field
+		if typeof(value) == TYPE_FLOAT and not is_finite(value):
+			return "'%s' is not a finite number." % field
+		if mine is Array:
+			for entry: Variant in value:
+				if typeof(entry) != (mine as Array).get_typed_builtin():
+					return "'%s' has an entry of the wrong type." % field
+	for pair: Array in [["cal_log", "instrument_id"], ["certificate_log", "standard_id"]]:
+		for entry: Dictionary in data[pair[0]]:
+			if typeof(entry.get(pair[1])) != TYPE_STRING:
+				return "'%s' has an entry with no %s." % pair
+	for id: Variant in data["sensors"]:
+		var state: Variant = data["sensors"][id]
+		if typeof(state) != TYPE_DICTIONARY:
+			return "Sensor '%s' is not a dictionary." % id
+		for key: Variant in state:
+			if typeof(state[key]) == TYPE_FLOAT and not is_finite(state[key]):
+				return "Sensor '%s' has a '%s' that is not a finite number." % [id, key]
+		# Instruments no longer in the data are skipped on load, not refused.
+		if sensors.has(str(id)) and not DriftingSensor.from_config(str(id)).apply_dict(state):
+			return "Sensor '%s' can't load." % id
+	return ""
+
+
+## Replaces the farm with one farm_to_dict() made. Checks all of it first: bad
+## data is refused whole and the reason returned ("" on success). An instrument
+## the save doesn't know starts new. Set GameClock first, and reload the scenes
+## afterward (SaveGame.restore() does the first).
+func farm_from_dict(data: Dictionary) -> String:
+	var problem: String = farm_dict_problem(data)
+	if problem != "":
+		return problem
+	var fresh: Node = (get_script() as GDScript).new()
+	fresh.build_registry()
+	fresh.set_world_seed(data["world_seed"])
+	set_world_seed(data["world_seed"])
+	rng.state = data["rng_state"]
+	# Listeners hold these sensors, so they are restored in place.
+	var states: Dictionary = fresh.sensors_to_dict()
+	for id: Variant in data["sensors"]:
+		if states.has(id):
+			(states[id] as Dictionary).merge(data["sensors"][id], true)
+		else:
+			push_warning("GameState: saved sensor '%s' is not in %s; skipped." % [id, DRIFT_TABLE])
+	sensors_from_dict(states)
+	for field: String in SAVED_FIELDS + SAVED_LATER:
+		var value: Variant = data.get(field, fresh.get(field))
+		if value is Array:
+			(get(field) as Array).assign((value as Array).duplicate(true))
+		elif value is Dictionary:
+			set(field, (value as Dictionary).duplicate(true))
+		else:
+			set(field, value)
+	fresh.free()
+	_morning = false
+	_morning_notes.clear()
+	# These hold the logs' own entries (a recall marks a record suspect in both).
+	last_cal_records.clear()
+	for record: Dictionary in cal_log:
+		last_cal_records[record["instrument_id"]] = record
+	certificates.clear()
+	for cert: Dictionary in certificate_log:
+		certificates[cert["standard_id"]] = cert
+	molt_changed.emit(molt_progress, molt_stage)
+	silk_changed.emit(optical_silk_spools)
+	relay_changed.emit(relay_slotted)
+	credits_changed.emit(credits)
+	drop_pod_changed.emit(drop_pod_present)
+	ore_changed.emit(crystal_ore)
+	fissures_changed.emit()
+	upgrades_changed.emit()
+	oirm_changed.emit()
+	credibility_changed.emit(credibility)
+	crops_changed.emit()
+	jobs_changed.emit()
+	lab_changed.emit()
+	return ""
+
+
 func get_sensor(instrument_id: String) -> DriftingSensor:
 	return sensors.get(instrument_id)
 

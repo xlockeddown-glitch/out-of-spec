@@ -115,6 +115,7 @@ func _ready() -> void:
 	# rover is freed on a scene swap; the sensor outlives us.
 	steering.error_changed.connect(_on_steering_error_changed)
 	GameState.upgrades_changed.connect(_apply_upgrades)
+	SaveGame.saving.connect(_park)
 	_apply_upgrades()
 	global_transform = GameState.parked_rover_transform(rover_id, global_transform)
 	if satellite_relay == null:
@@ -124,6 +125,10 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	_park()
+
+
+func _park() -> void:
 	GameState.park_rover(rover_id, global_transform)
 
 
