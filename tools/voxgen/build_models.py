@@ -741,7 +741,7 @@ ENV_CHAMBER = {"C1": "#D4DAE0", "C2": "#8D99AE", "M1": "#3B5978", "F1": "#2E3844
 # calibration bench): a dry-well temperature calibrator and a chilled-mirror hygrometer. Colors
 # are his generator's own and all match ones above (C1/C2/F1/K1/Y1 the reference meter's, M1 the
 # chamber's, B1 the bench's brass; no glow, blank recessed screens). Built and turned like the
-# field props. The hygrometer is on the dome's calibration bench; the dry well is not placed.
+# field props. The hygrometer is on the dome's calibration bench; the dry well is on its back-right corner.
 ENV_STANDARDS = {
     "dry_well_calibrator": {"C1": "#D4DAE0", "C2": "#8D99AE", "F1": "#2E3844", "K1": "#6C7A89",
                             "Y1": "#E5B53B", "S": SHADOW},
