@@ -1,6 +1,6 @@
 fm3_field_meter_case - 6 x 4 x 3 (FM-3 Field Meter in its open carry case). From the Gemini art loop (0.1 m voxels), 2026-11-22.
 X: 0..5 left to right, Y: 3..0 rear (+Y) to front (-Y), first row = highest Y.
-Palette: M1 = #4A607A, M2 = #6C7A89, M3 = #2E3844, B1 = #D9A13B, S = #1D222B, O1 = #E85D25, C1 = #8A94A0, P1 = #D1D5DB, G1 = #38E1C6
+Palette: M1 = #4A607A, M2 = #6C7A89, M3 = #2E3844, B1 = #D9A13B, S = #1D222B, O1 = #E85D25 (built as #E5B53B, the game FM-3 yellow), C1 = #8A94A0, P1 = #D1D5DB, G1 = #38E1C6
 
 Z = 0
 Y=03  M3 M2 M1 M1 M2 M3
