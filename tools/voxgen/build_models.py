@@ -755,12 +755,14 @@ ENV_STANDARDS = {
 
 # The Gemini art loop's batch (2026-11-22, 0.1 m voxels, Ryan: "All five"): two more live
 # tarantulas sized like the Curlyhair, the PX-1 rotary table, the MD-2P humidity generator and
-# the FM-3 in its carry case. Palettes as Gemini gave them, except the case's meter: Gemini
+# the FM-3 in its carry case. Palettes as Gemini gave them, except the Brazilian black (lightened,
+# see its entry) and the case's meter: Gemini
 # made it orange (O1 #E85D25), but the game's FM-3 is Ryan's yellow (field_meter_fm3 Y1), so
 # O1 takes that yellow; and Gemini lit its screen teal (G1), but Ryan dropped the glow
 # ("Drop", 2026-11-22), so G1 is the blank screen of his metrology pack (F1 #2E3844).
 # Built and turned like the field props; each glowing token is its own emit_* part.
-# Built only: none is placed in a scene yet.
+# All five are placed: the two tarantulas in small tanks of their own and the MD-2P in the
+# dome, the FM-3 case on the dome's calibration bench, and the PX-1 on the field cal pad.
 ART_LOOP = {
     "mexican_redknee": ({"B1": "#2E2B30", "B2": "#473F3E", "C1": "#D8B794", "K1": "#D44E1C",
                          "K2": "#9A3A1E", "S": SHADOW}, "spider", {}),
