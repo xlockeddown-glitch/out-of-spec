@@ -77,7 +77,7 @@ func open(instrument_id: String = "hygrometer") -> void:
 ## Instruments in service right now: buying a Tier 1 standard from Bram adds
 ## it and its units without a scene change.
 func _rebuild_list() -> void:
-	_ids = GameState.unit_ids() + GameState.standard_ids()
+	_ids = GameState.bench_unit_ids() + GameState.standard_ids()
 	_instrument_option.clear()
 	for id: String in _ids:
 		_instrument_option.add_item(GameState.instrument_name(id, true))

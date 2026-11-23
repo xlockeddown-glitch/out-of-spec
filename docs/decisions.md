@@ -981,3 +981,19 @@ Agent's notes (flagged for Ryan, not his words):
 - Not built, because players already have them: TUR on the bench at Uncertainty 2, two instruments per bench visit at Calibration 3, two fissures per drilling trip at Field Ops 4. Taking them away to give them back is Ryan's call.
 - Not built: the Instrumentation tier gates (levels 1, 3 and 6). Level 3 needs 150 XP, and the few standards a farm can buy before Tier 2 give 15 each, so the gate could hold a farm back for a long time. Robotics waits for robots.
 - K opens the skills view, on the farm and in the dome [PLACEHOLDER key].
+
+
+## 2026-11-23: Robots, first slice: build and commissioning
+
+### Ryan chose
+
+- "I am awake however keep pressing forward and show me renders whenever time permits"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- This is the first part of milestone 5. The job cards, robot audits with the interlock fine, and the 3D robot come in later slices, so a released robot does nothing on the farm yet except sit on the audit list.
+- T at Bram's bay opens the robots view [PLACEHOLDER key]. A Trellis costs 600 CR, 5 crystal ore and 1 silk spool and takes 1 day to assemble [PLACEHOLDER]. One build at a time [ASSUMPTION].
+- The design (§3.2) gates it on Robotics 1, Instrumentation 3 and an in-tolerance TW-6. Instrumentation is gated at 1 here, because nothing else is gated on Instrumentation yet (open question). A second robot needs Robotics 3, a third 5 [PLACEHOLDER]. "In tolerance" means owned, home, certified, not overdue and not recalled.
+- Every standard its sensors need (TW-6, PX-1, WD-1 and FM-3) must also be owned before it can be ordered, or it could never be released [ASSUMPTION].
+- Its four sensors start uncalibrated, up to half their MPE off. They are on the bench at once, but are audited, count toward credibility and count for the OIRM contract only after release. Release needs each sensor's last calibration to be a traceable, in-date pass that is not suspect. Calibrating one with an overdue standard still costs credibility, because the lapse is the lab's, and the audit's count of calibration records includes commissioning records.
+- Calibrating a robot sensor gives Robotics 5 and Calibration 5; the Calibration 5 is in place of the usual 10 (my reading of the table in §2.2). The bonuses for on time, TUR and found out of tolerance still apply.

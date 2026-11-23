@@ -1,0 +1,19 @@
+{
+  "_note": "Utility robots (docs/design/equipment_skills_robots.md section 3). Costs, assembly days and skill gates are [PLACEHOLDER]. instrumentation_level is 1 here; the design says 3 (open for Ryan). Each extra robot needs extra_robot_levels more Robotics levels. sensors are ids in sensor_drift_config.json robot_sensors; a built robot's copy is named sensor@robot.",
+  "frames": [
+    {
+      "id": "trellis",
+      "display_name": "Trellis",
+      "id_prefix": "TR",
+      "cost_credits": 600,
+      "cost_ore": 5,
+      "cost_spools": 1,
+      "assembly_days": 1,
+      "robotics_level": 1,
+      "instrumentation_level": 1,
+      "extra_robot_levels": 2,
+      "required_standard": "torque_standard",
+      "sensors": ["robot_joint_encoder", "robot_grip_torque", "robot_tank_pressure", "robot_soil_probe"]
+    }
+  ]
+}

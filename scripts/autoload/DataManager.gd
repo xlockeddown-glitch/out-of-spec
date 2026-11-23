@@ -29,6 +29,7 @@ const DATA_FILES: Dictionary = {
 	&"economy": "res://data/economy.json",
 	&"props": "res://data/props.json",
 	&"skills": "res://data/skills.json",
+	&"robots": "res://data/robots.json",
 }
 
 ## Table -> { section -> required fields (besides "id") }.
@@ -56,6 +57,9 @@ const RECORD_SECTIONS: Dictionary = {
 		"xp_sources": ["skill", "xp"],
 		"effects": ["display_name", "skill", "per_level"],
 		"unlocks": ["display_name", "skill", "level"],
+	},
+	&"robots": {
+		"frames": ["display_name", "id_prefix", "required_standard", "sensors"],
 	},
 }
 
