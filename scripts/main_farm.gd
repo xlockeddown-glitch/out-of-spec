@@ -262,27 +262,41 @@ func _on_ore_changed(ore: int) -> void:
 
 
 func _on_rover_entered_cal_pad() -> void:
-	if GameState.is_in_service(GameState.TIRE_ID):
-		_hud.push_log("FIELD CAL PAD: press E to calibrate the tire gauge against the WD-1.")
-	else:
-		_hud.push_log("FIELD CAL PAD: the tire gauge needs the WD-1 reference gauge. Bram sells it.")
+	var ready: Array[String] = GameState.field_cal_ready()
+	if ready.is_empty():
+		_hud.push_log("FIELD CAL PAD: no standard on the colony yet. Bram sells the WD-1 for the tire gauge.")
+		return
+	var names: PackedStringArray = []
+	for id: String in ready:
+		names.append(GameState.instrument_name(id).to_lower())
+	var line: String = "FIELD CAL PAD: press E to calibrate %s." % " and ".join(names)
+	if not GameState.is_in_service(GameState.TIRE_ID):
+		line += " The tire gauge needs the WD-1 reference gauge. Bram sells it."
+	_hud.push_log(line)
 
 
 func _try_field_cal() -> void:
 	if not _rover.is_stopped():
 		_hud.push_log("FIELD CAL PAD: stop the rover on the pad first.")
 		return
-	var sensor: DriftingSensor = GameState.get_sensor(GameState.TIRE_ID)
-	var record: Dictionary = GameState.calibrate_at_bench(GameState.TIRE_ID)
+	# The entry line already says which instruments still lack a standard.
+	for id: String in GameState.field_cal_ready():
+		_field_cal_one(id)
+
+
+func _field_cal_one(id: String) -> void:
+	var sensor: DriftingSensor = GameState.get_sensor(id)
+	var record: Dictionary = GameState.calibrate_at_bench(id)
 	if record.is_empty():
 		return
+	var label: String = GameState.instrument_name(id).to_upper()
 	if record.get("refused", false):
-		_hud.push_log("FIELD CAL REFUSED: " + str(record["reason"]))
+		_hud.push_log("FIELD CAL %s REFUSED: %s" % [label, str(record["reason"])])
 		return
 	var verdict: String = ("NOT TRACEABLE (standard overdue)" if record.get("standard_overdue", false)
 		else str(record["result"]).to_upper())
-	_hud.push_log("FIELD CAL %s  As-found %s  As-left %s  Due day %d  (%d min)" % [
-		verdict, sensor.format_value(record["as_found"]), sensor.format_value(record["as_left"]),
+	_hud.push_log("FIELD CAL %s %s  As-found %s  As-left %s  Due day %d  (%d min)" % [
+		label, verdict, sensor.format_value(record["as_found"]), sensor.format_value(record["as_left"]),
 		record["due_day"], roundi(record.get("bench_minutes", 0.0))])
 
 

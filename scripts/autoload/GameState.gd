@@ -337,6 +337,21 @@ func is_in_service(instrument_id: String) -> bool:
 	return sensor.calibrated_by != "" and owned_standards.has(sensor.calibrated_by)
 
 
+## Instruments the farm's field calibration pad calibrates, in order: the tire
+## gauge against the WD-1, then the steering encoder on the encoder jig against
+## the PX-1 rotary table (Ryan, 2026-11-22: "both").
+const FIELD_CAL_IDS: Array[String] = [TIRE_ID, STEERING_ID]
+
+
+## FIELD_CAL_IDS whose standard is on the colony.
+func field_cal_ready() -> Array[String]:
+	var ready: Array[String] = []
+	for id: String in FIELD_CAL_IDS:
+		if is_in_service(id):
+			ready.append(id)
+	return ready
+
+
 func _ids_with_role(role: String) -> Array[String]:
 	var ids: Array[String] = []
 	for id: Variant in sensors:

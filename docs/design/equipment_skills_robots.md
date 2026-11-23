@@ -25,7 +25,7 @@ This is the base the proposal builds on. Written against main at `79750b5`; the 
 - Audits: Inspector Vance and AUD-1T every 5th morning, one-time grace, then fines (`AuditEngine`).
 - Calibration today needs **no reference standard.** Zeroing at the bench is assumed to be correct. That is the gap the equipment system fills.
 - Canon hooks this proposal leans on (`docs/canon.md`): AUD-1T does "sticker and tire-pressure checks"; drills in the Bioluminescent Depths need "sub-percent" calibration; Kestrel sells "gray-market reference standards"; Old Orin teaches relay beacons for "calibrated thermal probes"; Bram sells signal boosters and treads.
-- Voxel props placed as set dressing: `field_survey_tripod` stands on the field calibration pad, `steering_encoder_jig` beside it and `soil_moisture_probe` beside the irrigation junction. No unplaced props remain.
+- Voxel props placed as set dressing: `field_survey_tripod` stands on the field calibration pad, `steering_encoder_jig` beside it (pressing E on the pad calibrates the steering encoder on the jig against the PX-1 rotary table, and the tire gauge against the WD-1 once owned) and `soil_moisture_probe` beside the irrigation junction. No unplaced props remain.
 
 ## 1. Test equipment
 
