@@ -243,10 +243,11 @@ func add_usage(amount: float) -> void:
 ## { "as_found": float, "as_left": float }: as-found is error - reference_error.
 ## After adjustment the true error is reference_error + residual, so a standard
 ## that is off moves the unit by the same amount without showing it.
-func zero(reference_error: float = 0.0) -> Dictionary:
+## `residual_scale` shrinks the as-left residual (the Calibration skill).
+func zero(reference_error: float = 0.0, residual_scale: float = 1.0) -> Dictionary:
 	var as_found: float = error - reference_error
 	_sign = _random_sign()
-	var residual: float = _rng.randf_range(-as_left_residual, as_left_residual)
+	var residual: float = _rng.randf_range(-as_left_residual, as_left_residual) * residual_scale
 	# Set before error so error_changed listeners read the new observed value.
 	reference_offset = reference_error
 	var before: float = error

@@ -234,7 +234,7 @@ func _show_job(job: Dictionary) -> void:
 	var standard_id: String = GameState.job_bench_standard(job)
 	_standard_label.text = ("Standard: %s" % GameState.instrument_name(standard_id, true) if standard_id != ""
 		else "No standard on the bench for this job.")
-	_calibrate_button.text = "CALIBRATE FOR CUSTOMER (%s min)" % SP811.integer(roundi(float(job.get("bench_minutes", 0.0))))
+	_calibrate_button.text = "CALIBRATE FOR CUSTOMER (%s min)" % SP811.integer(roundi(GameState.job_minutes(job)))
 	var problem: String = GameState.job_bench_problem(job)
 	_calibrate_button.disabled = problem != ""
 	var today: int = GameClock.get_day_index()
@@ -396,7 +396,20 @@ func _last_record_text(instrument_id: String) -> String:
 ## The standard used and the chain; for a standard its own certificate first.
 func _reference_text(instrument_id: String) -> String:
 	var text: String = _standard_text(instrument_id) + "\n" + _chain_text(instrument_id)
+	if GameState.has_skill_unlock("budget_view"):
+		text += _budget_text(instrument_id)
 	return _certificate_text(instrument_id) + "\n" + text if _is_standard(instrument_id) else text
+
+
+## The terms of U, once the Uncertainty skill shows them. "" with no standard.
+func _budget_text(instrument_id: String) -> String:
+	var budget: Dictionary = GameState.calibration_budget(instrument_id)
+	if budget.is_empty():
+		return ""
+	var sensor: DriftingSensor = GameState.get_sensor(instrument_id)
+	return "\nStandard uncertainties, k = %s for U:\nspec %s, certificate %s, resolution %s, operator %s" % [
+		SP811.number(budget["k"], 0), _unsigned_precise(sensor, budget["u_spec"]), _unsigned_precise(sensor, budget["u_cert"]),
+		_unsigned_precise(sensor, budget["u_res"]), _unsigned_precise(sensor, budget["u_op"])]
 
 
 ## "Standard: Pavonis Indexworks PX-1 Rotary Table   U ±0.0x°   TUR 47:1   Limit ±0.9x°"

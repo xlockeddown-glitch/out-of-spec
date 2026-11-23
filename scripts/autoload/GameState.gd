@@ -598,7 +598,8 @@ func performer_name(performed_by: String) -> String:
 
 ## Uncertainty budget for calibrating `instrument_id` against its standard
 ## right now (see CalUncertainty.budget). Empty if it has no standard.
-func calibration_budget(instrument_id: String) -> Dictionary:
+## `player_id` is the operator; "" means the local player.
+func calibration_budget(instrument_id: String, player_id: String = "") -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(instrument_id)
 	if sensor == null or sensor.calibrated_by == "":
 		return {}
@@ -606,7 +607,9 @@ func calibration_budget(instrument_id: String) -> Dictionary:
 	if standard == null:
 		push_warning("GameState: %s names unknown standard '%s'." % [instrument_id, sensor.calibrated_by])
 		return {}
-	return CalUncertainty.budget(sensor, standard)
+	var u_op: float = (sensor.mpe * DataManager.get_number(DRIFT_TABLE, "calibration_uncertainty/operator_fraction_of_mpe", 0.0)
+		* skill_factor("operator_uncertainty", player_id))
+	return CalUncertainty.budget(sensor, standard, u_op)
 
 
 ## True for a standard whose own reference is on the colony, so the bench can
@@ -680,7 +683,7 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 			"tur": 0.0,
 			"reason": missing,
 		}
-	var budget: Dictionary = calibration_budget(instrument_id) if use_standard else {}
+	var budget: Dictionary = calibration_budget(instrument_id, performed_by) if use_standard else {}
 	if budget.get("refused", false):
 		return {
 			"instrument_id": instrument_id,
@@ -707,7 +710,9 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 	# the observed error and a bad standard stays hidden (Ryan, 2026-11-22).
 	# A standard of another quantity carries its error through the chain's
 	# sensitivity (FM-3 volts into thermometer degrees Celsius, section 1.5).
-	var zeroed: Dictionary = sensor.zero(standard.error * sensor.standard_sensitivity if standard else sensor.reference_offset)
+	# The Calibration skill needs a standard to work against.
+	var zeroed: Dictionary = (sensor.zero(standard.error * sensor.standard_sensitivity, skill_factor("as_left_residual", performed_by))
+		if standard else sensor.zero(sensor.reference_offset))
 	var as_found: float = zeroed["as_found"]
 	var as_left: float = zeroed["as_left"]
 	var as_found_ok: bool = absf(as_found) <= sensor.mpe
@@ -814,7 +819,7 @@ func calibrate_at_bench(instrument_id: String, performed_by: String = "") -> Dic
 	var sensor: DriftingSensor = get_sensor(instrument_id)
 	if sensor == null:
 		return {}
-	var minutes: float = sensor.bench_minutes
+	var minutes: float = sensor.bench_minutes * skill_factor("bench_time", performed_by)
 	var record: Dictionary = calibrate(instrument_id, performed_by, true, minutes)
 	if record.is_empty() or record.get("refused", false):
 		return record
@@ -933,6 +938,46 @@ func skill_xp(skill_id: String, player_id: String = "") -> int:
 
 func skill_level(skill_id: String, player_id: String = "") -> int:
 	return _level_for_xp(skill_xp(skill_id, player_id))
+
+
+## What is left of a base amount at the player's level: 1.0 at level 1, less
+## `per_level` for each level above it, never under `floor` (data/skills.json).
+func skill_factor(effect_id: String, player_id: String = "") -> float:
+	var effect: Dictionary = DataManager.get_record(SKILLS_TABLE, effect_id, "effects")
+	if effect.is_empty():
+		return 1.0
+	var above: int = skill_level(str(effect["skill"]), player_id) - 1
+	return maxf(float(effect.get("floor", 0.0)), 1.0 - float(effect["per_level"]) * above)
+
+
+func has_skill_unlock(unlock_id: String, player_id: String = "") -> bool:
+	var unlock: Dictionary = DataManager.get_record(SKILLS_TABLE, unlock_id, "unlocks")
+	return not unlock.is_empty() and skill_level(str(unlock["skill"]), player_id) >= int(unlock["level"])
+
+
+## Line for the skills view: "Calibration  level 2  (60 XP, 150 for level 3)".
+func skill_text(skill_id: String, player_id: String = "") -> String:
+	var level: int = skill_level(skill_id, player_id)
+	var xp: int = skill_xp(skill_id, player_id)
+	var progress: String = ("%s XP, top level" % SP811.integer(xp) if level >= max_skill_level()
+		else "%s XP, %s for level %s" % [SP811.integer(xp), SP811.integer(xp_for_level(level + 1)), SP811.integer(level + 1)])
+	return "%s  level %s  (%s)%s" % [
+		DataManager.get_record(SKILLS_TABLE, skill_id, "skills").get("display_name", skill_id),
+		SP811.integer(level), progress, "  farm" if is_farm_skill(skill_id) else ""]
+
+
+## What the skill does at this level, and what it unlocks, for the skills view.
+func skill_effects_text(skill_id: String, player_id: String = "") -> String:
+	var parts: PackedStringArray = []
+	for effect: Dictionary in DataManager.get_records(SKILLS_TABLE, "effects"):
+		if effect["skill"] == skill_id:
+			parts.append("%s %s %% of base" % [effect["display_name"],
+				SP811.number(skill_factor(str(effect["id"]), player_id) * 100.0, 0)])
+	for unlock: Dictionary in DataManager.get_records(SKILLS_TABLE, "unlocks"):
+		if unlock["skill"] == skill_id:
+			parts.append(str(unlock["display_name"]) if has_skill_unlock(str(unlock["id"]), player_id)
+				else "Level %s: %s" % [SP811.integer(int(unlock["level"])), unlock["display_name"]])
+	return "; ".join(parts) if not parts.is_empty() else "No effect yet"
 
 
 func max_skill_level() -> int:
@@ -1605,9 +1650,10 @@ func add_tire_usage(meters: float) -> void:
 
 
 ## Distance a rover drove this tick: wears the steering encoder and the tire
-## gauge. There is one of each, whichever rover drove.
-func add_rover_usage(meters: float) -> void:
-	steering.add_usage(meters)
+## gauge. There is one of each, whichever rover drove. The driver's Field Ops
+## skill spares the encoder.
+func add_rover_usage(meters: float, player_id: String = "") -> void:
+	steering.add_usage(meters * skill_factor("steering_usage", player_id))
 	add_tire_usage(meters)
 
 
@@ -1855,10 +1901,24 @@ func is_exuvia_visible() -> bool:
 	return molt_stage == MoltStage.MOLTED or GameClock.get_day_index() < exuvia_until_day
 
 
+## One molt's length. The farm's Husbandry skill shortens it.
+func molt_days() -> float:
+	return PLAYTEST_MOLT_DAYS * skill_factor("molt_time")
+
+
+## "MOLT  40 %", what pauses it, or that the spool is ready.
+func molt_text() -> String:
+	if molt_stage == MoltStage.MOLTED:
+		return "MOLTED: optical silk spool ready"
+	var stage: String = "PRE-MOLT" if molt_stage == MoltStage.PRE_MOLT else "MOLT"
+	return (stage + " PAUSED: " + molt_pause_reason() if is_molt_paused()
+		else "%s  %s %%" % [stage, SP811.number(molt_progress * 100.0, 0)])
+
+
 func _tick_molt(delta_days: float) -> void:
 	if molt_stage == MoltStage.MOLTED or is_molt_paused():
 		return
-	molt_progress = minf(1.0, molt_progress + delta_days / PLAYTEST_MOLT_DAYS)
+	molt_progress = minf(1.0, molt_progress + delta_days / molt_days())
 	if molt_progress >= 1.0:
 		molt_stage = MoltStage.MOLTED
 	elif molt_progress >= PRE_MOLT_AT:
@@ -2261,10 +2321,10 @@ func job_bench_standard(job: Dictionary) -> String:
 
 
 ## Why `job` can't be done at the bench now, or "".
-func job_bench_problem(job: Dictionary) -> String:
+func job_bench_problem(job: Dictionary, player_id: String = "") -> String:
 	if job_bench_standard(job) != "":
 		var cutoff: int = int(job.get("due_day", 0)) + maxi(int(_jobs_number("late_grace_days", 3.0)), 0)
-		if job_finish_day(job) > cutoff:
+		if job_finish_day(job, player_id) > cutoff:
 			return "Not enough time: %s cancels at 06:00 on day %s." % [job.get("customer", "?"), SP811.integer(cutoff + 1)]
 		return ""
 	var owned: Array[String] = job_standards(job)
@@ -2273,9 +2333,14 @@ func job_bench_problem(job: Dictionary) -> String:
 	return "The %s is at OIRM until day %s." % [instrument_name(owned[0], true), SP811.integer(int(at_oirm[owned[0]]))]
 
 
-## The day the bench work on `job` would end if started now.
-func job_finish_day(job: Dictionary) -> int:
-	return floori(GameClock.elapsed_days + float(job.get("bench_minutes", 0.0)) / 1440.0) + 1
+## Bench time of `job` for this player, after their Calibration skill.
+func job_minutes(job: Dictionary, player_id: String = "") -> float:
+	return float(job.get("bench_minutes", 0.0)) * skill_factor("bench_time", player_id)
+
+
+## The day the bench work on `job` would end if the player started now.
+func job_finish_day(job: Dictionary, player_id: String = "") -> int:
+	return floori(GameClock.elapsed_days + job_minutes(job, player_id) / 1440.0) + 1
 
 
 ## Calibrates the customer's item at the bench against the best standard for
@@ -2284,11 +2349,11 @@ func job_finish_day(job: Dictionary) -> int:
 ## began. Each cuts the pay and costs credibility; a clean, on-time job earns
 ## a little. Returns { ok, reason } on failure, else the result written to
 ## job_log.
-func complete_job(job_id: String) -> Dictionary:
+func complete_job(job_id: String, player_id: String = "") -> Dictionary:
 	var job: Dictionary = active_job(job_id)
 	if job.is_empty():
 		return { "ok": false, "reason": "No such job." }
-	var problem: String = job_bench_problem(job)
+	var problem: String = job_bench_problem(job, player_id)
 	if problem != "":
 		return { "ok": false, "reason": problem }
 	var standard_id: String = job_bench_standard(job)
@@ -2296,7 +2361,7 @@ func complete_job(job_id: String) -> Dictionary:
 	var traceable: bool = fault == ""
 	# The work takes its time. The job stays active, marked at the bench, so a
 	# morning during it neither cancels it nor offers it again.
-	var minutes: float = float(job.get("bench_minutes", 0.0))
+	var minutes: float = job_minutes(job, player_id)
 	job["at_bench"] = true
 	if minutes > 0.0:
 		GameClock.advance(minutes / 1440.0)

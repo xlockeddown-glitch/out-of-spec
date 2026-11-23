@@ -57,6 +57,7 @@ func _ready() -> void:
 	GameState.silk_changed.connect(_on_silk_changed)
 	GameState.relay_changed.connect(_on_relay_changed)
 	GameState.phone_message.connect(_hud.push_log)
+	GameState.skill_leveled.connect(_on_skill_leveled)
 	SaveGame.save_failed.connect(_hud.push_log)
 	GameState.credits_changed.connect(_on_credits_changed)
 	GameState.ore_changed.connect(_on_ore_changed)
@@ -87,10 +88,12 @@ func _ready() -> void:
 	_hud.set_ore(GameState.crystal_ore)
 	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text())
 	_refresh_jobs_hud()
+	_hud.get_parent().add_child(SkillsUI.new())
 
 
 func _process(delta: float) -> void:
 	_hud.set_clock(GameClock.format_now())
+	_hud.set_molt(GameState.molt_text() if GameState.has_skill_unlock("molt_on_phone") else "")
 	if _inspect_left > 0.0:
 		_inspect_left -= delta
 		return
@@ -255,6 +258,11 @@ func _on_credibility_changed(_points: int) -> void:
 	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text())
 	if _bram_bay.rover_inside:
 		_refresh_bram()
+
+
+func _on_skill_leveled(player_id: String, skill_id: String, _level: int) -> void:
+	if player_id == "" or player_id == GameState.local_player_id:
+		_hud.push_log("SKILL UP: %s. K shows skills." % GameState.skill_text(skill_id))
 
 
 func _on_credits_changed(amount: int) -> void:
