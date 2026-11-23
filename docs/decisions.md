@@ -812,3 +812,13 @@ Agent's notes (flagged for Ryan, not his words):
 - The case takes the loose meter's spot and turn on the bench mat, at the rear right. The node is now FieldMeterCaseModel, and clicking it still reads "FM-3 Field Meter", now "in its open carry case".
 - The case is built at 0.05 m voxels, half the art loop's 0.1 m, so it is 0.3 m × 0.2 m × 0.15 m. At 0.1 m it would be 0.6 m wide, out of scale with the 0.25 m loose meter. The size is the agent's choice, so it is Ryan's call.
 - The loose meter's model (field_meter_fm3.glb) stays in the build, unplaced.
+
+## 2026-11-22: Keep the FM-3 case at half size
+
+### Ryan chose
+
+- "Keep"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan answered the agent's question, whether to keep the FM-3 carry case at half size (0.05 m voxels, 0.3 m wide) or build it at the art loop's full 0.1 m (0.6 m wide). It stays at half size, so the previous entry's size is now his call, not only the agent's.
