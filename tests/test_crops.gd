@@ -357,3 +357,25 @@ func test_plant_uses_the_offset_sent_with_the_command() -> String:
 	if absf(setpoint - expected) > 1e-9:
 		return "Set point must use the +4 offset sent with the command, got %s." % setpoint
 	return ""
+
+
+## Ryan (2026-11-22): "both". Clicking the soil probe reads out the plot:
+## irrigation holds its reading at the set point, even with the probe drifted.
+func test_soil_probe_reads_each_planting_at_its_set_point() -> String:
+	var gs: GameStateScript = _make_state()
+	var problem: String = ""
+	var empty: String = gs.soil_probe_text()
+	if not empty.begins_with("Nothing planted"):
+		problem = "With nothing planted the probe must say so, got '%s'." % empty
+	gs.plant_crop(CELL)
+	gs.get_sensor(gs.SOIL_PROBE_ID).error = 1.3
+	var setpoint: float = float(gs.plantings[CELL]["setpoint"]) * 100.0
+	var reading: float = gs.soil_probe_reading(CELL)
+	if problem == "" and not is_equal_approx(reading, snappedf(setpoint, 0.1)):
+		problem = "The probe must read the set point %s %%, got %s %%." % [setpoint, reading]
+	var text: String = gs.soil_probe_text()
+	var want: String = "(%d, %d) %s %%" % [CELL.x, CELL.z, SP811.number(reading, 1)]
+	if problem == "" and (want not in text or "due day" not in text):
+		problem = "The readout must hold '%s' and the due day, got '%s'." % [want, text]
+	_done(gs)
+	return problem

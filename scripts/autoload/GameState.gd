@@ -2249,6 +2249,39 @@ func soil_moisture(cell: Vector3i) -> float:
 	return clampf(float(planting["setpoint"]) - error_fraction, 0.0, 1.0)
 
 
+## What the plot's soil probe reads at a cell, in percent water by volume:
+## the true moisture plus the probe's error, to its resolution. Irrigation
+## holds this at the set point, so a drifted probe still reads on target.
+func soil_probe_reading(cell: Vector3i) -> float:
+	var probe: DriftingSensor = get_sensor(SOIL_PROBE_ID)
+	var reading: float = soil_moisture(cell) * 100.0 + (probe.error if probe != null else 0.0)
+	var step: float = probe.resolution if probe != null and probe.resolution > 0.0 else 0.1
+	return snappedf(reading, step)
+
+
+## The soil probe's readout for its inspect text: each planted cell's reading
+## (the first few, then a count of the rest), then its calibration due day. "Reads beans (1, 2) 32.0 %. Cal due day 9."
+const SOIL_PROBE_TEXT_CELLS: int = 4
+
+
+func soil_probe_text() -> String:
+	var readings: PackedStringArray = []
+	for cell: Vector3i in plantings:
+		if readings.size() == SOIL_PROBE_TEXT_CELLS:
+			readings.append("%s more" % SP811.integer(plantings.size() - SOIL_PROBE_TEXT_CELLS))
+			break
+		readings.append("%s (%s, %s) %s %%" % [
+			crop_name(plantings[cell]["crop_id"]).to_lower(), SP811.integer(cell.x), SP811.integer(cell.z),
+			SP811.number(soil_probe_reading(cell), 1)])
+	var text: String = ("Nothing planted to read." if readings.is_empty()
+		else "Reads %s." % ", ".join(readings))
+	var probe: DriftingSensor = get_sensor(SOIL_PROBE_ID)
+	if probe != null:
+		text += (" CAL OVERDUE (due day %d)." if probe.is_overdue(GameClock.get_day_index())
+			else " Cal due day %d.") % probe.cal_due_day
+	return text
+
+
 func is_soil_in_band(cell: Vector3i) -> bool:
 	var planting: Dictionary = plantings.get(cell, {})
 	if planting.is_empty():
