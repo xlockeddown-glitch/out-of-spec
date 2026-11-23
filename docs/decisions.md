@@ -614,3 +614,16 @@ Agent's notes (flagged for Ryan, not his words):
 - Ryan's answer was to the question of what to place from the Environmental Standards pack. Only the chilled-mirror hygrometer is placed; the dry-well calibrator stays unplaced.
 - It sits on the front-left corner of the dome's calibration bench mat at (2.25, 0.9, 0.55) m, turned 180° so its front faces the camera. It fills the 0.3 m strip between the front of the calibration station model (z = 0.4 m) and the front edge of the mat (z = 0.7 m), touching both without passing into either.
 - It is at true size (0.35 m × 0.3 m × 0.15 m). Set dressing only: it does not read humidity, and the bench's calibration still runs as before.
+
+## 2026-11-22: Plateau rim in the farm
+
+### Ryan chose
+
+- "Plateau"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next. It was asked as "the plateau rim tiles", so this places both rim tiles from the Dry Gulch & Plateau Rim pack.
+- Ten tiles stand in a row under a `PlateauRim` node, a 20 m run along X at z = −30 m (x −10 m to 10 m, z −31 m to −29 m). That is 3 m behind the gulch, so the two read as a wash at the foot of a mesa. Apart from the gulch, the nearest thing is fissure E, 8 m in front of the run.
+- Eight straight tiles are turned 180° so the cliff faces the camera. The west end has a corner tile turned 180° and the east end one turned −90°, so the steps and dust apron wrap round both ends. The tiles stand on the ground at true size (2.0 m tall); the ground is flat, so the plateau top is only the tiles' 1.2 m back strip and from behind the run reads as a wall.
+- The farm's default camera follows the rover, so the rim is in view only when the rover is near the back of the farm. Set dressing only: no collision, so the rover drives through it.

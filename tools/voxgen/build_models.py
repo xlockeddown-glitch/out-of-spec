@@ -709,7 +709,8 @@ LOGISTICS = {
 # Ryan's Dry Gulch & Plateau Rim terrain pack (2026-11-22, 0.2 m voxels): 10 x 10 tiles for a
 # 2.0 m grid cell. One palette for all three: P1..P4 are the boulders' PLATEAU colors, D1 his
 # dust. Built and turned like the field props (origin at the cell center), part "rock" like the
-# boulders. Only the gulch is placed (six tiles in a row behind the farm plot).
+# boulders. The gulch is placed (six tiles in a row behind the farm plot), and the rim (a 20 m
+# run with a corner at each end) stands behind the gulch.
 GULCH_RIM_COLORS = {"P1": PLATEAU[0], "P2": PLATEAU[1], "P3": PLATEAU[2], "P4": PLATEAU[3],
                     "D1": "#C26B4A", "S": SHADOW}
 GULCH_RIM = ("dry_gulch_straight", "plateau_rim_straight", "plateau_rim_corner")

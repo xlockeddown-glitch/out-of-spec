@@ -663,3 +663,65 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, -0.4, -25)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/dry_gulch_straight.glb"
 model_scale = 0.2
+
+[node name="PlateauRim" type="Node3D" parent="WorldView/WorldViewport/World"]
+
+[node name="RimCornerW" type="Node3D" parent="WorldView/WorldViewport/World/PlateauRim"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -9, 0, -30)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_rim_corner.glb"
+model_scale = 0.2
+
+[node name="RimStraightA" type="Node3D" parent="WorldView/WorldViewport/World/PlateauRim"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -7, 0, -30)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_rim_straight.glb"
+model_scale = 0.2
+
+[node name="RimStraightB" type="Node3D" parent="WorldView/WorldViewport/World/PlateauRim"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -5, 0, -30)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_rim_straight.glb"
+model_scale = 0.2
+
+[node name="RimStraightC" type="Node3D" parent="WorldView/WorldViewport/World/PlateauRim"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -3, 0, -30)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_rim_straight.glb"
+model_scale = 0.2
+
+[node name="RimStraightD" type="Node3D" parent="WorldView/WorldViewport/World/PlateauRim"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -1, 0, -30)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_rim_straight.glb"
+model_scale = 0.2
+
+[node name="RimStraightE" type="Node3D" parent="WorldView/WorldViewport/World/PlateauRim"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 1, 0, -30)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_rim_straight.glb"
+model_scale = 0.2
+
+[node name="RimStraightF" type="Node3D" parent="WorldView/WorldViewport/World/PlateauRim"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 3, 0, -30)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_rim_straight.glb"
+model_scale = 0.2
+
+[node name="RimStraightG" type="Node3D" parent="WorldView/WorldViewport/World/PlateauRim"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 5, 0, -30)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_rim_straight.glb"
+model_scale = 0.2
+
+[node name="RimStraightH" type="Node3D" parent="WorldView/WorldViewport/World/PlateauRim"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 7, 0, -30)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_rim_straight.glb"
+model_scale = 0.2
+
+[node name="RimCornerE" type="Node3D" parent="WorldView/WorldViewport/World/PlateauRim"]
+transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 9, 0, -30)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/plateau_rim_corner.glb"
+model_scale = 0.2
