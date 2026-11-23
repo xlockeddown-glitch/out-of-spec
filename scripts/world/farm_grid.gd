@@ -69,7 +69,8 @@ func _fill_plot() -> void:
 			if get_cell_item(cell) == INVALID_CELL_ITEM:
 				set_cell_item(cell, Tile.SOIL_UNTILLED)
 	for tilled: Variant in GameState.tilled_cells:
-		set_cell_item(tilled as Vector3i, Tile.SOIL_TILLED)
+		if get_cell_item(tilled as Vector3i) == Tile.SOIL_UNTILLED:
+			set_cell_item(tilled as Vector3i, Tile.SOIL_TILLED)
 	refresh_crops()
 
 
