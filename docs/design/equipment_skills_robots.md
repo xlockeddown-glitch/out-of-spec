@@ -20,7 +20,7 @@ Markers used throughout:
 This is the base the proposal builds on. Written against main at `79750b5`; the facts below were rechecked on main at `79de808`.
 
 - `DriftingSensor` (`scripts/metrology/drifting_sensor.gd`): an error that grows with time (`daily_drift_rate`) and with use (`usage_drift_rate`) in one direction. `zero()` logs the as-found error, leaves a random as-left residual up to `as_left_residual`, and re-rolls the direction. The band is |error| / MPE: up to 0.8 in band, up to 1.0 guard band, above 1.0 out of tolerance.
-- `GameState.calibrate(instrument_id, performed_by)`: zeroes the sensor, adjusts the interval (out of tolerance as found: shorter; on-time pass: longer; late pass: same), and appends a record to `cal_log`. `performed_by` is already `"You"` or `"Manager"`.
+- `GameState.calibrate(instrument_id, performed_by)`: zeroes the sensor, adjusts the interval (out of tolerance as found: shorter; on-time pass: longer; late pass: same), and appends a record to `cal_log`. `performed_by` is a player id, or `MANAGER_ID` for the audit grace.
 - Instruments in `data/sensor_drift_config.json`: `hygrometer` (relative humidity, MPE 5.0 %), `rover_steering_encoder` (degrees, MPE 4.0°, drifts per meter driven), `relay_dish_azimuth` (degrees, MPE 0.45°; in the table but not built by `GameState` yet).
 - Audits: Inspector Vance and AUD-1T every 5th morning, one-time grace, then fines (`AuditEngine`).
 - Calibration today needs **no reference standard.** Zeroing at the bench is assumed to be correct. That is the gap the equipment system fills.
@@ -285,7 +285,7 @@ Ryan named calibration speed, uncertainty reduction, equipment unlocks and robot
 | A robot completes a job | robotics | 1 |
 | Calibrate a robot sensor | robotics and calibration | 5 each |
 
-Calibrations by `"Manager"` (the audit grace) give no XP **[ASSUMPTION]**. A calibration made before the instrument has been in service for ceil(interval / 2) days gives no XP, matching the existing rule in `GameState` that such early calibrations don't count as interval evidence.
+Calibrations by `MANAGER_ID` (the audit grace) give no XP **[ASSUMPTION]**. A calibration made before the instrument has been in service for ceil(interval / 2) days gives no XP, matching the existing rule in `GameState` that such early calibrations don't count as interval evidence.
 
 ### 2.3 Level effects
 

@@ -172,7 +172,7 @@ func test_first_failed_audit_is_a_warning_then_fines() -> String:
 		return "The first failed audit must be a fine-free warning: %s" % first
 	if first_credits != start_credits:
 		return "The warning must not change credits (%d -> %d)." % [start_credits, first_credits]
-	if manager_cal.get("performed_by", "") != "Manager":
+	if manager_cal.get("performed_by", "") != GameStateScript.MANAGER_ID:
 		return "The manager must calibrate the violating instrument before Vance inspects: %s" % manager_cal
 	if not offences_after_grace.is_empty():
 		return "The warning must not raise repeat-offence counts: %s" % offences_after_grace

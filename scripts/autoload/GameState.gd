@@ -40,6 +40,7 @@ const DISPATCH_TABLE: StringName = &"dialogue_dispatches"
 const CROPS_TABLE: StringName = &"crops"
 const SOIL_PROBE_ID: String = "soil_probe"
 ## Who did a calibration when it wasn't a player: the manager's grace cal.
+## Player ids must never be this or LEGACY_LOCAL_PERFORMER.
 const MANAGER_ID: String = "Manager"
 ## What calibration records said before players had ids.
 const LEGACY_LOCAL_PERFORMER: String = "You"
@@ -400,7 +401,7 @@ func instrument_name(instrument_id: String, full: bool = false) -> String:
 
 
 ## Name to show for a calibration record's `performed_by`: "You" for the local
-## player (and for records saved before ids), otherwise the id itself.
+## player (and for records made before ids), otherwise the id itself.
 ## Other players' display names come with co-op.
 func performer_name(performed_by: String) -> String:
 	if performed_by == "" or performed_by == local_player_id or performed_by == LEGACY_LOCAL_PERFORMER:
