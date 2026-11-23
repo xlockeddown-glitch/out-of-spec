@@ -782,6 +782,26 @@ ART_LOOP = {
                               "S": SHADOW}, "prop", {}),
 }
 
+# Ryan's Mining & Crystal Extraction pack (2026-11-22): a core drill, an ore skip and a seismic
+# thumper (0.1 m voxels), and an active and a depleted crystal fissure (0.2 m, like ore_fissure).
+# Colors are his generator's own: P1..P4 match the boulders' PLATEAU colors, EC is TEAL and S is
+# SHADOW. Built and turned like the field props; the crystals glow (emit_crystals, as in
+# ore_fissure) and everything else is unlit. None is placed in a scene yet.
+MINING = {
+    "portable_core_drill": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "B1": "#D9A13B",
+                             "O1": "#C84B31", "S": SHADOW}, "prop", {}, 0.1),
+    "ore_sorting_skip": ({"M1": "#4A607A", "M2": "#6C7A89", "M3": "#2E3844", "Q1": "#2A8F85",
+                          "Q2": "#6EC8BE", "P2": PLATEAU[1], "S": SHADOW}, "prop", {}, 0.1),
+    "seismic_thumper": ({"M2": "#6C7A89", "M3": "#2E3844", "Y1": "#E5B53B", "B1": "#D9A13B",
+                         "S": SHADOW}, "prop", {}, 0.1),
+    "crystal_ore_fissure": ({"P1": PLATEAU[0], "P2": PLATEAU[1], "P3": PLATEAU[2],
+                             "P4": PLATEAU[3], "EC": TEAL, "Q1": "#2A8F85", "S": SHADOW},
+                            "rock", {"EC": "emit_crystals"}, 0.2),
+    "crystal_ore_fissure_depleted": ({"P1": PLATEAU[0], "P2": PLATEAU[1], "P3": PLATEAU[2],
+                                      "P4": PLATEAU[3], "A1": "#5C6B73", "S": SHADOW},
+                                     "rock", {}, 0.2),
+}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop",
@@ -831,6 +851,7 @@ MODELS = [
     (lambda: prop_sheet("env_chamber_cart", ENV_CHAMBER), 0.1),
     *[((lambda n=n: prop_sheet(n, ENV_STANDARDS[n])), 0.025) for n in ENV_STANDARDS],
     *[((lambda n=n: prop_sheet(n, *ART_LOOP[n])), 0.1) for n in ART_LOOP],
+    *[((lambda n=n: prop_sheet(n, *MINING[n][:3])), MINING[n][3]) for n in MINING],
 ]
 
 
