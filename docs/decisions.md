@@ -740,5 +740,18 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - This is the soil probe half of "both" (the clamp stand entry above is the other half). Clicking the soil moisture probe on the farm now adds the probe's reading for each planted cell after its description, for example "Reads biscuit reed (0, 2) 40.0 %", then "Cal due day 5." or "CAL OVERDUE (due day 5)." With nothing planted it says "Nothing planted to read."
-- The reading is what the probe shows, true moisture plus its error, to its 0.1 % resolution. Irrigation holds that reading at the set point (unless the set point less the error falls outside 0 % to 100 %, where the soil cannot follow), so a drifted probe still reads on target while the soil is off by the error. That is the point: the probe cannot tell you it has drifted; only calibration can.
+- The reading is what the probe shows, true moisture plus its error, to its 0.1 % resolution. Irrigation holds that reading at the set point (unless the set point less the error falls outside 0 % to 100 %, where the soil cannot follow), so a drifted probe still reads on target while the soil is off by the error. That is the point: the probe cannot tell you it has drifted; only calibration can. (Superseded by "The soil probe's readout shows its drift" below: the readout now shows the drift.)
 - The hover label lists the first 4 cells, then "N more", so a full plot does not run off the screen.
+
+## 2026-11-22: The soil probe's readout shows its drift
+
+### Ryan chose
+
+- "both"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan answered the agent's question, whether the probe should flag drift or the art loop's new renders be reviewed; this entry is the probe half.
+- Clicking the soil probe now adds "Drift +2.70 %, GUARD BAND." before the due day, the same way the dome's displays and the rover's steering readout show drift: the error as the last reference saw it, with its band (IN TOLERANCE, GUARD BAND or OUT OF TOLERANCE against the probe's MPE).
+- This replaces the previous entry's note that only calibration can show the drift. The soil readings still sit on the set point, so the drift line is what tells the player the soil is off. The drift line is the error as the last reference saw it, so if that reference was itself off, the drift line and the soil readings can disagree by that much.
+- The hover label stays one color; tinting it by band (teal, amber, red) is left for later.
