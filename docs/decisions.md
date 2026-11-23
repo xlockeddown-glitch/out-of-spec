@@ -845,3 +845,14 @@ Agent's notes (flagged for Ryan, not his words):
 
 - Ryan answered the agent's question, whether the FM-3 carry case's screen should stop glowing teal, to match the other metrology props, or keep the glow.
 - Gemini had lit the meter's screen teal as its own glowing part. The screen is now the blank, unlit screen of Ryan's metrology pack (#2E3844), like the loose FM-3, the LS-85 reference meter and the hygrometer. The voxel grid is unchanged.
+
+## 2026-11-22: Keep the loose FM-3 model in the build
+
+### Ryan chose
+
+- "Keep"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan answered the agent's question, whether to keep the loose FM-3 model (field_meter_fm3.glb) in the build now that its carry case has replaced it on the calibration bench, or remove it.
+- It stays in the build, unplaced, so it is ready if the FM-3 is shown out of its case later, for example in the field.
