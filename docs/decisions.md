@@ -976,7 +976,7 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - Level effects follow §2.3 of the design: bench time, as-left error, operator uncertainty, molt time and steering drift from driving, in `data/skills.json`. Level 1 is the base; all numbers [PLACEHOLDER]. Husbandry 3 shows the molt on the field phone; Uncertainty 5 shows the uncertainty budget on the bench.
-- An unskilled operator adds u_op = 5 % of the unit's MPE [PLACEHOLDER]. That lowers every bench TUR a little (no TUR can be over 10:1) until the Uncertainty skill shrinks it. OIRM's own calibrations are not affected.
+- An unskilled operator adds u_op = 5 % of the unit's MPE [PLACEHOLDER]. At Uncertainty 1 no bench TUR can be over 10:1, so very high TURs drop most (steering encoder 47.6 to 9.8, relay timebase 172.9 to 10.0) and the rest by less (dome pressure 3.1 to 3.0, terrarium thermometer 4.8 to 4.3). No unit crosses the 4:1 or 2:1 lines, against its own standard or one that takes it over. The Uncertainty skill raises them again. OIRM's own calibrations are not affected.
 - Bench time also applies to paid jobs. The as-left effect needs a standard, so the remote zero is unchanged.
 - Not built, because players already have them: TUR on the bench at Uncertainty 2, two instruments per bench visit at Calibration 3, two fissures per drilling trip at Field Ops 4. Taking them away to give them back is Ryan's call.
 - Not built: the Instrumentation tier gates (levels 1, 3 and 6). Level 3 needs 150 XP, and the few standards a farm can buy before Tier 2 give 15 each, so the gate could hold a farm back for a long time. Robotics waits for robots.
