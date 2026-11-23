@@ -1,4 +1,4 @@
-[gd_scene load_steps=35 format=3]
+[gd_scene load_steps=37 format=3]
 
 [ext_resource type="Script" path="res://scripts/dome/dome_interior.gd" id="1_dome"]
 [ext_resource type="Script" path="res://scripts/dome/terrarium.gd" id="2_terr"]
@@ -118,6 +118,12 @@ size = Vector3(0.35, 0.15, 0.3)
 
 [sub_resource type="BoxShape3D" id="Inspect_dry_well_calibrator"]
 size = Vector3(0.25, 0.35, 0.25)
+
+[sub_resource type="BoxShape3D" id="Inspect_mexican_redknee_tank"]
+size = Vector3(0.7, 0.6, 0.5)
+
+[sub_resource type="BoxShape3D" id="Inspect_brazilian_black_tank"]
+size = Vector3(0.7, 0.6, 0.5)
 
 [sub_resource type="BoxShape3D" id="Inspect_md2p_humidity_generator"]
 size = Vector3(0.7, 1.2, 0.6)
@@ -616,6 +622,60 @@ prop_id = "env_chamber_cart"
 
 [node name="Shape" type="CollisionShape3D" parent="EnvChamberCartModel/Inspect"]
 shape = SubResource("Inspect_env_chamber_cart")
+
+[node name="RedkneeTank" type="Node3D" parent="."]
+position = Vector3(-4.35, 1, 0)
+
+[node name="TankModel" type="Node3D" parent="RedkneeTank"]
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/terrarium.glb"
+model_scale = 0.05
+emit_energy_overrides = Dictionary[String, float]({
+"emit_heat_lamp": 0.5
+})
+
+[node name="SpiderModel" type="Node3D" parent="RedkneeTank"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0.12, 0.15, 0.05)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/mexican_redknee.glb"
+model_scale = 0.05
+
+[node name="Inspect" type="Area3D" parent="RedkneeTank"]
+position = Vector3(0, 0.3, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "mexican_redknee_tank"
+
+[node name="Shape" type="CollisionShape3D" parent="RedkneeTank/Inspect"]
+shape = SubResource("Inspect_mexican_redknee_tank")
+
+[node name="BrazilianBlackTank" type="Node3D" parent="."]
+position = Vector3(-1.65, 1, 0)
+
+[node name="TankModel" type="Node3D" parent="BrazilianBlackTank"]
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/terrarium.glb"
+model_scale = 0.05
+emit_energy_overrides = Dictionary[String, float]({
+"emit_heat_lamp": 0.5
+})
+
+[node name="SpiderModel" type="Node3D" parent="BrazilianBlackTank"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0.12, 0.15, 0.05)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/brazilian_black.glb"
+model_scale = 0.05
+
+[node name="Inspect" type="Area3D" parent="BrazilianBlackTank"]
+position = Vector3(0, 0.3, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "brazilian_black_tank"
+
+[node name="Shape" type="CollisionShape3D" parent="BrazilianBlackTank/Inspect"]
+shape = SubResource("Inspect_brazilian_black_tank")
 
 [node name="HumidityGeneratorModel" type="Node3D" parent="."]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 1.5, 0, -1.2)
