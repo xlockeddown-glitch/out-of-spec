@@ -44,9 +44,9 @@
     "display_name": "Brazilian Black",
     "description": "Grammostola pulchra, in a small tank of its own: tarantulas don't share a tank."
   },
-  "field_meter_fm3": {
+  "fm3_field_meter_case": {
     "display_name": "FM-3 Field Meter",
-    "description": "Handheld field meter, lying face up on the bench mat."
+    "description": "Handheld field meter in its open carry case on the bench mat."
   },
   "chilled_mirror_hygrometer": {
     "display_name": "Chilled-Mirror Hygrometer",

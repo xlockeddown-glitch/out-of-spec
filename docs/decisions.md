@@ -799,3 +799,16 @@ Agent's notes (flagged for Ryan, not his words):
 - The small tanks are decor you can click to inspect. They have no humidity, molt or silk of their own; the game still tracks only the Curlyhair.
 - New text in data/props.json names each species with its scientific name from data/tarantula_species.json.
 - The Brazilian black is near-black and hard to see at this size; it may need a lighter palette later.
+
+## 2026-11-22: Swap the loose FM-3 for its carry case
+
+### Ryan chose
+
+- "fm3 can replace"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan answered the agent's question, whether the FM-3 carry case should replace the loose FM-3 on the calibration bench or stay unplaced.
+- The case takes the loose meter's spot and turn on the bench mat, at the rear right. The node is now FieldMeterCaseModel, and clicking it still reads "FM-3 Field Meter", now "in its open carry case".
+- The case is built at 0.05 m voxels, half the art loop's 0.1 m, so it is 0.3 m × 0.2 m × 0.15 m. At 0.1 m it would be 0.6 m wide, out of scale with the 0.25 m loose meter. The size is the agent's choice, so it is Ryan's call.
+- The loose meter's model (field_meter_fm3.glb) stays in the build, unplaced.
