@@ -718,3 +718,15 @@ Agent's notes (flagged for Ryan, not his words):
 - It is the same calibration as at the bench: same standard, uncertainty budget, refusals, result and bench time (30 min for steering [PLACEHOLDER], on the game clock). The rover must be stopped on the pad.
 - The PX-1 is a Tier 0 standard the colony starts with, so steering is offered from day 1. Instruments without a standard are skipped, and the entry line says the tire gauge still needs the WD-1.
 - The list of pad instruments is `GameState.FIELD_CAL_IDS`, with a test that steering is offered alone before the WD-1 and with the tire gauge after.
+
+## 2026-11-22: Make the bench's clamp stand clickable
+
+### Ryan chose
+
+- "both"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to "soil probe reads the plot, or the bench's dead upright strip". This entry covers the strip; the soil probe gets its own entry and PR.
+- The strip is the clamp stand in the calibration station model, holding the hygrometer under test. It now has its own box in the bench click area (0.5 m × 0.6 m × 0.2 m, from the deck up to the stand's crossbar), so clicking it opens the calibration bench like the rest of the station.
+- Measured by casting a picking ray every 2 px from the dome camera: the dry well, chilled-mirror hygrometer and field meter keep the same pixel counts as before (288, 309 and 96), so the new box hides none of them. The box's back corner shows a few pixels past the crossbar against the wall.
