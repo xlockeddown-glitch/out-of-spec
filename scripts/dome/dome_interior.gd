@@ -40,6 +40,8 @@ func _ready() -> void:
 	_airlock.clicked.connect(func() -> void: SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE))
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)
+	for prop: Inspectable in get_tree().get_nodes_in_group(Inspectable.GROUP):
+		prop.inspected.connect(_toast)
 	GameState.calibration_recorded.connect(_on_calibration_recorded)
 	GameState.phone_message.connect(_on_phone_message)
 	# An audit posts several phone lines in one frame; this fires after them,

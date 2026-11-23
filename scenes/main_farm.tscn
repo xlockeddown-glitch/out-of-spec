@@ -16,6 +16,7 @@
 [ext_resource type="MeshLibrary" path="res://assets/voxels/soil_tiles.tres" id="14_soil"]
 [ext_resource type="Script" path="res://scripts/rover/cab_readout.gd" id="15_readout"]
 [ext_resource type="Script" path="res://scripts/world/parking_pad.gd" id="16_pad"]
+[ext_resource type="Script" path="res://scripts/world/inspectable.gd" id="30_inspect"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -104,6 +105,27 @@ size = Vector3(3, 3, 1.2)
 
 [sub_resource type="BoxMesh" id="CabReadoutMesh"]
 size = Vector3(0.2, 0.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="Inspect_field_survey_tripod"]
+size = Vector3(0.7, 1.4, 0.7)
+
+[sub_resource type="BoxShape3D" id="Inspect_steering_encoder_jig"]
+size = Vector3(0.6, 0.4, 0.6)
+
+[sub_resource type="BoxShape3D" id="Inspect_irrigation_junction"]
+size = Vector3(1.2, 0.8, 1.2)
+
+[sub_resource type="BoxShape3D" id="Inspect_soil_moisture_probe"]
+size = Vector3(0.3, 0.6, 0.3)
+
+[sub_resource type="BoxShape3D" id="Inspect_water_cistern"]
+size = Vector3(1.6, 1.8, 1.6)
+
+[sub_resource type="BoxShape3D" id="Inspect_harvest_crate"]
+size = Vector3(1.0, 0.6, 0.8)
+
+[sub_resource type="BoxShape3D" id="Inspect_shipping_pallet"]
+size = Vector3(1.4, 0.3, 1.2)
 
 [node name="MainFarm" type="Node" unique_id=111713122]
 script = ExtResource("1_main")
@@ -296,11 +318,31 @@ script = ExtResource("12_slot")
 model_path = "res://assets/voxels/field_survey_tripod.glb"
 model_scale = 0.1
 
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/FieldCalPad/Tripod"]
+position = Vector3(0, 0.7, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "field_survey_tripod"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/FieldCalPad/Tripod/Inspect"]
+shape = SubResource("Inspect_field_survey_tripod")
+
 [node name="EncoderJig" type="Node3D" parent="WorldView/WorldViewport/World/FieldCalPad"]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -2.6, 0, 0)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/steering_encoder_jig.glb"
 model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/FieldCalPad/EncoderJig"]
+position = Vector3(0, 0.2, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "steering_encoder_jig"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/FieldCalPad/EncoderJig/Inspect"]
+shape = SubResource("Inspect_steering_encoder_jig")
 
 [node name="DropPod" type="Node3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("drone")]
 visible = false
@@ -552,6 +594,24 @@ rover = NodePath("../..")
 [node name="FieldPhoneHUD" parent="HUDLayer" unique_id=1260413487 instance=ExtResource("6_hud")]
 unique_name_in_owner = true
 
+[node name="HoverHint" type="Label" parent="HUDLayer"]
+unique_name_in_owner = true
+anchors_preset = -1
+anchor_top = 1.0
+anchor_right = 0.68
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = -64.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.2196, 0.8824, 0.7765, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 22
+vertical_alignment = 2
+
 [node name="PodModel" type="Node3D" parent="WorldView/WorldViewport/World/DropPod" node_paths=PackedStringArray("greybox")]
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/drop_pod.glb"
@@ -576,17 +636,47 @@ script = ExtResource("12_slot")
 model_path = "res://assets/voxels/irrigation_junction.glb"
 model_scale = 0.1
 
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/IrrigationJunctionModel"]
+position = Vector3(0, 0.4, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "irrigation_junction"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/IrrigationJunctionModel/Inspect"]
+shape = SubResource("Inspect_irrigation_junction")
+
 [node name="SoilProbeModel" type="Node3D" parent="WorldView/WorldViewport/World"]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -7.8, -0.4, 12.5)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/soil_moisture_probe.glb"
 model_scale = 0.1
 
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/SoilProbeModel"]
+position = Vector3(0, 0.7, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "soil_moisture_probe"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/SoilProbeModel/Inspect"]
+shape = SubResource("Inspect_soil_moisture_probe")
+
 [node name="WaterCisternModel" type="Node3D" parent="WorldView/WorldViewport/World"]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.6, 0, 13.2)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/water_cistern.glb"
 model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/WaterCisternModel"]
+position = Vector3(0, 0.9, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "water_cistern"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/WaterCisternModel/Inspect"]
+shape = SubResource("Inspect_water_cistern")
 
 [node name="Clutter" type="Node3D" parent="WorldView/WorldViewport/World"]
 
@@ -632,11 +722,31 @@ script = ExtResource("12_slot")
 model_path = "res://assets/voxels/harvest_crate.glb"
 model_scale = 0.1
 
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/HarvestCrateModel"]
+position = Vector3(0, 0.3, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "harvest_crate"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/HarvestCrateModel/Inspect"]
+shape = SubResource("Inspect_harvest_crate")
+
 [node name="ShippingPalletModel" type="Node3D" parent="WorldView/WorldViewport/World"]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 1, 0, 13.3)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/shipping_pallet.glb"
 model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/ShippingPalletModel"]
+position = Vector3(0, 0.15, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "shipping_pallet"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/ShippingPalletModel/Inspect"]
+shape = SubResource("Inspect_shipping_pallet")
 
 [node name="Gulch" type="Node3D" parent="WorldView/WorldViewport/World"]
 

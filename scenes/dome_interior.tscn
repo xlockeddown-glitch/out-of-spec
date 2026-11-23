@@ -1,4 +1,4 @@
-[gd_scene load_steps=26 format=3]
+[gd_scene load_steps=29 format=3]
 
 [ext_resource type="Script" path="res://scripts/dome/dome_interior.gd" id="1_dome"]
 [ext_resource type="Script" path="res://scripts/dome/terrarium.gd" id="2_terr"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://scripts/world/model_slot.gd" id="5_slot"]
 [ext_resource type="Script" path="res://scripts/dome/lab_floor.gd" id="6_lab"]
 [ext_resource type="Script" path="res://scripts/ui/plan_board_ui.gd" id="7_plan"]
+[ext_resource type="Script" path="res://scripts/world/inspectable.gd" id="30_inspect"]
 
 [sub_resource type="Environment" id="Env"]
 background_mode = 1
@@ -93,6 +94,12 @@ corner_radius_top_left = 10
 corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
+
+[sub_resource type="BoxShape3D" id="Inspect_ref_meter_ls85"]
+size = Vector3(0.4, 0.15, 0.35)
+
+[sub_resource type="BoxShape3D" id="Inspect_env_chamber_cart"]
+size = Vector3(1.4, 1.5, 1.0)
 
 [node name="DomeInterior" type="Node3D"]
 script = ExtResource("1_dome")
@@ -520,11 +527,31 @@ script = ExtResource("5_slot")
 model_path = "res://assets/voxels/ref_meter_ls85.glb"
 model_scale = 0.025
 
+[node name="Inspect" type="Area3D" parent="RefMeterModel"]
+position = Vector3(0, 0.075, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "ref_meter_ls85"
+
+[node name="Shape" type="CollisionShape3D" parent="RefMeterModel/Inspect"]
+shape = SubResource("Inspect_ref_meter_ls85")
+
 [node name="EnvChamberCartModel" type="Node3D" parent="."]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 5.2, 0, 0)
 script = ExtResource("5_slot")
 model_path = "res://assets/voxels/env_chamber_cart.glb"
 model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="EnvChamberCartModel"]
+position = Vector3(0, 0.75, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "env_chamber_cart"
+
+[node name="Shape" type="CollisionShape3D" parent="EnvChamberCartModel/Inspect"]
+shape = SubResource("Inspect_env_chamber_cart")
 
 [node name="StationModel" type="Node3D" parent="CalStation" node_paths=PackedStringArray("greybox")]
 script = ExtResource("5_slot")

@@ -12,6 +12,7 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 @onready var _rover: RoverController = %Rover
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
 @onready var _airlock: Clickable = %Airlock
+@onready var _hover_hint: Label = %HoverHint
 @onready var _bram_bay: BramBay = %BramBay
 ## Ryan, 2026-11-22: "Pad by the airlock". Park here and press E to calibrate
 ## the tire gauge against the WD-1 without going into the dome.
@@ -35,6 +36,8 @@ func _ready() -> void:
 	_hud.slot_spool_pressed.connect(_on_slot_spool_pressed)
 	_hud.enter_dome_pressed.connect(_go_to_dome)
 	_airlock.clicked.connect(_go_to_dome)
+	for prop: Inspectable in get_tree().get_nodes_in_group(Inspectable.GROUP):
+		prop.inspected.connect(_hud.push_log)
 	# Bound methods so the autoload drops them when this scene is freed.
 	GameState.silk_changed.connect(_on_silk_changed)
 	GameState.relay_changed.connect(_on_relay_changed)
@@ -72,6 +75,8 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	_hud.set_clock(GameClock.format_now())
+	var hovered: Clickable = Clickable.hovered
+	_hover_hint.text = hovered.hint if hovered else ""
 
 
 func _on_uplink_changed(has_los: bool, quality: float, lag_s: float) -> void:

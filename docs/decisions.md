@@ -664,3 +664,18 @@ Agent's notes (flagged for Ryan, not his words):
 - Ryan's answer was to the question of what to place next. This places the steering encoder jig, the last unplaced voxel model.
 - It is a child of the field calibration pad (`FieldCalPad/EncoderJig`) at (10.9, 0, 15) m in the farm, turned 180° so its spirit level faces the camera. Its footprint (x 10.6 m to 11.2 m, z 14.7 m to 15.3 m) is 0.3 m west of the pad's west edge, mirroring the tripod just off the pad's other side. It is clear of the plot (back edge z = 12 m) and fissure H (z from 17.6 m).
 - It is at true size (0.6 m × 0.6 m, 0.4 m tall). Set dressing only: no collision and no interaction. The design doc has a rotary table as the Tier 0 angle standard in place of the jig, so the steering calibration still runs as before.
+
+## 2026-11-22: Inspect props on click
+
+### Ryan chose
+
+- "Make it interactive"
+- "Inspect on click"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answers were to what to do now that all voxel models are placed, then to which kind of interaction. Hovering a placed prop shows its name; clicking it adds one line, "Name: description", to the phone log in the farm or to the bottom toast in the dome. No new rules: nothing is measured, bought or changed by a click.
+- The names and descriptions live in `data/props.json`, so the SP 811 check scans them. The descriptions hold no specs; any spec one needs stays [PLACEHOLDER].
+- Props covered: in the farm the survey tripod, encoder jig, irrigation junction, soil probe, water cistern, harvest crate and shipping pallet; in the dome the environmental chamber and the reference multimeter on its lid. The chamber's click box stops 1.5 m up so it does not cover the meter.
+- Left out: the field meter, hygrometer and dry well on the dome bench. They sit inside the bench's click box (which opens the calibration bench), and the picking ray stops at the first box it enters, so they cannot be inspected until that box is shrunk.
+- The farm gains a hover name in the world view's bottom-left corner, in teal. The dome already showed hover hints.

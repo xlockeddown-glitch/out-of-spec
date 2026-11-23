@@ -1,0 +1,39 @@
+{
+  "_note": "Inspect text for placed props (Ryan, 2026-11-22: \"Inspect on click\"). Hover shows display_name; a click shows display_name and description. No specs here: any spec a description needs stays [PLACEHOLDER].",
+  "field_survey_tripod": {
+    "display_name": "Field Survey Tripod",
+    "description": "Holds a sighting target beside the field calibration pad."
+  },
+  "steering_encoder_jig": {
+    "display_name": "Steering Encoder Jig",
+    "description": "Clamps a wheel in its channel. The spirit level on the bridge plate shows when the wheel sits square."
+  },
+  "irrigation_junction": {
+    "display_name": "Irrigation Junction",
+    "description": "Valve manifold that splits the cistern's water into the plot's irrigation lines."
+  },
+  "soil_moisture_probe": {
+    "display_name": "Soil Moisture Probe",
+    "description": "The plot's auto-irrigation waters by this dial."
+  },
+  "water_cistern": {
+    "display_name": "Water Cistern",
+    "description": "Holds the farm's irrigation water."
+  },
+  "harvest_crate": {
+    "display_name": "Harvest Crate",
+    "description": "Picked crops wait here before they go to market."
+  },
+  "shipping_pallet": {
+    "display_name": "Shipping Pallet",
+    "description": "Crates ride out on it."
+  },
+  "env_chamber_cart": {
+    "display_name": "Environmental Chamber",
+    "description": "Climate test chamber on a wheeled cart."
+  },
+  "ref_meter_ls85": {
+    "display_name": "Reference Meter",
+    "description": "Bench reference meter, resting on the chamber's lid."
+  }
+}

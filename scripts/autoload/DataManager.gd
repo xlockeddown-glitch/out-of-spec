@@ -27,6 +27,7 @@ const DATA_FILES: Dictionary = {
 	&"dialogue_dispatches": "res://data/dialogue_dispatches.json",
 	&"items": "res://data/items.json",
 	&"economy": "res://data/economy.json",
+	&"props": "res://data/props.json",
 }
 
 ## Table -> { section -> required fields (besides "id") }.
@@ -48,6 +49,7 @@ const RECORD_SECTIONS: Dictionary = {
 	&"day_night": {},
 	&"items": {},
 	&"economy": {},
+	&"props": {},
 }
 
 var is_loaded: bool = false
