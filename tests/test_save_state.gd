@@ -47,7 +47,7 @@ func _worn() -> GameStateScript:
 
 
 func _clean_files() -> void:
-	for suffix: String in ["", ".bak", ".tmp", ".unreadable", ".old"]:
+	for suffix: String in ["", ".bak", ".tmp", ".unreadable", ".unreadable2", ".old"]:
 		if FileAccess.file_exists(PATH + suffix):
 			DirAccess.remove_absolute(PATH + suffix)
 
@@ -61,21 +61,21 @@ func _differs(a: Dictionary, b: Dictionary, when: String) -> String:
 
 func test_every_variable_is_saved_or_named_as_not() -> String:
 	var gs: GameStateScript = GameStateScript.new()
-	var problem: String = ""
+	var problems: PackedStringArray = []
 	var known: Array[String] = gs.SAVED_FIELDS + gs.SAVED_LATER + gs.NOT_SAVED
 	var found: Array[String] = []
 	for property: Dictionary in GameStateScript.get_script_property_list():
 		if property["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE:
 			found.append(property["name"])
 			if not property["name"] in known:
-				problem = "'%s' is in neither SAVED_FIELDS, SAVED_LATER nor NOT_SAVED." % property["name"]
+				problems.append("'%s' is in neither SAVED_FIELDS, SAVED_LATER nor NOT_SAVED." % property["name"])
 	for field: String in known:
 		if not field in found:
-			problem = "'%s' is listed but is not a GameState variable." % field
+			problems.append("'%s' is listed but is not a GameState variable." % field)
 		if known.count(field) != 1:
-			problem = "'%s' is listed twice." % field
+			problems.append("'%s' is listed twice." % field)
 	gs.free()
-	return problem
+	return "\n".join(problems)
 
 
 func test_round_trip_is_exact_and_play_continues_the_same() -> String:
@@ -147,7 +147,8 @@ func test_bad_data_is_refused_whole() -> String:
 	var bads: Array[Dictionary] = []
 	for change: Array in [["credits", "many"], ["credits", null], ["plantings", []], ["cal_log", [1]],
 			["cal_log", [{}]], ["certificate_log", [{ "standard_id": 4 }]], ["phone_log", [{}]],
-			["molt_progress", NAN], ["rng_state", 1.5], ["sensors", []],
+			["molt_progress", NAN], ["cal_log", [{ "instrument_id": "x", "mpe": NAN }]],
+			["plantings", { Vector3i.ZERO: { "deep": [NAN] } }], ["rng_state", 1.5], ["sensors", []],
 			["sensors", { sensor_id: { "error": NAN } }], ["sensors", { sensor_id: 3 }]]:
 		var bad: Dictionary = good.duplicate(true)
 		bad[change[0]] = change[1]
@@ -222,6 +223,10 @@ func _bad_files() -> String:
 	SaveGame.write(PATH)
 	if FileAccess.file_exists(PATH + ".bak") or not FileAccess.file_exists(PATH + ".unreadable"):
 		return "A file that won't load must be set aside, not become the backup."
+	_damage(PATH)
+	SaveGame.write(PATH)
+	if not FileAccess.file_exists(PATH + ".unreadable2"):
+		return "A second file that won't load must not replace the first."
 	return ""
 
 
@@ -285,3 +290,60 @@ func _menu_check() -> String:
 	if SaveGame.continue_farm(PATH) == "" or SaveGame.farm_open or GameState.credits != 6:
 		return "A farm that can't load must not open."
 	return ""
+
+
+func _damage(path: String) -> void:
+	var file: FileAccess = FileAccess.open(path, FileAccess.WRITE)
+	file.store_string("damaged")
+	file.close()
+
+
+func test_interrupted_and_damaged_saves_fall_back() -> String:
+	return _with_live(_fall_back)
+
+
+func _fall_back() -> String:
+	for credits: int in [10, 20]:
+		GameState.credits = credits
+		SaveGame.write(PATH)
+	# Stopped between the two renames: the newest farm is in the temporary file.
+	DirAccess.rename_absolute(PATH, PATH + ".tmp")
+	GameState.credits = 0
+	if not SaveGame.exists(PATH) or SaveGame.read(PATH) != "" or GameState.credits != 20:
+		return "A finished temporary file must load when the save is missing."
+	DirAccess.rename_absolute(PATH + ".tmp", PATH)
+	_damage(PATH)
+	if SaveGame.read(PATH) != "" or GameState.credits != 10:
+		return "With the save damaged, the backup must load."
+	# Whole and undamaged, but not a farm that can load: it must not become the backup.
+	var data: Dictionary = SaveGame.snapshot()
+	data["farm"]["cal_log"] = [{ "instrument_id": "x", "mpe": NAN }]
+	SaveGame._write_data(data, PATH)
+	GameState.credits = 30
+	if SaveGame.write(PATH) != "" or SaveGame.read_file(PATH + ".bak")["data"]["farm"]["credits"] != 10:
+		return "A save that can't load must not replace the backup."
+	var log_size: int = GameState.cal_log.size()
+	GameState.cal_log.append({ "instrument_id": "x", "mpe": NAN })
+	var refused: String = SaveGame.write(PATH)
+	GameState.cal_log.resize(log_size)
+	if refused == "" or SaveGame.read_file(PATH)["data"]["farm"]["credits"] != 30:
+		return "A farm that could not load again must not be written."
+	return ""
+
+
+func test_a_load_moves_a_live_rover() -> String:
+	return _with_live(_rover_load)
+
+
+func _rover_load() -> String:
+	var spot := Transform3D(Basis.IDENTITY, Vector3(5, 0, 0))
+	var rover: Node3D = (load("res://scripts/rover/rover_controller.gd") as GDScript).new()
+	GameState.park_rover(rover.rover_id, spot)
+	var data: Dictionary = SaveGame.snapshot()
+	rover.transform = Transform3D(Basis.IDENTITY, Vector3(9, 0, 9))
+	GameState.farm_loaded.connect(rover._unpark)
+	SaveGame.restore(data)
+	var at: Vector3 = rover.position
+	var parked: Vector3 = GameState.parked_rover_transform(rover.rover_id).origin
+	rover.free()
+	return "" if at == spot.origin and parked == at else "A load must move the rover and keep the place it is parked (%s, %s)." % [at, parked]

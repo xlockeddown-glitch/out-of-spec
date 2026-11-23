@@ -14,6 +14,8 @@ signal credits_changed(credits: int)
 signal audit_completed(report: Dictionary)
 signal drop_pod_changed(present: bool)
 signal ore_changed(ore: int)
+## A load replaced the farm. Rovers move to where it parked them.
+signal farm_loaded
 signal fissures_changed
 signal upgrades_changed
 ## A standard left on, or came back from, the OIRM drop pod (milestone 2).
@@ -406,6 +408,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 			return "'%s' has the wrong type." % field
 		if typeof(value) == TYPE_FLOAT and not is_finite(value):
 			return "'%s' is not a finite number." % field
+		if _has_nan(value):
+			return "'%s' holds a value that is not a number." % field
 		if mine is Array:
 			for entry: Variant in value:
 				if typeof(entry) != (mine as Array).get_typed_builtin():
@@ -425,6 +429,16 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if sensors.has(str(id)) and not DriftingSensor.from_config(str(id)).apply_dict(state):
 			return "Sensor '%s' can't load." % id
 	return ""
+
+
+static func _has_nan(value: Variant) -> bool:
+	if value is float:
+		return is_nan(value)
+	if value is Dictionary:
+		return (value as Dictionary).values().any(_has_nan)
+	if value is Array:
+		return (value as Array).any(_has_nan)
+	return false
 
 
 ## Replaces the farm with one farm_to_dict() made. Checks all of it first: bad
@@ -466,6 +480,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	certificates.clear()
 	for cert: Dictionary in certificate_log:
 		certificates[cert["standard_id"]] = cert
+	farm_loaded.emit()
 	molt_changed.emit(molt_progress, molt_stage)
 	silk_changed.emit(optical_silk_spools)
 	relay_changed.emit(relay_slotted)

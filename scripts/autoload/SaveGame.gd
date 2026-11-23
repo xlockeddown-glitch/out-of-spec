@@ -78,12 +78,10 @@ func day_of(data: Dictionary) -> int:
 ## one that doesn't to ".unreadable".
 func _set_aside(path: String) -> String:
 	var old_taken: bool = false
-	for file_path: String in [path, path + ".bak"]:
-		if not FileAccess.file_exists(file_path):
-			continue
+	for file_path: String in _candidates(path):
 		var error: Error = OK
 		if not read_file(file_path).has("data"):
-			error = DirAccess.rename_absolute(file_path, path + ".unreadable")
+			error = DirAccess.rename_absolute(file_path, _unreadable_path(path))
 		elif old_taken:
 			error = DirAccess.remove_absolute(file_path)
 		else:
@@ -129,7 +127,12 @@ func data_problem(data: Dictionary) -> String:
 ## Saves the farm. The save before it is kept beside it as ".bak". Returns ""
 ## or why it failed.
 func write(path: String = DEFAULT_PATH) -> String:
-	return _write_data(snapshot(), path)
+	var data: Dictionary = snapshot()
+	# A farm that could not load again must not replace one that can.
+	var problem: String = data_problem(data)
+	if problem != "":
+		return "The farm can't be saved: " + problem
+	return _write_data(data, path)
 
 
 func _write_data(data: Dictionary, path: String) -> String:
@@ -150,38 +153,59 @@ func _write_data(data: Dictionary, path: String) -> String:
 	if FileAccess.file_exists(path):
 		# A file this game can't read (damaged, or from a newer version) is set
 		# aside: it must not replace a good backup, or be lost.
-		var aside: String = ".bak" if read_file(path).has("data") else ".unreadable"
-		var aside_error: Error = DirAccess.rename_absolute(path, path + aside)
+		var aside: String = path + ".bak" if read_file(path).has("data") else _unreadable_path(path)
+		var aside_error: Error = DirAccess.rename_absolute(path, aside)
 		if aside_error != OK:
 			return "Could not back up %s (error %d)." % [path, aside_error]
+	# Stopped here, the farm is in the temporary file; _candidates() finds it.
 	var move_error: Error = DirAccess.rename_absolute(temp, path)
 	if move_error != OK:
 		return "Could not replace %s (error %d)." % [path, move_error]
 	return ""
 
 
-## True if there is a save or a backup to load.
+## A name for a file that can't be read. One set aside earlier is kept.
+func _unreadable_path(path: String) -> String:
+	var aside: String = path + ".unreadable"
+	var number: int = 2
+	while FileAccess.file_exists(aside):
+		aside = "%s.unreadable%d" % [path, number]
+		number += 1
+	return aside
+
+
+## The files that can hold the farm, newest first. The temporary file counts
+## only while the save is missing: a write stopped between its two renames.
+func _candidates(path: String) -> Array[String]:
+	var found: Array[String] = []
+	for file_path: String in [path, path + ".tmp", path + ".bak"]:
+		if FileAccess.file_exists(file_path) and not (file_path == path + ".tmp" and path in found):
+			found.append(file_path)
+	return found
+
+
+## True if there is a save, or a file that stands in for one, to try.
 func exists(path: String = DEFAULT_PATH) -> bool:
-	return FileAccess.file_exists(path) or FileAccess.file_exists(path + ".bak")
+	return not _candidates(path).is_empty()
 
 
 ## What Continue would load: { data }, with { problem } too when the newest save
-## won't load and the backup is used instead; { problem } alone when neither
+## won't load and one before it is used instead; { problem } alone when none
 ## loads; {} when there is no save.
 func check(path: String = DEFAULT_PATH) -> Dictionary:
-	if not exists(path):
-		return {}
-	var newest: Dictionary = read_file(path)
-	if newest.has("data") or not FileAccess.file_exists(path + ".bak"):
-		return newest
-	var backup: Dictionary = read_file(path + ".bak")
-	if backup.has("data"):
-		newest["data"] = backup["data"]
-	return newest
+	var found: Dictionary = {}
+	for file_path: String in _candidates(path):
+		var result: Dictionary = read_file(file_path)
+		if result.has("data"):
+			found["data"] = result["data"]
+			break
+		if not found.has("problem"):
+			found["problem"] = result["problem"]
+	return found
 
 
-## Loads the farm, or the backup if the save is missing or won't load.
-## Returns "" or why it failed; on a problem nothing changes.
+## Loads what check() found. Returns "" or why it failed; on a problem nothing
+## changes.
 func read(path: String = DEFAULT_PATH) -> String:
 	var found: Dictionary = check(path)
 	if found.has("data"):
