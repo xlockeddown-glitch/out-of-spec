@@ -1,0 +1,30 @@
+brazilian_black - 7 x 7 x 3 (live Brazilian Black tarantula, sized like the Curlyhair). From the Gemini art loop (0.1 m voxels), 2026-11-22.
+X: 0..6 left to right, Y: 6..0 rear (+Y) to front (-Y), first row = highest Y.
+Palette: K1 = #0E1117, K2 = #1D222B, S1 = #324058, S2 = #586E8C, EY = #9AB0CC
+
+Z = 0
+Y=06  S2 K1 .. .. .. K1 S2
+Y=05  .. .. K1 K1 K1 .. ..
+Y=04  S2 K1 K1 K1 K1 K1 S2
+Y=03  .. .. .. K1 .. .. ..
+Y=02  S2 K1 K1 K1 K1 K1 S2
+Y=01  .. .. K2 K1 K2 .. ..
+Y=00  S2 K1 .. .. .. K1 S2
+
+Z = 1
+Y=06  .. S1 K2 K2 K2 S1 ..
+Y=05  .. .. K2 K1 K2 .. ..
+Y=04  .. S1 K1 K1 K1 S1 ..
+Y=03  .. .. .. K1 .. .. ..
+Y=02  .. S1 K1 K1 K1 S1 ..
+Y=01  .. .. S1 EY S1 .. ..
+Y=00  .. S1 K1 .. K1 S1 ..
+
+Z = 2
+Y=06  .. .. .. S1 .. .. ..
+Y=05  .. .. S1 K1 S1 .. ..
+Y=04  .. .. .. K1 .. .. ..
+Y=03  .. .. .. .. .. .. ..
+Y=02  .. .. .. S1 .. .. ..
+Y=01  .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. ..

@@ -1,0 +1,30 @@
+mexican_redknee - 7 x 7 x 3 (live Mexican Redknee tarantula, sized like the Curlyhair). From the Gemini art loop (0.1 m voxels), 2026-11-22.
+X: 0..6 left to right, Y: 6..0 rear (+Y) to front (-Y), first row = highest Y.
+Palette: B1 = #2E2B30, B2 = #473F3E, K1 = #D44E1C, K2 = #9A3A1E, C1 = #D8B794, S = #1D222B
+
+Z = 0
+Y=06  B1 .. .. S  .. .. B1
+Y=05  .. .. S  S  S  .. ..
+Y=04  B1 B1 .. S  .. B1 B1
+Y=03  .. B1 S  S  S  B1 ..
+Y=02  B1 .. S  S  S  .. B1
+Y=01  .. .. B1 S  B1 .. ..
+Y=00  B1 .. .. .. .. .. B1
+
+Z = 1
+Y=06  B1 K1 B1 K2 B1 K1 B1
+Y=05  .. .. B1 B1 B1 .. ..
+Y=04  B1 K1 .. S  .. K1 B1
+Y=03  .. .. C1 B1 C1 .. ..
+Y=02  B1 K1 C1 B1 C1 K1 B1
+Y=01  .. .. C1 S  C1 .. ..
+Y=00  B1 K1 B1 .. B1 K1 B1
+
+Z = 2
+Y=06  .. K1 .. B2 .. K1 ..
+Y=05  .. .. B2 K2 B2 .. ..
+Y=04  .. K1 .. .. .. K1 ..
+Y=03  .. .. .. B1 .. .. ..
+Y=02  .. K1 .. B2 .. K1 ..
+Y=01  .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. ..

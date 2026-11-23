@@ -755,3 +755,18 @@ Agent's notes (flagged for Ryan, not his words):
 - Clicking the soil probe now adds "Drift +2.70 %, GUARD BAND." before the due day, the same way the dome's displays and the rover's steering readout show drift: the error as the last reference saw it, with its band (IN TOLERANCE, GUARD BAND or OUT OF TOLERANCE against the probe's MPE).
 - This replaces the previous entry's note that only calibration can show the drift. The soil readings still sit on the set point, so the drift line is what tells the player the soil is off. The drift line is the error as the last reference saw it, so if that reference was itself off, the drift line and the soil readings can disagree by that much.
 - The hover label stays one color; tinting it by band (teal, amber, red) is left for later.
+
+## 2026-11-22: Bring the art loop's five models into the build
+
+### Ryan chose
+
+- "All five"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan answered the agent's question, whether to bring the Gemini art loop's five new models into the model build. Each now has a sheet in tools/voxgen/sheets/ and builds at 0.1 m voxels: the Mexican redknee and Brazilian black tarantulas (7 x 7 x 3, sized like the Curlyhair), the PX-1 rotary table (6 x 6 x 3), the MD-2P humidity generator (7 x 6 x 12, 1.2 m tall) and the FM-3 in its carry case (6 x 4 x 3).
+- Built only: none is placed in a scene yet.
+- Palettes are Gemini's, with one change: Gemini made the case's meter orange (#E85D25), but the game's FM-3 is Ryan's yellow from his pack, so the case uses that yellow (#E5B53B).
+- Glowing tokens are their own emit_* parts: the PX-1 and MD-2P displays and the case screen in teal, the MD-2P standby LED in amber.
+- The FM-3 case skips the dark border pass ("Answer A"). The case is small, and the pass around its 2-voxel screen painted 14 of its 43 voxels dark, including half the meter, so the case read as a black box. Gemini already set the screen on dark foam. This is an exception to Ryan's rule, so it is his call: the skip is one line (BORDER_SKIP in build_models.py) and can come out.
+- The Brazilian black is very dark (near-black body, blue-grey hairs); it reads in the dome's light but may need a lift if it sits in shadow.

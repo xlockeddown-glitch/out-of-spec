@@ -1,0 +1,99 @@
+md2p_humidity_generator - 7 x 6 x 12 (Meridiani Dewpoint MD-2P Humidity Generator). From the Gemini art loop (0.1 m voxels), 2026-11-22.
+X: 0..6 left to right, Y: 5..0 rear (+Y) to front (-Y), first row = highest Y.
+Palette: C1 = #6C7A89, C2 = #4A607A, M3 = #2E3844, M4 = #9AA5B1, B1 = #E0A96D, W1 = #4A7A82, N1 = #C85A2A, S = #1D222B, G1 = #38E1C6, G2 = #F5A623
+
+Z = 0
+Y=05  M3 M3 .. .. .. M3 M3
+Y=04  M3 M3 S  S  S  M3 M3
+Y=03  .. S  S  S  S  S  ..
+Y=02  M3 M3 S  S  S  M3 M3
+Y=01  M3 M3 .. .. .. M3 M3
+Y=00  .. .. .. .. .. .. ..
+
+Z = 1
+Y=05  M3 M3 M3 M3 M3 M3 M3
+Y=04  M3 M3 M3 M3 M3 M3 M3
+Y=03  M3 M3 M3 M3 M3 M3 M3
+Y=02  M3 M3 M3 M3 M3 M3 M3
+Y=01  M3 S  S  S  M3 M3 M3
+Y=00  .. .. .. .. .. .. ..
+
+Z = 2
+Y=05  C1 C1 C1 C1 C1 M3 M3
+Y=04  C1 C1 C1 C1 C1 M3 M3
+Y=03  C1 C1 C1 C1 C1 M3 M3
+Y=02  C1 C1 C1 C1 C1 M3 M3
+Y=01  C1 C1 C1 C1 C1 M3 M3
+Y=00  M3 C2 C2 C2 C2 .. ..
+
+Z = 3
+Y=05  C1 S  S  S  C1 C2 C2
+Y=04  C1 C1 C1 C1 C1 C2 M4
+Y=03  C1 C1 C1 C1 C1 C2 M4
+Y=02  C1 S  S  C1 C1 C2 C2
+Y=01  C1 W1 W1 C1 C1 B1 B1
+Y=00  C2 .. .. C2 M4 .. ..
+
+Z = 4
+Y=05  C1 S  S  S  C1 C2 C2
+Y=04  C1 C1 C1 C1 C1 C2 M4
+Y=03  C1 C1 C1 C1 C1 C2 M4
+Y=02  C1 S  S  C1 C1 C2 C2
+Y=01  C1 W1 W1 C1 C1 .. ..
+Y=00  C2 .. .. C2 B1 .. ..
+
+Z = 5
+Y=05  C1 C1 C1 C1 C1 M3 M3
+Y=04  C1 C1 C1 C1 C1 M3 M3
+Y=03  C1 C1 C1 C1 C1 M3 M3
+Y=02  C1 C1 C1 C1 C1 M3 M3
+Y=01  C1 C1 C1 C1 C1 .. ..
+Y=00  C2 C2 C2 C2 M4 .. ..
+
+Z = 6
+Y=05  C1 C1 C1 C1 C1 C2 C2
+Y=04  C1 C1 C1 C1 C1 C2 M4
+Y=03  C1 C1 C1 C1 C1 C2 M4
+Y=02  C1 C1 C1 C1 C1 C2 C2
+Y=01  C1 C1 C1 C1 C1 .. ..
+Y=00  M3 C2 C2 C2 C2 .. ..
+
+Z = 7
+Y=05  M3 M3 M3 M3 M3 M3 M3
+Y=04  M3 M3 M3 M3 M3 M3 M3
+Y=03  M3 M3 M3 M3 M3 M3 M3
+Y=02  S  M3 M3 M3 S  M3 M3
+Y=01  S  S  S  S  S  .. ..
+Y=00  .. .. .. .. .. .. ..
+
+Z = 8
+Y=05  C1 C1 C1 C1 C1 M4 M4
+Y=04  C1 C1 C1 C1 C1 M4 M4
+Y=03  C1 C1 C1 C1 C1 .. ..
+Y=02  S  C1 C1 C1 S  .. ..
+Y=01  S  G1 G1 S  S  .. ..
+Y=00  .. .. .. .. .. .. ..
+
+Z = 9
+Y=05  C1 C1 C1 C1 C1 B1 B1
+Y=04  C1 C1 C1 C1 C1 B1 B1
+Y=03  C1 C1 C1 C1 C1 .. ..
+Y=02  S  C1 C1 C1 S  .. ..
+Y=01  S  G1 G1 S  G2 .. ..
+Y=00  .. .. .. .. .. .. ..
+
+Z = 10
+Y=05  C1 C1 C1 C1 C1 M4 B1
+Y=04  C1 C1 C1 C1 C1 M4 B1
+Y=03  C1 C1 C1 C1 C1 .. ..
+Y=02  S  C1 C1 C1 S  .. ..
+Y=01  S  S  S  S  S  .. ..
+Y=00  .. .. .. .. .. .. ..
+
+Z = 11
+Y=05  .. .. M3 M4 B1 M4 ..
+Y=04  .. .. M3 M4 B1 M4 ..
+Y=03  .. .. .. .. .. .. ..
+Y=02  C1 C1 C1 C1 C1 .. ..
+Y=01  N1 N1 C1 C1 C1 .. ..
+Y=00  .. .. .. .. .. .. ..
