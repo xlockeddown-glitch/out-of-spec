@@ -407,8 +407,7 @@ func _budget_text(instrument_id: String) -> String:
 	if budget.is_empty():
 		return ""
 	var sensor: DriftingSensor = GameState.get_sensor(instrument_id)
-	return "\nStandard uncertainties, k = %s for U:
-spec %s, certificate %s, resolution %s, operator %s" % [
+	return "\nStandard uncertainties, k = %s for U:\nspec %s, certificate %s, resolution %s, operator %s" % [
 		SP811.number(budget["k"], 0), _unsigned_precise(sensor, budget["u_spec"]), _unsigned_precise(sensor, budget["u_cert"]),
 		_unsigned_precise(sensor, budget["u_res"]), _unsigned_precise(sensor, budget["u_op"])]
 
