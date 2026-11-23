@@ -422,5 +422,11 @@ func test_soil_probe_text_flags_drift_band() -> String:
 			problem = "At %s × MPE the readout must hold '%s', got '%s'." % [ratio, want, text]
 	if problem == "" and "OUT OF TOLERANCE" not in gs.soil_probe_text():
 		problem = "Past MPE the readout must say OUT OF TOLERANCE."
+	# A standard that was off at the last zero hides that much drift: the
+	# readout shows the observed error, not the true one.
+	probe.error = probe.mpe * 1.5
+	probe.reference_offset = probe.mpe * 1.0
+	if problem == "" and "Drift %s, IN TOLERANCE." % probe.format_value(probe.mpe * 0.5) not in gs.soil_probe_text():
+		problem = "The drift line must show the observed error, got '%s'." % gs.soil_probe_text()
 	_done(gs)
 	return problem
