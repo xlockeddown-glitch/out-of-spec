@@ -29,6 +29,8 @@ signal soil_tilled(cell: Vector3i)
 signal jobs_changed
 ## The lab grew, a build started or finished, or an area changed.
 signal lab_changed
+## A robot was ordered, assembled or released.
+signal robots_changed
 ## A skill gained XP. `player_id` is "" for a farm skill.
 signal skill_xp_changed(player_id: String, skill_id: String)
 ## A skill reached a new level. `player_id` is "" for a farm skill.
@@ -229,6 +231,9 @@ var planting_offset_steps: int = 0
 var player_skill_xp: Dictionary = {}
 ## Skill id -> XP, for the skills the whole farm shares.
 var farm_skill_xp: Dictionary = {}
+## Robot id ("TR-1") -> { frame, name, state (ROBOT_STATES), done_day,
+## ordered_by }. Assembled robots' sensors are in `sensors` as "sensor@robot".
+var robots: Dictionary = {}
 ## Passed as plant_crop's offset to mean "use planting_offset_steps now".
 const OFFSET_CURRENT: int = -2147483648
 
@@ -300,6 +305,7 @@ func build_registry() -> void:
 		sensors[id] = sensor
 		if sensor.role == "standard" and sensor.tier <= 0:
 			owned_standards[id] = 0
+	_sync_robot_sensors(robots)
 	_seed_sensors()
 	steering = sensors.get(STEERING_ID)
 	hygrometer = sensors.get(HYGROMETER_ID)
@@ -382,7 +388,7 @@ const SAVED_FIELDS: Array[String] = [
 ]
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
-const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp"]
+const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -438,6 +444,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 			return "'player_skill_xp' has a player whose XP is not whole numbers."
 	if not _holds_only_ints(data.get("farm_skill_xp", {})):
 		return "'farm_skill_xp' has XP that is not a whole number."
+	var robot_problem: String = _robots_dict_problem(data.get("robots", {}))
+	if robot_problem != "":
+		return robot_problem
+	var robot_sensors: Array[String] = _robot_sensor_ids(data.get("robots", {}))
 	for id: Variant in data["sensors"]:
 		var state: Variant = data["sensors"][id]
 		if typeof(state) != TYPE_DICTIONARY:
@@ -446,7 +456,7 @@ func farm_dict_problem(data: Dictionary) -> String:
 			if typeof(state[key]) == TYPE_FLOAT and not is_finite(state[key]):
 				return "Sensor '%s' has a '%s' that is not a finite number." % [id, key]
 		# Instruments no longer in the data are skipped on load, not refused.
-		if sensors.has(str(id)) and not DriftingSensor.from_config(str(id)).apply_dict(state):
+		if (sensors.has(str(id)) or str(id) in robot_sensors) and not DriftingSensor.from_config(str(id)).apply_dict(state):
 			return "Sensor '%s' can't load." % id
 	return ""
 
@@ -475,6 +485,8 @@ func farm_from_dict(data: Dictionary) -> String:
 		return problem
 	var fresh: Node = (get_script() as GDScript).new()
 	fresh.build_registry()
+	fresh._sync_robot_sensors(data.get("robots", {}))
+	_sync_robot_sensors(data.get("robots", {}))
 	fresh.set_world_seed(data["world_seed"])
 	set_world_seed(data["world_seed"])
 	rng.state = data["rng_state"]
@@ -518,6 +530,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	crops_changed.emit()
 	jobs_changed.emit()
 	lab_changed.emit()
+	robots_changed.emit()
 	return ""
 
 
@@ -526,13 +539,15 @@ func get_sensor(instrument_id: String) -> DriftingSensor:
 
 
 ## Ids of the instruments Vance audits and the bench calibrates, in data order:
-## the units in service, whose standard is on the colony.
+## the units in service, whose standard is on the colony. An unreleased robot's
+## sensors are not among them (see bench_unit_ids).
 func unit_ids() -> Array[String]:
-	var ids: Array[String] = []
-	for id: String in all_unit_ids():
-		if is_in_service(id):
-			ids.append(id)
-	return ids
+	return bench_unit_ids().filter(func(id: String) -> bool: return not is_commissioning(id))
+
+
+## unit_ids() and the sensors of robots not released yet, in data order.
+func bench_unit_ids() -> Array[String]:
+	return all_unit_ids().filter(is_in_service)
 
 
 ## Ids of the reference standards on the colony, in data order.
@@ -1039,7 +1054,11 @@ func _xp_after_calibration(record: Dictionary) -> void:
 	if not record["traceable"] or int(record["days_in_service"]) < ceili(int(record["previous_interval_days"]) / 2.0):
 		return
 	var player: String = record["performed_by"]
-	_award_xp("calibrate_player", player)
+	if robot_of(record["instrument_id"]) != "":
+		_award_xp("calibrate_robot", player)
+		_award_xp("calibrate_robot_player", player)
+	else:
+		_award_xp("calibrate_player", player)
 	if not record["as_found_in_tolerance"]:
 		_award_xp("calibrate_found_oot", player)
 	if record["on_time"]:
@@ -1057,6 +1076,219 @@ func _award_clean_audit_xp() -> void:
 		players.append(local_player_id)
 	for player: Variant in players:
 		_award_xp("clean_audit", str(player))
+
+
+# --- Robots (docs/design/equipment_skills_robots.md section 3) ------------------
+
+const ROBOTS_TABLE: StringName = &"robots"
+const ROBOT_STATES: Array[String] = ["assembling", "commissioning", "released"]
+## A new sensor's error is up to this share of its MPE [PLACEHOLDER].
+const ROBOT_START_ERROR_RATIO: float = 0.5
+
+
+func robot_frame(frame_id: String) -> Dictionary:
+	return DataManager.get_record(ROBOTS_TABLE, frame_id, "frames")
+
+
+## The robot a sensor is on ("TR-1"), or "" for any other instrument.
+static func robot_of(instrument_id: String) -> String:
+	return instrument_id.get_slice("@", 1) if "@" in instrument_id else ""
+
+
+## True for a sensor of a robot that isn't released: the bench calibrates it,
+## but it is not audited and can't cost credibility for falling overdue.
+func is_commissioning(instrument_id: String) -> bool:
+	var robot: String = robot_of(instrument_id)
+	return robot != "" and robots.get(robot, {}).get("state", "") != "released"
+
+
+## A robot's sensor ids, in data order. None until it is assembled.
+func robot_sensor_ids(robot_id: String) -> Array[String]:
+	return _robot_sensor_ids({ robot_id: robots[robot_id] }) if robots.has(robot_id) else [] as Array[String]
+
+
+func _robot_sensor_ids(of_robots: Dictionary) -> Array[String]:
+	var ids: Array[String] = []
+	for robot_id: Variant in of_robots:
+		var robot: Dictionary = of_robots[robot_id]
+		if robot["state"] == "assembling":
+			continue
+		for model: Variant in robot_frame(robot["frame"]).get("sensors", []):
+			ids.append("%s@%s" % [model, robot_id])
+	return ids
+
+
+## Gives `sensors` exactly the sensors of `of_robots`, keeping those it has.
+func _sync_robot_sensors(of_robots: Dictionary) -> void:
+	var wanted: Array[String] = _robot_sensor_ids(of_robots)
+	for id: Variant in sensors.keys():
+		if robot_of(str(id)) != "" and not str(id) in wanted:
+			sensors.erase(id)
+	for id: String in wanted:
+		if sensors.has(id):
+			continue
+		var sensor: DriftingSensor = DriftingSensor.from_config(id)
+		var robot_id: String = robot_of(id)
+		sensor.display_name = "%s %s" % [robot_id, sensor.display_name]
+		sensor.short_name = "%s %s" % [robot_id, sensor.short_name]
+		sensor.max_error = sensor.mpe * MAX_ERROR_MPE_MULTIPLE
+		sensor.cal_interval_days = int(_interval_cfg("initial_days", 5.0))
+		sensor.reseed(hash("%d:%s" % [world_seed, id]))
+		sensor.start_uncalibrated(ROBOT_START_ERROR_RATIO)
+		sensors[id] = sensor
+
+
+## Why a save's robots can't load, or "".
+static func _robots_dict_problem(saved: Dictionary) -> String:
+	for id: Variant in saved:
+		var robot: Variant = saved[id]
+		if typeof(id) != TYPE_STRING or id == "" or "@" in id:
+			return "'robots' has a bad robot id."
+		if typeof(robot) != TYPE_DICTIONARY:
+			return "Robot '%s' is not a dictionary." % id
+		for key: String in ["frame", "name", "state", "ordered_by"]:
+			if typeof(robot.get(key)) != TYPE_STRING:
+				return "Robot '%s' has no %s." % [id, key]
+		if not robot["state"] in ROBOT_STATES or typeof(robot.get("done_day")) != TYPE_INT:
+			return "Robot '%s' has a bad state or done_day." % id
+	return ""
+
+
+func robot_cost_text(frame_id: String) -> String:
+	var frame: Dictionary = robot_frame(frame_id)
+	var spools: int = int(frame.get("cost_spools", 0))
+	return "%s + %s silk spool%s" % [
+		lab_cost_text(int(frame.get("cost_credits", 0)), int(frame.get("cost_ore", 0))),
+		SP811.integer(spools), "" if spools == 1 else "s"]
+
+
+## Why `player_id` can't order this robot now, or "". One build at a time
+## [ASSUMPTION].
+func robot_build_problem(frame_id: String, player_id: String = "") -> String:
+	var frame: Dictionary = robot_frame(frame_id)
+	if frame.is_empty():
+		return "There is no such robot."
+	for id: Variant in robots:
+		if robots[id]["state"] == "assembling":
+			return "%s is still being assembled." % robots[id]["name"]
+	var needs: Dictionary = {
+		"robotics": int(frame.get("robotics_level", 1)) + robots.size() * int(frame.get("extra_robot_levels", 0)),
+		"instrumentation": int(frame.get("instrumentation_level", 1)),
+	}
+	for skill: String in needs:
+		if skill_level(skill, player_id) < needs[skill]:
+			return "Needs %s level %s." % [skill.capitalize(), SP811.integer(needs[skill])]
+	var standard: String = str(frame.get("required_standard", ""))
+	if standard != "":
+		var title: String = instrument_name(standard, true)
+		if not owned_standards.has(standard):
+			return "Needs the %s: its sensors are calibrated against it." % title
+		if at_oirm.has(standard):
+			return "The %s is at OIRM until day %s." % [title, SP811.integer(int(at_oirm[standard]))]
+		var fault: String = standard_problem(standard)
+		if fault != "":
+			return "The %s is %s." % [title, fault]
+	# Without all of them the robot could never be released.
+	for model: Variant in frame.get("sensors", []):
+		var by: String = str(DataManager.get_value(DRIFT_TABLE, "robot_sensors/%s/calibrated_by" % model, ""))
+		if not owned_standards.has(by):
+			return "Needs the %s: its %s is calibrated against it." % [instrument_name(by, true),
+				str(DataManager.get_value(DRIFT_TABLE, "robot_sensors/%s/short_name" % model, model))]
+	if credits < int(frame.get("cost_credits", 0)) or crystal_ore < int(frame.get("cost_ore", 0)) \
+			or optical_silk_spools < int(frame.get("cost_spools", 0)):
+		return "Costs %s; you have %s CR, %s crystal ore and %s silk." % [robot_cost_text(frame_id),
+			SP811.integer(credits), SP811.integer(crystal_ore), SP811.integer(optical_silk_spools)]
+	return ""
+
+
+## Orders a robot: pays, and assembly finishes some mornings later. Returns ""
+## or why not.
+func build_robot(frame_id: String, player_id: String = "") -> String:
+	if player_id == "":
+		player_id = local_player_id
+	var problem: String = robot_build_problem(frame_id, player_id)
+	if problem != "":
+		return problem
+	var frame: Dictionary = robot_frame(frame_id)
+	_lab_pay(int(frame.get("cost_credits", 0)), int(frame.get("cost_ore", 0)))
+	for i: int in int(frame.get("cost_spools", 0)):
+		optical_silk_spools -= 1
+		_spool_species.pop_front()
+	silk_changed.emit(optical_silk_spools)
+	var id: String = "%s-%d" % [frame.get("id_prefix", "R"), robots.size() + 1]
+	robots[id] = {
+		"frame": frame_id,
+		"name": "%s %s" % [frame.get("display_name", frame_id), id],
+		"state": "assembling",
+		"done_day": GameClock.get_day_index() + maxi(int(frame.get("assembly_days", 1)), 1),
+		"ordered_by": player_id,
+	}
+	post_phone("ROBOT: %s is being assembled, ready the morning of day %s." % [
+		robots[id]["name"], SP811.integer(robots[id]["done_day"])])
+	robots_changed.emit()
+	return ""
+
+
+## Each morning: assembled robots come to the bench, uncalibrated.
+func _finish_robot_builds(day: int) -> void:
+	for id: Variant in robots:
+		var robot: Dictionary = robots[id]
+		if robot["state"] != "assembling" or day < int(robot["done_day"]):
+			continue
+		robot["state"] = "commissioning"
+		_sync_robot_sensors(robots)
+		_award_xp("build_robot", robot["ordered_by"])
+		post_phone("ROBOT: %s is assembled. Calibrate its %s sensors at the bench, then release it at Bram's bay." % [
+			robot["name"], SP811.integer(robot_sensor_ids(str(id)).size())])
+		robots_changed.emit()
+
+
+## What a robot's sensor still needs before release, or "".
+func robot_sensor_problem(instrument_id: String) -> String:
+	var record: Dictionary = last_cal_records.get(instrument_id, {})
+	var sensor: DriftingSensor = get_sensor(instrument_id)
+	if record.is_empty() or sensor == null:
+		return "not calibrated"
+	if not record.get("traceable", false):
+		return "last calibration not traceable"
+	if record.get("suspect", false) or suspect_units.has(instrument_id):
+		return "suspect, recalled"
+	if record.get("result", "") != CalUncertainty.PASS:
+		return "last result %s: calibrate it again" % record.get("result", "?")
+	return "overdue" if sensor.is_overdue(GameClock.get_day_index()) else ""
+
+
+## Why a robot can't be released to work, or "".
+func robot_release_problem(robot_id: String) -> String:
+	if not robots.has(robot_id):
+		return "There is no such robot."
+	var robot: Dictionary = robots[robot_id]
+	if robot["state"] == "assembling":
+		return "%s is still being assembled." % robot["name"]
+	if robot["state"] == "released":
+		return "%s is already released." % robot["name"]
+	var ids: Array[String] = robot_sensor_ids(robot_id)
+	if ids.is_empty():
+		return "%s has no sensors to calibrate." % robot["name"]
+	var left: PackedStringArray = []
+	for id: String in ids:
+		var problem: String = robot_sensor_problem(id)
+		if problem != "":
+			left.append("%s (%s)" % [instrument_name(id), problem])
+	return "" if left.is_empty() else "Not ready: %s." % ", ".join(left)
+
+
+## Commissions a robot: every sensor's last calibration must be a traceable,
+## in-date pass. From now on its sensors are audited. Returns "" or why not.
+func release_robot(robot_id: String, player_id: String = "") -> String:
+	var problem: String = robot_release_problem(robot_id)
+	if problem != "":
+		return problem
+	robots[robot_id]["state"] = "released"
+	_award_xp("commission_robot", player_id)
+	post_phone("ROBOT: %s is commissioned and released. Its sensors are on the audit list." % robots[robot_id]["name"])
+	robots_changed.emit()
+	return ""
 
 
 # --- Relay lock (section 1.4 #4, section 1.7) ---------------------------------
@@ -1135,6 +1367,7 @@ func _on_day_started(day: int) -> void:
 	# Courier returns land in the morning, before an audit that day.
 	_receive_oirm_returns(day)
 	_finish_lab_build(day)
+	_finish_robot_builds(day)
 	_hold_relay_lock()
 	_note_holdover_lapses(day)
 	_morning = true
@@ -1180,7 +1413,7 @@ func _run_audit(day: int) -> void:
 	# A recall found on this pod gives the player until the next audit to redo it.
 	var fineable_suspects: Dictionary = {}
 	for id: Variant in suspect_units:
-		if int(suspect_units[id]) < day:
+		if int(suspect_units[id]) < day and not is_commissioning(str(id)):
 			fineable_suspects[id] = suspect_units[id]
 	var excused: Dictionary = _excused_units(day)
 	var report: Dictionary = AuditEngine.evaluate(day, audited, offence_counts, since, fineable_suspects, excused)
@@ -1840,7 +2073,7 @@ func _put_units_in_service(standard_id: String) -> Array:
 					taken.append(str(unit_id))
 	for id: String in all_unit_ids():
 		var unit: DriftingSensor = sensors[id]
-		if unit.calibrated_by != standard_id or id in taken:
+		if unit.calibrated_by != standard_id or id in taken or robot_of(id) != "":
 			continue
 		unit.cal_due_day = today + unit.cal_interval_days
 		# Put in service today: the first calibration is not interval evidence.
@@ -2126,6 +2359,8 @@ func _excused_until_audit(unit_id: String, day: int) -> bool:
 func _credibility_after_calibration(record: Dictionary) -> void:
 	if record.get("standard_overdue", false):
 		change_credibility(int(_cred_number("overdue_standard_used_points", -5.0)))
+	if is_commissioning(record["instrument_id"]):
+		return  # not the colony's unit until its robot is released
 	if contract_state != "active" or record.get("performed_by", "") == MANAGER_ID:
 		return
 	if get_sensor(record["instrument_id"]).role == "standard":

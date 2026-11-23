@@ -24,6 +24,7 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 ## the tire gauge against the WD-1 without going into the dome.
 @onready var _cal_pad: ParkingPad = %FieldCalPad
 
+var _robots_ui: RobotsUI
 var _bram_line: String = ""
 ## Seconds left showing a clicked prop's text in the hover label.
 var _inspect_left: float = 0.0
@@ -89,6 +90,8 @@ func _ready() -> void:
 	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text())
 	_refresh_jobs_hud()
 	_hud.get_parent().add_child(SkillsUI.new())
+	_robots_ui = RobotsUI.new()
+	_hud.get_parent().add_child(_robots_ui)
 
 
 func _process(delta: float) -> void:
@@ -189,6 +192,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _is_key(event, KEY_L) and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_sell_to_lin()
+	elif _is_key(event, KEY_T) and _bram_bay.rover_inside:
+		get_viewport().set_input_as_handled()
+		_robots_ui.open()
 	elif _is_key(event, KEY_C):
 		get_viewport().set_input_as_handled()
 		var seed: String = GameState.cycle_seed()
@@ -324,6 +330,7 @@ func _field_cal_one(id: String) -> void:
 
 func _on_rover_exited_bay() -> void:
 	_armed_standard = ""
+	_robots_ui.hide()
 	_hud.hide_bram()
 
 
@@ -339,6 +346,8 @@ func _on_rover_entered_bay() -> void:
 	if not GameState.harvest_bin.is_empty():
 		_hud.push_log("LIN: %s crops in your bin, %s CR for the lot. Press L to sell." % [
 			SP811.integer(GameState.harvest_bin.size()), SP811.integer(GameState.harvest_bin_value())])
+	if GameState.owned_standards.has("torque_standard") or not GameState.robots.is_empty():
+		_hud.push_log("BRAM: robots are built here. Press T.")
 	_refresh_bram()
 
 
