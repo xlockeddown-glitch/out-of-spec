@@ -570,6 +570,12 @@ script = ExtResource("12_slot")
 model_path = "res://assets/voxels/irrigation_junction.glb"
 model_scale = 0.1
 
+[node name="SoilProbeModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -7.8, -0.4, 12.5)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/soil_moisture_probe.glb"
+model_scale = 0.1
+
 [node name="WaterCisternModel" type="Node3D" parent="WorldView/WorldViewport/World"]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.6, 0, 13.2)
 script = ExtResource("12_slot")

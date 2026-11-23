@@ -639,3 +639,16 @@ Agent's notes (flagged for Ryan, not his words):
 - Ryan's answer was to the question of what to place next. This places the dry-well calibrator, the second model from the Environmental Standards pack.
 - It sits in the back-right corner of the dome's calibration bench at (3.8, 0.9, −0.55) m, turned 180° so its keypad faces the camera. Its footprint (x 3.675 m to 3.925 m, z −0.675 m to −0.425 m) is inside the bench top and clear of the field meter in front of it (back edge near z = −0.33 m) and the calibration station model (right end at x = 3.5 m).
 - It is at true size (0.25 m × 0.25 m × 0.35 m tall). From the dome's camera it shows behind the field meter. Set dressing only: nothing in the game uses a temperature reference yet, and the bench's calibration still runs as before.
+
+## 2026-11-22: Soil probe in the farm
+
+### Ryan chose
+
+- "Soil probe"
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan's answer was to the question of what to place next. This places the hand soil-moisture probe from the field props pack.
+- It stands just past the plot's front edge at (−7.8, −0.4, 12.5) m, on the irrigation junction's right with 0.45 m edge to edge between them, turned 180° so its dial faces the camera. The story has auto-irrigation trusting a soil-moisture probe, so it stands with the plot's water supply. Its footprint (x −7.95 m to −7.65 m, z 12.35 m to 12.65 m) is outside the soil tiles, so no crop cell holds it.
+- Its two spikes (0.4 m) are pushed into the ground, so the casing sits on the ground and it stands 0.6 m above it. It is at true size (0.3 m × 0.3 m footprint).
+- Set dressing only: no collision and no reading. The design doc has the probe as a sensor dropped for now, so it does not drift and needs no calibration; its specs stay [PLACEHOLDER].
