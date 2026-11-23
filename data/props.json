@@ -35,5 +35,17 @@
   "ref_meter_ls85": {
     "display_name": "Reference Meter",
     "description": "Bench reference meter, resting on the chamber's lid."
+  },
+  "field_meter_fm3": {
+    "display_name": "FM-3 Field Meter",
+    "description": "Handheld field meter, lying face up on the bench mat."
+  },
+  "chilled_mirror_hygrometer": {
+    "display_name": "Chilled-Mirror Hygrometer",
+    "description": "Humidity reference: it cools a small mirror until dew forms on it and reads the dew point."
+  },
+  "dry_well_calibrator": {
+    "display_name": "Dry-Well Calibrator",
+    "description": "Temperature reference: a heated metal block with a well for the probe under test."
   }
 }

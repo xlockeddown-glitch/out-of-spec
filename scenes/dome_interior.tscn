@@ -1,4 +1,4 @@
-[gd_scene load_steps=29 format=3]
+[gd_scene load_steps=33 format=3]
 
 [ext_resource type="Script" path="res://scripts/dome/dome_interior.gd" id="1_dome"]
 [ext_resource type="Script" path="res://scripts/dome/terrarium.gd" id="2_terr"]
@@ -65,7 +65,13 @@ size = Vector3(1.5, 1, 1)
 radius = 0.3
 
 [sub_resource type="BoxShape3D" id="BenchShape"]
-size = Vector3(2, 1, 1.4)
+size = Vector3(0.5, 0.6, 0.75)
+
+[sub_resource type="BoxShape3D" id="BenchDeckShape"]
+size = Vector3(0.8, 0.2, 0.8)
+
+[sub_resource type="BoxShape3D" id="BenchBodyShape"]
+size = Vector3(2, 0.9, 1.4)
 
 [sub_resource type="BoxShape3D" id="PlanBoardShape"]
 size = Vector3(2.2, 1.2, 0.4)
@@ -100,6 +106,15 @@ size = Vector3(0.4, 0.15, 0.35)
 
 [sub_resource type="BoxShape3D" id="Inspect_env_chamber_cart"]
 size = Vector3(1.4, 1.5, 1.0)
+
+[sub_resource type="BoxShape3D" id="Inspect_field_meter_fm3"]
+size = Vector3(0.15, 0.1, 0.25)
+
+[sub_resource type="BoxShape3D" id="Inspect_chilled_mirror_hygrometer"]
+size = Vector3(0.35, 0.15, 0.3)
+
+[sub_resource type="BoxShape3D" id="Inspect_dry_well_calibrator"]
+size = Vector3(0.25, 0.35, 0.25)
 
 [node name="DomeInterior" type="Node3D"]
 script = ExtResource("1_dome")
@@ -282,7 +297,16 @@ script = ExtResource("3_click")
 hint = "Calibration bench"
 
 [node name="Shape" type="CollisionShape3D" parent="CalStation/BenchClick"]
+position = Vector3(-0.65, -0.05, -0.125)
 shape = SubResource("BenchShape")
+
+[node name="DeckShape" type="CollisionShape3D" parent="CalStation/BenchClick"]
+position = Vector3(0, -0.25, 0)
+shape = SubResource("BenchDeckShape")
+
+[node name="BodyShape" type="CollisionShape3D" parent="CalStation/BenchClick"]
+position = Vector3(0, -0.8, 0)
+shape = SubResource("BenchBodyShape")
 
 [node name="Airlock" type="Node3D" parent="."]
 position = Vector3(0, 0, -3.84)
@@ -508,18 +532,48 @@ rotation = Vector3(0, 3.4, 0)
 script = ExtResource("5_slot")
 model_path = "res://assets/voxels/field_meter_fm3.glb"
 model_scale = 0.025
+[node name="Inspect" type="Area3D" parent="FieldMeterModel"]
+position = Vector3(0, 0.05, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "field_meter_fm3"
+
+[node name="Shape" type="CollisionShape3D" parent="FieldMeterModel/Inspect"]
+shape = SubResource("Inspect_field_meter_fm3")
+
 
 [node name="HygrometerModel" type="Node3D" parent="."]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 2.25, 0.9, 0.55)
 script = ExtResource("5_slot")
 model_path = "res://assets/voxels/chilled_mirror_hygrometer.glb"
 model_scale = 0.025
+[node name="Inspect" type="Area3D" parent="HygrometerModel"]
+position = Vector3(0, 0.075, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "chilled_mirror_hygrometer"
+
+[node name="Shape" type="CollisionShape3D" parent="HygrometerModel/Inspect"]
+shape = SubResource("Inspect_chilled_mirror_hygrometer")
+
 
 [node name="DryWellModel" type="Node3D" parent="."]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 3.8, 0.9, -0.55)
 script = ExtResource("5_slot")
 model_path = "res://assets/voxels/dry_well_calibrator.glb"
 model_scale = 0.025
+[node name="Inspect" type="Area3D" parent="DryWellModel"]
+position = Vector3(0, 0.175, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "dry_well_calibrator"
+
+[node name="Shape" type="CollisionShape3D" parent="DryWellModel/Inspect"]
+shape = SubResource("Inspect_dry_well_calibrator")
+
 
 [node name="RefMeterModel" type="Node3D" parent="."]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 5.2, 1.5, 0.22)
