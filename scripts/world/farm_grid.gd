@@ -6,8 +6,9 @@ extends GridMap
 ## tiles to a MeshLibrary with the SAME item IDs as `Tile` and assign it to
 ## `mesh_library_override` (or straight to `mesh_library`); no code changes.
 ##
-## Tilled cells are mirrored into GameState.tilled_cells so they survive
-## farm <-> dome scene swaps.
+## Tilled cells live in GameState.tilled_cells, changed only with
+## GameState.till(), so they survive farm <-> dome scene swaps. The grid shows
+## them, whoever tilled them.
 
 signal tile_changed(cell: Vector3i, tile: int)
 
@@ -34,6 +35,7 @@ func _ready() -> void:
 		mesh_library = _build_greybox_library()
 	_fill_plot()
 	GameState.crops_changed.connect(refresh_crops)
+	GameState.soil_tilled.connect(_on_soil_tilled)
 
 
 func world_to_cell(world_pos: Vector3) -> Vector3i:
@@ -45,14 +47,19 @@ func world_to_cell(world_pos: Vector3) -> Vector3i:
 func till_cell(cell: Vector3i) -> TillResult:
 	match get_cell_item(cell):
 		Tile.SOIL_UNTILLED:
-			set_cell_item(cell, Tile.SOIL_TILLED)
-			GameState.tilled_cells[cell] = true
-			tile_changed.emit(cell, Tile.SOIL_TILLED)
+			if not GameState.till(cell):
+				_on_soil_tilled(cell)  # already recorded, not shown yet
 			return TillResult.TILLED
 		Tile.SOIL_TILLED:
 			return TillResult.ALREADY_TILLED
 		_:
 			return TillResult.NOT_SOIL
+
+
+func _on_soil_tilled(cell: Vector3i) -> void:
+	if get_cell_item(cell) == Tile.SOIL_UNTILLED:
+		set_cell_item(cell, Tile.SOIL_TILLED)
+		tile_changed.emit(cell, Tile.SOIL_TILLED)
 
 
 func _fill_plot() -> void:
