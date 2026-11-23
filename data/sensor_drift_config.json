@@ -208,7 +208,7 @@
       "seller": "bram",
       "maker": "Turnwright",
       "certificate_prefix": "TW",
-      "_note": "Tier 2 (spec section 1.4), sold by Bram once there is an OIRM account. ±0.25 % of indicated from 10 % to 100 % of full scale (retailer-cited, Ryan's pick), taken at a 100 N·m test point [PLACEHOLDER]. It will calibrate Bram's wrench and the robot grip; neither is in the game yet. Certificate uncertainty, drift (MPE in about 120 days), resolution, price and interval are [PLACEHOLDER]."
+      "_note": "Tier 2 (spec section 1.4), sold by Bram once there is an OIRM account. ±0.25 % of indicated from 10 % to 100 % of full scale (retailer-cited, Ryan's pick), taken at a 100 N·m test point [PLACEHOLDER]. It calibrates the robots' grip torque sensors; Bram's wrench is not in the game yet. Certificate uncertainty, drift (MPE in about 120 days), resolution, price and interval are [PLACEHOLDER]."
     },
     "pressure_controller": {
       "role": "standard",
@@ -281,6 +281,58 @@
       "_note": "Tier 0 reference for the soil probe: soil samples weighed wet, oven-dried and weighed again (the gravimetric method), with a certified balance. Agent's proposal, not yet Ryan's; no maker name. Every number is [PLACEHOLDER]; drift takes it to its MPE in about 60 days like the other Tier 0 standards."
     },
     "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. Tier 0 standards' daily_drift_rate takes one from zero to its MPE in about 60 days, Tier 1 in about 120 days (Ryan, 2026-11-22), so skipping an OIRM cycle risks a recall. resolution (one digit of the unit under test), bench_minutes and the standards' specs and drift rates are placeholders (docs/design/equipment_skills_robots.md section 1.5). tier 0 (or absent) = owned from the start; tier 1+ = bought, arrives with a maker's certificate traceable to OIRM (section 1.7). A unit is in service (audited, on the bench) only while its calibrated_by standard is owned. standard_sensitivity (default 1) converts the standard's unit into the unit's own. display_decimals sets how many decimals readings show."
+  },
+  "robot_sensors": {
+    "robot_joint_encoder": {
+      "role": "unit",
+      "display_name": "Joint Encoder",
+      "short_name": "joint encoder",
+      "error_unit": "degrees",
+      "daily_drift_rate": 0.03,
+      "max_permissible_error": 1.0,
+      "as_left_residual": 0.05,
+      "resolution": 0.1,
+      "calibrated_by": "rotary_table",
+      "bench_minutes": 30
+    },
+    "robot_grip_torque": {
+      "role": "unit",
+      "display_name": "Grip Torque Sensor",
+      "short_name": "grip torque",
+      "error_unit": "N·m",
+      "daily_drift_rate": 0.12,
+      "max_permissible_error": 4.0,
+      "as_left_residual": 0.2,
+      "resolution": 0.1,
+      "calibrated_by": "torque_standard",
+      "bench_minutes": 30
+    },
+    "robot_tank_pressure": {
+      "role": "unit",
+      "display_name": "Tank Pressure Gauge",
+      "short_name": "tank gauge",
+      "error_unit": "kPa",
+      "daily_drift_rate": 0.06,
+      "max_permissible_error": 2.0,
+      "as_left_residual": 0.1,
+      "resolution": 0.1,
+      "calibrated_by": "reference_gauge",
+      "bench_minutes": 30
+    },
+    "robot_soil_probe": {
+      "role": "unit",
+      "display_name": "Soil Probe",
+      "short_name": "soil probe",
+      "error_unit": "percentage_points_vwc",
+      "daily_drift_rate": 0.1,
+      "max_permissible_error": 3.0,
+      "as_left_residual": 0.2,
+      "resolution": 0.1,
+      "standard_sensitivity": 5.0,
+      "calibrated_by": "field_meter_dc",
+      "bench_minutes": 40
+    },
+    "_note": "One copy per built robot, with the id sensor@robot (robots.json). Audited only once the robot is released. Every number is [PLACEHOLDER], chosen so each TUR is at least 4:1 against calibrated_by (all sensors drift to their MPE in about 30 days). The soil probe reads a voltage: 5 percentage points of VWC per volt from the FM-3 [ASSUMPTION]."
   },
   "guardband": {
     "green": {

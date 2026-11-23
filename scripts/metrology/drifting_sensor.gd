@@ -115,13 +115,29 @@ func reseed(p_seed: int) -> void:
 	_sign = _random_sign()
 
 
+## Where an instrument's data is. A robot's sensor ("robot_soil_probe@TR-1")
+## shares its model's entry.
+static func config_path(p_instrument_id: String) -> String:
+	if "@" in p_instrument_id:
+		return "robot_sensors/%s" % p_instrument_id.get_slice("@", 0)
+	return "instruments/%s" % p_instrument_id
+
+
+## A new, never calibrated instrument: a random error up to `ratio` of the MPE
+## either way, from this sensor's own generator.
+func start_uncalibrated(ratio: float) -> void:
+	error = _rng.randf_range(-ratio, ratio) * mpe
+	cal_due_day = 0
+	last_cal_day = -1
+
+
 ## Builds a sensor from instruments/<id> and guardband/green in the config.
 ## Fields missing from the data keep their defaults (with a warning).
 static func from_config(p_instrument_id: String, p_max_error: float = INF) -> DriftingSensor:
 	var sensor := DriftingSensor.new()
 	sensor.instrument_id = p_instrument_id
 	sensor.max_error = p_max_error
-	var base: String = "instruments/%s" % p_instrument_id
+	var base: String = config_path(p_instrument_id)
 	if DataManager.get_value(CONFIG_TABLE, base) == null:
 		push_warning("DriftingSensor: instrument '%s' not in %s; using defaults." % [p_instrument_id, CONFIG_TABLE])
 		return sensor
