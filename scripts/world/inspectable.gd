@@ -23,7 +23,7 @@ static func display_name(id: String) -> String:
 	return str(DataManager.get_value(&"props", id + "/display_name", id))
 
 
-## "NAME: description", or just the name when the prop has no description.
+## "Name: description", or just the name when the prop has no description.
 static func inspect_text(id: String) -> String:
 	var description: String = str(DataManager.get_value(&"props", id + "/description", ""))
 	var title: String = display_name(id)

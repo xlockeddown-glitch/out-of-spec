@@ -33,7 +33,7 @@
     "description": "Climate test chamber on a wheeled cart."
   },
   "ref_meter_ls85": {
-    "display_name": "Reference Multimeter",
+    "display_name": "Reference Meter",
     "description": "Bench reference meter, resting on the chamber's lid."
   }
 }

@@ -29,7 +29,9 @@ func test_every_prop_has_name_and_description() -> String:
 
 func test_inspect_text_joins_name_and_description() -> String:
 	var got: String = Inspectable.inspect_text("water_cistern")
-	var want: String = "Water Cistern: Holds the farm's irrigation water."
+	var want: String = "%s: %s" % [
+		DataManager.get_value(&"props", "water_cistern/display_name", ""),
+		DataManager.get_value(&"props", "water_cistern/description", "")]
 	if got != want:
 		return "got '%s', want '%s'" % [got, want]
 	return ""
