@@ -1056,6 +1056,6 @@ Agent's notes (flagged for Ryan, not his words):
 - u_robot = 0.1 MPE ÷ √3 [PLACEHOLDER]. The robot's worst sensor, as a share of its own MPE, times 0.1 goes hidden into the unit [ASSUMPTION]. The programmer's u_op still counts.
 - "As it comes due" runs from one day before [PLACEHOLDER], tried once a day. The clock trigger works too, but the screen offers only the first. The design's amber guard-band trigger is not built: it would give away the hidden error.
 - A robot won't use a standard that is not traceable; it posts why to the phone. It takes no bench time and wears only the joint encoder [ASSUMPTION].
-- XP is Robotics only (the job, and a robot sensor calibrated), and none before the unit has run half its interval. A robot may calibrate another robot's sensors; the recall then follows the robot that did the work. Open for Ryan. It neither counts toward nor breaks the contract run.
+- XP is Robotics only (the job, and a robot sensor calibrated), and none before the unit has run half its interval. It neither counts toward nor breaks the contract run. A robot may calibrate another robot's sensors; the recall then follows the robot that did the work. Open for Ryan.
 - A robot sensor found out of tolerance recalls *every* traceable calibration its robot did since that sensor's last good one (§3.4), not only those a threshold would change (§1.6). Open for Ryan.
 - Not built: a recalled standard's effect on a robot's own work, and the COLLECT SPOOL card.
