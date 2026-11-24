@@ -1,0 +1,35 @@
+tarantula_silk_skein - 6 x 6 x 4 (coiled raw silk skein). From Ryan's Tarantula & Optical Silk generator (0.1 m voxels), 2026-11-23.
+X: 0..5 left to right, Y: 5..0 rear (+Y) to front (-Y), first row = highest Y.
+Palette: K2 = #E8DEC0, K1 = #5CA8A3, K3 = #D4A359, B2 = #6B4D30, S = #1D222B
+
+Z = 0
+Y=05  .. K2 K2 K2 K2 ..
+Y=04  K2 K2 K2 K2 K2 K2
+Y=03  S  B2 B2 B2 B2 S
+Y=02  S  B2 B2 B2 B2 S
+Y=01  K2 K2 K2 K2 K2 K2
+Y=00  .. K2 K2 K2 K2 ..
+
+Z = 1
+Y=05  .. K3 K2 K2 K1 ..
+Y=04  K3 K2 K1 K2 K2 K2
+Y=03  .. B2 B2 B2 B2 ..
+Y=02  .. B2 B2 B2 B2 ..
+Y=01  K2 K2 K2 K2 K1 K3
+Y=00  .. K1 K2 K3 K2 ..
+
+Z = 2
+Y=05  .. K2 K2 S  K2 ..
+Y=04  K2 K2 K1 K1 K3 K2
+Y=03  .. B2 B2 B2 B2 ..
+Y=02  .. B2 B2 B2 B2 ..
+Y=01  K2 K3 K1 K1 K2 K2
+Y=00  .. K2 S  K2 K2 ..
+
+Z = 3
+Y=05  .. .. .. .. .. ..
+Y=04  .. K2 K3 K1 K2 ..
+Y=03  .. .. B2 B2 .. ..
+Y=02  .. .. B2 B2 .. ..
+Y=01  .. K2 K1 K3 K2 ..
+Y=00  .. .. .. .. .. ..

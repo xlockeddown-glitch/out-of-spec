@@ -142,6 +142,12 @@ size = Vector3(0.8, 1.0, 0.8)
 [sub_resource type="BoxShape3D" id="Inspect_water_cistern"]
 size = Vector3(1.6, 1.8, 1.6)
 
+[sub_resource type="BoxShape3D" id="Inspect_rover_docking_pad"]
+size = Vector3(2.2, 0.3, 2.6)
+
+[sub_resource type="BoxShape3D" id="Inspect_twin_column_air_dryer"]
+size = Vector3(1.0, 1.4, 0.8)
+
 [sub_resource type="BoxShape3D" id="Inspect_harvest_crate"]
 size = Vector3(1.0, 0.6, 0.8)
 
@@ -699,6 +705,38 @@ prop_id = "soil_moisture_probe"
 
 [node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/SoilProbeModel/Inspect"]
 shape = SubResource("Inspect_soil_moisture_probe")
+
+[node name="RoverPadModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 16, -0.18, -1.8)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/rover_docking_pad.glb"
+model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/RoverPadModel"]
+position = Vector3(0, 0.15, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "rover_docking_pad"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/RoverPadModel/Inspect"]
+shape = SubResource("Inspect_rover_docking_pad")
+
+[node name="AirDryerModel" type="Node3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 19.3, 0, -1.6)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/twin_column_air_dryer.glb"
+model_scale = 0.1
+
+[node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/AirDryerModel"]
+position = Vector3(0, 0.7, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+prop_id = "twin_column_air_dryer"
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/AirDryerModel/Inspect"]
+shape = SubResource("Inspect_twin_column_air_dryer")
 
 [node name="WaterCisternModel" type="Node3D" parent="WorldView/WorldViewport/World"]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.6, 0, 13.2)

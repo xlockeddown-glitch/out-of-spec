@@ -60,6 +60,14 @@
     "display_name": "PX-1 Rotary Table",
     "description": "Angle reference: it turns to set angles, and the steering encoder on the jig is checked against them."
   },
+  "silk_winding_spool": {
+    "display_name": "Silk Winding Spool",
+    "description": "A hand-crank reel for winding optical silk."
+  },
+  "terrarium_mister_kit": {
+    "display_name": "Terrarium Mister Kit",
+    "description": "A mister bottle and feeding tongs on a tray."
+  },
   "md2p_humidity_generator": {
     "display_name": "MD-2P Humidity Generator",
     "description": "Humidity reference: it makes air at a set relative humidity for the hygrometer under test."
@@ -87,5 +95,13 @@
   "seismic_thumper": {
     "display_name": "Seismic Thumper",
     "description": "A hammer weight on guide rails."
+  },
+  "rover_docking_pad": {
+    "display_name": "Rover Docking Pad",
+    "description": "A parking pad with guide curbs and an umbilical socket at the rear."
+  },
+  "twin_column_air_dryer": {
+    "display_name": "Twin-Column Air Dryer",
+    "description": "A compressor with two desiccant columns that dry its air."
   }
 }
