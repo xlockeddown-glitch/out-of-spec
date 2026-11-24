@@ -494,7 +494,11 @@ func farm_from_dict(data: Dictionary) -> String:
 	var states: Dictionary = fresh.sensors_to_dict()
 	for id: Variant in data["sensors"]:
 		if states.has(id):
+			var rate: float = states[id]["usage_drift_rate"]
 			(states[id] as Dictionary).merge(data["sensors"][id], true)
+			# Nothing changes a robot's wear rate, and early saves hold 0.
+			if str(id).contains("@"):
+				states[id]["usage_drift_rate"] = rate
 		else:
 			push_warning("GameState: saved sensor '%s' is not in %s; skipped." % [id, DRIFT_TABLE])
 	sensors_from_dict(states)
@@ -1549,7 +1553,7 @@ func set_interlock_override(robot_id: String, on: bool) -> String:
 	if not on and not is_interlock_overridden(robot_id):
 		return "%s's interlock is armed." % robot["name"]
 	robot["override"] = on
-	robot["holding"] = not on
+	robot["holding"] = not on and not robot_out_of_tolerance(robot_id).is_empty()
 	if on:
 		robot["override_logged"] = true
 	post_phone("ROBOT: %s: interlock %s." % [robot["name"], "OVERRIDDEN" if on else "armed"])

@@ -70,6 +70,10 @@ func _check_interlock(gs: GameStateScript) -> String:
 		return "Back in tolerance, the interlock arms itself."
 	if gs.set_interlock_override(ROBOT, true) == "":
 		return "Only a holding robot can be overridden."
+	var old: Dictionary = gs.farm_to_dict()
+	old["sensors"][ENCODER]["usage_drift_rate"] = 0.0
+	if gs.farm_from_dict(old) != "" or gs.get_sensor(ENCODER).usage_drift_rate <= 0.0:
+		return "A save from before robots wore must get the wear rate."
 	for key: String in ["holding", "override", "override_logged"]:
 		var data: Dictionary = gs.farm_to_dict()
 		data["robots"][ROBOT][key] = 1

@@ -1017,7 +1017,7 @@ Agent's notes (flagged for Ryan, not his words):
 
 ### Ryan chose
 
-- "Yes, start M5-3" (drift effects and the interlock). Vance fining an overridden interlock was already decided in the design (§6 item 10).
+- "Yes, start M5-3" (drift effects and the interlock). Vance fining an overridden interlock was already in the design as an assumption (§6 item 10).
 
 ### Agent's notes (flagged for Ryan, not his words)
 
