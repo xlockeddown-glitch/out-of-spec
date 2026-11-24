@@ -3660,6 +3660,7 @@ func reset_lab() -> void:
 			if owned_standards.has(str(id)):
 				lab_areas[str(discipline)] = 1
 				break
+	_sync_lab_layout()
 	lab_changed.emit()
 
 
@@ -3668,7 +3669,8 @@ func reset_lab() -> void:
 ## stood, and a new space goes beside its area if it can.
 func lab_layout_slots() -> Array[String]:
 	# Looking changes nothing: in co-op only the host changes the farm.
-	var kept: Array[String] = lab_layout.duplicate()
+	var kept: Array[String] = lab_layout
+	lab_layout = lab_layout.duplicate()
 	_sync_lab_layout()
 	var slots: Array[String] = lab_layout
 	lab_layout = kept

@@ -18,6 +18,8 @@ const JOB_PREFIX: String = "job:"
 
 var _ids: Array[String] = []
 var _current_id: String = ""
+## The shown result is from this session's calibration.
+var _calibrated: bool = false
 ## Budget and acceptance limit of the selected instrument against its standard.
 var _budget: Dictionary = {}
 var _limit: float = 0.0
@@ -91,10 +93,16 @@ func close() -> void:
 	closed.emit()
 
 
-## The pod landing or leaving changes whether a standard can be sent.
+## The pod landing or leaving changes whether a standard can be sent, and a
+## standard away at OIRM what can be calibrated. A finished result stays shown.
 func _on_pod_or_oirm_changed() -> void:
-	if visible and _is_standard(_current_id):
-		_on_instrument_selected(_ids.find(_current_id))
+	var index: int = _ids.find(_current_id)
+	if not visible or index < 0:
+		return
+	if not _calibrated or GameState.at_oirm.has(_current_id):
+		_on_instrument_selected(index)
+	elif _is_standard(_current_id):
+		_show_send()
 
 
 ## Jobs accepted, finished, cancelled or gone late: rebuild the list and keep
@@ -129,6 +137,7 @@ func _is_standard(instrument_id: String) -> bool:
 
 func _on_instrument_selected(index: int) -> void:
 	_current_id = _ids[index]
+	_calibrated = false
 	_calibrate_button.show()
 	_send_button.hide()
 	if _current_id.begins_with(JOB_PREFIX):
@@ -303,6 +312,7 @@ func _on_calibrate_pressed() -> void:
 		return
 	# One calibration per session with this instrument; re-enabled when the
 	# player switches instrument or reopens the bench.
+	_calibrated = true
 	_calibrate_button.disabled = true
 	var sensor: DriftingSensor = GameState.get_sensor(_current_id)
 	_show_as_found(sensor, record["as_found"] as float)
