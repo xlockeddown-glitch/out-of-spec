@@ -1471,6 +1471,16 @@ func robot_calibrate_targets(robot_id: String, player_id: String = "") -> Array[
 		return _robot_target_problem(robot_id, id, player_id) == "")
 
 
+## The units in service it can't have a CALIBRATE card for: each reason -> their ids.
+func robot_calibrate_gaps(robot_id: String, player_id: String = "") -> Dictionary:
+	var gaps: Dictionary = {}
+	for id: String in bench_unit_ids():
+		var problem: String = _robot_target_problem(robot_id, id, player_id)
+		if problem != "":
+			gaps.get_or_add(problem, []).append(id)
+	return gaps
+
+
 ## Why a robot's CALIBRATE card can't be for this instrument, or "". A robot
 ## never calibrates itself, and it leaves the standards to people [ASSUMPTION].
 func _robot_target_problem(robot_id: String, target: String, player_id: String) -> String:

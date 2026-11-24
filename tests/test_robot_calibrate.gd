@@ -54,6 +54,18 @@ func _check_gates(gs: GameStateScript) -> String:
 	sensor.mpe = float(gs.calibration_budget(TARGET)["u_res"])
 	if not gs.add_robot_calibrate_card(ROBOT, TARGET).contains("under 4:1"):
 		return "It needs 4:1 with the robot's term."
+	# Every unit in service is either offered or listed with its reason.
+	var gaps: Dictionary = gs.robot_calibrate_gaps(ROBOT)
+	var listed: Array = gs.robot_calibrate_targets(ROBOT)
+	for reason: String in gaps:
+		listed = listed + gaps[reason]
+		if TARGET in gaps[reason] and not reason.contains("under 4:1"):
+			return "Wrong reason: %s" % gaps
+	listed.sort()
+	var units: Array = gs.bench_unit_ids()
+	units.sort()
+	if listed != units or not gaps.get("A robot never calibrates itself.", []).has(ENCODER):
+		return "Each unit once, with its reason: %s" % gaps
 	sensor.mpe = mpe
 	gs.set_rover_uplink("rover_1", false)
 	if gs.add_robot_calibrate_card(ROBOT, TARGET) == "":
