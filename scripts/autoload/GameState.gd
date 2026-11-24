@@ -1329,9 +1329,17 @@ func release_robot(robot_id: String, player_id: String = "") -> String:
 
 const JOB_WATER: String = "water"
 const JOB_CALIBRATE: String = "calibrate"
-## What can start each job's card: a clock time, soil that reads off target, or
-## an instrument coming due.
-const CARD_TRIGGERS: Dictionary[String, Array] = { JOB_WATER: ["clock", "soil"], JOB_CALIBRATE: ["clock", "due"] }
+const JOB_COLLECT: String = "collect_spool"
+## What can start each job's card: a clock time, soil that reads off target, an
+## instrument coming due, or a silk spool that is ready.
+const CARD_TRIGGERS: Dictionary[String, Array] = { JOB_WATER: ["clock", "soil"], JOB_CALIBRATE: ["clock", "due"],
+	JOB_COLLECT: ["spool"] }
+## The robot sensors each job wears, by one use a job.
+const JOB_WEARS: Dictionary[String, Array] = {
+	JOB_WATER: ["robot_joint_encoder", "robot_tank_pressure", "robot_soil_probe"],
+	JOB_CALIBRATE: ["robot_joint_encoder"],
+	JOB_COLLECT: ["robot_joint_encoder", "robot_grip_torque"],
+}
 ## A "due" card starts this many days before its instrument is due [PLACEHOLDER].
 const DUE_CARD_LEAD_DAYS: int = 1
 ## A soil card starts once the robot's probe reads this share of a crop's
@@ -1393,7 +1401,7 @@ func add_robot_calibrate_card(robot_id: String, target: String, trigger: String 
 		player_id = local_player_id
 	var problem: String = _robot_program_problem(robot_id)
 	if problem == "":
-		problem = robot_calibrate_gate(player_id)
+		problem = robot_job_gate(JOB_CALIBRATE, player_id)
 	if problem == "":
 		problem = _robot_target_problem(robot_id, target, player_id)
 	if problem != "":
@@ -1411,15 +1419,44 @@ func add_robot_calibrate_card(robot_id: String, target: String, trigger: String 
 	return ""
 
 
-## The skill levels the CALIBRATE card still needs, or "".
-func robot_calibrate_gate(player_id: String = "") -> String:
-	var gate: Dictionary = DataManager.get_record(ROBOTS_TABLE, JOB_CALIBRATE, "jobs").get("skill_gate", {})
+## Adds a COLLECT SPOOL card: the robot picks up the dome's silk spool once it is
+## ready. Returns "" or why not.
+func add_robot_collect_card(robot_id: String, player_id: String = "") -> String:
+	if player_id == "":
+		player_id = local_player_id
+	var problem: String = _robot_program_problem(robot_id)
+	if problem == "":
+		problem = robot_job_gate(JOB_COLLECT, player_id)
+	if problem == "":
+		problem = robot_collect_problem(robot_id)
+	if problem != "":
+		return problem
+	if robot_cards(robot_id).size() >= robot_card_slots(player_id):
+		return "%s has no free job slot." % robots[robot_id]["name"]
+	robots[robot_id]["cards"] = robot_cards(robot_id) + [{ "trigger": "spool", "job": JOB_COLLECT, "hour": 6, "every_days": 1,
+		"last_day": _latest_day_at(6), "added_by": player_id }]
+	robots_changed.emit()
+	return ""
+
+
+## What this robot's grip still needs before it is given a COLLECT SPOOL card, or
+## "". Only the calibration record counts: the true error is hidden.
+func robot_collect_problem(robot_id: String) -> String:
+	var grip: String = "robot_grip_torque@" + robot_id
+	var problem: String = robot_sensor_problem(grip)
+	return "" if problem == "" else "COLLECT SPOOL cards need a calibrated grip. %s: %s." % [instrument_name(grip, true), problem]
+
+
+## The skill levels a job's card still needs, or "".
+func robot_job_gate(job: String, player_id: String = "") -> String:
+	var gate: Dictionary = DataManager.get_record(ROBOTS_TABLE, job, "jobs").get("skill_gate", {})
 	var missing: PackedStringArray = []
 	for skill: Variant in gate:
 		if skill_level(str(skill), player_id) < int(gate[skill]):
 			missing.append("%s level %s" % [DataManager.get_record(SKILLS_TABLE, str(skill), "skills").get("display_name", skill),
 				SP811.integer(int(gate[skill]))])
-	return "" if missing.is_empty() else "CALIBRATE cards need %s." % " and ".join(missing)
+	return "" if missing.is_empty() else "%s cards need %s." % [
+		job.replace("_", " ").to_upper(), " and ".join(missing)]
 
 
 ## The units a robot can be given a CALIBRATE card for.
@@ -1459,7 +1496,11 @@ func robot_card_text(card: Dictionary) -> String:
 	var job: String = "WATER all plots"
 	if card["job"] == JOB_CALIBRATE:
 		job = "CALIBRATE %s" % instrument_name(card["target"], true)
+	elif card["job"] == JOB_COLLECT:
+		job = "COLLECT SPOOL"
 	match card["trigger"]:
+		"spool":
+			return job + " when it is ready"
 		"soil":
 			return job + " when the soil reads off target"
 		"due":
@@ -1502,10 +1543,13 @@ func _run_robot_cards() -> void:
 			if not _card_is_due(str(id), card):
 				continue
 			card["last_day"] = _latest_day_at(card["hour"])
-			if card["job"] == JOB_CALIBRATE:
-				_robot_calibrate(str(id), card)
-			else:
-				_robot_water(str(id), card["added_by"])
+			match card["job"]:
+				JOB_CALIBRATE:
+					_robot_calibrate(str(id), card)
+				JOB_COLLECT:
+					_robot_collect(str(id), card["added_by"])
+				_:
+					_robot_water(str(id), card["added_by"])
 			_update_interlock(str(id))
 			break
 
@@ -1513,6 +1557,8 @@ func _run_robot_cards() -> void:
 func _card_is_due(robot_id: String, card: Dictionary) -> bool:
 	if card["trigger"] == "clock":
 		return _latest_day_at(card["hour"]) - int(card["last_day"]) >= int(card["every_days"])
+	if card["trigger"] == "spool":
+		return is_spool_ready()
 	if card["trigger"] == "due":
 		# Tried once a day, so one that can't be done isn't reported every tick.
 		var target: DriftingSensor = get_sensor(card["target"])
@@ -1568,8 +1614,7 @@ func _robot_water(robot_id: String, player_id: String) -> void:
 		var before: float = plantings[lands]["setpoint"]
 		if adjust_setpoint(lands, steps_for[cell]) != before:
 			trimmed += 1
-	for id: String in robot_sensor_ids(robot_id):
-		get_sensor(id).add_usage(1.0)
+	_wear_robot(robot_id, JOB_WATER)
 	if trimmed > 0:
 		_award_xp("robot_job", player_id)
 		post_phone("ROBOT: %s trimmed the irrigation set point of %s plot%s by its own soil probe." % [
@@ -1594,14 +1639,27 @@ func _robot_calibrate(robot_id: String, card: Dictionary) -> void:
 	if problem != "":
 		post_phone("ROBOT: %s did not calibrate the %s. %s" % [robots[robot_id]["name"], instrument_name(target, true), problem])
 		return
-	var encoder: DriftingSensor = get_sensor("robot_joint_encoder@" + robot_id)
-	if encoder != null:
-		encoder.add_usage(1.0)
+	_wear_robot(robot_id, JOB_CALIBRATE)
 	# As for a player's calibration: no XP before half the interval has run.
 	if int(record["days_in_service"]) >= ceili(int(record["previous_interval_days"]) / 2.0):
 		_award_xp("robot_job", player)
 	post_phone("ROBOT: %s calibrated the %s: %s, TUR %s:1." % [robots[robot_id]["name"], instrument_name(target, true),
 		record["result"], SP811.number(record["tur"], 1)])
+
+
+## COLLECT SPOOL: the robot picks up the ready spool for the farm. Not reported:
+## there can be many a day.
+func _robot_collect(robot_id: String, player_id: String) -> void:
+	if not collect_spool(player_id, true):
+		return
+	_wear_robot(robot_id, JOB_COLLECT)
+
+
+func _wear_robot(robot_id: String, job: String) -> void:
+	for model: String in JOB_WEARS[job]:
+		var sensor: DriftingSensor = get_sensor("%s@%s" % [model, robot_id])
+		if sensor != null:
+			sensor.add_usage(1.0)
 
 
 ## How far off a robot's work is, as a share of the unit's MPE, when its worst
@@ -2640,7 +2698,9 @@ func _tick_molt(delta_days: float) -> void:
 
 
 ## Picks up the spool from a molted enclosure and starts the next molt cycle.
-func collect_spool(player_id: String = "") -> bool:
+## With `by_robot` a robot does it to that player's program, which trains no
+## one's hands: only Robotics XP [ASSUMPTION].
+func collect_spool(player_id: String = "", by_robot: bool = false) -> bool:
 	if not is_spool_ready():
 		return false
 	optical_silk_spools += 1
@@ -2648,7 +2708,7 @@ func collect_spool(player_id: String = "") -> bool:
 	exuvia_until_day = GameClock.get_day_index() + EXUVIA_LINGER_DAYS
 	molt_progress = 0.0
 	molt_stage = MoltStage.ACTIVE
-	_award_xp("collect_spool", player_id)
+	_award_xp("robot_job" if by_robot else "collect_spool", player_id)
 	silk_changed.emit(optical_silk_spools)
 	molt_changed.emit(molt_progress, molt_stage)
 	return true
