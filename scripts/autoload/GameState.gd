@@ -1597,7 +1597,9 @@ func _robot_calibrate(robot_id: String, card: Dictionary) -> void:
 	var encoder: DriftingSensor = get_sensor("robot_joint_encoder@" + robot_id)
 	if encoder != null:
 		encoder.add_usage(1.0)
-	_award_xp("robot_job", player)
+	# As for a player's calibration: no XP before half the interval has run.
+	if int(record["days_in_service"]) >= ceili(int(record["previous_interval_days"]) / 2.0):
+		_award_xp("robot_job", player)
 	post_phone("ROBOT: %s calibrated the %s: %s, TUR %s:1." % [robots[robot_id]["name"], instrument_name(target, true),
 		record["result"], SP811.number(record["tur"], 1)])
 
@@ -2199,7 +2201,7 @@ func _recall_after_robot_failure(record: Dictionary) -> void:
 			continue
 		if done["instrument_id"] == sensor_id:
 			break
-		if done.get("programmed_by", "") == "" or done["performed_by"] != robot_id:
+		if done.get("programmed_by", "") == "" or done.get("performed_by", "") != robot_id:
 			continue
 		done["suspect"] = true
 		done["recalled_by"] = sensor_id

@@ -131,7 +131,15 @@ func _check_refusals(gs: GameStateScript) -> String:
 		return "An overdue standard is refused, and said once: %s" % [gs.phone_log.slice(posts)]
 	gs.get_sensor(standard).cal_due_day = 1000
 	_tick(gs, 8.26)
-	return "" if gs.cal_log.size() == count + 1 else "The next day it tries again."
+	if gs.cal_log.size() != count + 1:
+		return "The next day it tries again."
+	# Redoing it the next day runs, but earns no XP.
+	gs.robots[ROBOT]["cards"][0]["every_days"] = 1
+	var robotics: int = gs.skill_xp("robotics")
+	_tick(gs, 9.26)
+	if gs.cal_log.size() != count + 2:
+		return "A daily card runs daily: %s" % [gs.phone_log.slice(-2)]
+	return "" if gs.skill_xp("robotics") == robotics else "A repeat can't be farmed for XP."
 
 
 func test_recall() -> String:
