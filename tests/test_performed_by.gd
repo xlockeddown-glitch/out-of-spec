@@ -55,21 +55,27 @@ func test_callers_name_the_player() -> String:
 				"job_minutes", "job_finish_day"]:
 			actions[str(method["name"])] = true
 	var call_site: RegEx = RegEx.create_from_string(r"GameState\.(\w+)(?:\.bind)?\(")
+	var comment: RegEx = RegEx.create_from_string(r"(?m)(^|\s)#.*$")
 	var problems: PackedStringArray = []
 	var seen: int = 0
 	for dir: String in ["res://scripts", "res://scripts/camera", "res://scripts/dome", "res://scripts/rover", "res://scripts/ui", "res://scripts/world"]:
 		for file: String in DirAccess.get_files_at(dir):
 			if not file.ends_with(".gd"):
 				continue
-			for line: String in FileAccess.get_file_as_string(dir + "/" + file).split("\n"):
-				if line.strip_edges().begins_with("#"):
+			var text: String = comment.sub(FileAccess.get_file_as_string(dir + "/" + file), "", true)
+			for found: RegExMatch in call_site.search_all(text):
+				if not actions.has(found.get_string(1)):
 					continue
-				for found: RegExMatch in call_site.search_all(line):
-					if not actions.has(found.get_string(1)):
-						continue
-					seen += 1
-					if not line.contains("GameState.local_player_id"):
-						problems.append("%s: %s" % [file, line.strip_edges()])
+				seen += 1
+				# The whole call, up to its closing parenthesis.
+				var end: int = found.get_end()
+				var depth: int = 1
+				while depth > 0 and end < text.length():
+					depth += 1 if text[end] == "(" else -1 if text[end] == ")" else 0
+					end += 1
+				var call_text: String = text.substr(found.get_start(), end - found.get_start())
+				if not call_text.contains("GameState.local_player_id"):
+					problems.append("%s: %s" % [file, call_text])
 	if seen < 15:
 		return "It found only %d calls, so it checks nothing." % seen
 	return "\n".join(problems)

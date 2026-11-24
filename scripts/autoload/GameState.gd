@@ -1761,7 +1761,7 @@ func _update_interlock(robot_id: String) -> void:
 
 
 ## Lets a holding robot work with bad sensors, or arms its interlock again. Its
-## log keeps the override, and who did it last, until Vance's next audit.
+## log keeps the override, and who did it last, until an audit clears it.
 ## Returns "" or why not.
 func set_interlock_override(robot_id: String, on: bool, player_id: String = "") -> String:
 	var problem: String = _robot_program_problem(robot_id)
