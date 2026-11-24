@@ -43,7 +43,7 @@ func _check_gates(gs: GameStateScript) -> String:
 		return "There must be something to calibrate."
 	gs.farm_skill_xp["robotics"] = gs.xp_for_level(4) - 1
 	if not gs.add_robot_calibrate_card(ROBOT, TARGET).contains("Robotics level 4"):
-		return "It needs Robotics 4: %s %d" % [gs.robot_calibrate_gate(), gs.skill_level("robotics")]
+		return "It needs Robotics 4: %s %d" % [gs.robot_job_gate(gs.JOB_CALIBRATE), gs.skill_level("robotics")]
 	gs.farm_skill_xp["robotics"] = gs.xp_for_level(4)
 	gs.player_skill_xp[gs.local_player_id]["calibration"] = gs.xp_for_level(3) - 1
 	if not gs.add_robot_calibrate_card(ROBOT, TARGET).contains("Calibration level 3"):

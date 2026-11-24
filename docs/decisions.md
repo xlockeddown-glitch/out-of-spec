@@ -1066,3 +1066,16 @@ Agent's notes (flagged for Ryan, not his words):
 
 - Ryan sent the pack without instructions. Dust Turnip, the one root crop, shows it; no crop was renamed or added, and growth and prices are unchanged. Whether the Plateau Fiber-Tuber should be a crop of its own is open for Ryan.
 - A crop picks its models with `model` in `data/crops.json`; one without it keeps the sun-pods.
+
+## 2026-11-23: Robot COLLECT SPOOL card
+
+### Ryan chose
+
+- "Yes" to the overnight roadmap of 2026-11-23, which lists this card.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The card needs Robotics 2 and a grip torque sensor whose last calibration is a traceable, passing one that is neither overdue nor suspect. Both are checked when the card is added. Later the interlock holds a robot whose grip is out of tolerance.
+- It has one trigger, "spool ready", and collects each spool as it is ready. The robot and the player share one way to collect, so the next molt starts the same.
+- A job wears the grip (0.02 N·m) and the joint encoder [PLACEHOLDER].
+- XP is Robotics only, as for the other cards [ASSUMPTION].

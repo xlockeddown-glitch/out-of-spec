@@ -162,7 +162,16 @@ func _add_card_rows(id: String) -> void:
 		GameState.add_robot_card.bind(id, "clock"), "Card added.")
 	_add_card_button("ADD CARD: WATER all plots when the soil reads off target", id + " soil",
 		GameState.add_robot_card.bind(id, "soil"), "Card added.")
-	var gate: String = GameState.robot_calibrate_gate()
+	if not cards.any(func(card: Dictionary) -> bool: return card["job"] == GameState.JOB_COLLECT):
+		var problem: String = GameState.robot_job_gate(GameState.JOB_COLLECT)
+		if problem == "":
+			problem = GameState.robot_collect_problem(id)
+		if problem == "":
+			_add_card_button("ADD CARD: COLLECT SPOOL when it is ready", id + " spool",
+				GameState.add_robot_collect_card.bind(id), "Card added.")
+		else:
+			_rows.add_child(PlanBoardUI._label("    " + problem, DIM, 18))
+	var gate: String = GameState.robot_job_gate(GameState.JOB_CALIBRATE)
 	if gate != "":
 		_rows.add_child(PlanBoardUI._label("    " + gate, DIM, 18))
 		return
