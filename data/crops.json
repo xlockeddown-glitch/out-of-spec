@@ -17,7 +17,8 @@
     "tolerance_band": 0.12,
     "base_sell_credits": 36,
     "out_of_spec_penalty_pct": 20,
-    "substrate_byproduct": "root_coir"
+    "substrate_byproduct": "root_coir",
+    "model": "tuber_stage"
   },
   {
     "id": "bubble_pods",

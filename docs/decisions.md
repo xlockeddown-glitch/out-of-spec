@@ -1059,3 +1059,10 @@ Agent's notes (flagged for Ryan, not his words):
 - XP is Robotics only (the job, and a robot sensor calibrated), and none before the unit has run half its interval. It neither counts toward nor breaks the contract run. A robot may calibrate another robot's sensors; the recall then follows the robot that did the work. Open for Ryan.
 - A robot sensor found out of tolerance recalls *every* traceable calibration its robot did since that sensor's last good one (§3.4), not only those a threshold would change (§1.6). Open for Ryan.
 - Not built: a recalled standard's effect on a robot's own work, and the COLLECT SPOOL card.
+
+## 2026-11-23: Fiber-Tuber Root Crop pack
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan sent the pack without instructions. Dust Turnip, the one root crop, shows it; no crop was renamed or added, and growth and prices are unchanged. Whether the Plateau Fiber-Tuber should be a crop of its own is open for Ryan.
+- A crop picks its models with `model` in `data/crops.json`; one without it keeps the sun-pods.
