@@ -858,6 +858,10 @@ func _on_time_advanced(delta_days: float) -> void:
 		if is_in_service(str(id)) and not is_relay_locked(str(id)):
 			(sensors[id] as DriftingSensor).advance_days(delta_days)
 	_note_soil_excursions()
+	# At 06:00 the cards wait for _on_day_started, so what they change counts
+	# toward the new day.
+	if fmod(GameClock.elapsed_days, 1.0) != 0.0:
+		_run_robot_cards()
 	_note_flare_start(delta_days)
 	if drop_pod_present and GameClock.elapsed_days >= _drop_pod_departure_at:
 		drop_pod_present = false
@@ -1153,6 +1157,9 @@ func _robots_dict_problem(saved: Dictionary) -> String:
 			return "Robot '%s' has an unknown frame." % id
 		if not robot["state"] in ROBOT_STATES or typeof(robot.get("done_day")) != TYPE_INT:
 			return "Robot '%s' has a bad state or done_day." % id
+		var cards: Variant = robot.get("cards", [])
+		if typeof(cards) != TYPE_ARRAY or not (cards as Array).all(_is_card):
+			return "Robot '%s' has a bad job card." % id
 	return ""
 
 
@@ -1296,6 +1303,158 @@ func release_robot(robot_id: String, player_id: String = "") -> String:
 	return ""
 
 
+# --- Robot job cards (docs/design/equipment_skills_robots.md section 3.3) ------
+
+## What starts a card: a clock time, or soil that reads off target.
+const CARD_TRIGGERS: Array[String] = ["clock", "soil"]
+const JOB_WATER: String = "water"
+## A soil card starts once the robot's probe reads this share of a crop's
+## tolerance band away from its target [PLACEHOLDER].
+const SOIL_CARD_BAND_RATIO: float = 0.25
+
+
+## Job cards a robot can hold: one per Robotics level up to the table's end.
+func robot_card_slots(player_id: String = "") -> int:
+	var slots: Variant = DataManager.get_value(ROBOTS_TABLE, "job_slots_by_level", [1])
+	if typeof(slots) != TYPE_ARRAY or (slots as Array).is_empty():
+		return 0
+	return int(slots[clampi(skill_level("robotics", player_id), 1, (slots as Array).size()) - 1])
+
+
+func robot_cards(robot_id: String) -> Array:
+	return robots.get(robot_id, {}).get("cards", [])
+
+
+func _robot_program_problem(robot_id: String) -> String:
+	if not robots.has(robot_id):
+		return "There is no such robot."
+	if robots[robot_id]["state"] != "released":
+		return "%s is not released." % robots[robot_id]["name"]
+	if not relay_has_los():
+		return "No line of sight to the relay. %s keeps its last program." % robots[robot_id]["name"]
+	return ""
+
+
+## Adds a WATER card: the robot trims the irrigation set points of growing
+## crops by its own soil probe. "clock" runs at `hour` every `every_days` days,
+## first at the next such time; "soil" runs when the soil reads off target.
+## Returns "" or why not.
+func add_robot_card(robot_id: String, trigger: String, hour: int = 6, every_days: int = 1, player_id: String = "") -> String:
+	if player_id == "":
+		player_id = local_player_id
+	var problem: String = _robot_program_problem(robot_id)
+	if problem != "":
+		return problem
+	var card: Dictionary = { "trigger": trigger, "job": JOB_WATER, "hour": hour, "every_days": every_days,
+		"last_day": _latest_day_at(hour) + 1 - every_days, "added_by": player_id }
+	if not _is_card(card):
+		return "There is no such job card."
+	if robot_cards(robot_id).size() >= robot_card_slots(player_id):
+		return "%s has no free job slot." % robots[robot_id]["name"]
+	robots[robot_id]["cards"] = robot_cards(robot_id) + [card]
+	robots_changed.emit()
+	return ""
+
+
+func remove_robot_card(robot_id: String, index: int) -> String:
+	var problem: String = _robot_program_problem(robot_id)
+	if problem != "":
+		return problem
+	var cards: Array = robot_cards(robot_id).duplicate()
+	if index < 0 or index >= cards.size():
+		return "There is no such job card."
+	cards.remove_at(index)
+	robots[robot_id]["cards"] = cards
+	robots_changed.emit()
+	return ""
+
+
+func robot_card_text(card: Dictionary) -> String:
+	if card["trigger"] == "soil":
+		return "WATER all plots when the soil reads off target"
+	return "WATER all plots at %02d:00 %s" % [card["hour"],
+		"every day" if card["every_days"] == 1 else "every %s days" % SP811.integer(card["every_days"])]
+
+
+static func _is_card(card: Variant) -> bool:
+	if typeof(card) != TYPE_DICTIONARY:
+		return false
+	for key: String in ["hour", "every_days", "last_day"]:
+		if typeof(card.get(key)) != TYPE_INT:
+			return false
+	for key: String in ["trigger", "job", "added_by"]:
+		if typeof(card.get(key)) != TYPE_STRING:
+			return false
+	return card["trigger"] in CARD_TRIGGERS and card["job"] == JOB_WATER \
+			and card["hour"] >= 0 and card["hour"] < 24 and card["every_days"] >= 1
+
+
+## The last game day whose `hour` has come (0 before the first).
+func _latest_day_at(hour: int) -> int:
+	var day: int = GameClock.get_day_index()
+	return day if GameClock.elapsed_at_hour(day, float(hour)) <= GameClock.elapsed_days + BAND_EPSILON else day - 1
+
+
+## Each released robot runs the first card whose trigger holds. It needs no
+## line of sight for that.
+func _run_robot_cards() -> void:
+	for id: Variant in robots:
+		if robots[id]["state"] != "released":
+			continue
+		for card: Dictionary in robot_cards(str(id)):
+			if not _card_is_due(str(id), card):
+				continue
+			if card["trigger"] == "clock":
+				card["last_day"] = _latest_day_at(card["hour"])
+			_robot_water(str(id), card["added_by"])
+			break
+
+
+func _card_is_due(robot_id: String, card: Dictionary) -> bool:
+	if card["trigger"] == "clock":
+		return _latest_day_at(card["hour"]) - int(card["last_day"]) >= int(card["every_days"])
+	for cell: Vector3i in plantings:
+		var limit: float = float(crop(plantings[cell]["crop_id"]).get("tolerance_band", 0.0)) * SOIL_CARD_BAND_RATIO
+		if absf(_robot_soil_gap(robot_id, cell)) > limit and _robot_trim_steps(robot_id, cell) != 0:
+			return true
+	return false
+
+
+## The crop's target less what the robot's own probe reads (fractions). 0.0 for
+## a crop that is ready, whose soil no longer counts.
+func _robot_soil_gap(robot_id: String, cell: Vector3i) -> float:
+	var probe: DriftingSensor = get_sensor("robot_soil_probe@" + robot_id)
+	if probe == null or is_crop_ready(cell):
+		return 0.0
+	var reading: float = soil_moisture(cell) * 100.0 + probe.error
+	if probe.resolution > 0.0:
+		reading = snappedf(reading, probe.resolution)
+	return float(crop(plantings[cell]["crop_id"]).get("soil_moisture_target", 0.0)) - reading / 100.0
+
+
+## Set point steps that bring the robot's reading to the target, as far as the
+## set point can still move.
+func _robot_trim_steps(robot_id: String, cell: Vector3i) -> int:
+	var setpoint: float = plantings[cell]["setpoint"]
+	var steps: int = roundi(_robot_soil_gap(robot_id, cell) / SETPOINT_STEP)
+	return clampi(steps, -roundi(setpoint / SETPOINT_STEP), roundi((1.0 - setpoint) / SETPOINT_STEP))
+
+
+## WATER: trims every growing crop's set point. A job that changes nothing
+## earns no XP and isn't reported.
+func _robot_water(robot_id: String, player_id: String) -> void:
+	var trimmed: int = 0
+	for cell: Vector3i in plantings:
+		var steps: int = _robot_trim_steps(robot_id, cell)
+		if steps != 0:
+			adjust_setpoint(cell, steps)
+			trimmed += 1
+	if trimmed > 0:
+		_award_xp("robot_job", player_id)
+		post_phone("ROBOT: %s trimmed the irrigation set point of %s plot%s by its own soil probe." % [
+			robots[robot_id]["name"], SP811.integer(trimmed), "" if trimmed == 1 else "s"])
+
+
 # --- Relay lock (section 1.4 #4, section 1.7) ---------------------------------
 
 ## A rover reports its line of sight to the relay here.
@@ -1379,6 +1538,7 @@ func _on_day_started(day: int) -> void:
 	_charge_overdue_credibility(day)
 	_expire_jobs(day)
 	_grow_crops()
+	_run_robot_cards()
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)

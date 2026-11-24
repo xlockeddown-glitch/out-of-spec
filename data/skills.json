@@ -23,6 +23,7 @@
     { "id": "till", "skill": "field_ops", "xp": 1 },
     { "id": "build_robot", "skill": "robotics", "xp": 50 },
     { "id": "commission_robot", "skill": "robotics", "xp": 25 },
+    { "id": "robot_job", "skill": "robotics", "xp": 1 },
     { "id": "calibrate_robot", "skill": "robotics", "xp": 5 },
     { "id": "calibrate_robot_player", "skill": "calibration", "xp": 5 }
   ],

@@ -997,3 +997,18 @@ Agent's notes (flagged for Ryan, not his words):
 - Every standard its sensors need (TW-6, PX-1, WD-1 and FM-3) must also be owned before it can be ordered, or it could never be released [ASSUMPTION].
 - Its four sensors start uncalibrated, up to half their MPE off. They are on the bench at once, but are audited, count toward credibility and count for the OIRM contract only after release. Release needs each sensor's last calibration to be a traceable, in-date pass that is not suspect. Calibrating one with an overdue standard still costs credibility, because the lapse is the lab's, and the audit's count of calibration records includes commissioning records.
 - Calibrating a robot sensor gives Robotics 5 and Calibration 5; the Calibration 5 is in place of the usual 10 (my reading of the table in §2.2). The bonuses for on time, TUR and found out of tolerance still apply.
+
+## 2026-11-23: Robot job cards: WATER
+
+### Ryan chose
+
+- What WATER does, given the auto-irrigation: "Trim set points (Recommended)". The robot checks the plots with its own probe and adjusts each set point to correct for the plot probe's drift. Auto-irrigation stays. If the robot's probe drifts, it trims wrongly.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- A released robot holds job cards and runs the first one due, one job per clock tick (§3.3). Robotics 1 gives one slot, 2 and up give two (§2.4). Cards added below the first wait their turn.
+- Triggers: a clock time every n days, or soil reading more than a quarter of a crop's tolerance band off target [PLACEHOLDER]; a probe's error stops at 3 MPE (9 percentage points), so half a band would never trigger. The robots view offers daily at 06:00 and the soil card; the order is the order added [PLACEHOLDER].
+- "All plots" is the only target, and a crop that is ready is left alone.
+- With no line of sight a robot runs what it has but takes no new program.
+- A job that trims something earns Robotics 1 for whoever added the card. A check that changes nothing earns nothing.
+- Not built: COLLECT SPOOL and CALIBRATE cards, the interlock and audit fine, what drift in the other three sensors does, and drift from use. WATER doesn't use the robot's tank.
