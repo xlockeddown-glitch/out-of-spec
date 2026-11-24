@@ -268,7 +268,7 @@ func _drive(delta: float) -> void:
 	move_and_slide()
 	# Horizontal displacement actually achieved; pushing into a rock adds no drift.
 	var driven: float = Vector2(global_position.x - before.x, global_position.z - before.z).length()
-	GameState.add_rover_usage(driven)
+	GameState.add_rover_usage(driven, GameState.local_player_id)
 
 
 func _zero_steering() -> void:
@@ -319,7 +319,7 @@ func _try_mine() -> bool:
 			if d < best:
 				best = d
 				nearest = fissure
-	if nearest and GameState.mine_fissure(nearest.fissure_id):
+	if nearest and GameState.mine_fissure(nearest.fissure_id, GameState.local_player_id):
 		ore_mined.emit(nearest.fissure_id)
 		return true
 	return false

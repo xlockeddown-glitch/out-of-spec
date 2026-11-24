@@ -1189,6 +1189,8 @@ func _robots_dict_problem(saved: Dictionary) -> String:
 		for key: String in ["holding", "override", "override_logged"]:
 			if typeof(robot.get(key, false)) != TYPE_BOOL:
 				return "Robot '%s' has a bad %s." % [id, key]
+		if typeof(robot.get("override_by", "")) != TYPE_STRING:
+			return "Robot '%s' has a bad override_by." % id
 	return ""
 
 
@@ -1759,8 +1761,9 @@ func _update_interlock(robot_id: String) -> void:
 
 
 ## Lets a holding robot work with bad sensors, or arms its interlock again. Its
-## log keeps the override until Vance's next audit. Returns "" or why not.
-func set_interlock_override(robot_id: String, on: bool) -> String:
+## log keeps the override, and who did it last, until an audit clears it.
+## Returns "" or why not.
+func set_interlock_override(robot_id: String, on: bool, player_id: String = "") -> String:
 	var problem: String = _robot_program_problem(robot_id)
 	if problem != "":
 		return problem
@@ -1773,6 +1776,7 @@ func set_interlock_override(robot_id: String, on: bool) -> String:
 	robot["holding"] = not on and not robot_out_of_tolerance(robot_id).is_empty()
 	if on:
 		robot["override_logged"] = true
+		robot["override_by"] = local_player_id if player_id == "" else player_id
 	post_phone("ROBOT: %s: interlock %s." % [robot["name"], "OVERRIDDEN" if on else "armed"])
 	robots_changed.emit()
 	return ""
@@ -1787,6 +1791,8 @@ func _interlock_findings() -> Array[Dictionary]:
 		if robot.get("override_logged", false):
 			findings.append({ "robot_id": str(id), "fine": AuditEngine.interlock_fine() })
 			robot["override_logged"] = is_interlock_overridden(str(id))
+			if not robot["override_logged"]:
+				robot.erase("override_by")
 	return findings
 
 
@@ -2069,6 +2075,7 @@ func _apply_audit_grace(report: Dictionary) -> void:
 		var robot: Dictionary = robots[finding["robot_id"]]
 		for key: String in ["holding", "override", "override_logged"]:
 			robot[key] = false
+		robot.erase("override_by")
 		done.append("armed %s's interlock" % robot["name"])
 	report["waived_names"] = " and ".join(done)
 

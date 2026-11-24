@@ -274,7 +274,7 @@ func _chain_text(instrument_id: String) -> String:
 
 func _on_calibrate_pressed() -> void:
 	if _current_id.begins_with(JOB_PREFIX):
-		var result: Dictionary = GameState.complete_job(_current_id.trim_prefix(JOB_PREFIX))
+		var result: Dictionary = GameState.complete_job(_current_id.trim_prefix(JOB_PREFIX), GameState.local_player_id)
 		_calibrate_button.disabled = true
 		var clean: bool = result.get("ok", false) and result["on_time"] and result["traceable"]
 		_result_label.text = GameState.job_result_text(result) if result.get("ok", false) else "REFUSED: " + str(result["reason"])
@@ -285,7 +285,7 @@ func _on_calibrate_pressed() -> void:
 			# Done: keep the pay and credibility shown, not "no longer active".
 			_current_id = ""
 		return
-	var record: Dictionary = GameState.calibrate_at_bench(_current_id)
+	var record: Dictionary = GameState.calibrate_at_bench(_current_id, GameState.local_player_id)
 	if record.is_empty():
 		return
 	if record.get("refused", false):

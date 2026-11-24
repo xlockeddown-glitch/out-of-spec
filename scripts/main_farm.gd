@@ -138,7 +138,7 @@ func _on_steering_zeroed(record: Dictionary) -> void:
 
 func _on_slot_spool_pressed() -> void:
 	var replaced: bool = GameState.relay_slotted
-	if GameState.slot_spool_into_relay():
+	if GameState.slot_spool_into_relay(GameState.local_player_id):
 		_hud.push_log("%s installed%s. Uplink lag × %s." % [
 			"Damaged silk spool" if GameState.slotted_spool_damaged else "Optical silk spool",
 			", the damaged one thrown away" if replaced else "", SP811.number(GameState.get_relay_lag_multiplier(), 2)])
@@ -317,7 +317,7 @@ func _try_field_cal() -> void:
 
 func _field_cal_one(id: String) -> void:
 	var sensor: DriftingSensor = GameState.get_sensor(id)
-	var record: Dictionary = GameState.calibrate_at_bench(id)
+	var record: Dictionary = GameState.calibrate_at_bench(id, GameState.local_player_id)
 	if record.is_empty():
 		return
 	var label: String = GameState.instrument_name(id).to_upper()
@@ -386,7 +386,7 @@ func _try_buy_standard(standard_id: String) -> void:
 		return
 	_armed_standard = ""
 	if problem.is_empty():
-		problem = GameState.buy_standard(standard_id)
+		problem = GameState.buy_standard(standard_id, GameState.local_player_id)
 	if problem.is_empty():
 		_bram_line = "Handle it like it's worth more than your tractor. It nearly is."
 	else:

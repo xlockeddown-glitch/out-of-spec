@@ -49,7 +49,7 @@ func world_to_cell(world_pos: Vector3) -> Vector3i:
 func till_cell(cell: Vector3i) -> TillResult:
 	match get_cell_item(cell):
 		Tile.SOIL_UNTILLED:
-			if not GameState.till(cell):
+			if not GameState.till(cell, GameState.local_player_id):
 				_on_soil_tilled(cell)  # already recorded, not shown yet
 			return TillResult.TILLED
 		Tile.SOIL_TILLED:

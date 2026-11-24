@@ -38,3 +38,55 @@ func test_performer_names() -> String:
 	if names != ["You", "player_1", "Manager", "You", "You"]:
 		return "Only the local player and old records read 'You', got %s" % [names]
 	return ""
+
+
+## Screens and scenes must say whose action it is: in co-op the state may be
+## another machine's.
+func test_callers_name_the_player() -> String:
+	var actions: Dictionary = {}
+	for method: Dictionary in GameStateScript.get_script_method_list():
+		var args: Array = method["args"].map(func(arg: Dictionary) -> String: return arg["name"])
+		if not "player_id" in args and not "performed_by" in args:
+			continue
+		# These only read, for the player at this screen.
+		if not str(method["name"]) in ["performer_name", "calibration_budget", "skill_xp", "skill_level", "skill_factor",
+				"has_skill_unlock", "skill_text", "skill_effects_text", "robot_build_problem", "robot_card_slots",
+				"robot_job_gate", "robot_calibrate_targets", "robot_calibrate_gaps", "job_bench_problem",
+				"job_minutes", "job_finish_day"]:
+			actions[str(method["name"])] = args.find("player_id") if "player_id" in args else args.find("performed_by")
+	var call_site: RegEx = RegEx.create_from_string(r"GameState\.(\w+)(?:\.bind)?\(")
+	var comment: RegEx = RegEx.create_from_string(r"(?m)(^|\s)#.*$")
+	var problems: PackedStringArray = []
+	var seen: int = 0
+	for dir: String in ["res://scripts", "res://scripts/camera", "res://scripts/dome", "res://scripts/rover", "res://scripts/ui", "res://scripts/world"]:
+		for file: String in DirAccess.get_files_at(dir):
+			if not file.ends_with(".gd"):
+				continue
+			var text: String = comment.sub(FileAccess.get_file_as_string(dir + "/" + file), "", true)
+			for found: RegExMatch in call_site.search_all(text):
+				if not actions.has(found.get_string(1)):
+					continue
+				seen += 1
+				# The arguments, up to the closing parenthesis. A bracket or comma
+				# inside a string isn't told apart, so it could only fail the test.
+				var end: int = found.get_end()
+				var depth: int = 1
+				var passed: PackedStringArray = [""]
+				while end < text.length():
+					if text[end] in "([{":
+						depth += 1
+					elif text[end] in ")]}":
+						depth -= 1
+					if depth == 0:
+						break
+					if text[end] == "," and depth == 1:
+						passed.append("")
+					else:
+						passed[-1] += text[end]
+					end += 1
+				var index: int = actions[found.get_string(1)]
+				if index >= passed.size() or passed[index].strip_edges() != "GameState.local_player_id":
+					problems.append("%s: %s%s)" % [file, found.get_string(), ",".join(passed)])
+	if seen < 15:
+		return "It found only %d calls, so it checks nothing." % seen
+	return "\n".join(problems)

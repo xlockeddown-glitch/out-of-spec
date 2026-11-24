@@ -92,12 +92,16 @@ func _check_fine(gs: GameStateScript) -> String:
 		gs.get_sensor(id).error = 0.0
 		gs.get_sensor(id).cal_due_day = 1000
 	gs.get_sensor(PROBE).error = 5.0
-	gs.set_interlock_override(ROBOT, true)
+	gs.set_interlock_override(ROBOT, true, "player_2")
 	# Calibrating before the audit doesn't clear the log.
 	gs.get_sensor(PROBE).error = 0.0
 	_tick(gs, 7.1)
 	var credits: int = gs.credits
+	if gs.robots[ROBOT].get("override_by", "") != "player_2":
+		return "The log must name who overrode it: %s" % [gs.robots[ROBOT]]
 	gs._run_audit(10)
+	if gs.robots[ROBOT].has("override_by"):
+		return "Reading the log clears the name."
 	if gs.credits != credits - AuditEngine.interlock_fine() or gs.audit_log.back()["passed"]:
 		return "The override alone must cost one fine, took %d." % (credits - gs.credits)
 	gs._run_audit(15)
@@ -108,10 +112,13 @@ func _check_fine(gs: GameStateScript) -> String:
 	gs._run_audit(20)
 	if not gs.robots[ROBOT]["override_logged"]:
 		return "A standing override stays in the log."
+	if gs.robots[ROBOT].get("override_by", "") != gs.local_player_id:
+		return "With no player named it is the local player."
 	gs.audit_grace_used = false
 	credits = gs.credits
 	gs._run_audit(25)
-	if gs.credits != credits or gs.robots[ROBOT]["override_logged"] or gs.is_interlock_overridden(ROBOT):
+	if gs.credits != credits or gs.robots[ROBOT]["override_logged"] or gs.robots[ROBOT].has("override_by") \
+			or gs.is_interlock_overridden(ROBOT):
 		return "The one-time warning covers it."
 	return "" if str(gs.audit_log.back()["waived_names"]).contains("armed Trellis TR-1's interlock") else "The manager must say so: %s" % gs.audit_log.back()["waived_names"]
 
