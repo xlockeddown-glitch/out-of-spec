@@ -162,6 +162,15 @@ func _add_card_rows(id: String) -> void:
 		GameState.add_robot_card.bind(id, "clock"), "Card added.")
 	_add_card_button("ADD CARD: WATER all plots when the soil reads off target", id + " soil",
 		GameState.add_robot_card.bind(id, "soil"), "Card added.")
+	var gate: String = GameState.robot_calibrate_gate()
+	if gate != "":
+		_rows.add_child(PlanBoardUI._label("    " + gate, DIM, 18))
+		return
+	for target: String in GameState.robot_calibrate_targets(id):
+		if cards.any(func(card: Dictionary) -> bool: return card.get("target", "") == target):
+			continue
+		_add_card_button("ADD CARD: CALIBRATE %s as it comes due" % GameState.instrument_name(target, true),
+			"%s calibrate %s" % [id, target], GameState.add_robot_calibrate_card.bind(id, target), "Card added.")
 
 
 func _add_card_button(text: String, row: String, action: Callable, done: String) -> void:
