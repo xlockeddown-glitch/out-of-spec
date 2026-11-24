@@ -858,7 +858,10 @@ func _on_time_advanced(delta_days: float) -> void:
 		if is_in_service(str(id)) and not is_relay_locked(str(id)):
 			(sensors[id] as DriftingSensor).advance_days(delta_days)
 	_note_soil_excursions()
-	_run_robot_cards()
+	# At 06:00 the cards wait for _on_day_started, so what they change counts
+	# toward the new day.
+	if fmod(GameClock.elapsed_days, 1.0) != 0.0:
+		_run_robot_cards()
 	_note_flare_start(delta_days)
 	if drop_pod_present and GameClock.elapsed_days >= _drop_pod_departure_at:
 		drop_pod_present = false
@@ -1343,7 +1346,7 @@ func add_robot_card(robot_id: String, trigger: String, hour: int = 6, every_days
 	if problem != "":
 		return problem
 	var card: Dictionary = { "trigger": trigger, "job": JOB_WATER, "hour": hour, "every_days": every_days,
-		"last_day": _latest_day_at(hour), "added_by": player_id }
+		"last_day": _latest_day_at(hour) + 1 - every_days, "added_by": player_id }
 	if not _is_card(card):
 		return "There is no such job card."
 	if robot_cards(robot_id).size() >= robot_card_slots(player_id):
@@ -1383,7 +1386,7 @@ static func _is_card(card: Variant) -> bool:
 		if typeof(card.get(key)) != TYPE_STRING:
 			return false
 	return card["trigger"] in CARD_TRIGGERS and card["job"] == JOB_WATER \
-			and card["hour"] >= 0 and card["hour"] < 24 and card["every_days"] >= 1 and card["last_day"] >= 0
+			and card["hour"] >= 0 and card["hour"] < 24 and card["every_days"] >= 1
 
 
 ## The last game day whose `hour` has come (0 before the first).
@@ -1535,6 +1538,7 @@ func _on_day_started(day: int) -> void:
 	_charge_overdue_credibility(day)
 	_expire_jobs(day)
 	_grow_crops()
+	_run_robot_cards()
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)

@@ -144,7 +144,7 @@ func _on_card_pressed(row: String, action: Callable, done: String) -> void:
 	_armed_id = ""
 	_show_result(action.call(), done)
 	_refresh()
-	_focus_row(row)
+	_focus_row(row, row.get_slice(" ", 0) + " ")
 
 
 func _on_order_pressed(id: String) -> void:
@@ -174,7 +174,7 @@ func _show_result(problem: String, done: String) -> void:
 
 
 ## Keyboard and gamepad focus: the row for `id`, else the first one.
-func _focus_row(id: String) -> void:
+func _focus_row(id: String, near: String = "") -> void:
 	var target: Button = _close_button
 	for child: Node in _rows.get_children():
 		var row := child as Button
@@ -183,6 +183,8 @@ func _focus_row(id: String) -> void:
 		if row.get_meta(&"row") == id:
 			target = row
 			break
-		if target == _close_button:
+		# With that row gone, the first row starting with `near`, else the first.
+		var is_near: bool = near != "" and str(row.get_meta(&"row")).begins_with(near)
+		if target == _close_button or (is_near and not str(target.get_meta(&"row")).begins_with(near)):
 			target = row
 	target.grab_focus()

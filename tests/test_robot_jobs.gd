@@ -109,22 +109,37 @@ func _check_clock(gs: GameStateScript) -> String:
 	var target: float = _target(gs)
 	gs.add_robot_card(ROBOT, "clock", 12, 2)
 	gs.get_sensor("soil_probe").error = 5.0
-	_tick(gs, 7.25)
-	if not _near(gs, target):
-		return "Every 2 days: nothing at the first 12:00."
-	_tick(gs, 8.2)
+	_tick(gs, 7.2)
 	var early: bool = not _near(gs, target)
-	_tick(gs, 8.25)
+	_tick(gs, 7.25)
 	if early or not _near(gs, target + 0.05):
 		return "Wrong time: early %s, set point %s." % [early, gs.plantings[CELL]["setpoint"]]
 	gs.get_sensor("soil_probe").error = 0.0
-	_tick(gs, 9.25)
+	_tick(gs, 8.25)
 	if not _near(gs, target + 0.05):
-		return "It must wait 2 days again."
-	_tick(gs, 10.25)
-	if not _near(gs, target):
-		return "It must run 2 days later."
-	return ""
+		return "It must wait 2 days."
+	_tick(gs, 9.25)
+	return "" if _near(gs, target) else "It must run 2 days later."
+
+
+func test_morning_trim_counts_toward_the_new_day() -> String:
+	return _run(_check_morning)
+
+
+func _check_morning(gs: GameStateScript) -> String:
+	gs.add_robot_card(ROBOT, "clock")
+	# The plot probe is exact and the robot's is not: the trim does the harm.
+	gs.plantings[CELL]["crop_id"] = "dust_turnip"
+	gs.plantings[CELL]["setpoint"] = 0.25
+	gs.get_sensor(PROBE).error = 9.0
+	GameClock.elapsed_days = 8.0
+	gs._on_time_advanced(0.0)
+	if absf(float(gs.plantings[CELL]["setpoint"]) - 0.25) > EPS:
+		return "At 06:00 the old day closes first."
+	gs._on_day_started(9)
+	if float(gs.plantings[CELL]["setpoint"]) > 0.2:
+		return "The 06:00 card must run that morning."
+	return "" if gs.plantings[CELL]["days_grown"] == 1 else "The old day's growth was lost."
 
 
 func test_soil_card_and_rewards() -> String:
@@ -194,7 +209,7 @@ func test_cards_run_on_the_clock_and_load() -> String:
 func _check_load(gs: GameStateScript) -> String:
 	gs.add_robot_card(ROBOT, "clock", 7)
 	var data: Dictionary = gs.farm_to_dict()
-	for change: Array in [["job", "spin"], ["trigger", "x"], ["hour", 24], ["hour", 1.0], ["every_days", 0], ["last_day", -1], ["added_by", 1]]:
+	for change: Array in [["job", "spin"], ["trigger", "x"], ["hour", 24], ["hour", 1.0], ["every_days", 0], ["last_day", 1.0], ["added_by", 1]]:
 		var bad: Dictionary = data.duplicate(true)
 		bad["robots"][ROBOT]["cards"][0][change[0]] = change[1]
 		if gs.farm_dict_problem(bad) == "":
