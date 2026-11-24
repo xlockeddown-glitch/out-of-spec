@@ -1107,4 +1107,4 @@ Agent's notes (flagged for Ryan, not his words):
 
 ### Agent's notes (flagged for Ryan, not his words)
 
-- Under the CALIBRATE cards, one row per reason names the units in service the robot can't have a card for. Units the farm doesn't own aren't listed.
+- Under the CALIBRATE cards, one row per reason (a ratio is its own reason) names the units in service the robot can't have a card for. Units the farm doesn't own aren't listed.

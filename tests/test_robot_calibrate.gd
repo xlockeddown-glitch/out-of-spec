@@ -64,7 +64,7 @@ func _check_gates(gs: GameStateScript) -> String:
 	listed.sort()
 	var units: Array = gs.bench_unit_ids()
 	units.sort()
-	if listed != units or not gaps["A robot never calibrates itself."].has(ENCODER):
+	if listed != units or not gaps.get("A robot never calibrates itself.", []).has(ENCODER):
 		return "Each unit once, with its reason: %s" % gaps
 	sensor.mpe = mpe
 	gs.set_rover_uplink("rover_1", false)
