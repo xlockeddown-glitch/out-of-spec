@@ -48,6 +48,9 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `plateau_weather_mast.glb` | Weather mast, 1.8 m tall; placed on the farm as set dressing | 0.1 m voxels, origin at ground level. Built from Ryan's Outdoor Infrastructure grid (`tools/voxgen/sheets/plateau_weather_mast.txt`). |
 | `gulch_culvert_bridge.glb` | Culvert bridge for the straight gulch, 2.0 m × 2.0 m × 1.2 m tall; placed on the farm as set dressing | 0.2 m voxels, origin at the base. Built from Ryan's Outdoor Infrastructure grid (`tools/voxgen/sheets/gulch_culvert_bridge.txt`). |
 | `solar_array_skid.glb` | Tilted solar panel on a skid, 1.2 m tall; placed on the farm as set dressing | 0.1 m voxels, origin at ground level. Built from Ryan's Outdoor Infrastructure grid (`tools/voxgen/sheets/solar_array_skid.txt`). |
+| `silk_winding_spool.glb` | Hand-crank silk winding spool, 0.2 m × 0.2 m × 0.2 m tall (on the dome's terrarium bench) | **0.025 m voxels**, origin at ground level. Built from Ryan's Tarantula & Optical Silk grid (`tools/voxgen/sheets/silk_winding_spool.txt`). |
+| `terrarium_mister_kit.glb` | Mister bottle and feeding tongs on a tray, 0.2 m × 0.15 m × 0.2 m tall (on the dome's terrarium bench) | **0.025 m voxels**, origin at ground level. Built from Ryan's Tarantula & Optical Silk grid (`tools/voxgen/sheets/terrarium_mister_kit.txt`). |
+| `tarantula_silk_skein.glb` | Coiled silk skein, 0.6 m × 0.6 m × 0.4 m tall at 0.1 m voxels (the dome's silk pickup, shown at half size) | 0.1 m voxels, origin at ground level. Built from Ryan's Tarantula & Optical Silk grid (`tools/voxgen/sheets/tarantula_silk_skein.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.025 m, 0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 

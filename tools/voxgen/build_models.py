@@ -814,6 +814,17 @@ OUTDOOR = {
                           "B1": "#D9A13B", "S": SHADOW}, "prop", {}, 0.1),
 }
 
+# Ryan's Tarantula & Optical Silk pack (2026-11-23): a winding spool and a mister kit at 0.025 m
+# voxels, and a silk skein at 0.1 m. Colors are his own. Nothing is lit.
+SILK = {
+    "silk_winding_spool": ({"M3": "#2E3844", "B1": "#D9A13B", "B2": "#9C6B30", "K1": "#5CA8A3",
+                            "K2": "#E8DEC0", "S": SHADOW}, 0.025),
+    "terrarium_mister_kit": ({"M3": "#2E3844", "M2": "#8D99AE", "G1": "#6FA3B0", "G2": "#3B5978",
+                              "B1": "#D9A13B", "S": SHADOW}, 0.025),
+    "tarantula_silk_skein": ({"K2": "#E8DEC0", "K1": "#5CA8A3", "K3": "#D4A359", "B2": "#6B4D30",
+                              "S": SHADOW}, 0.1),
+}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop",
@@ -865,6 +876,7 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, *ART_LOOP[n])), 0.1) for n in ART_LOOP],
     *[((lambda n=n: prop_sheet(n, *MINING[n][:3])), MINING[n][3]) for n in MINING],
     *[((lambda n=n: prop_sheet(n, *OUTDOOR[n][:3])), OUTDOOR[n][3]) for n in OUTDOOR],
+    *[((lambda n=n: prop_sheet(n, SILK[n][0])), SILK[n][1]) for n in SILK],
 ]
 
 
