@@ -284,7 +284,9 @@ func test_clearing_a_space_costs_and_has_downtime() -> String:
 
 func test_spaces_keep_their_place_on_the_wall() -> String:
 	var gs: GameStateScript = _make_state()
+	var kept: Array[String] = gs.lab_layout.duplicate()
 	var before: Array[String] = gs.lab_layout_slots()
+	var looked: bool = gs.lab_layout == kept
 	var refit: Vector2i = gs._lab_refit_cost()
 	gs.credits = refit.x
 	gs.crystal_ore = refit.y
@@ -296,6 +298,8 @@ func test_spaces_keep_their_place_on_the_wall() -> String:
 	gs.fit_lab_area("pressure")
 	var refitted: Array[String] = gs.lab_layout_slots()
 	_done(gs)
+	if not looked:
+		return "Looking at the lab must not write its layout."
 	for i: int in before.size():
 		if i == spot:
 			continue

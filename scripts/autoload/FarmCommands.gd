@@ -13,8 +13,10 @@ const ACTIONS: Array[StringName] = [
 ]
 const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
 
-## Set while a guest: called with (action, arguments), it returns the host's
-## answer, maybe later. Not set alone or as the host.
+## True while a guest: nothing is done here, only asked for.
+var guest: bool = false
+## A guest's way to the host: called with (action, arguments), it returns the
+## host's answer, maybe later.
 var remote: Callable
 ## The farm acted on. Only tests set another.
 var state: Node
@@ -25,10 +27,12 @@ var _waiting: bool = false
 ## Does `action` for the player at this screen and returns GameState's own answer,
 ## or a refusal of the same type. Await it: the host's answer takes time.
 func request(action: StringName, arguments: Array = []) -> Variant:
-	if not remote.is_valid():
+	if not guest:
 		return execute(_farm().local_player_id, action, arguments)
 	if problem(action, arguments) != "":
 		return refusal(action, problem(action, arguments))
+	if not remote.is_valid():
+		return refusal(action, "Not connected to the host.")
 	# A second press before the answer must not act twice.
 	if _waiting:
 		return refusal(action, "Still waiting for the host.")

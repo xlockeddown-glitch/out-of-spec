@@ -3564,7 +3564,9 @@ func fit_lab_area(discipline: String) -> String:
 	var problem: String = lab_fit_problem(discipline)
 	if problem != "":
 		return problem
+	_sync_lab_layout()
 	lab_areas[discipline] = lab_space(discipline) + 1
+	_sync_lab_layout()
 	var spaces: int = lab_space(discipline)
 	var plural: String = "" if spaces == 1 else "s"
 	post_phone("LAB: the %s area has %s space%s (%s): up to %s job%s at once." % [discipline,
@@ -3638,6 +3640,7 @@ func _finish_lab_build(day: int) -> void:
 			lab_size_name().to_lower(), SP811.integer(free_spaces), "" if free_spaces == 1 else "s"])
 	else:
 		post_phone("LAB: the %s space is cleared. Fit it out at the dome plan board." % build.get("discipline", "?"))
+	_sync_lab_layout()
 	lab_changed.emit()
 
 
@@ -3664,8 +3667,12 @@ func reset_lab() -> void:
 ## lab_areas: each space keeps its place, a cleared space frees where it
 ## stood, and a new space goes beside its area if it can.
 func lab_layout_slots() -> Array[String]:
+	# Looking changes nothing: in co-op only the host changes the farm.
+	var kept: Array[String] = lab_layout.duplicate()
 	_sync_lab_layout()
-	return lab_layout.duplicate()
+	var slots: Array[String] = lab_layout
+	lab_layout = kept
+	return slots
 
 
 func _sync_lab_layout() -> void:

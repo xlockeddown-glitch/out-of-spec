@@ -280,29 +280,26 @@ func _on_calibrate_pressed() -> void:
 		if _current_id != id:
 			return
 		if result.get("no_answer", false):
-			_show_no_answer(result)
+			_show_refusal("", result)
+			return
+		if not result["ok"]:
+			_show_refusal("REFUSED: ", result)
 			return
 		_calibrate_button.disabled = true
-		var clean: bool = result.get("ok", false) and result["on_time"] and result["traceable"]
-		_result_label.text = GameState.job_result_text(result) if result.get("ok", false) else "REFUSED: " + str(result["reason"])
+		_result_label.text = GameState.job_result_text(result)
 		_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(
-			DriftingSensor.Band.IN_BAND if clean else DriftingSensor.Band.GUARDBAND if result.get("ok", false)
-			else DriftingSensor.Band.OUT_OF_TOLERANCE))
-		if result.get("ok", false):
-			# Done: keep the pay and credibility shown, not "no longer active".
-			_current_id = ""
+			DriftingSensor.Band.IN_BAND if result["on_time"] and result["traceable"] else DriftingSensor.Band.GUARDBAND))
+		# Done: keep the pay and credibility shown, not "no longer active".
+		_current_id = ""
 		return
 	var record: Dictionary = await FarmCommands.request(&"calibrate_at_bench", [id])
 	if record.is_empty() or _current_id != id:
 		return
 	if record.get("no_answer", false):
-		_show_no_answer(record)
+		_show_refusal("", record)
 		return
 	if record.get("refused", false):
-		_calibrate_button.disabled = true
-		_result_label.text = "REFUSED: " + str(record["reason"])
-		_result_label.add_theme_color_override(
-			"font_color", DriftingSensor.band_color(DriftingSensor.Band.OUT_OF_TOLERANCE))
+		_show_refusal("REFUSED: ", record)
 		return
 	# One calibration per session with this instrument; re-enabled when the
 	# player switches instrument or reopens the bench.
@@ -359,17 +356,12 @@ func _on_send_pressed() -> void:
 	if sent["ok"]:
 		_on_instrument_selected(_ids.find(_current_id))
 		return
-	if sent.get("no_answer", false):
-		_show_no_answer(sent)
-		return
-	_result_label.text = "NOT SENT: " + str(sent["reason"])
-	_result_label.add_theme_color_override(
-		"font_color", DriftingSensor.band_color(DriftingSensor.Band.OUT_OF_TOLERANCE))
+	_show_refusal("NOT SENT: ", sent)
 
 
-## No answer from the farm is no finding: the button stays for another try.
-func _show_no_answer(answer: Dictionary) -> void:
-	_result_label.text = str(answer["reason"])
+## A refusal is no finding: amber, and the button stays for another try.
+func _show_refusal(prefix: String, answer: Dictionary) -> void:
+	_result_label.text = prefix + str(answer["reason"])
 	_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(DriftingSensor.Band.GUARDBAND))
 
 

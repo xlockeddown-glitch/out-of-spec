@@ -79,6 +79,11 @@ func test_bad_requests_are_refused() -> String:
 
 func test_a_guest_waits_for_the_host() -> String:
 	var commands: Node = _make()
+	commands.guest = true
+	var cut_off: Variant = commands.request(&"start_lab_grow")
+	if cut_off != "Not connected to the host." or not commands.state.lab_build.is_empty():
+		_free(commands)
+		return "A guest cut off from the host must do nothing, got %s" % cut_off
 	commands.remote = _ask_host
 	var got: Array = []
 	var ask: Callable = func() -> void: got.append(await commands.request(&"start_lab_grow"))
