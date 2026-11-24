@@ -180,6 +180,10 @@ func _add_card_rows(id: String) -> void:
 			continue
 		_add_card_button("ADD CARD: CALIBRATE %s as it comes due" % GameState.instrument_name(target, true),
 			"%s calibrate %s" % [id, target], GameState.add_robot_calibrate_card.bind(id, target), "Card added.")
+	var gaps: Dictionary = GameState.robot_calibrate_gaps(id)
+	for reason: String in gaps:
+		var names: Array = gaps[reason].map(func(unit: String) -> String: return GameState.instrument_name(unit, true))
+		_rows.add_child(PlanBoardUI._label("No CALIBRATE card for %s. %s" % [", ".join(names), reason], DIM, 18))
 
 
 func _add_card_button(text: String, row: String, action: Callable, done: String) -> void:

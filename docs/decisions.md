@@ -1098,3 +1098,13 @@ Agent's notes (flagged for Ryan, not his words):
 - A whole spool may replace a damaged one in the relay, which is thrown away [ASSUMPTION]. Without that the first spool slotted would be final. Each slotting earns the usual Husbandry XP.
 - Balance, flagged for Ryan: robots use damaged spools up at no cost and the relay takes a whole one first, so damage matters only when no whole spool is in stock.
 - The screens count damaged spools. Old saves load with every spool whole.
+
+## 2026-11-23: Why a unit has no CALIBRATE card
+
+### Ryan chose
+
+- "Yes" to the overnight roadmap, which has the robot screen say why a unit is missing.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Under the CALIBRATE cards, one row per reason names the units in service the robot can't have a card for. Units the farm doesn't own aren't listed.
