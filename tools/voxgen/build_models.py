@@ -671,6 +671,12 @@ FIELD_PROPS = {
 CROP_SUNPOD = {"T1": "#3D2919", "G3": "#2E4F22", "G1": "#4C7A34", "G2": "#6FA34B",
                "C1": "#D9A13B", "C2": "#F2C96B", "S": SHADOW}
 
+# Ryan's Fiber-Tuber Root Crop pack (2026-11-23), 0.1 m voxels. Colors are his own. FarmGrid shows
+# them for the crops whose "model" in data/crops.json is "tuber_stage".
+CROP_TUBER = {"T1": "#3D2919", "G3": "#2E4F22", "G1": "#587D3A", "G2": "#7EA856", "R1":
+              "#9C5A2E", "R2": "#C98A4B", "R3": "#E6CF9E", "W1": "#7A6838", "W2": "#544728",
+              "S": SHADOW}
+
 # Ryan's Pack 3 (2026-11-22): 0.1 m voxels, origin at the footprint center on the ground,
 # palettes as given in his generator script (S there is already SHADOW). Built and turned
 # like the field props. The farm shows the wilted crop on planted cells; the tarantula is in the
@@ -874,6 +880,8 @@ MODELS = [
     (lambda: prop_sheet("steering_encoder_jig"), 0.1),
     (lambda: prop_sheet("field_survey_tripod"), 0.1),
     *[((lambda n=n: prop_sheet(f"crop_stage_{n}", CROP_SUNPOD, "crop")), 0.1) for n in range(4)],
+    *[((lambda n=n: prop_sheet(f"tuber_stage_{n}", CROP_TUBER, "crop")), 0.1)
+      for n in (0, 1, 2, 3, "wilted")],
     *[((lambda n=n: prop_sheet(n, *PACK3[n])), 0.1) for n in PACK3],
     *[((lambda n=n: prop_sheet(n, CLUTTER[n])), 0.2) for n in CLUTTER],
     *[((lambda n=n: prop_sheet(n, LOGISTICS[n])), 0.1) for n in LOGISTICS],

@@ -20,8 +20,10 @@ enum TillResult { TILLED, ALREADY_TILLED, NOT_SOIL }
 @export var plot_size_cells: Vector2i = Vector2i(12, 12)
 @export var mesh_library_override: MeshLibrary
 
-const CROP_STAGE_MODEL := "res://assets/voxels/crop_stage_%d.glb"
-const CROP_WILTED_MODEL := "res://assets/voxels/crop_stage_wilted.glb"
+## Filled in with the crop's model set, then 0 to 3 or "wilted".
+const CROP_MODEL := "res://assets/voxels/%s_%s.glb"
+## Model set of a crop with no "model" in data/crops.json.
+const DEFAULT_CROP_MODEL_SET := "crop_stage"
 ## Crop models use 0.1 m voxels.
 const CROP_VOXEL_M := 0.1
 
@@ -99,12 +101,15 @@ func refresh_crops() -> void:
 
 func _crop_model_path(cell: Vector3i) -> String:
 	var planting: Dictionary = GameState.plantings[cell]
+	var crop: Dictionary = GameState.crop(planting["crop_id"])
+	var model_set: String = str(crop.get("model", DEFAULT_CROP_MODEL_SET))
 	if int(planting["out_of_band_days"]) > 0 or planting.get("out_today", false):
-		return CROP_WILTED_MODEL
+		return CROP_MODEL % [model_set, "wilted"]
 	if GameState.is_crop_ready(cell):
-		return CROP_STAGE_MODEL % 3
-	var growth_days: int = maxi(1, int(GameState.crop(planting["crop_id"]).get("growth_days", 1)))
-	return CROP_STAGE_MODEL % clampi(floori(float(int(planting["days_grown"]) * 3) / float(growth_days)), 0, 2)
+		return CROP_MODEL % [model_set, 3]
+	var growth_days: int = maxi(1, int(crop.get("growth_days", 1)))
+	var stage: int = clampi(floori(float(int(planting["days_grown"]) * 3) / float(growth_days)), 0, 2)
+	return CROP_MODEL % [model_set, stage]
 
 
 ## The voxel model at `path`, or a small green box if it can't load.

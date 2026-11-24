@@ -1042,3 +1042,10 @@ Agent's notes (flagged for Ryan, not his words):
 
 - Ryan sent the pack without instructions. The pad lies in Bram's bay as the rover's service spot, sunk 0.18 m and without collision, so driving is unchanged. The dryer stands beside the bay as set dressing.
 - What they do in the game (docking, charging, dry air) is open for Ryan.
+
+## 2026-11-23: Fiber-Tuber Root Crop pack
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan sent the pack without instructions. Dust Turnip, the one root crop, shows it; no crop was renamed or added, and growth and prices are unchanged. Whether the Plateau Fiber-Tuber should be a crop of its own is open for Ryan.
+- A crop picks its models with `model` in `data/crops.json`; one without it keeps the sun-pods.
