@@ -1108,3 +1108,19 @@ Agent's notes (flagged for Ryan, not his words):
 ### Agent's notes (flagged for Ryan, not his words)
 
 - Under the CALIBRATE cards, one row per reason (a ratio is its own reason) names the units in service the robot can't have a card for. Units the farm doesn't own aren't listed.
+
+## 2026-11-24: Co-op, first slice
+
+### Ryan chose
+
+- "Yes" to starting co-op now.
+- "Agree" to a first slice with the shared rover and screens only, and no walking characters.
+- "Direct IP first": friends join by IP address, Steam later.
+- "yeah lets do wait for now": at 06:00 with someone still up, the day waits for them.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Order, one PR each: player ids, host commands, host clock, joining, syncing, beds, guest skills.
+- Every screen and scene now says which player acts, and a test keeps it so. One player notices no change.
+- A robot's log keeps who overrode its interlock last, until the audit that clears it [ASSUMPTION]. No screen shows the name: whether one should is open, with no effect on the fine.
+- Open: bench calibration time in co-op, who can pause, who may drive a shared rover, where a guest's skills are kept, rejoining mid-day, whether each player picks a seed of their own, and how names show.
