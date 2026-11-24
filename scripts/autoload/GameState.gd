@@ -105,6 +105,10 @@ var relay_slotted: bool = false
 var slotted_spool_species: StringName = &""
 ## Species of each spool in inventory, oldest first (parallel to optical_silk_spools).
 var _spool_species: Array[StringName] = []
+## Whether each of those spools is damaged (a shorter list means the rest aren't).
+var _spool_damaged: Array[bool] = []
+## Whether the spool now in the relay is damaged.
+var slotted_spool_damaged: bool = false
 ## Every calibration event, oldest first. Week 3 audits read this, so a
 ## FAIL can't be erased by calibrating again.
 var cal_log: Array[Dictionary] = []
@@ -388,7 +392,8 @@ const SAVED_FIELDS: Array[String] = [
 ]
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
-const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots"]
+const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
+	"_spool_damaged", "slotted_spool_damaged"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -1243,8 +1248,7 @@ func build_robot(frame_id: String, player_id: String = "") -> String:
 	var frame: Dictionary = robot_frame(frame_id)
 	_lab_pay(int(frame.get("cost_credits", 0)), int(frame.get("cost_ore", 0)))
 	for i: int in int(frame.get("cost_spools", 0)):
-		optical_silk_spools -= 1
-		_spool_species.pop_front()
+		_take_spool(true)
 	silk_changed.emit(optical_silk_spools)
 	var number: int = robots.size() + 1
 	while robots.has("%s-%d" % [frame.get("id_prefix", "R"), number]):
@@ -1648,10 +1652,15 @@ func _robot_calibrate(robot_id: String, card: Dictionary) -> void:
 
 
 ## COLLECT SPOOL: the robot picks up the ready spool for the farm. Not reported:
-## there can be many a day.
+## there can be many a day. A grip that is out of tolerance, which works only with
+## the interlock overridden, may damage it (section 3.4).
 func _robot_collect(robot_id: String, player_id: String) -> void:
-	if not collect_spool(player_id, true):
+	if not is_spool_ready():
 		return
+	var grip: DriftingSensor = get_sensor("robot_grip_torque@" + robot_id)
+	var damaged: bool = grip != null and grip.get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE \
+			and rng.randf() < DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/bad_grip_damage_chance", 0.0)
+	collect_spool(player_id, true, damaged)
 	_wear_robot(robot_id, JOB_COLLECT)
 
 
@@ -2700,11 +2709,13 @@ func _tick_molt(delta_days: float) -> void:
 ## Picks up the spool from a molted enclosure and starts the next molt cycle.
 ## With `by_robot` a robot does it to that player's program, which trains no
 ## one's hands: only Robotics XP [ASSUMPTION].
-func collect_spool(player_id: String = "", by_robot: bool = false) -> bool:
+func collect_spool(player_id: String = "", by_robot: bool = false, damaged: bool = false) -> bool:
 	if not is_spool_ready():
 		return false
 	optical_silk_spools += 1
 	_spool_species.append(dome_species_id)
+	_spool_damaged.resize(_spool_species.size())
+	_spool_damaged[-1] = damaged
 	exuvia_until_day = GameClock.get_day_index() + EXUVIA_LINGER_DAYS
 	molt_progress = 0.0
 	molt_stage = MoltStage.ACTIVE
@@ -2714,17 +2725,54 @@ func collect_spool(player_id: String = "", by_robot: bool = false) -> bool:
 	return true
 
 
+func _is_spool_damaged(index: int) -> bool:
+	return index < _spool_damaged.size() and _spool_damaged[index]
+
+
+func damaged_spools() -> int:
+	return _spool_damaged.count(true)
+
+
+## "3", or "3 (1 DAMAGED)".
+func spool_count_text() -> String:
+	if damaged_spools() == 0:
+		return SP811.integer(optical_silk_spools)
+	return "%s (%s DAMAGED)" % [SP811.integer(optical_silk_spools), SP811.integer(damaged_spools())]
+
+
+## Takes the oldest spool out of stock, a damaged one first or last [ASSUMPTION].
+## Returns its species and whether it is damaged.
+func _take_spool(damaged_first: bool) -> Array:
+	optical_silk_spools -= 1
+	if _spool_species.is_empty():
+		return [dome_species_id, false]
+	var index: int = 0
+	for i: int in _spool_species.size():
+		if _is_spool_damaged(i) == damaged_first:
+			index = i
+			break
+	var taken: Array = [_spool_species[index], _is_spool_damaged(index)]
+	_spool_species.remove_at(index)
+	if index < _spool_damaged.size():
+		_spool_damaged.remove_at(index)
+	return taken
+
+
 # --- Relay ----------------------------------------------------------------------
 
+## A whole spool may take the place of a damaged one, which is thrown away.
 func can_slot_spool() -> bool:
-	return optical_silk_spools > 0 and not relay_slotted
+	if relay_slotted:
+		return slotted_spool_damaged and optical_silk_spools > damaged_spools()
+	return optical_silk_spools > 0
 
 
 func slot_spool_into_relay(player_id: String = "") -> bool:
 	if not can_slot_spool():
 		return false
-	optical_silk_spools -= 1
-	slotted_spool_species = _spool_species.pop_front() if not _spool_species.is_empty() else dome_species_id
+	var taken: Array = _take_spool(false)
+	slotted_spool_species = taken[0]
+	slotted_spool_damaged = taken[1]
 	relay_slotted = true
 	_award_xp("slot_spool", player_id)
 	silk_changed.emit(optical_silk_spools)
@@ -2734,11 +2782,14 @@ func slot_spool_into_relay(player_id: String = "") -> bool:
 
 ## Multiplier applied to rover uplink lag (1.0 = no upgrade). The spool's base
 ## cut and the spinning species' lag_reduction_pct stack multiplicatively:
-## (1 - spool%) * (1 - species%). Curlyhair: 0.40 * 0.95 = 0.38.
+## (1 - spool%) * (1 - species%). Curlyhair: 0.40 * 0.95 = 0.38. A damaged spool
+## gives only part of the base cut.
 func get_relay_lag_multiplier() -> float:
 	if not relay_slotted:
 		return 1.0
 	var spool_pct: float = DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/relay_lag_reduction_pct", 0.0)
+	if slotted_spool_damaged:
+		spool_pct *= DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/damaged_reduction_share", 1.0)
 	var species_pct: float = 0.0
 	var raw: Variant = DataManager.get_record(SPECIES_TABLE, slotted_spool_species).get("lag_reduction_pct")
 	if typeof(raw) == TYPE_FLOAT or typeof(raw) == TYPE_INT:  # null for undesigned morphs

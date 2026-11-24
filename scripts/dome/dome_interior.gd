@@ -90,8 +90,8 @@ func _refresh_status() -> void:
 
 	_molt_bar.value = GameState.molt_progress
 	_molt_label.text = GameState.molt_text()
-	_silk_label.text = "SILK SPOOLS %d   RELAY: %s" % [
-		GameState.optical_silk_spools, "OPTICAL SILK" if GameState.relay_slotted else "STOCK"]
+	_silk_label.text = "SILK SPOOLS %s   RELAY: %s" % [GameState.spool_count_text(),
+		"STOCK" if not GameState.relay_slotted else "DAMAGED SILK" if GameState.slotted_spool_damaged else "OPTICAL SILK"]
 
 
 ## Writes "<TITLE>  <ideal + observed error>" and its band and due day. The

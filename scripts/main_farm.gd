@@ -151,7 +151,7 @@ func _on_relay_changed(_slotted: bool) -> void:
 
 
 func _refresh_relay_hud() -> void:
-	_hud.set_relay(GameState.relay_slotted, GameState.optical_silk_spools, GameState.can_slot_spool())
+	_hud.set_relay(GameState.relay_slotted, GameState.slotted_spool_damaged, GameState.spool_count_text(), GameState.can_slot_spool())
 
 
 func _on_soil_tilled(cell: Vector3i) -> void:
