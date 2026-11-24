@@ -2,7 +2,7 @@ class_name CalBenchUI
 extends Control
 ## Centered bench-calibration overlay (Week 2 board, milestone 3).
 ## Opening (or switching instrument) freezes the As-Found error. ZERO /
-## CALIBRATE runs GameState.calibrate_at_bench(): the unit is compared with
+## CALIBRATE asks for calibrate_at_bench(): the unit is compared with
 ## its standard, the As-Found is judged pass / indeterminate / fail against
 ## the acceptance limit and MPE, and the bench time passes on the clock.
 ## Standards are listed too (milestone 2): they can be sent to OIRM (drop pod, or
@@ -273,8 +273,12 @@ func _chain_text(instrument_id: String) -> String:
 
 
 func _on_calibrate_pressed() -> void:
+	var id: String = _current_id
 	if _current_id.begins_with(JOB_PREFIX):
-		var result: Dictionary = GameState.complete_job(_current_id.trim_prefix(JOB_PREFIX), GameState.local_player_id)
+		var result: Dictionary = await FarmCommands.request(&"complete_job", [id.trim_prefix(JOB_PREFIX)])
+		# The host's answer may come after another row was chosen.
+		if _current_id != id:
+			return
 		_calibrate_button.disabled = true
 		var clean: bool = result.get("ok", false) and result["on_time"] and result["traceable"]
 		_result_label.text = GameState.job_result_text(result) if result.get("ok", false) else "REFUSED: " + str(result["reason"])
@@ -285,8 +289,8 @@ func _on_calibrate_pressed() -> void:
 			# Done: keep the pay and credibility shown, not "no longer active".
 			_current_id = ""
 		return
-	var record: Dictionary = GameState.calibrate_at_bench(_current_id, GameState.local_player_id)
-	if record.is_empty():
+	var record: Dictionary = await FarmCommands.request(&"calibrate_at_bench", [id])
+	if record.is_empty() or _current_id != id:
 		return
 	if record.get("refused", false):
 		_calibrate_button.disabled = true
@@ -342,7 +346,10 @@ func _on_calibrate_pressed() -> void:
 
 
 func _on_send_pressed() -> void:
-	var sent: Dictionary = GameState.send_to_oirm(_current_id)
+	var id: String = _current_id
+	var sent: Dictionary = await FarmCommands.request(&"send_to_oirm", [id])
+	if _current_id != id:
+		return
 	if sent["ok"]:
 		_on_instrument_selected(_ids.find(_current_id))
 		return

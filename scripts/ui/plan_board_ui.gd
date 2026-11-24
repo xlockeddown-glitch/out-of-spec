@@ -183,16 +183,18 @@ func _area_row(discipline: String) -> HBoxContainer:
 
 
 func _on_grow_pressed() -> void:
-	_show_result(GameState.start_lab_grow(), "Building started. Your areas keep working meanwhile.")
+	_show_result(await FarmCommands.request(&"start_lab_grow"), "Building started. Your areas keep working meanwhile.")
 
 
 func _on_fit_pressed(discipline: String) -> void:
-	_show_result(GameState.fit_lab_area(discipline), "The %s area has %s space%s." % [discipline,
+	# Asked first: the text counts the new space.
+	var problem: String = await FarmCommands.request(&"fit_lab_area", [discipline])
+	_show_result(problem, "The %s area has %s space%s." % [discipline,
 		SP811.integer(GameState.lab_space(discipline)), "" if GameState.lab_space(discipline) == 1 else "s"])
 
 
 func _on_clear_pressed(discipline: String) -> void:
-	_show_result(GameState.clear_lab_area(discipline), "Clearing one %s space: %s." % [discipline, GameState.lab_refit_text()])
+	_show_result(await FarmCommands.request(&"clear_lab_area", [discipline]), "Clearing one %s space: %s." % [discipline, GameState.lab_refit_text()])
 
 
 func _show_result(problem: String, done_text: String) -> void:
