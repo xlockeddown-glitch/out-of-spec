@@ -11,4 +11,4 @@ func test_every_crop_has_its_models() -> String:
 			var path: String = FarmGrid.CROP_MODEL % [model_set, stage]
 			if not ResourceLoader.exists(path):
 				return "%s has no %s." % [crop["id"], path]
-	return "" if roots_seen else "Dust Turnip uses the tuber models."
+	return "" if roots_seen else "Dust Turnip should use the tuber models."
