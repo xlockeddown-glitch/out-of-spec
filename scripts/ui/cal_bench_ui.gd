@@ -20,6 +20,8 @@ var _ids: Array[String] = []
 var _current_id: String = ""
 ## The shown result is from this session's calibration.
 var _calibrated: bool = false
+## _away_text() as shown.
+var _away: String = ""
 ## Budget and acceptance limit of the selected instrument against its standard.
 var _budget: Dictionary = {}
 var _limit: float = 0.0
@@ -94,15 +96,25 @@ func close() -> void:
 
 
 ## The pod landing or leaving changes whether a standard can be sent, and a
-## standard away at OIRM what can be calibrated. A finished result stays shown.
+## standard away at OIRM what can be calibrated. Otherwise the reading, or a
+## finished result, stays as it was.
 func _on_pod_or_oirm_changed() -> void:
 	var index: int = _ids.find(_current_id)
 	if not visible or index < 0:
 		return
-	if not _calibrated or GameState.at_oirm.has(_current_id):
+	var standard: bool = _is_standard(_current_id)
+	if not _calibrated and (_away_text() != _away or (standard and not GameState.has_bench_reference(_current_id))):
 		_on_instrument_selected(index)
-	elif _is_standard(_current_id):
+	elif standard:
 		_show_send()
+
+
+## What keeps the selected instrument off the bench, or "".
+func _away_text() -> String:
+	for id: String in [_current_id, str(GameState.calibration_budget(_current_id).get("standard_id", ""))]:
+		if GameState.at_oirm.has(id):
+			return "%s %s" % [id, GameState.at_oirm[id]]
+	return ""
 
 
 ## Jobs accepted, finished, cancelled or gone late: rebuild the list and keep
@@ -138,6 +150,7 @@ func _is_standard(instrument_id: String) -> bool:
 func _on_instrument_selected(index: int) -> void:
 	_current_id = _ids[index]
 	_calibrated = false
+	_away = _away_text()
 	_calibrate_button.show()
 	_send_button.hide()
 	if _current_id.begins_with(JOB_PREFIX):
@@ -315,6 +328,10 @@ func _on_calibrate_pressed() -> void:
 	_calibrated = true
 	_calibrate_button.disabled = true
 	var sensor: DriftingSensor = GameState.get_sensor(_current_id)
+	# Judged as the host did, with the standard it used.
+	_limit = record["acceptance_limit"]
+	for meter: BandMeter in [_found_meter, _left_meter]:
+		meter.acceptance_ratio = _limit / sensor.mpe if sensor.mpe > 0.0 else 1.0
 	_show_as_found(sensor, record["as_found"] as float)
 	var as_left: float = record["as_left"]
 	var left_band: int = _bench_band(sensor, as_left)
@@ -355,13 +372,22 @@ func _on_calibrate_pressed() -> void:
 	else:
 		_result_label.text = "AS-FOUND WITHIN ACCEPTANCE LIMIT, LATE: PASS. Interval unchanged. " + interval_note
 	_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
-	_standard_label.text = _reference_text(_current_id)
+	var used: String = record["standard_id"]
+	if used == GameState.calibration_budget(_current_id).get("standard_id", ""):
+		_standard_label.text = _reference_text(_current_id)
+	else:
+		_standard_label.text = "Standard: %s   Limit ±%s" % [
+			GameState.instrument_name(used, true), _unsigned_precise(sensor, _limit)]
 
 
 func _on_send_pressed() -> void:
 	var id: String = _current_id
 	var sent: Dictionary = await FarmCommands.request(&"send_to_oirm", [id])
 	if _current_id != id:
+		return
+	if sent["ok"] and _calibrated:
+		_result_label.text += " Sent to OIRM, back on day %d." % sent["return_day"]
+		_send_button.disabled = true
 		return
 	if sent["ok"]:
 		_on_instrument_selected(_ids.find(_current_id))
