@@ -53,7 +53,7 @@ func test_callers_name_the_player() -> String:
 				"has_skill_unlock", "skill_text", "skill_effects_text", "robot_build_problem", "robot_card_slots",
 				"robot_job_gate", "robot_calibrate_targets", "robot_calibrate_gaps", "job_bench_problem",
 				"job_minutes", "job_finish_day"]:
-			actions[str(method["name"])] = true
+			actions[str(method["name"])] = args.find("player_id") if "player_id" in args else args.find("performed_by")
 	var call_site: RegEx = RegEx.create_from_string(r"GameState\.(\w+)(?:\.bind)?\(")
 	var comment: RegEx = RegEx.create_from_string(r"(?m)(^|\s)#.*$")
 	var problems: PackedStringArray = []
@@ -67,15 +67,26 @@ func test_callers_name_the_player() -> String:
 				if not actions.has(found.get_string(1)):
 					continue
 				seen += 1
-				# The whole call, up to its closing parenthesis.
+				# The arguments, up to the closing parenthesis. A bracket or comma
+				# inside a string isn't told apart, so it could only fail the test.
 				var end: int = found.get_end()
 				var depth: int = 1
-				while depth > 0 and end < text.length():
-					depth += 1 if text[end] == "(" else -1 if text[end] == ")" else 0
+				var passed: PackedStringArray = [""]
+				while end < text.length():
+					if text[end] in "([{":
+						depth += 1
+					elif text[end] in ")]}":
+						depth -= 1
+					if depth == 0:
+						break
+					if text[end] == "," and depth == 1:
+						passed.append("")
+					else:
+						passed[-1] += text[end]
 					end += 1
-				var call_text: String = text.substr(found.get_start(), end - found.get_start())
-				if not call_text.contains("GameState.local_player_id"):
-					problems.append("%s: %s" % [file, call_text])
+				var index: int = actions[found.get_string(1)]
+				if index >= passed.size() or passed[index].strip_edges() != "GameState.local_player_id":
+					problems.append("%s: %s%s)" % [file, found.get_string(), ",".join(passed)])
 	if seen < 15:
 		return "It found only %d calls, so it checks nothing." % seen
 	return "\n".join(problems)
