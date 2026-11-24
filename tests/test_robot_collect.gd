@@ -121,6 +121,16 @@ func _check_use(gs: GameStateScript) -> String:
 	data.erase("slotted_spool_damaged")
 	if gs.farm_dict_problem(data) != "":
 		return "An old save must load: %s" % gs.farm_dict_problem(data)
+	gs.slotted_spool_damaged = true
+	gs.farm_from_dict(data)
+	if gs.damaged_spools() != 0 or gs.slotted_spool_damaged or gs.spool_count_text() != "3":
+		return "Every spool of an old save is whole."
+	data["_spool_damaged"] = gs._spool_damaged.duplicate()
+	for i: int in 4:
+		data["_spool_damaged"].append(true)
+	if gs.farm_dict_problem(data) == "":
+		return "More damaged entries than spools must be refused."
+	gs._spool_damaged.assign([true])
 	# The relay takes the oldest whole one, a robot the oldest damaged one.
 	if gs._take_spool(false) != [&"a", false] or gs._take_spool(true) != [&"curlyhair", true] \
 			or gs.optical_silk_spools != 1 or gs.damaged_spools() != 0 or gs._spool_species != [&"b"]:

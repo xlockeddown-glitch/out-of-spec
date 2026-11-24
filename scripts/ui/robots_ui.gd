@@ -78,7 +78,7 @@ func _on_robots_changed() -> void:
 
 func _refresh() -> void:
 	_funds.text = "You have %s CR, %s crystal ore and %s silk." % [SP811.integer(GameState.credits),
-		SP811.integer(GameState.crystal_ore), SP811.integer(GameState.optical_silk_spools)]
+		SP811.integer(GameState.crystal_ore), GameState.spool_count_text()]
 	for child: Node in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()

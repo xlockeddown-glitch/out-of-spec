@@ -1096,4 +1096,5 @@ Agent's notes (flagged for Ryan, not his words):
 - A damaged spool gives half [PLACEHOLDER] the base lag cut: 30 % instead of 60 %. The species' own cut is kept [ASSUMPTION].
 - The relay takes the oldest whole spool, and a robot's eye the oldest damaged one, if there is one [ASSUMPTION]. A damaged eye has no effect.
 - A whole spool may replace a damaged one in the relay, which is thrown away [ASSUMPTION]. Without that the first spool slotted would be final. Each slotting earns the usual Husbandry XP.
+- Balance, flagged for Ryan: robots use damaged spools up at no cost and the relay takes a whole one first, so damage matters only when no whole spool is in stock.
 - The screens count damaged spools. Old saves load with every spool whole.

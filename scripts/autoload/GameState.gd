@@ -440,6 +440,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 			for entry: Variant in value:
 				if typeof(entry) != (mine as Array).get_typed_builtin():
 					return "'%s' has an entry of the wrong type." % field
+	if data.has("_spool_damaged") and data["_spool_damaged"].size() > data["_spool_species"].size():
+		return "'_spool_damaged' has more entries than there are spools."
 	for pair: Array in [["cal_log", "instrument_id"], ["certificate_log", "standard_id"]]:
 		for entry: Dictionary in data[pair[0]]:
 			if typeof(entry.get(pair[1])) != TYPE_STRING:
@@ -1233,7 +1235,7 @@ func robot_build_problem(frame_id: String, player_id: String = "") -> String:
 	if credits < int(frame.get("cost_credits", 0)) or crystal_ore < int(frame.get("cost_ore", 0)) \
 			or optical_silk_spools < int(frame.get("cost_spools", 0)):
 		return "Costs %s; you have %s CR, %s crystal ore and %s silk." % [robot_cost_text(frame_id),
-			SP811.integer(credits), SP811.integer(crystal_ore), SP811.integer(optical_silk_spools)]
+			SP811.integer(credits), SP811.integer(crystal_ore), spool_count_text()]
 	return ""
 
 
@@ -2746,11 +2748,16 @@ func _take_spool(damaged_first: bool) -> Array:
 	optical_silk_spools -= 1
 	if _spool_species.is_empty():
 		return [dome_species_id, false]
-	var index: int = 0
+	var index: int = -1
 	for i: int in _spool_species.size():
 		if _is_spool_damaged(i) == damaged_first:
 			index = i
 			break
+	if index < 0:
+		# Spools with no species listed are whole.
+		if not damaged_first and _spool_species.size() <= optical_silk_spools:
+			return [dome_species_id, false]
+		index = 0
 	var taken: Array = [_spool_species[index], _is_spool_damaged(index)]
 	_spool_species.remove_at(index)
 	if index < _spool_damaged.size():
