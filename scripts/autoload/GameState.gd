@@ -494,7 +494,11 @@ func farm_from_dict(data: Dictionary) -> String:
 	var states: Dictionary = fresh.sensors_to_dict()
 	for id: Variant in data["sensors"]:
 		if states.has(id):
+			var rate: float = states[id]["usage_drift_rate"]
 			(states[id] as Dictionary).merge(data["sensors"][id], true)
+			# Nothing changes a robot's wear rate, and early saves hold 0.
+			if str(id).contains("@"):
+				states[id]["usage_drift_rate"] = rate
 		else:
 			push_warning("GameState: saved sensor '%s' is not in %s; skipped." % [id, DRIFT_TABLE])
 	sensors_from_dict(states)
@@ -1160,6 +1164,9 @@ func _robots_dict_problem(saved: Dictionary) -> String:
 		var cards: Variant = robot.get("cards", [])
 		if typeof(cards) != TYPE_ARRAY or not (cards as Array).all(_is_card):
 			return "Robot '%s' has a bad job card." % id
+		for key: String in ["holding", "override", "override_logged"]:
+			if typeof(robot.get(key, false)) != TYPE_BOOL:
+				return "Robot '%s' has a bad %s." % [id, key]
 	return ""
 
 
@@ -1311,6 +1318,8 @@ const JOB_WATER: String = "water"
 ## A soil card starts once the robot's probe reads this share of a crop's
 ## tolerance band away from its target [PLACEHOLDER].
 const SOIL_CARD_BAND_RATIO: float = 0.25
+## How far off a trim is with the tank gauge at its MPE [PLACEHOLDER].
+const TANK_DOSE_ERROR_AT_MPE: float = 0.1
 
 
 ## Job cards a robot can hold: one per Robotics level up to the table's end.
@@ -1401,18 +1410,25 @@ func _run_robot_cards() -> void:
 	for id: Variant in robots:
 		if robots[id]["state"] != "released":
 			continue
+		_update_interlock(str(id))
+		if is_robot_holding(str(id)):
+			continue
 		for card: Dictionary in robot_cards(str(id)):
 			if not _card_is_due(str(id), card):
 				continue
-			if card["trigger"] == "clock":
-				card["last_day"] = _latest_day_at(card["hour"])
+			card["last_day"] = _latest_day_at(card["hour"])
 			_robot_water(str(id), card["added_by"])
+			_update_interlock(str(id))
 			break
 
 
 func _card_is_due(robot_id: String, card: Dictionary) -> bool:
 	if card["trigger"] == "clock":
 		return _latest_day_at(card["hour"]) - int(card["last_day"]) >= int(card["every_days"])
+	# Off by a plot it can't bring the soil it reads on target, so it tries once
+	# a day [PLACEHOLDER] instead of every tick.
+	if _robot_plot_offset(robot_id) != 0 and _latest_day_at(card["hour"]) <= int(card["last_day"]):
+		return false
 	for cell: Vector3i in plantings:
 		var limit: float = float(crop(plantings[cell]["crop_id"]).get("tolerance_band", 0.0)) * SOIL_CARD_BAND_RATIO
 		if absf(_robot_soil_gap(robot_id, cell)) > limit and _robot_trim_steps(robot_id, cell) != 0:
@@ -1440,19 +1456,121 @@ func _robot_trim_steps(robot_id: String, cell: Vector3i) -> int:
 	return clampi(steps, -roundi(setpoint / SETPOINT_STEP), roundi((1.0 - setpoint) / SETPOINT_STEP))
 
 
-## WATER: trims every growing crop's set point. A job that changes nothing
-## earns no XP and isn't reported.
+## WATER: trims every growing crop's set point, as well as its joints and tank
+## let it. A job that changes nothing earns no XP and isn't reported.
 func _robot_water(robot_id: String, player_id: String) -> void:
-	var trimmed: int = 0
+	# Every plot is read before any is trimmed: a trim can land on the next one.
+	var steps_for: Dictionary = {}
 	for cell: Vector3i in plantings:
-		var steps: int = _robot_trim_steps(robot_id, cell)
+		var steps: int = roundi(_robot_trim_steps(robot_id, cell) * _robot_dose(robot_id))
 		if steps != 0:
-			adjust_setpoint(cell, steps)
+			steps_for[cell] = steps
+	if steps_for.is_empty():
+		return
+	var trimmed: int = 0
+	for cell: Vector3i in steps_for:
+		var lands: Vector3i = cell + Vector3i(_robot_plot_offset(robot_id), 0, 0)
+		if not plantings.has(lands):
+			continue
+		var before: float = plantings[lands]["setpoint"]
+		if adjust_setpoint(lands, steps_for[cell]) != before:
 			trimmed += 1
+	for id: String in robot_sensor_ids(robot_id):
+		get_sensor(id).add_usage(1.0)
 	if trimmed > 0:
 		_award_xp("robot_job", player_id)
 		post_phone("ROBOT: %s trimmed the irrigation set point of %s plot%s by its own soil probe." % [
 			robots[robot_id]["name"], SP811.integer(trimmed), "" if trimmed == 1 else "s"])
+
+
+## How many plots along x its water lands from where it was sent: 0, or one
+## plot toward the joint encoder's error once that is out of tolerance.
+func _robot_plot_offset(robot_id: String) -> int:
+	var encoder: DriftingSensor = get_sensor("robot_joint_encoder@" + robot_id)
+	if encoder == null or encoder.get_band() != DriftingSensor.Band.OUT_OF_TOLERANCE:
+		return 0
+	return 1 if encoder.error > 0.0 else -1
+
+
+## The share of a trim it delivers. A tank gauge that reads high doses low.
+func _robot_dose(robot_id: String) -> float:
+	var gauge: DriftingSensor = get_sensor("robot_tank_pressure@" + robot_id)
+	return 1.0 if gauge == null else 1.0 - TANK_DOSE_ERROR_AT_MPE * gauge.error / gauge.mpe
+
+
+# --- Robot interlock (section 3.3) ---------------------------------------------
+
+## The robot's sensors that are out of tolerance, in data order.
+func robot_out_of_tolerance(robot_id: String) -> Array[String]:
+	return robot_sensor_ids(robot_id).filter(func(id: String) -> bool:
+		return get_sensor(id).get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE)
+
+
+## True while the interlock keeps a released robot from working.
+func is_robot_holding(robot_id: String) -> bool:
+	return robots.has(robot_id) and robots[robot_id]["state"] == "released" \
+			and not is_interlock_overridden(robot_id) and not robot_out_of_tolerance(robot_id).is_empty()
+
+
+func is_interlock_overridden(robot_id: String) -> bool:
+	return robots.get(robot_id, {}).get("override", false)
+
+
+## The names of the sensors out of tolerance, without the robot's: "grip torque".
+func robot_bad_sensor_names(robot_id: String) -> String:
+	var names: PackedStringArray = []
+	for id: String in robot_out_of_tolerance(robot_id):
+		names.append(get_sensor(id).short_name.trim_prefix(robot_id + " "))
+	return " and ".join(names)
+
+
+## Says when a robot starts to hold. With every sensor back in tolerance the
+## interlock arms itself again.
+func _update_interlock(robot_id: String) -> void:
+	var robot: Dictionary = robots[robot_id]
+	var was_stopped: bool = robot.get("holding", false) or robot.get("override", false)
+	if robot_out_of_tolerance(robot_id).is_empty():
+		if was_stopped:
+			robot["holding"] = false
+			robot["override"] = false
+			post_phone("ROBOT: %s: all sensors in tolerance. Interlock armed." % robot["name"])
+			robots_changed.emit()
+	elif not was_stopped:
+		robot["holding"] = true
+		post_phone("ROBOT: %s: %s out of tolerance. Holding." % [robot["name"], robot_bad_sensor_names(robot_id)])
+		robots_changed.emit()
+
+
+## Lets a holding robot work with bad sensors, or arms its interlock again. Its
+## log keeps the override until Vance's next audit. Returns "" or why not.
+func set_interlock_override(robot_id: String, on: bool) -> String:
+	var problem: String = _robot_program_problem(robot_id)
+	if problem != "":
+		return problem
+	var robot: Dictionary = robots[robot_id]
+	if on and not is_robot_holding(robot_id):
+		return "%s is not holding." % robot["name"]
+	if not on and not is_interlock_overridden(robot_id):
+		return "%s's interlock is armed." % robot["name"]
+	robot["override"] = on
+	robot["holding"] = not on and not robot_out_of_tolerance(robot_id).is_empty()
+	if on:
+		robot["override_logged"] = true
+	post_phone("ROBOT: %s: interlock %s." % [robot["name"], "OVERRIDDEN" if on else "armed"])
+	robots_changed.emit()
+	return ""
+
+
+## Vance's finding for each robot whose interlock was overridden since the last
+## audit. Reading the log clears it, unless the override is still on.
+func _interlock_findings() -> Array[Dictionary]:
+	var findings: Array[Dictionary] = []
+	for id: Variant in robots:
+		var robot: Dictionary = robots[id]
+		if robot.get("override_logged", false):
+			findings.append({ "robot_id": str(id), "fine": AuditEngine.interlock_fine() })
+			robot["override_logged"] = is_interlock_overridden(str(id))
+	return findings
 
 
 # --- Relay lock (section 1.4 #4, section 1.7) ---------------------------------
@@ -1590,6 +1708,12 @@ func _run_audit(day: int) -> void:
 			report["passed"] = false
 			report["total_fine"] = int(report["total_fine"]) + int(tire["fine"])
 
+	# Vance reads the robots' interlock logs (section 6 item 10).
+	report["interlocks"] = _interlock_findings()
+	for finding: Dictionary in report["interlocks"]:
+		report["passed"] = false
+		report["total_fine"] = int(report["total_fine"]) + int(finding["fine"])
+
 	if not report["passed"] and not audit_grace_used:
 		_apply_audit_grace(report)
 
@@ -1631,6 +1755,9 @@ func _run_audit(day: int) -> void:
 	for id: String in unit_ids():
 		var chain: Dictionary = traceability_chain(id)
 		post_phone(("Chain: %s" if chain["traceable"] else "Chain BROKEN: %s") % chain["text"])
+	for finding: Dictionary in report["interlocks"]:
+		post_phone("VANCE: %s interlock overridden: %s" % [robots[finding["robot_id"]]["name"],
+			"WAIVED (one-time warning)" if finding.get("waived", false) else "FINE %s CR" % SP811.integer(finding["fine"])])
 	# Last before the verdict, so the HUD's short log still shows it.
 	if report.has("tire_check"):
 		post_phone(_tire_check_line(report["tire_check"]))
@@ -1718,6 +1845,14 @@ func _apply_audit_grace(report: Dictionary) -> void:
 		done.append("talked Vance out of the lapsed certificate on the " + " and the ".join(excused))
 	if tires_topped:
 		done.append("reset the rover tires")
+	for finding: Dictionary in report.get("interlocks", []):
+		finding["fine"] = 0
+		finding["waived"] = true
+		# The manager has calibrated whatever the robot was holding for.
+		var robot: Dictionary = robots[finding["robot_id"]]
+		for key: String in ["holding", "override", "override_logged"]:
+			robot[key] = false
+		done.append("armed %s's interlock" % robot["name"])
 	report["waived_names"] = " and ".join(done)
 
 

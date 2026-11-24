@@ -187,6 +187,8 @@ func _show_audit(report: Dictionary) -> void:
 			failing.append("%s (%s)" % [name_text, ", ".join(why)])
 	if report.get("tire_check", {}).get("violation", false):
 		failing.append("rover tires (AUD-1T)")
+	for finding: Dictionary in report.get("interlocks", []):
+		failing.append("%s (interlock overridden)" % GameState.robots[finding["robot_id"]]["name"])
 	_toast_fresh("AUDIT DAY %d: FINE %s CR. %s. Details on the phone log." % [
 		report.get("day", 0), SP811.integer(int(report.get("total_fine", 0))), ", ".join(failing)])
 

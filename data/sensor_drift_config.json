@@ -289,6 +289,8 @@
       "short_name": "joint encoder",
       "error_unit": "degrees",
       "daily_drift_rate": 0.03,
+      "usage_drift_rate": 0.005,
+      "usage_unit": "robot_job",
       "max_permissible_error": 1.0,
       "as_left_residual": 0.05,
       "resolution": 0.1,
@@ -313,6 +315,8 @@
       "short_name": "tank gauge",
       "error_unit": "kPa",
       "daily_drift_rate": 0.06,
+      "usage_drift_rate": 0.01,
+      "usage_unit": "robot_job",
       "max_permissible_error": 2.0,
       "as_left_residual": 0.1,
       "resolution": 0.1,
@@ -325,6 +329,8 @@
       "short_name": "soil probe",
       "error_unit": "percentage_points_vwc",
       "daily_drift_rate": 0.1,
+      "usage_drift_rate": 0.02,
+      "usage_unit": "robot_job",
       "max_permissible_error": 3.0,
       "as_left_residual": 0.2,
       "resolution": 0.1,
@@ -332,7 +338,7 @@
       "calibrated_by": "field_meter_dc",
       "bench_minutes": 40
     },
-    "_note": "One copy per built robot, with the id sensor@robot (robots.json). Audited only once the robot is released. Every number is [PLACEHOLDER], chosen so each TUR is at least 4:1 against calibrated_by (all sensors drift to their MPE in about 30 days). The soil probe reads a voltage: 5 percentage points of VWC per volt from the FM-3 [ASSUMPTION]."
+    "_note": "One copy per built robot, with the id sensor@robot (robots.json). Audited only once the robot is released. Every number is [PLACEHOLDER], chosen so each TUR is at least 4:1 against calibrated_by (all sensors drift to their MPE in about 30 days; usage_drift_rate is per WATER job, which does not use the grip). The soil probe reads a voltage: 5 percentage points of VWC per volt from the FM-3 [ASSUMPTION]."
   },
   "guardband": {
     "green": {
@@ -358,7 +364,8 @@
     "suspect_cal_credits": 75,
     "aud1t_tire_limit_kpa": 6.9,
     "aud1t_tire_credits": 20,
-    "_note": "suspect_cal_credits: a unit whose calibration was made suspect by a recall and not redone before the audit (milestone 2). Placeholder. aud1t_tire_*: AUD-1T measures the rover tires on audit day (Ryan, 2026-11-22: 'AUD-1T's own line'); tires are filled to what the tire gauge reads, so they sit off the set point by minus the gauge's true error. [PLACEHOLDER] limit 6.9 kPa (1 psi, about 2 x the gauge MPE) and 20 CR petty fine are the agent's picks, not researched; tune in playtest."
+    "interlock_override_credits": 100,
+    "_note": "interlock_override_credits: each robot whose interlock was overridden since the last audit [PLACEHOLDER]. suspect_cal_credits: a unit whose calibration was made suspect by a recall and not redone before the audit (milestone 2). Placeholder. aud1t_tire_*: AUD-1T measures the rover tires on audit day (Ryan, 2026-11-22: 'AUD-1T's own line'); tires are filled to what the tire gauge reads, so they sit off the set point by minus the gauge's true error. [PLACEHOLDER] limit 6.9 kPa (1 psi, about 2 x the gauge MPE) and 20 CR petty fine are the agent's picks, not researched; tune in playtest."
   },
   "flares": {
     "first_day": 10,
