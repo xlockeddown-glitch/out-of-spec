@@ -118,11 +118,12 @@ func set_drift(drift_deg: float, band: int) -> void:
 			_set_status("OUT OF TOLERANCE", COLOR_FAIL)
 
 
-func set_relay(slotted: bool, spools: int, can_slot: bool) -> void:
-	_relay_status_label.text = "RELAY: OPTICAL SILK" if slotted else "RELAY: STOCK TRANSCEIVER"
+func set_relay(slotted: bool, damaged: bool, spools: String, can_slot: bool) -> void:
+	_relay_status_label.text = "RELAY: STOCK TRANSCEIVER" if not slotted \
+			else "RELAY: DAMAGED SILK" if damaged else "RELAY: OPTICAL SILK"
 	_relay_status_label.add_theme_color_override(
-		"font_color", Color(0.45, 0.9, 1) if slotted else Color(0.4, 0.7, 0.45))
-	_spool_label.text = "SILK SPOOLS %d" % spools
+		"font_color", Color(0.4, 0.7, 0.45) if not slotted else COLOR_WARN if damaged else Color(0.45, 0.9, 1))
+	_spool_label.text = "SILK SPOOLS %s" % spools
 	_slot_spool_button.disabled = not can_slot
 
 

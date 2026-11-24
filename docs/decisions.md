@@ -1083,3 +1083,18 @@ Agent's notes (flagged for Ryan, not his words):
 - Pacing, flagged for Ryan: a molt is 40 min [PLACEHOLDER, set for playtests], so a robot can collect about 36 spools a day. That puts its grip and encoder out of tolerance in about 5 days, and earns about 36 Robotics XP a day while idle, which undercuts CALIBRATE's Robotics 4 gate. A longer molt fixes all three.
 - Collecting isn't posted to the phone, which it would flood.
 - Not built: damage to the spool from a bad grip (§3.4).
+
+## 2026-11-23: Damaged silk spools
+
+### Ryan chose
+
+- "Yes, your call" to damaged spools and their numbers.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- A robot whose grip torque is out of tolerance, which works only with its interlock overridden, has a 50 % chance [PLACEHOLDER] to damage each spool it collects. A player never does.
+- A damaged spool gives half [PLACEHOLDER] the base lag cut: 30 % instead of 60 %. The species' own cut is kept [ASSUMPTION].
+- The relay takes the oldest whole spool, and a robot's eye the oldest damaged one, if there is one [ASSUMPTION]. A damaged eye has no effect.
+- A whole spool may replace a damaged one in the relay, which is thrown away [ASSUMPTION]. Without that the first spool slotted would be final. Each slotting earns the usual Husbandry XP.
+- Balance, flagged for Ryan: robots use damaged spools up at no cost and the relay takes a whole one first, so damage matters only when no whole spool is in stock.
+- The screens count damaged spools. Old saves load with every spool whole.

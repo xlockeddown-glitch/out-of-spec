@@ -137,8 +137,11 @@ func _on_steering_zeroed(record: Dictionary) -> void:
 
 
 func _on_slot_spool_pressed() -> void:
+	var replaced: bool = GameState.relay_slotted
 	if GameState.slot_spool_into_relay():
-		_hud.push_log("Optical silk spool installed. Uplink lag × %s." % SP811.number(GameState.get_relay_lag_multiplier(), 2))
+		_hud.push_log("%s installed%s. Uplink lag × %s." % [
+			"Damaged silk spool" if GameState.slotted_spool_damaged else "Optical silk spool",
+			", the damaged one thrown away" if replaced else "", SP811.number(GameState.get_relay_lag_multiplier(), 2)])
 
 
 func _on_silk_changed(_spools: int) -> void:
@@ -151,7 +154,7 @@ func _on_relay_changed(_slotted: bool) -> void:
 
 
 func _refresh_relay_hud() -> void:
-	_hud.set_relay(GameState.relay_slotted, GameState.optical_silk_spools, GameState.can_slot_spool())
+	_hud.set_relay(GameState.relay_slotted, GameState.slotted_spool_damaged, GameState.spool_count_text(), GameState.can_slot_spool())
 
 
 func _on_soil_tilled(cell: Vector3i) -> void:

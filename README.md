@@ -73,7 +73,7 @@ Open `project.godot` in Godot 4.7 and press F5. The farm saves each morning and 
 | R or ZERO STEERING button | Re-zero steering drift remotely |
 | Tab, airlock, or ENTER DOME | Swap farm <-> dome |
 | Click (dome) | Bench calibration, terrarium info, collect silk spool |
-| INSTALL SILK SPOOL (phone) | Slot a spool into the relay (cuts uplink lag) |
+| INSTALL SILK SPOOL (phone) | Slot a spool into the relay (cuts uplink lag); a whole one may replace a damaged one |
 
 Week 2 loop: dome hygrometer starts out of tolerance -> calibrate at the bench -> molt fills (20 s) -> collect spool -> farm -> install spool -> lower lag.
 
