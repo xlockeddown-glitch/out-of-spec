@@ -57,6 +57,7 @@ func test_it_acts_for_the_named_player() -> String:
 func test_bad_requests_are_refused() -> String:
 	var commands: Node = _make()
 	var problems: PackedStringArray = []
+	var credits: int = commands.state.credits
 	for bad: Array in [[&"add_credits", [1000]], [&"free", []], [&"set_interlock_override", ["robot_1"]],
 			[&"set_interlock_override", ["robot_1", 1]], [&"calibrate_at_bench", [null]],
 			[&"calibrate_at_bench", ["air_hygrometer", "player_9"]], [&"collect_spool", ["player_9", true, true]]]:
@@ -64,6 +65,10 @@ func test_bad_requests_are_refused() -> String:
 			problems.append(str(bad))
 	var kinds: Array = [commands.refusal(&"start_lab_grow", "no"), commands.refusal(&"collect_spool", "no"),
 		commands.refusal(&"send_to_oirm", "no"), commands.refusal(&"add_credits", "no")]
+	for bad: Array in [["player_2", &"add_credits", [1000]], ["", &"calibrate_at_bench", [commands.state.HYGROMETER_ID]]]:
+		var answer: Variant = commands.execute(bad[0], bad[1], bad[2])
+		if commands.state.credits != credits or not commands.state.cal_log.is_empty() or (answer is Dictionary and not answer.get("no_answer", false)):
+			problems.append(str(bad))
 	_free(commands)
 	if not problems.is_empty():
 		return "These must be refused: " + ", ".join(problems)
@@ -93,6 +98,7 @@ func test_a_guest_waits_for_the_host() -> String:
 	return ""
 
 
+## It knows only the listed actions: another GameState change would pass unseen.
 ## main_farm.gd, the rover and the grid come in the next change.
 func test_screens_do_not_change_the_farm_directly() -> String:
 	var direct: RegEx = RegEx.create_from_string(r"GameState\s*\.\s*(%s)\b" % "|".join(CommandsScript.ACTIONS))

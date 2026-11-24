@@ -1124,5 +1124,5 @@ Agent's notes (flagged for Ryan, not his words):
 - Every screen and scene now says which player acts, and a test keeps it so. One player notices no change.
 - A robot's log keeps who overrode its interlock last, until the audit that clears it [ASSUMPTION]. No screen shows the name: whether one should is open, with no effect on the fine.
 - Open: bench calibration time in co-op, who can pause, who may drive a shared rover, where a guest's skills are kept, rejoining mid-day, whether each player picks a seed of their own, and how names show.
-- Host commands: the dome, bench, lab, Kestrel and robot screens change the farm only through FarmCommands, by action name with plain arguments, and a test keeps it so. The host says who acts. The farm and rover come next. One player notices no change.
+- Host commands: the dome, bench, lab, Kestrel and robot screens change the farm only through FarmCommands, by action name with plain arguments, and a test keeps the listed actions so. The host says who acts. FIT OUT now says only "one more space", as a guest's count may lag. The farm and rover come next. One player notices no change.
 - To settle with syncing: REMOVE CARD names a card by its place, so another player's change in the same moment could move it.

@@ -42,9 +42,9 @@ func request(action: StringName, arguments: Array = []) -> Variant:
 
 ## On the host: does `action` as `player_id`, who must come from the connection.
 func execute(player_id: String, action: StringName, arguments: Array) -> Variant:
-	var reason: String = problem(action, arguments)
+	# GameState would take no name as the host's own.
+	var reason: String = "No player is named." if player_id == "" else problem(action, arguments)
 	if reason != "":
-		push_warning("FarmCommands: " + reason)
 		return refusal(action, reason)
 	var passed: Array = arguments.duplicate()
 	if _player_index(action) >= 0:
@@ -67,13 +67,14 @@ func problem(action: StringName, arguments: Array) -> String:
 	return ""
 
 
-## `reason`, shaped as the action's own answer.
+## `reason`, shaped as the action's own answer. "no_answer" tells a screen
+## that this is not GameState's answer, so it may try again.
 func refusal(action: StringName, reason: String) -> Variant:
 	match (_method(action)["return"]["type"] as int) if action in ACTIONS else TYPE_STRING:
 		TYPE_BOOL:
 			return false
 		TYPE_DICTIONARY:
-			return { "ok": false, "refused": true, "reason": reason }
+			return { "ok": false, "refused": true, "no_answer": true, "reason": reason }
 	return reason
 
 
