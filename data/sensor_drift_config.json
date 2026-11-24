@@ -340,7 +340,7 @@
       "calibrated_by": "field_meter_dc",
       "bench_minutes": 40
     },
-    "_note": "One copy per built robot, with the id sensor@robot (robots.json). Audited only once the robot is released. Every number is [PLACEHOLDER], chosen so each TUR is at least 4:1 against calibrated_by (all sensors drift to their MPE in about 30 days; usage_drift_rate is per job that uses the sensor: GameState.JOB_WEARS). The soil probe reads a voltage: 5 percentage points of VWC per volt from the FM-3 [ASSUMPTION]."
+    "_note": "One copy per built robot, with the id sensor@robot (robots.json). Audited only once the robot is released. Every number is [PLACEHOLDER], chosen so each TUR is at least 4:1 against calibrated_by (all sensors drift to their MPE in about 30 days, sooner with use; a grip and an encoder that collect every spool in about 5 days; usage_drift_rate is per job that uses the sensor: GameState.JOB_WEARS). The soil probe reads a voltage: 5 percentage points of VWC per volt from the FM-3 [ASSUMPTION]."
   },
   "guardband": {
     "green": {

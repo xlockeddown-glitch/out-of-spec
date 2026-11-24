@@ -1077,5 +1077,9 @@ Agent's notes (flagged for Ryan, not his words):
 
 - The card needs Robotics 2 and a grip torque sensor whose last calibration is a traceable, passing one that is neither overdue nor suspect. Both are checked when the card is added. Later the interlock holds a robot whose grip is out of tolerance.
 - It has one trigger, "spool ready", and collects each spool as it is ready. The robot and the player share one way to collect, so the next molt starts the same.
+- The gates are not checked again while the card runs, as for WATER. Open for Ryan.
 - A job wears the grip (0.02 N·m) and the joint encoder [PLACEHOLDER].
 - XP is Robotics only, as for the other cards [ASSUMPTION].
+- Pacing, flagged for Ryan: a molt is 40 min [PLACEHOLDER, set for playtests], so a robot can collect about 36 spools a day. That puts its grip and encoder out of tolerance in about 5 days, and earns about 36 Robotics XP a day while idle, which undercuts CALIBRATE's Robotics 4 gate. A longer molt fixes all three.
+- Collecting isn't posted to the phone, which it would flood.
+- Not built: damage to the spool from a bad grip (§3.4).

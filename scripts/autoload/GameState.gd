@@ -1647,12 +1647,12 @@ func _robot_calibrate(robot_id: String, card: Dictionary) -> void:
 		record["result"], SP811.number(record["tur"], 1)])
 
 
-## COLLECT SPOOL: the robot picks up the ready spool for the farm.
+## COLLECT SPOOL: the robot picks up the ready spool for the farm. Not reported:
+## there can be many a day.
 func _robot_collect(robot_id: String, player_id: String) -> void:
 	if not collect_spool(player_id, true):
 		return
 	_wear_robot(robot_id, JOB_COLLECT)
-	post_phone("ROBOT: %s collected the optical silk spool." % robots[robot_id]["name"])
 
 
 func _wear_robot(robot_id: String, job: String) -> void:
