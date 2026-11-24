@@ -1012,3 +1012,19 @@ Agent's notes (flagged for Ryan, not his words):
 - With no line of sight a robot runs what it has but takes no new program.
 - A job that trims something earns Robotics 1 for whoever added the card. A check that changes nothing earns nothing.
 - Not built: COLLECT SPOOL and CALIBRATE cards, the interlock and audit fine, what drift in the other three sensors does, and drift from use. WATER doesn't use the robot's tank.
+
+## 2026-11-23: Robot interlock and drift effects
+
+### Ryan chose
+
+- "Yes, start M5-3" (drift effects and the interlock). Vance fining an overridden interlock was already decided in the design (§6 item 10).
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- A released robot with any sensor out of tolerance (true error) posts once, for example "TR-1: grip torque out of tolerance. Holding.", and runs no cards. A card that came due meanwhile runs once the robot is free.
+- The robots view can override the interlock (two presses, needs line of sight). With every sensor back in tolerance the interlock arms itself again.
+- Vance reads the interlock log: 100 CR per robot overridden since the last audit [PLACEHOLDER], even if it was armed again in time, on top of the bad sensor's own fine [ASSUMPTION]. The one-time warning covers it too.
+- WATER only trims set points, so drift acts on the trim [ASSUMPTION]. A joint encoder out of tolerance sends each trim to the next plot along x, toward its error; if nothing grows there it is lost. The tank gauge scales the trim, 10 % at its MPE [PLACEHOLDER]; reading high, it doses low. The soil probe trims wrongly as before. Grip torque changes no job until COLLECT SPOOL, but still trips the interlock.
+- With the encoder out of tolerance the soil card runs once a day [PLACEHOLDER], or it would push the next plot all the way within a few ticks.
+- A WATER job with something to trim wears the encoder (0.005°), the tank gauge (0.01 kPa) and the probe (0.02 percentage points) [PLACEHOLDER], even if the water lands on no crop.
+- Not built: the CALIBRATE card, its u_robot term, and the recall of what a bad robot calibrated. Next slice.

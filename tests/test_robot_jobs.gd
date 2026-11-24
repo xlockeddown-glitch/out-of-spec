@@ -132,6 +132,7 @@ func _check_morning(gs: GameStateScript) -> String:
 	gs.plantings[CELL]["crop_id"] = "dust_turnip"
 	gs.plantings[CELL]["setpoint"] = 0.25
 	gs.get_sensor(PROBE).error = 9.0
+	gs.set_interlock_override(ROBOT, true)
 	GameClock.elapsed_days = 8.0
 	gs._on_time_advanced(0.0)
 	if absf(float(gs.plantings[CELL]["setpoint"]) - 0.25) > EPS:
@@ -174,6 +175,7 @@ func test_drifted_robot_probe_trims_wrongly() -> String:
 func _check_drifted(gs: GameStateScript) -> String:
 	gs.add_robot_card(ROBOT, "soil")
 	gs.get_sensor(PROBE).error = 8.0
+	gs.set_interlock_override(ROBOT, true)
 	_tick(gs, 7.1)
 	if absf(gs.soil_moisture(CELL) - (_target(gs) - 0.08)) > EPS:
 		return "A probe reading 8 % high must dry the soil by 8 %."

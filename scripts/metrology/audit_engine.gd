@@ -20,6 +20,8 @@ extends RefCounted
 ##     what the tire gauge reads, so they sit at minus its true error. Past
 ##     aud1t_tire_limit_kpa = aud1t_tire_credits, a flat petty fine on top of
 ##     the gauge's own line. No repeat surcharge.
+##   - A robot's interlock overridden since the last audit = interlock_override_credits
+##     each, flat, on top of the bad sensor's own line. No repeat surcharge.
 ##   - Repeat offences reset after a fully clean audit (GameState).
 ##   - Calibration records since the last audit are listed on the report
 ##     (traceability). They don't change the fine; Week 4 Vance may care.
@@ -122,6 +124,11 @@ static func tire_check(gauge_error_kpa: float) -> Dictionary:
 		"violation": violation,
 		"fine": roundi(_cfg("aud1t_tire_credits", 20.0)) if violation else 0,
 	}
+
+
+## The fine for one robot's overridden interlock.
+static func interlock_fine() -> int:
+	return roundi(_cfg("interlock_override_credits", 100.0))
 
 
 ## A nonnegative kPa value in whole TIRE_REPORT_KPA steps. The 1e-9 nudge

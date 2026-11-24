@@ -105,7 +105,7 @@ func _add_robot_rows(id: String) -> void:
 			_rows.add_child(PlanBoardUI._label("%s: assembling, ready the morning of day %s" % [
 				robot["name"], SP811.integer(robot["done_day"])], TEXT, 20))
 		"released":
-			_rows.add_child(PlanBoardUI._label("%s: released" % robot["name"], TEAL, 20))
+			_add_interlock_rows(id)
 			_add_card_rows(id)
 		_:
 			_rows.add_child(PlanBoardUI._label("%s: commissioning" % robot["name"], AMBER, 20))
@@ -117,6 +117,37 @@ func _add_robot_rows(id: String) -> void:
 			release.set_meta(&"row", id)
 			release.pressed.connect(_on_release_pressed.bind(id))
 			_rows.add_child(release)
+
+
+## A released robot's state and, with its interlock tripped, the button for it.
+func _add_interlock_rows(id: String) -> void:
+	var overridden: bool = GameState.is_interlock_overridden(id)
+	var bad: String = GameState.robot_bad_sensor_names(id)
+	var state: String = "released"
+	if overridden:
+		state = "INTERLOCK OVERRIDDEN" + (", %s out of tolerance" % bad if bad != "" else "")
+	elif bad != "":
+		state = "%s out of tolerance. Holding." % bad
+	_rows.add_child(PlanBoardUI._label("%s: %s" % [GameState.robots[id]["name"], state], TEAL if state == "released" else AMBER, 20))
+	if state == "released":
+		return
+	var row: String = id + " interlock"
+	var text: String = "ARM INTERLOCK" if overridden else "OVERRIDE INTERLOCK (Vance fines it)"
+	var button: Button = PlanBoardUI._button(("PRESS AGAIN TO " if row == _armed_id else "") + text)
+	button.set_meta(&"row", row)
+	button.pressed.connect(_on_interlock_pressed.bind(id, row, not overridden))
+	_rows.add_child(button)
+
+
+func _on_interlock_pressed(id: String, row: String, on: bool) -> void:
+	if on and _armed_id != row:
+		_armed_id = row
+		_result.text = ""
+	else:
+		_armed_id = ""
+		_show_result(GameState.set_interlock_override(id, on), "Interlock overridden." if on else "Interlock armed.")
+	_refresh()
+	_focus_row(row, id + " ")
 
 
 ## A released robot's job cards, top to bottom, then the cards it can be given.
