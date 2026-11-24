@@ -626,8 +626,9 @@ func performer_name(performed_by: String) -> String:
 
 ## Uncertainty budget for calibrating `instrument_id` against its standard
 ## right now (see CalUncertainty.budget). Empty if it has no standard.
-## `player_id` is the operator; "" means the local player.
-func calibration_budget(instrument_id: String, player_id: String = "") -> Dictionary:
+## `player_id` is the operator; "" means the local player. With `by_robot` a
+## robot does the work to that player's program, which adds u_robot.
+func calibration_budget(instrument_id: String, player_id: String = "", by_robot: bool = false) -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(instrument_id)
 	if sensor == null or sensor.calibrated_by == "":
 		return {}
@@ -637,7 +638,10 @@ func calibration_budget(instrument_id: String, player_id: String = "") -> Dictio
 		return {}
 	var u_op: float = (sensor.mpe * DataManager.get_number(DRIFT_TABLE, "calibration_uncertainty/operator_fraction_of_mpe", 0.0)
 		* skill_factor("operator_uncertainty", player_id))
-	return CalUncertainty.budget(sensor, standard, u_op)
+	# In tolerance, a robot is off by up to this share of the unit's MPE, with no
+	# stated confidence.
+	var u_robot: float = CalUncertainty.spec_to_standard(sensor.mpe * robot_fraction_of_mpe(), 0.0) if by_robot else 0.0
+	return CalUncertainty.budget(sensor, standard, u_op, u_robot)
 
 
 ## True for a standard whose own reference is on the colony, so the bench can
@@ -693,9 +697,11 @@ func standard_problem(standard_id: String) -> String:
 ## zero is untraceable: it adjusts the unit but is not a calibration, so the
 ## interval, due day and last calibration day stay as they were.
 ## `bench_minutes` is copied onto the record (0 off the bench).
-## `performed_by` is a player id or MANAGER_ID; "" means the local player.
+## `performed_by` is a player id or MANAGER_ID; "" means the local player. With
+## `robot_id` that robot does it to the player's program: u_robot is added, the
+## robot's own error goes into the unit, and the record is the robot's.
 func calibrate(instrument_id: String, performed_by: String = "", use_standard: bool = true,
-		bench_minutes: float = 0.0) -> Dictionary:
+		bench_minutes: float = 0.0, robot_id: String = "") -> Dictionary:
 	if performed_by == "":
 		performed_by = local_player_id
 	var sensor: DriftingSensor = get_sensor(instrument_id)
@@ -711,7 +717,7 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 			"tur": 0.0,
 			"reason": missing,
 		}
-	var budget: Dictionary = calibration_budget(instrument_id, performed_by) if use_standard else {}
+	var budget: Dictionary = calibration_budget(instrument_id, performed_by, robot_id != "") if use_standard else {}
 	if budget.get("refused", false):
 		return {
 			"instrument_id": instrument_id,
@@ -739,7 +745,8 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 	# A standard of another quantity carries its error through the chain's
 	# sensitivity (FM-3 volts into thermometer degrees Celsius, section 1.5).
 	# The Calibration skill needs a standard to work against.
-	var zeroed: Dictionary = (sensor.zero(standard.error * sensor.standard_sensitivity, skill_factor("as_left_residual", performed_by))
+	var zeroed: Dictionary = (sensor.zero(standard.error * sensor.standard_sensitivity + _robot_cal_error(robot_id, sensor.mpe),
+			skill_factor("as_left_residual", performed_by))
 		if standard else sensor.zero(sensor.reference_offset))
 	var as_found: float = zeroed["as_found"]
 	var as_left: float = zeroed["as_left"]
@@ -789,7 +796,9 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 		"as_left": as_left,
 		"as_left_band": sensor.band_for(as_left),
 		"day": today,
-		"performed_by": performed_by,
+		"performed_by": performed_by if robot_id == "" else robot_id,
+		# The player whose job card a robot worked to; "" if no robot did this.
+		"programmed_by": "" if robot_id == "" else performed_by,
 		"on_time": on_time,
 		"days_in_service": days_in_service,
 		"interval_evidence": enough_service,
@@ -816,6 +825,7 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 	last_cal_records[instrument_id] = record
 	if sensor.role == "standard" and traceable:
 		_certify_on_bench(record)
+	_recall_after_robot_failure(record)
 	calibration_recorded.emit(record)
 	_note_soil_excursions()
 	_credibility_after_calibration(record)
@@ -1062,6 +1072,11 @@ func _xp_after_calibration(record: Dictionary) -> void:
 	if not record["traceable"] or int(record["days_in_service"]) < ceili(int(record["previous_interval_days"]) / 2.0):
 		return
 	var player: String = record["performed_by"]
+	if record.get("programmed_by", "") != "":
+		# A robot's work trains no one's hands: only Robotics XP [ASSUMPTION].
+		if robot_of(record["instrument_id"]) != "":
+			_award_xp("calibrate_robot", record["programmed_by"])
+		return
 	if robot_of(record["instrument_id"]) != "":
 		_award_xp("calibrate_robot", player)
 		_award_xp("calibrate_robot_player", player)
@@ -1312,9 +1327,13 @@ func release_robot(robot_id: String, player_id: String = "") -> String:
 
 # --- Robot job cards (docs/design/equipment_skills_robots.md section 3.3) ------
 
-## What starts a card: a clock time, or soil that reads off target.
-const CARD_TRIGGERS: Array[String] = ["clock", "soil"]
 const JOB_WATER: String = "water"
+const JOB_CALIBRATE: String = "calibrate"
+## What can start each job's card: a clock time, soil that reads off target, or
+## an instrument coming due.
+const CARD_TRIGGERS: Dictionary[String, Array] = { JOB_WATER: ["clock", "soil"], JOB_CALIBRATE: ["clock", "due"] }
+## A "due" card starts this many days before its instrument is due [PLACEHOLDER].
+const DUE_CARD_LEAD_DAYS: int = 1
 ## A soil card starts once the robot's probe reads this share of a crop's
 ## tolerance band away from its target [PLACEHOLDER].
 const SOIL_CARD_BAND_RATIO: float = 0.25
@@ -1365,6 +1384,64 @@ func add_robot_card(robot_id: String, trigger: String, hour: int = 6, every_days
 	return ""
 
 
+## Adds a CALIBRATE card for `target`, a unit the bench calibrates, against the
+## standard it always uses. "due" runs as the target comes due, "clock" as in
+## add_robot_card. Returns "" or why not.
+func add_robot_calibrate_card(robot_id: String, target: String, trigger: String = "due", hour: int = 6,
+		every_days: int = 1, player_id: String = "") -> String:
+	if player_id == "":
+		player_id = local_player_id
+	var problem: String = _robot_program_problem(robot_id)
+	if problem == "":
+		problem = robot_calibrate_gate(player_id)
+	if problem == "":
+		problem = _robot_target_problem(robot_id, target, player_id)
+	if problem != "":
+		return problem
+	# A due card may run at once; a clock card waits for its next time.
+	var last_day: int = _latest_day_at(hour) + (-1 if trigger == "due" else 1 - every_days)
+	var card: Dictionary = { "trigger": trigger, "job": JOB_CALIBRATE, "hour": hour, "every_days": every_days,
+		"last_day": last_day, "added_by": player_id, "target": target }
+	if not _is_card(card):
+		return "There is no such job card."
+	if robot_cards(robot_id).size() >= robot_card_slots(player_id):
+		return "%s has no free job slot." % robots[robot_id]["name"]
+	robots[robot_id]["cards"] = robot_cards(robot_id) + [card]
+	robots_changed.emit()
+	return ""
+
+
+## The skill levels the CALIBRATE card still needs, or "".
+func robot_calibrate_gate(player_id: String = "") -> String:
+	var gate: Dictionary = DataManager.get_record(ROBOTS_TABLE, JOB_CALIBRATE, "jobs").get("skill_gate", {})
+	var missing: PackedStringArray = []
+	for skill: Variant in gate:
+		if skill_level(str(skill), player_id) < int(gate[skill]):
+			missing.append("%s level %s" % [DataManager.get_record(SKILLS_TABLE, str(skill), "skills").get("display_name", skill),
+				SP811.integer(int(gate[skill]))])
+	return "" if missing.is_empty() else "CALIBRATE cards need %s." % " and ".join(missing)
+
+
+## The units a robot can be given a CALIBRATE card for.
+func robot_calibrate_targets(robot_id: String, player_id: String = "") -> Array[String]:
+	return bench_unit_ids().filter(func(id: String) -> bool:
+		return _robot_target_problem(robot_id, id, player_id) == "")
+
+
+## Why a robot's CALIBRATE card can't be for this instrument, or "". A robot
+## never calibrates itself, and it leaves the standards to people [ASSUMPTION].
+func _robot_target_problem(robot_id: String, target: String, player_id: String) -> String:
+	if not target in bench_unit_ids():
+		return "The bench calibrates no such unit."
+	if robot_of(target) == robot_id:
+		return "A robot never calibrates itself."
+	var budget: Dictionary = calibration_budget(target, player_id, true)
+	if not budget["clean"]:
+		return "With %s doing it, TUR %s:1 is under %s:1." % [robots[robot_id]["name"], SP811.number(budget["tur"], 1),
+			SP811.number(CalUncertainty.tur_clean(), 0)]
+	return ""
+
+
 func remove_robot_card(robot_id: String, index: int) -> String:
 	var problem: String = _robot_program_problem(robot_id)
 	if problem != "":
@@ -1379,9 +1456,15 @@ func remove_robot_card(robot_id: String, index: int) -> String:
 
 
 func robot_card_text(card: Dictionary) -> String:
-	if card["trigger"] == "soil":
-		return "WATER all plots when the soil reads off target"
-	return "WATER all plots at %02d:00 %s" % [card["hour"],
+	var job: String = "WATER all plots"
+	if card["job"] == JOB_CALIBRATE:
+		job = "CALIBRATE %s" % instrument_name(card["target"], true)
+	match card["trigger"]:
+		"soil":
+			return job + " when the soil reads off target"
+		"due":
+			return job + " as it comes due"
+	return job + " at %02d:00 %s" % [card["hour"],
 		"every day" if card["every_days"] == 1 else "every %s days" % SP811.integer(card["every_days"])]
 
 
@@ -1394,7 +1477,9 @@ static func _is_card(card: Variant) -> bool:
 	for key: String in ["trigger", "job", "added_by"]:
 		if typeof(card.get(key)) != TYPE_STRING:
 			return false
-	return card["trigger"] in CARD_TRIGGERS and card["job"] == JOB_WATER \
+	if card["job"] == JOB_CALIBRATE and typeof(card.get("target")) != TYPE_STRING:
+		return false
+	return card["trigger"] in CARD_TRIGGERS.get(card["job"], []) \
 			and card["hour"] >= 0 and card["hour"] < 24 and card["every_days"] >= 1
 
 
@@ -1417,7 +1502,10 @@ func _run_robot_cards() -> void:
 			if not _card_is_due(str(id), card):
 				continue
 			card["last_day"] = _latest_day_at(card["hour"])
-			_robot_water(str(id), card["added_by"])
+			if card["job"] == JOB_CALIBRATE:
+				_robot_calibrate(str(id), card)
+			else:
+				_robot_water(str(id), card["added_by"])
 			_update_interlock(str(id))
 			break
 
@@ -1425,6 +1513,11 @@ func _run_robot_cards() -> void:
 func _card_is_due(robot_id: String, card: Dictionary) -> bool:
 	if card["trigger"] == "clock":
 		return _latest_day_at(card["hour"]) - int(card["last_day"]) >= int(card["every_days"])
+	if card["trigger"] == "due":
+		# Tried once a day, so one that can't be done isn't reported every tick.
+		var target: DriftingSensor = get_sensor(card["target"])
+		return target != null and _latest_day_at(card["hour"]) > int(card["last_day"]) \
+				and target.cal_due_day - GameClock.get_day_index() <= DUE_CARD_LEAD_DAYS
 	# Off by a plot it can't bring the soil it reads on target, so it tries once
 	# a day [PLACEHOLDER] instead of every tick.
 	if _robot_plot_offset(robot_id) != 0 and _latest_day_at(card["hour"]) <= int(card["last_day"]):
@@ -1481,6 +1574,51 @@ func _robot_water(robot_id: String, player_id: String) -> void:
 		_award_xp("robot_job", player_id)
 		post_phone("ROBOT: %s trimmed the irrigation set point of %s plot%s by its own soil probe." % [
 			robots[robot_id]["name"], SP811.integer(trimmed), "" if trimmed == 1 else "s"])
+
+
+## CALIBRATE: the robot calibrates the card's unit against its standard, taking
+## no bench time [ASSUMPTION]. It won't use a standard that isn't traceable.
+func _robot_calibrate(robot_id: String, card: Dictionary) -> void:
+	var player: String = card["added_by"]
+	var target: String = card["target"]
+	var record: Dictionary = {}
+	var problem: String = _robot_target_problem(robot_id, target, player)
+	if problem == "":
+		var standard_id: String = get_sensor(target).calibrated_by
+		var fault: String = standard_problem(standard_id)
+		if fault != "":
+			problem = "The %s is %s." % [instrument_name(standard_id, true), fault]
+	if problem == "":
+		record = calibrate(target, player, true, 0.0, robot_id)
+		problem = record.get("reason", "")
+	if problem != "":
+		post_phone("ROBOT: %s did not calibrate the %s. %s" % [robots[robot_id]["name"], instrument_name(target, true), problem])
+		return
+	var encoder: DriftingSensor = get_sensor("robot_joint_encoder@" + robot_id)
+	if encoder != null:
+		encoder.add_usage(1.0)
+	# As for a player's calibration: no XP before half the interval has run.
+	if int(record["days_in_service"]) >= ceili(int(record["previous_interval_days"]) / 2.0):
+		_award_xp("robot_job", player)
+	post_phone("ROBOT: %s calibrated the %s: %s, TUR %s:1." % [robots[robot_id]["name"], instrument_name(target, true),
+		record["result"], SP811.number(record["tur"], 1)])
+
+
+## How far off a robot's work is, as a share of the unit's MPE, when its worst
+## sensor is at its own MPE.
+func robot_fraction_of_mpe() -> float:
+	return DataManager.get_number(DRIFT_TABLE, "calibration_uncertainty/robot_fraction_of_mpe", 0.0)
+
+
+## The hidden error a robot puts into a calibration of a unit with this MPE: that
+## of its worst sensor, scaled [ASSUMPTION]. 0.0 for no robot.
+func _robot_cal_error(robot_id: String, mpe: float) -> float:
+	var worst: float = 0.0
+	for id: String in robot_sensor_ids(robot_id):
+		var sensor: DriftingSensor = get_sensor(id)
+		if absf(sensor.error / sensor.mpe) > absf(worst):
+			worst = sensor.error / sensor.mpe
+	return worst * robot_fraction_of_mpe() * mpe
 
 
 ## How many plots along x its water lands from where it was sent: 0, or one
@@ -2045,6 +2183,36 @@ func _recall_and_post(standard_id: String, standard_error: float, since_day: int
 		names.append("%s (day %d)" % [instrument_name(record["instrument_id"]), record["day"]])
 	post_phone("RECALL: %d calibration(s) made with the %s are suspect%s. Redo them before the next audit." % [
 		flagged.size(), instrument_name(standard_id, true), (": " + ", ".join(names)) if not names.is_empty() else ""])
+
+
+## A robot sensor found out of tolerance, by a traceable calibration, makes every
+## traceable calibration its robot did since that sensor's last good one suspect
+## (section 3.4), whether or not its result would change.
+func _recall_after_robot_failure(record: Dictionary) -> void:
+	var sensor_id: String = record["instrument_id"]
+	var robot_id: String = robot_of(sensor_id)
+	if robot_id == "" or not record["traceable"] or record["result"] != CalUncertainty.FAIL:
+		return
+	var names: PackedStringArray = []
+	# Newest first, from before this record back to the sensor's last good one.
+	for i: int in range(cal_log.size() - 2, -1, -1):
+		var done: Dictionary = cal_log[i]
+		if done.get("suspect", false) or not done.get("traceable", false):
+			continue
+		if done["instrument_id"] == sensor_id:
+			break
+		if done.get("programmed_by", "") == "" or done.get("performed_by", "") != robot_id:
+			continue
+		done["suspect"] = true
+		done["recalled_by"] = sensor_id
+		if is_same(_last_traceable_record(done["instrument_id"]), done):
+			suspect_units[done["instrument_id"]] = record["day"]
+		names.append("%s (day %s)" % [instrument_name(done["instrument_id"]), SP811.integer(done["day"])])
+	if names.is_empty():
+		return
+	post_phone("RECALL: %d calibration(s) %s did since the last good one of its %s are suspect: %s. Redo them before the next audit." % [
+		names.size(), robots[robot_id]["name"], get_sensor(sensor_id).short_name.trim_prefix(robot_id + " "), ", ".join(names)])
+	robots_changed.emit()
 
 
 ## Reverse traceability (section 1.6). `standard_error` is the standard's as-found
@@ -2663,6 +2831,8 @@ func _credibility_after_calibration(record: Dictionary) -> void:
 		return  # not the colony's unit until its robot is released
 	if contract_state != "active" or record.get("performed_by", "") == MANAGER_ID:
 		return
+	if record.get("programmed_by", "") != "":
+		return  # a robot's work neither counts nor breaks the player's run
 	if get_sensor(record["instrument_id"]).role == "standard":
 		return  # the run counts the colony's units
 	var needed: int = contract_run_needed()

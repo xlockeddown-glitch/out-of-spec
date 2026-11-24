@@ -1042,3 +1042,20 @@ Agent's notes (flagged for Ryan, not his words):
 
 - Ryan sent the pack without instructions. The pad lies in Bram's bay as the rover's service spot, sunk 0.18 m and without collision, so driving is unchanged. The dryer stands beside the bay as set dressing.
 - What they do in the game (docking, charging, dry air) is open for Ryan.
+
+## 2026-11-23: Robot CALIBRATE card
+
+### Ryan chose
+
+- "Yes, start CALIBRATE" (the card, its u_robot term and the recall of what a bad robot calibrated).
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- A CALIBRATE card names one unit and uses the standard that unit always uses. Robots leave the standards to people, and never calibrate themselves [ASSUMPTION].
+- It needs Robotics 4 and Calibration 3 [PLACEHOLDER] and a TUR of at least 4:1 counting u_robot, when the card is added and each time it runs. A soil probe at Uncertainty 1 comes out at 3.8:1, so it needs more Uncertainty skill first.
+- u_robot = 0.1 MPE ÷ √3 [PLACEHOLDER]. The robot's worst sensor, as a share of its own MPE, times 0.1 goes hidden into the unit [ASSUMPTION]. The programmer's u_op still counts.
+- "As it comes due" runs from one day before [PLACEHOLDER], tried once a day. The clock trigger works too, but the screen offers only the first. The design's amber guard-band trigger is not built: it would give away the hidden error.
+- A robot won't use a standard that is not traceable; it posts why to the phone. It takes no bench time and wears only the joint encoder [ASSUMPTION].
+- XP is Robotics only (the job, and a robot sensor calibrated), and none before the unit has run half its interval. It neither counts toward nor breaks the contract run. A robot may calibrate another robot's sensors; the recall then follows the robot that did the work. Open for Ryan.
+- A robot sensor found out of tolerance recalls *every* traceable calibration its robot did since that sensor's last good one (§3.4), not only those a threshold would change (§1.6). Open for Ryan.
+- Not built: a recalled standard's effect on a robot's own work, and the COLLECT SPOOL card.

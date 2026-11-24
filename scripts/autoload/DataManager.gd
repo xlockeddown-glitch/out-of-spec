@@ -60,6 +60,7 @@ const RECORD_SECTIONS: Dictionary = {
 	},
 	&"robots": {
 		"frames": ["display_name", "id_prefix", "required_standard", "sensors"],
+		"jobs": ["skill_gate"],
 	},
 }
 
