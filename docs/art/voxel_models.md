@@ -307,3 +307,8 @@ Where the generated models differ from the footprints above:
   - **Silk skein** (`tarantula_silk_skein`): 6 × 6 × 4 voxels at **0.1 m** (0.6 m × 0.6 m × 0.4 m tall), 100 voxels. Silk coils (K2 `#E8DEC0`, K1 `#5CA8A3`, K3 `#D4A359`) tied with twine (B2 `#6B4D30`).
 
   The skein is the dome's silk pickup (`SkeinModel`), shown at half size (0.05 m voxels) because at 0.1 m it cut into the Brazilian black's tank. The spool and the mister kit are set dressing on the terrarium bench (`SilkSpoolModel`, `MisterKitModel`; each with an Inspect text).
+- **Rover Docking Pad & Air Dryer** (Ryan's zip and two grids, 2026-11-23). Built and turned by `prop_sheet()` from `tools/voxgen/sheets/<name>.txt` (converted without running the script), his palettes as given; the grids, the script and the .vox files in his zip match voxel for voxel. 0.1 m voxels, origin at the footprint center on the ground, the sheet's front (-Y) facing -Z, part `prop`, nothing lit. S is shadow.
+  - **Rover docking pad** (`rover_docking_pad`): 22 × 26 × 3 voxels (2.2 m × 2.6 m × 0.3 m tall), 1218 voxels. Colors M3 `#2E3844`, M2 `#6C7A89`, Y1 `#E5B53B`, B1 `#D9A13B` and P1 `#A8422B`.
+  - **Twin-column air dryer** (`twin_column_air_dryer`): 10 × 8 × 14 voxels (1.0 m × 0.8 m × 1.4 m tall), 612 voxels. Colors C1 `#D4DAE0`, C2 `#8D99AE`, M1 `#3B5978`, F1 `#2E3844` and B1 `#D9A13B`.
+
+  Both are turned 180° to face out of Bram's bay: the pad inside it (`RoverPadModel`), sunk 0.18 m so the rover stands on its deck, and the dryer outside to the right (`AirDryerModel`). Neither has collision; each has an Inspect text.

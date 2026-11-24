@@ -1035,3 +1035,10 @@ Agent's notes (flagged for Ryan, not his words):
 
 - Ryan sent the pack without instructions. The skein stands in for the silk pickup in the dome, at half the size his generator gives (0.05 m voxels, not 0.1 m): at full size it cut into the Brazilian black's tank. The greybox spool is the fallback.
 - The winding spool and the mister kit are set dressing on the terrarium bench. What they do in the game is open for Ryan.
+
+## 2026-11-23: Rover Docking Pad & Air Dryer pack
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- Ryan sent the pack without instructions. The pad lies in Bram's bay as the rover's service spot, sunk 0.18 m and without collision, so driving is unchanged. The dryer stands beside the bay as set dressing.
+- What they do in the game (docking, charging, dry air) is open for Ryan.

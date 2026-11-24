@@ -825,6 +825,14 @@ SILK = {
                               "S": SHADOW}, 0.1),
 }
 
+# Ryan's Rover Docking Pad & Air Dryer pack (2026-11-23), 0.1 m voxels. Colors are his own. Nothing is lit.
+DOCK = {
+    "rover_docking_pad": {"M3": "#2E3844", "M2": "#6C7A89", "Y1": "#E5B53B", "B1": "#D9A13B",
+                          "P1": "#A8422B", "S": SHADOW},
+    "twin_column_air_dryer": {"C1": "#D4DAE0", "C2": "#8D99AE", "M1": "#3B5978", "F1": "#2E3844",
+                              "B1": "#D9A13B", "S": SHADOW},
+}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop",
@@ -877,6 +885,7 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, *MINING[n][:3])), MINING[n][3]) for n in MINING],
     *[((lambda n=n: prop_sheet(n, *OUTDOOR[n][:3])), OUTDOOR[n][3]) for n in OUTDOOR],
     *[((lambda n=n: prop_sheet(n, SILK[n][0])), SILK[n][1]) for n in SILK],
+    *[((lambda n=n: prop_sheet(n, DOCK[n])), 0.1) for n in DOCK],
 ]
 
 

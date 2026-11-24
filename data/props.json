@@ -95,5 +95,13 @@
   "seismic_thumper": {
     "display_name": "Seismic Thumper",
     "description": "A hammer weight on guide rails."
+  },
+  "rover_docking_pad": {
+    "display_name": "Rover Docking Pad",
+    "description": "A parking pad with guide curbs and an umbilical socket at the rear."
+  },
+  "twin_column_air_dryer": {
+    "display_name": "Twin-Column Air Dryer",
+    "description": "A compressor with two desiccant columns that dry its air."
   }
 }

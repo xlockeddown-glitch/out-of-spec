@@ -51,6 +51,8 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `silk_winding_spool.glb` | Hand-crank silk winding spool, 0.2 m × 0.2 m × 0.2 m tall (on the dome's terrarium bench) | **0.025 m voxels**, origin at ground level. Built from Ryan's Tarantula & Optical Silk grid (`tools/voxgen/sheets/silk_winding_spool.txt`). |
 | `terrarium_mister_kit.glb` | Mister bottle and feeding tongs on a tray, 0.2 m × 0.15 m × 0.2 m tall (on the dome's terrarium bench) | **0.025 m voxels**, origin at ground level. Built from Ryan's Tarantula & Optical Silk grid (`tools/voxgen/sheets/terrarium_mister_kit.txt`). |
 | `tarantula_silk_skein.glb` | Coiled silk skein, 0.6 m × 0.6 m × 0.4 m tall at 0.1 m voxels (the dome's silk pickup, shown at half size) | 0.1 m voxels, origin at ground level. Built from Ryan's Tarantula & Optical Silk grid (`tools/voxgen/sheets/tarantula_silk_skein.txt`). |
+| `rover_docking_pad.glb` | Rover docking pad with guide curbs, 2.2 m × 2.6 m × 0.3 m tall (in Bram's bay, sunk 0.18 m) | 0.1 m voxels, origin at ground level. Built from Ryan's Rover Docking Pad & Air Dryer grid (`tools/voxgen/sheets/rover_docking_pad.txt`). |
+| `twin_column_air_dryer.glb` | Twin-column desiccant air dryer, 1.0 m × 0.8 m × 1.4 m tall (beside Bram's bay) | 0.1 m voxels, origin at ground level. Built from Ryan's Rover Docking Pad & Air Dryer grid (`tools/voxgen/sheets/twin_column_air_dryer.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.025 m, 0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 
