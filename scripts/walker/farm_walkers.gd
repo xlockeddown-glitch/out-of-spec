@@ -45,6 +45,7 @@ func _physics_process(_delta: float) -> void:
 	elif _own.global_position.distance_to(at) > MOVED_M:
 		_own.global_position = at
 		_own.velocity = Vector3.ZERO
+	_own.model.set_suit(WalkerModel.suit_for(own, CoopSession.players))
 
 
 func _process(delta: float) -> void:
@@ -65,6 +66,7 @@ func _show_friend(player_id: String, pose: Array, delta: float) -> void:
 		add_child(_friends[player_id])
 		share = 1.0
 	var model: WalkerModel = _friends[player_id]
+	model.set_suit(WalkerModel.suit_for(player_id, CoopSession.players))
 	if model.position.distance_to(at) > JUMP_M:
 		share = 1.0
 	model.position = model.position.lerp(at, share)
