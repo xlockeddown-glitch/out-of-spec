@@ -181,8 +181,9 @@ func _on_tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int) ->
 			return
 		var grade: String = ("in spec" if entry["in_spec"]
 			else "OFF SPEC: the soil left its moisture band on %s days" % SP811.integer(entry["out_of_band_days"]))
-		_hud.push_log("HARVESTED %s, %s. Bin: %s crops for Lin at Bram's bay." % [
-			GameState.crop_name(entry["crop_id"]), grade, SP811.integer(GameState.harvest_bin.size())])
+		# A guest's copy of the bin may lag the host's.
+		_hud.push_log("HARVESTED %s, %s.%s" % [GameState.crop_name(entry["crop_id"]), grade, "" if FarmCommands.guest
+			else " Bin: %s crops for Lin at Bram's bay." % SP811.integer(GameState.harvest_bin.size())])
 	elif GameState.plantings.has(cell):
 		_hud.push_log(GameState.crop_status_text(cell) + ". [ and ] move the set point.")
 	else:
@@ -263,10 +264,14 @@ func _is_key(event: InputEvent, keycode: Key) -> bool:
 
 
 func _sell_to_lin() -> void:
-	if GameState.harvest_bin.is_empty():
+	# A guest's copy of the bin may lag: the host says whether it is empty.
+	if not FarmCommands.guest and GameState.harvest_bin.is_empty():
 		_hud.push_log("LIN: Nothing in your bin. Bring me crops, and keep that spider away from my stall.")
 		return
-	await FarmCommands.request(&"sell_harvest_to_lin")
+	var paid: int = await FarmCommands.request(&"sell_harvest_to_lin")
+	if FarmCommands.guest and paid <= 0 and is_inside_tree():
+		# 0 is also the answer when the host can't be reached.
+		_hud.push_log("NOTHING SOLD.")
 
 
 func _refresh_jobs_hud() -> void:
@@ -288,7 +293,7 @@ func _try_accept_job(index: int) -> void:
 
 
 func _on_ore_mined(_fissure_id: StringName) -> void:
-	_hud.push_log("Drilled 1 crystal ore. Carrying %d." % GameState.crystal_ore)
+	_hud.push_log("Drilled 1 crystal ore." + ("" if FarmCommands.guest else " Carrying %d." % GameState.crystal_ore))
 
 
 func _on_credibility_changed(_points: int) -> void:

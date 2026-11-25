@@ -47,10 +47,9 @@ func world_to_cell(world_pos: Vector3) -> Vector3i:
 func till_cell(cell: Vector3i) -> TillResult:
 	match get_cell_item(cell):
 		Tile.SOIL_UNTILLED:
-			if not await FarmCommands.request(&"till", [cell]):
-				if not GameState.tilled_cells.has(cell):
-					return TillResult.REFUSED
-				_on_soil_tilled(cell)  # already recorded, not shown yet
+			if not await FarmCommands.request(&"till", [cell]) and not GameState.tilled_cells.has(cell):
+				return TillResult.REFUSED
+			_on_soil_tilled(cell)  # a guest's own record comes later
 			return TillResult.TILLED
 		Tile.SOIL_TILLED:
 			return TillResult.ALREADY_TILLED
