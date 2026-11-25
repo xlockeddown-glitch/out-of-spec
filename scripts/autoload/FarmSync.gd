@@ -33,6 +33,7 @@ const SHOWN_BY: Dictionary = {
 	&"boulders_changed": ["boulder_hits"],
 	&"blocks_changed": ["found_blocks"],
 	&"pockets_changed": ["found_pockets"],
+	&"stone_changed": ["stone", "stone_pieces"],
 	&"rover_place_changed": ["rover_in_tunnels"],
 }
 ## These also show the day.

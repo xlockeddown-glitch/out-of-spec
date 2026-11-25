@@ -24,6 +24,9 @@ var _had_los: bool = true
 ## The blocks this screen has told about.
 var _blocks_told: Array[Vector2i] = []
 var _pockets_told: Array[Vector2i] = []
+## The stone stock last told, and the kind of piece B builds.
+var _stone_told: int = 0
+var _stone_kind: int = StonePieces.WALL
 var _last_band: int = DriftingSensor.Band.IN_BAND
 
 @onready var _rover: RoverController = %Rover
@@ -63,6 +66,11 @@ func _ready() -> void:
 	GameState.blocks_changed.connect(_on_blocks_changed)
 	_pockets_told.assign(GameState.found_pockets.keys())
 	GameState.pockets_changed.connect(_on_pockets_changed)
+	var stone_view := StonePiecesView.new()
+	stone_view.name = "StonePieces"
+	$WorldView/WorldViewport/World.add_child(stone_view)
+	_stone_told = GameState.stone
+	GameState.stone_changed.connect(_on_stone_changed)
 	_rover.tilled_cell_used.connect(_on_tilled_cell_used)
 	_hud.zero_steering_pressed.connect(_on_zero_pressed)
 	_hud.slot_spool_pressed.connect(_on_slot_spool_pressed)
@@ -262,6 +270,44 @@ func _on_pockets_changed() -> void:
 			_hud.push_log("FOUND AN ORE POCKET: +%s crystal ore" % SP811.integer(OrePocket.ORE))
 
 
+func _on_stone_changed() -> void:
+	if GameState.stone > _stone_told:
+		_hud.push_log("STONE +%d%s" % [GameState.stone - _stone_told,
+				"" if FarmCommands.guest else " (%d)" % GameState.stone])
+	_stone_told = GameState.stone
+
+
+## N: the next kind of piece for B to build.
+func _cycle_stone_kind() -> void:
+	_stone_kind = StonePieces.next_kind(_stone_kind)
+	_hud.push_log("STONE PIECE: %s (%d stone)" % [StonePieces.kind_name(_stone_kind), StonePieces.cost(_stone_kind)])
+
+
+## B: builds the chosen piece on the cell in front of the stopped rover, or takes
+## up the piece there.
+func _place_stone() -> void:
+	if _rover.away_text() != "":
+		_say_if_away()
+		return
+	if not _rover.is_stopped():
+		_hud.push_log("STONE: stop the rover first.")
+		return
+	var at: Vector2i = _rover.dig_cell()
+	var taking: bool = GameState.stone_pieces.has(at)
+	var kind: int = GameState.stone_pieces.get(at, _stone_kind)
+	var problem: String = await FarmCommands.request(&"place_stone", [Vector3i(at.x, 0, at.y), _stone_kind])
+	if not is_inside_tree():
+		return
+	if problem != "":
+		_hud.push_log("STONE REFUSED: %s" % problem)
+	elif taking:
+		_hud.push_log("TOOK UP A %s: +%d stone%s" % [StonePieces.kind_name(kind).to_upper(), StonePieces.cost(kind),
+				"" if FarmCommands.guest else ", %d left" % GameState.stone])
+	else:
+		_hud.push_log("BUILT A %s: %d stone spent%s" % [StonePieces.kind_name(kind).to_upper(), StonePieces.cost(kind),
+				"" if FarmCommands.guest else ", %d left" % GameState.stone])
+
+
 ## V: a survey from the standing rover reads a bearing to the nearest ore pocket.
 func _survey() -> void:
 	if _rover.away_text() != "":
@@ -346,6 +392,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"rover_fill"):
 		get_viewport().set_input_as_handled()
 		_rover.queue_command(RoverController.Command.FILL)
+	elif _is_key(event, KEY_B):
+		get_viewport().set_input_as_handled()
+		_place_stone()
+	elif _is_key(event, KEY_N):
+		get_viewport().set_input_as_handled()
+		_cycle_stone_kind()
 	elif _is_key(event, KEY_Q):
 		get_viewport().set_input_as_handled()
 		_check_with_block()

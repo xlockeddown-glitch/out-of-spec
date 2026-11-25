@@ -33,6 +33,8 @@ signal terrain_changed
 signal blocks_changed
 ## The ore pockets dug up changed.
 signal pockets_changed
+## The stone stock or a piece built from it changed.
+signal stone_changed
 ## A boulder was hit or broken.
 signal boulders_changed
 ## The rover went into the tunnels or came out.
@@ -221,6 +223,10 @@ var boulder_hits: Dictionary[StringName, int] = {}
 var found_blocks: Dictionary[Vector2i, bool] = {}
 ## The cells whose ore pocket was dug up.
 var found_pockets: Dictionary[Vector2i, bool] = {}
+## Stone from broken boulders, spent on pieces (StonePieces), shared by the farm.
+var stone: int = 0
+## The pieces built, cell of Terrain -> StonePieces kind.
+var stone_pieces: Dictionary[Vector2i, int] = {}
 
 ## Lab credibility (Ryan, 2026-11-22): audits and overdue instruments move it;
 ## the phone shows its band. See data/economy.json "credibility".
@@ -443,7 +449,7 @@ const MAX_KNOWN_GUESTS: int = 64
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
-	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures"]
+	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -516,6 +522,11 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if not cell is Vector2i or not data["found_pockets"][cell] is bool or not data["found_pockets"][cell] \
 				or not cell in OrePocket.cells(data["world_seed"]):
 			return "'found_pockets' has a cell that holds no ore."
+	if data.get("stone", 0) < 0 or data.get("stone", 0) > StonePieces.MAX_STONE:
+		return "'stone' is not a stock that can be held."
+	var pieces_problem: String = StonePieces.pieces_problem(data.get("stone_pieces", {}))
+	if pieces_problem != "":
+		return "'stone_pieces' %s" % pieces_problem
 	var hits: Dictionary = data.get("boulder_hits", {})
 	for boulder: Variant in hits:
 		if not (boulder is String or boulder is StringName) or not StringName(boulder) in BOULDERS \
@@ -678,6 +689,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	boulders_changed.emit()
 	blocks_changed.emit()
 	pockets_changed.emit()
+	stone_changed.emit()
 	rover_place_changed.emit()
 	return ""
 
@@ -2690,13 +2702,16 @@ func is_boulder_broken(boulder_id: StringName) -> bool:
 
 
 ## Returns how often it has now been hit, or 0 if it can't be. A broken one stays
-## broken. It costs and gives nothing [ASSUMPTION].
+## broken. It costs nothing, and the hit that breaks it gives stone.
 @warning_ignore("unused_parameter")
 func hit_boulder(boulder_id: StringName, player_id: String = "") -> int:
 	if not boulder_id in BOULDERS or is_boulder_broken(boulder_id):
 		return 0
 	boulder_hits[boulder_id] = boulder_hits.get(boulder_id, 0) + 1
 	boulders_changed.emit()
+	if is_boulder_broken(boulder_id):
+		stone = mini(stone + StonePieces.PER_BOULDER, StonePieces.MAX_STONE)
+		stone_changed.emit()
 	return boulder_hits[boulder_id]
 
 
@@ -4230,6 +4245,8 @@ func till(cell: Vector3i, player_id: String = "") -> bool:
 func dig(cell: Vector3i, player_id: String = "") -> String:
 	var at := Vector2i(cell.x, cell.z)
 	var problem: String = Terrain.dig_problem(at, dug) if cell.y == 0 else "This ground can't be dug."
+	if stone_pieces.has(at):
+		problem = STONE_IN_THE_WAY
 	if problem == "":
 		dug[at] = dug.get(at, 0) + 1
 		terrain_changed.emit()
@@ -4242,6 +4259,43 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 			pockets_changed.emit()
 			ore_changed.emit(crystal_ore)
 	return problem
+
+
+const STONE_IN_THE_WAY: String = "Stone is built here. Take it up first."
+
+
+## Builds a piece of `kind` (StonePieces) on a cell of Terrain (y = 0), or takes
+## up the one there, whatever its kind, for all its stone back. Returns "" or why
+## not. The host works out where the rovers stand.
+@warning_ignore("unused_parameter")
+func place_stone(cell: Vector3i, kind: int, player_id: String = "") -> String:
+	var at := Vector2i(cell.x, cell.z)
+	if cell.y != 0:
+		return "Nothing can be built here."
+	if stone_pieces.has(at):
+		stone = mini(stone + StonePieces.cost(stone_pieces[at]), StonePieces.MAX_STONE)
+		stone_pieces.erase(at)
+		stone_changed.emit()
+		return ""
+	SaveGame.saving.emit()  # rovers say where they are
+	var rovers: Array[Transform3D] = []
+	for id: String in rover_transforms:
+		if not rover_is_away(id):
+			rovers.append(rover_transforms[id])
+	var problem: String = StonePieces.problem(at, kind, stone_pieces, rovers)
+	if problem != "":
+		return problem
+	if stone < StonePieces.cost(kind):
+		return "Needs %d stone; carrying %d." % [StonePieces.cost(kind), stone]
+	stone -= StonePieces.cost(kind)
+	stone_pieces[at] = kind
+	stone_changed.emit()
+	return ""
+
+
+## The cells that hold a channel, for water to run in.
+func channel_cells() -> Array[Vector2i]:
+	return StonePieces.channel_cells(stone_pieces)
 
 
 ## The block a check uses: the last one found. {} with none.
@@ -4278,6 +4332,8 @@ func survey_ore() -> Dictionary:
 func fill(cell: Vector3i, player_id: String = "") -> String:
 	var at := Vector2i(cell.x, cell.z)
 	var problem: String = Terrain.fill_problem(at, dug) if cell.y == 0 else "There is nothing to fill here."
+	if stone_pieces.has(at):
+		problem = STONE_IN_THE_WAY
 	if problem == "":
 		dug[at] -= 1
 		if dug[at] == 0:
