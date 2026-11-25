@@ -1,0 +1,171 @@
+terrace_upper_bluff - 10 x 10 x 14 (terrace upper bluff). full grid from Ryan's terrace generator script (0.2 m voxels), 2026-11-24.
+X: 0..9 left to right, Y: 9..0 rear (+Y) to front (-Y), first row = highest Y.
+Palette: P1 = #A8422B, P2 = #8E3522, P3 = #6E2617, P4 = #5E2214, O1 = #C97A3B, D1 = #C26B4A, K1 = #343A46, F1 = #6D7A4C, F2 = #8A9663, EC = #38E1C6, S = #1D222B
+
+Z = 0
+Y=09  P3 P3 P3 P3 P3 P3 P3 P3 P3 P3
+Y=08  P3 P3 P3 P3 P3 P3 P3 P3 P3 P3
+Y=07  P3 P3 P3 P3 P3 P3 P3 P3 P3 P3
+Y=06  P3 P3 P3 P3 P3 P3 P3 P3 P3 P3
+Y=05  P3 P3 P3 P3 P3 P3 P3 P3 P3 P3
+Y=04  P3 P3 P3 P3 P3 P3 P3 P3 P3 P3
+Y=03  P3 P3 P3 P3 P3 P3 P3 P3 P3 P3
+Y=02  P3 P3 P3 P3 P3 P3 P3 P3 P3 P3
+Y=01  P3 P3 P3 P3 P3 P3 P3 P3 P3 P3
+Y=00  P3 P3 P3 P3 P3 P3 P3 P3 P3 P3
+
+Z = 1
+Y=09  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=08  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=07  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=06  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=05  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=04  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=03  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=02  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=01  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=00  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+
+Z = 2
+Y=09  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=08  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=07  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=06  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=05  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=04  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=03  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=02  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=01  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=00  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+
+Z = 3
+Y=09  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=08  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=07  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=06  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=05  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=04  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=03  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=02  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=01  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=00  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+
+Z = 4
+Y=09  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=08  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=07  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=06  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=05  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=04  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=03  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=02  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=01  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=00  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+
+Z = 5
+Y=09  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=08  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=07  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=06  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=05  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=04  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=03  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=02  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=01  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+Y=00  P2 P2 P2 P2 P2 P2 P2 P2 P2 P2
+
+Z = 6
+Y=09  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=08  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=07  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=06  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=05  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=04  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=03  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=02  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=01  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=00  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+
+Z = 7
+Y=09  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=08  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=07  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=06  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=05  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=04  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=03  .. .. .. .. EC EC .. .. .. ..
+Y=02  .. .. .. .. EC EC .. .. F1 F1
+Y=01  .. .. .. .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. .. .. .. ..
+
+Z = 8
+Y=09  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=08  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=07  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=06  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=05  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=04  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=03  .. .. .. .. EC EC .. .. .. ..
+Y=02  .. .. .. .. EC EC .. .. F2 F2
+Y=01  .. .. .. .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. .. .. .. ..
+
+Z = 9
+Y=09  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=08  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=07  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=06  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=05  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=04  P1 P1 P1 S P1 P1 S P1 P1 P1
+Y=03  .. .. .. .. .. .. .. .. .. ..
+Y=02  .. .. .. .. .. .. .. .. .. ..
+Y=01  .. .. .. .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. .. .. .. ..
+
+Z = 10
+Y=09  K1 K1 K1 K1 K1 K1 K1 K1 K1 K1
+Y=08  K1 K1 K1 K1 K1 K1 K1 K1 K1 K1
+Y=07  K1 K1 K1 K1 K1 K1 K1 K1 K1 K1
+Y=06  K1 K1 K1 K1 K1 K1 K1 K1 K1 K1
+Y=05  K1 K1 K1 K1 K1 K1 K1 K1 K1 K1
+Y=04  K1 K1 K1 K1 K1 K1 K1 K1 K1 K1
+Y=03  .. .. .. .. .. .. .. .. .. ..
+Y=02  .. .. .. .. .. .. .. .. .. ..
+Y=01  .. .. .. .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. .. .. .. ..
+
+Z = 11
+Y=09  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=08  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=07  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=06  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=05  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=04  O1 O1 O1 O1 O1 O1 O1 O1 O1 O1
+Y=03  .. .. .. .. .. .. .. .. .. ..
+Y=02  .. .. .. .. .. .. .. .. .. ..
+Y=01  .. .. .. .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. .. .. .. ..
+
+Z = 12
+Y=09  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=08  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=07  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=06  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=05  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=04  P1 P1 P1 P1 P1 P1 P1 P1 P1 P1
+Y=03  .. .. .. .. .. .. .. .. .. ..
+Y=02  .. .. .. .. .. .. .. .. .. ..
+Y=01  .. .. .. .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. .. .. .. ..
+
+Z = 13
+Y=09  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=08  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=07  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=06  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=05  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=04  P4 P4 P4 P4 P4 P4 P4 P4 P4 P4
+Y=03  .. .. .. .. .. .. .. .. .. ..
+Y=02  .. .. .. .. .. .. .. .. .. ..
+Y=01  .. .. .. .. .. .. .. .. .. ..
+Y=00  .. .. .. .. .. .. .. .. .. ..

@@ -861,6 +861,16 @@ ENV_VARIANTS = {"mesa_butte_stack": BUTTE, "gulch_bend_corner": BUTTE, "cavern_c
                 "rim_inner_corner": BUTTE, "sub_crystal_seam_wall": CAVERN, "sub_pillar_vault": CAVERN}
 
 
+# Ryan's Terrace pack (2026-11-24): stepped terrace pieces at 0.2 m voxels, part `rock`. P1..P4,
+# D1, K1 are the boulders', gulch's and basalt's colors; O1 (ochre) and EC (teal, lit as
+# emit_crystal) are his; F1 and F2 are the shrub's sage greens. S is shadow. Nothing else is lit.
+TERRACE_COLORS = {"P1": PLATEAU[0], "P2": PLATEAU[1], "P3": PLATEAU[2], "P4": PLATEAU[3],
+                  "O1": "#C97A3B", "D1": "#C26B4A", "K1": "#343A46", "F1": "#6D7A4C",
+                  "F2": "#8A9663", "EC": TEAL, "S": SHADOW}
+TERRACE = ("terrace_ramp_block", "terrace_mid_deck", "terrace_upper_bluff", "retaining_wall_endcap",
+           "terrace_switchback_block", "rim_overhang_shelf")
+
+
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop",
                      parts: dict[str, str] | None = None) -> Model:
@@ -930,6 +940,8 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, *HILL_DRESS[n][:2])), HILL_DRESS[n][2]) for n in HILL_DRESS],
     *[((lambda n=n: prop_sheet(n, ENV_VARIANTS[n], "rock", {"EC": "emit_crystal"})), 0.2)
       for n in ENV_VARIANTS],
+    *[((lambda n=n: prop_sheet(n, TERRACE_COLORS, "rock", {"EC": "emit_crystal"})), 0.2)
+      for n in TERRACE],
     *[((lambda n=n: prop_sheet(n, COBALT, "spider")), 0.025) for n in ("cobalt_body", "cobalt_leg")],
     (sentinel_crib, 0.05),
 ]
