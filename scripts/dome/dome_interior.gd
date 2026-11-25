@@ -44,7 +44,7 @@ func _ready() -> void:
 	_kestrel_click.clicked.connect(_kestrel_ui.open)
 	$UI.add_child(SkillsUI.new())
 	$UI.add_child(CoopUI.new())
-	_airlock.clicked.connect(func() -> void: SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE))
+	_airlock.clicked.connect(func() -> void: SceneSwitcher.swap_to(SceneSwitcher.outside))
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)
 	for prop: Inspectable in get_tree().get_nodes_in_group(Inspectable.GROUP):

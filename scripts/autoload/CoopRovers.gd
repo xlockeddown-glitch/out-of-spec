@@ -137,6 +137,9 @@ func tick(now: int) -> void:
 			known.clear()
 	if not session.is_hosting() or session.players.size() < 2:
 		return
+	if not farm.rover_transforms.has(farm.TUNNEL_ROVER):
+		# A guest can only drive a rover the farm knows, and may go in first.
+		farm.park_rover(farm.TUNNEL_ROVER, farm.TUNNEL_START)
 	for rover_id: String in farm.rover_transforms:
 		if not _poses.has(rover_id):
 			# A rover in the scene here says where it is itself; the farm may lag it.
