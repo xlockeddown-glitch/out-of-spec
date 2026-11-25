@@ -27,10 +27,13 @@ var paused: bool = false
 ## Days since the save started. 0.0 = day 1, 06:00.
 var elapsed_days: float = 0.0
 
+## The host's, with friends in: time stops just short of 06:00 (CoopBeds).
+var morning_waits: bool = false
+
 ## A guest's clock may run this far past the host's last word (10 game minutes).
 const MAX_AHEAD_DAYS: float = 10.0 / 1440.0
 ## It stops this short of 06:00 (one game second) until the host says it is
-## morning.
+## morning. So does the host's own while the morning waits.
 const BEFORE_MORNING_DAYS: float = 1.0 / 86400.0
 ## A guest's guess at the host's clock, and how far the guess may go.
 var _host_days: float = 0.0
@@ -44,7 +47,10 @@ func _process(delta: float) -> void:
 	if paused or seconds_per_day <= 0.0:
 		return
 	var delta_days: float = delta / seconds_per_day
+	var before: float = elapsed_days
 	advance(delta_days)
+	if morning_waits:
+		delta_days = minf(delta_days, elapsed_days - before)
 	if delta_days > 0.0:
 		clock_ran.emit(delta_days)
 
@@ -56,6 +62,8 @@ func advance(delta_days: float) -> void:
 	if FarmCommands.guest or delta_days <= 0.0:
 		return
 	var end: float = elapsed_days + delta_days
+	if morning_waits:
+		end = minf(end, floorf(elapsed_days) + 1.0 - BEFORE_MORNING_DAYS)
 	while floorf(end) > floorf(elapsed_days):
 		var morning: float = floorf(elapsed_days) + 1.0
 		var step: float = morning - elapsed_days
@@ -90,7 +98,12 @@ func _run_as_guest(delta: float) -> void:
 	guest_time_shown.emit()
 
 
-## Debug helper: jump to the next 06:00. Sensors drift for the skipped time.
+## True if the day would have to wait before this much time could pass.
+func waits_within(delta_days: float) -> bool:
+	return morning_waits and elapsed_days + delta_days > floorf(elapsed_days) + 1.0 - BEFORE_MORNING_DAYS
+
+
+## Jumps to the next 06:00. Sensors drift for the skipped time.
 func skip_to_next_morning() -> void:
 	advance(float(get_day_index()) - elapsed_days)
 

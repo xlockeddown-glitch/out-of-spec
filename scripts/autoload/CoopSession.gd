@@ -22,7 +22,7 @@ signal lost
 signal state_received(data: Dictionary)
 
 ## Raise it whenever two versions could disagree about the farm or the messages.
-const PROTOCOL: int = 1
+const PROTOCOL: int = 2
 const DEFAULT_PORT: int = 24711
 const MAX_PLAYERS: int = 4
 

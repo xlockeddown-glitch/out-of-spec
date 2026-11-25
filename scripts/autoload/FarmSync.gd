@@ -57,6 +57,7 @@ static func clock() -> Dictionary:
 		"elapsed_days": GameClock.elapsed_days,
 		"seconds_per_day": GameClock.seconds_per_day,
 		"paused": GameClock.paused,
+		"in_bed": Array(CoopBeds.in_bed, TYPE_NIL, &"", null),
 	}
 
 
@@ -75,6 +76,7 @@ static func follow_clock(data: Dictionary, farm: Node = GameState) -> String:
 static func _follow(data: Dictionary) -> bool:
 	var day: int = GameClock.get_day_index()
 	GameClock.follow(data["elapsed_days"], data["seconds_per_day"], data["paused"])
+	CoopBeds.in_bed.assign(data["in_bed"])
 	return GameClock.get_day_index() != day
 
 
@@ -133,6 +135,9 @@ static func _clock_problem(data: Dictionary) -> String:
 		var value: Variant = data.get(key)
 		if typeof(value) != TYPE_FLOAT or not is_finite(value) or value < 0.0:
 			return "The host's clock has a bad '%s'." % key
+	var in_bed: Variant = data.get("in_bed")
+	if typeof(in_bed) != TYPE_ARRAY or (in_bed as Array).any(func(id: Variant) -> bool: return typeof(id) != TYPE_STRING):
+		return "The host's clock has a bad 'in_bed'."
 	return "" if data.get("paused") is bool else "The host's clock has a bad 'paused'."
 
 

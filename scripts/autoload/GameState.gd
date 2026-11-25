@@ -953,6 +953,24 @@ func _certify_on_bench(record: Dictionary) -> void:
 	oirm_changed.emit()
 
 
+## With friends in, bench work can't run past 06:00, where the day waits.
+const NO_TIME_TONIGHT: String = "This would run past 06:00, and the day waits until everyone is in bed."
+
+
+## With friends in: "" or why not. See CoopBeds.
+func go_to_bed(player_id: String = "") -> String:
+	return CoopBeds.go_to_bed(_player(player_id))
+
+
+func get_up(player_id: String = "") -> String:
+	CoopBeds.get_up(_player(player_id))
+	return ""
+
+
+func _player(player_id: String) -> String:
+	return player_id if player_id != "" else local_player_id
+
+
 ## The player's bench calibration: calibrate() against the standard, then the
 ## bench time passes on the game clock (instruments keep drifting meanwhile).
 ## The record gains "bench_minutes". `performed_by` is as in calibrate(). A
@@ -962,6 +980,8 @@ func calibrate_at_bench(instrument_id: String, performed_by: String = "") -> Dic
 	if sensor == null:
 		return {}
 	var minutes: float = sensor.bench_minutes * skill_factor("bench_time", performed_by)
+	if GameClock.waits_within(minutes / 1440.0):
+		return { "ok": false, "refused": true, "reason": NO_TIME_TONIGHT }
 	var record: Dictionary = calibrate(instrument_id, performed_by, true, minutes)
 	if record.is_empty() or record.get("refused", false):
 		return record
@@ -3336,6 +3356,8 @@ func complete_job(job_id: String, player_id: String = "") -> Dictionary:
 	# The work takes its time. The job stays active, marked at the bench, so a
 	# morning during it neither cancels it nor offers it again.
 	var minutes: float = job_minutes(job, player_id)
+	if GameClock.waits_within(minutes / 1440.0):
+		return { "ok": false, "reason": NO_TIME_TONIGHT }
 	job["at_bench"] = true
 	if minutes > 0.0:
 		GameClock.advance(minutes / 1440.0)

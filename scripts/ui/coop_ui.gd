@@ -12,6 +12,7 @@ var _strip: Label
 var _panel: Control
 var _about: Label
 var _action: Button
+var _bed: Button
 var _close_button: Button
 var _addresses: PackedStringArray = []
 var _problem: String = ""
@@ -48,6 +49,9 @@ func _ready() -> void:
 	buttons.alignment = BoxContainer.ALIGNMENT_END
 	buttons.add_theme_constant_override(&"separation", 12)
 	column.add_child(buttons)
+	_bed = PlanBoardUI._button("")
+	_bed.pressed.connect(_on_bed)
+	buttons.add_child(_bed)
 	_action = PlanBoardUI._button("")
 	_action.pressed.connect(_on_action)
 	buttons.add_child(_action)
@@ -58,7 +62,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	_strip.text = strip_text(CoopSession.players, GameState.local_player_id, CoopSession.is_hosting(), CoopSync.is_too_big())
+	_strip.text = strip_text(CoopSession.players, GameState.local_player_id, CoopSession.is_hosting(), CoopSync.is_too_big(), CoopBeds.in_bed)
 	if _panel.visible:
 		_refresh()
 
@@ -97,8 +101,23 @@ func _refresh() -> void:
 	else:
 		_action.text = "HOST THIS FARM"
 		_about.text = _problem if _problem != "" else "Hosting lets friends join this farm while you play. Anyone who knows your address can join, so share it only with friends."
+	_bed.visible = CoopBeds.together()
+	_bed.text = "GET UP" if GameState.local_player_id in CoopBeds.in_bed else "GO TO BED"
+	if _bed.visible:
+		_about.text += "\n\nThe day ends when everyone is in bed, and waits at 06:00 for anyone still up."
+		if _problem != "":
+			_about.text += "\n\n" + _problem
 	# A farm run on its own, not from the title menu, is nobody's to share.
 	_action.disabled = not FarmCommands.guest and not SaveGame.farm_open
+
+
+func _on_bed() -> void:
+	if GameState.local_player_id in CoopBeds.in_bed:
+		_problem = str(await FarmCommands.request(&"get_up"))
+	else:
+		_problem = str(await FarmCommands.request(&"go_to_bed"))
+	if _panel.visible:
+		_refresh()
 
 
 func _on_action() -> void:
@@ -119,13 +138,19 @@ static func player_name(player_id: String) -> String:
 
 
 ## The line at the top of the screen; "" when playing alone.
-static func strip_text(players: Array[String], own_id: String, hosting: bool, too_big: bool) -> String:
+static func strip_text(players: Array[String], own_id: String, hosting: bool, too_big: bool, in_bed: Array[String] = []) -> String:
 	if players.is_empty():
 		return ""
 	if hosting and too_big:
 		return "CO-OP  THE FARM IS TOO BIG TO SHARE, SO FRIENDS CAN'T STAY"
 	if players.size() == 1:
 		return "CO-OP  WAITING FOR FRIENDS  (F7)"
+	if not in_bed.is_empty():
+		var up: PackedStringArray = []
+		for player_id: String in players:
+			if not player_id in in_bed:
+				up.append(player_name(player_id))
+		return "CO-OP  %d OF %d IN BED, STILL UP: %s  (F7)" % [players.size() - up.size(), players.size(), ", ".join(up)]
 	return "CO-OP  %d PLAYERS, YOU ARE %s  (F7)" % [players.size(), player_name(own_id)]
 
 
