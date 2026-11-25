@@ -47,6 +47,13 @@ func _physics_process(_delta: float) -> void:
 		_own.velocity = Vector3.ZERO
 
 
+## After a dig or a stone changed the water: this screen's walker, if it is in deep
+## water now, is moved out.
+func leave_deep_water() -> void:
+	if _own != null:
+		_own.leave_deep_water()
+
+
 func _process(delta: float) -> void:
 	for player_id: String in _friends.keys():
 		if not CoopWalkers.is_out(player_id):

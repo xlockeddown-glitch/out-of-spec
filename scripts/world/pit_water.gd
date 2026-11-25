@@ -4,21 +4,23 @@ extends RefCounted
 ## pieces and the land. Nothing of it is saved or sent, and there is no chance in it,
 ## so every PC finds the same water.
 ##
-## The ground seeps. A pit two steps deep or more, and every such pit touching it,
-## fills to the water table, but never above the lowest ground round it. A channel
-## laid next to such a pit carries a thin film along its length, and one step
-## dimples it runs into that lie lower fill to their own rims.
+## The ground seeps. A pit three steps deep or more, and every such pit touching it,
+## fills to the water table, but never above the lowest ground round it. Two steps
+## are dry, three hold half a meter (shallow, a rover wades), and the fourth step
+## makes it a meter (deep, which stops a rover). A channel laid next to such a pit
+## carries a thin film along its length, and one step dimples it runs into that lie
+## lower fill to their own rims.
 
 ## A cell this many steps down reaches the water [PLACEHOLDER].
-const SEEP_STEPS: int = 2
+const SEEP_STEPS: int = 3
 ## The table lies this far under the lowest natural ground in a pit [PLACEHOLDER].
-const TABLE_M: float = 0.5
+const TABLE_M: float = 1.0
 ## A channel's film is this deep over the channel's floor [PLACEHOLDER].
 const FILM_M: float = 0.08
 ## A rover wades from this depth, so a film does not slow it [PLACEHOLDER].
 const WADE_MIN_M: float = 0.1
 ## Water this shallow is no water at all.
-const MIN_DEPTH_M: float = 0.02
+const MIN_DEPTH_M: float = 0.02 ## [PLACEHOLDER]
 
 ## Wet cells and the level of the water in each.
 static var _levels: Dictionary[Vector2i, float] = {}
@@ -28,12 +30,19 @@ static var _dug: Dictionary[Vector2i, int] = {}
 ## The deep boxes, each a run along x, and the water level at each.
 static var _blocks: Array[Rect2] = []
 static var _block_levels: Array[float] = []
+## Ground at each cell's middle, and the natural ground there, for one working out.
+static var _ground_cache: Dictionary[Vector2i, float] = {}
+static var _natural_cache: Dictionary[Vector2i, float] = {}
+## The ground at whole meters, for one working out of the blocks.
+static var _point_cache: Dictionary[Vector2i, float] = {}
 
 
 ## The water for these steps and pieces: { levels: cell -> level, film: cell -> true }.
 static func work_out(dug: Dictionary[Vector2i, int], pieces: Dictionary[Vector2i, int]) -> Dictionary:
 	var levels: Dictionary[Vector2i, float] = {}
 	var seen: Dictionary[Vector2i, bool] = {}
+	_ground_cache.clear()
+	_natural_cache.clear()
 	for cell: Vector2i in dug:
 		if _steps(cell, dug) < SEEP_STEPS or seen.has(cell):
 			continue
@@ -58,6 +67,8 @@ static func work_out(dug: Dictionary[Vector2i, int], pieces: Dictionary[Vector2i
 		for cell: Vector2i in net:
 			for side: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 				_fill_dimple(cell + side, cell, dug, pits, pieces, levels)
+	_ground_cache.clear()
+	_natural_cache.clear()
 	return { "levels": levels, "film": film }
 
 
@@ -131,6 +142,27 @@ static func gap_m(at: Vector2) -> float:
 	return gap
 
 
+## Whether any of these blocks touches a box of `half` (across, along) at `at`, its
+## front toward `ahead`.
+static func box_hits(blocks: Array[Rect2], at: Vector2, ahead: Vector2, half: Vector2) -> bool:
+	var along: Vector2 = ahead.normalized()
+	var across := Vector2(-along.y, along.x)
+	var reach := Vector2(
+		half.y * absf(along.x) + half.x * absf(across.x), half.y * absf(along.y) + half.x * absf(across.y)
+	)
+	for block: Rect2 in blocks:
+		var gap: Vector2 = at - block.get_center()
+		var block_half: Vector2 = block.size * 0.5
+		if absf(gap.x) > block_half.x + reach.x or absf(gap.y) > block_half.y + reach.y:
+			continue
+		if absf(gap.dot(along)) > block_half.x * absf(along.x) + block_half.y * absf(along.y) + half.y:
+			continue
+		if absf(gap.dot(across)) > block_half.x * absf(across.x) + block_half.y * absf(across.y) + half.x:
+			continue
+		return true
+	return false
+
+
 # --- Working it out ----------------------------------------------------------
 
 ## A cell's steps, but nothing by the ford, as in the ground.
@@ -139,18 +171,23 @@ static func _steps(cell: Vector2i, dug: Dictionary[Vector2i, int]) -> int:
 	return 0 if steps > 0 and Terrain.is_near_water(cell) else steps
 
 
-static func _middle(cell: Vector2i) -> Vector2:
-	return Vector2(cell * Terrain.CELL_M) + Vector2.ONE * (Terrain.CELL_M * 0.5)
+## A cell's middle is a whole meter, so the ground there is a point of the ground.
+static func _middle_point(cell: Vector2i) -> Vector2i:
+	@warning_ignore("integer_division")
+	return cell * Terrain.CELL_M + Vector2i.ONE * (Terrain.CELL_M / 2)
 
 
 ## The ground at a cell's middle, which is the cell's own depth.
 static func _ground_m(cell: Vector2i, dug: Dictionary[Vector2i, int]) -> float:
-	return Terrain.height(_middle(cell), dug)
+	if not _ground_cache.has(cell):
+		_ground_cache[cell] = Terrain.point_height(_middle_point(cell), dug)
+	return _ground_cache[cell]
 
 
 static func _natural_m(cell: Vector2i) -> float:
-	var none: Dictionary[Vector2i, int] = {}
-	return Terrain.height(_middle(cell), none)
+	if not _natural_cache.has(cell):
+		_natural_cache[cell] = Terrain.natural(_middle_point(cell))
+	return _natural_cache[cell]
 
 
 ## The cells touching `cell`, and the cells touching those, all dug SEEP_STEPS or more.
@@ -211,13 +248,14 @@ static func _is_fed(net: Array[Vector2i], pits: Dictionary[Vector2i, float]) -> 
 	return false
 
 
-## A one step dimple beside a fed channel, lower than the channel, fills to its own
-## rim, which the channel's own ground is part of.
+## A one step dimple (exactly one step: a deeper one is a pit's business) beside a
+## fed channel, lower than the channel, fills to its own rim, which the channel's own
+## ground is part of.
 static func _fill_dimple(
 	cell: Vector2i, from: Vector2i, dug: Dictionary[Vector2i, int], pits: Dictionary[Vector2i, float],
 	pieces: Dictionary[Vector2i, int], levels: Dictionary[Vector2i, float]
 ) -> void:
-	if _steps(cell, dug) < 1 or pits.has(cell) or levels.has(cell) or pieces.get(cell, -1) == StonePieces.CHANNEL:
+	if _steps(cell, dug) != 1 or pits.has(cell) or levels.has(cell) or pieces.get(cell, -1) == StonePieces.CHANNEL:
 		return
 	var floor_m: float = _ground_m(cell, dug)
 	if floor_m >= _ground_m(from, dug) - MIN_DEPTH_M:
@@ -229,42 +267,75 @@ static func _fill_dimple(
 
 
 ## The deep blocks, as the ford's: a block stands where its middle or a corner is deep.
+## Depth is found once for each point of a quarter meter lattice, as a block's
+## corners, middle and sides are shared with the blocks beside it.
 static func _work_out_blocks() -> void:
 	_blocks.clear()
 	_block_levels.clear()
+	_point_cache.clear()
 	var step: float = Ford.BLOCK_M
 	var per_cell: int = roundi(Terrain.CELL_M / step)
+	var tops: Dictionary[Vector2i, float] = {}
 	var found: Dictionary[Vector2i, float] = {}
 	for cell: Vector2i in _levels:
 		if _levels[cell] - _lowest_point_m(cell) < Terrain.WASH_BLOCK_M:
 			continue
-		for i: int in per_cell:
-			for j: int in per_cell:
-				var block: Vector2i = cell * per_cell + Vector2i(i, j)
+		for bx: int in per_cell:
+			for bz: int in per_cell:
+				var block: Vector2i = cell * per_cell + Vector2i(bx, bz)
 				var top_m: float = -INF
-				for dx: float in [0.0, 0.5, 1.0]:
-					for dz: float in [0.0, 0.5, 1.0]:
-						var at: Vector2 = (Vector2(block) + Vector2(dx, dz)) * step
-						if is_deep(at):
-							top_m = maxf(top_m, level_m(at))
+				for dx: int in 3:
+					for dz: int in 3:
+						top_m = maxf(top_m, _deep_top_m(block * 2 + Vector2i(dx, dz), tops))
 				if top_m > -INF:
 					found[block] = top_m
+	_point_cache.clear()
 	var order: Array[Vector2i] = found.keys()
 	order.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.y < b.y or (a.y == b.y and a.x < b.x))
-	var i: int = 0
-	while i < order.size():
-		var first: Vector2i = order[i]
+	var at_run: int = 0
+	while at_run < order.size():
+		var first: Vector2i = order[at_run]
 		var run: int = 1
-		while i + run < order.size() and order[i + run] == first + Vector2i(run, 0) and is_equal_approx(found[order[i + run]], found[first]):
+		while at_run + run < order.size() and order[at_run + run] == first + Vector2i(run, 0) and is_equal_approx(found[order[at_run + run]], found[first]):
 			run += 1
 		_blocks.append(Rect2(Vector2(first) * step, Vector2(run * step, step)))
 		_block_levels.append(found[first])
-		i += run
+		at_run += run
+
+
+## The water's top at a point of the quarter meter lattice if it is deep there, else
+## -INF. The ground is as Terrain.height finds it, from points found once.
+static func _deep_top_m(lattice: Vector2i, tops: Dictionary[Vector2i, float]) -> float:
+	if tops.has(lattice):
+		return tops[lattice]
+	var at: Vector2 = Vector2(lattice) * (Ford.BLOCK_M * 0.5)
+	var top_m: float = level_m(at)
+	var found: float = -INF
+	if top_m > -INF and top_m - _height_m(at) >= Terrain.WASH_BLOCK_M:
+		found = top_m
+	tops[lattice] = found
+	return found
+
+
+## Terrain.height at a point, from ground found once for each whole meter.
+static func _height_m(at: Vector2) -> float:
+	var inside: Vector2 = at.clampf(-Terrain.HALF_M, Terrain.HALF_M)
+	var low: Vector2i = Vector2i(inside.floor()).mini(Terrain.HALF_M - 1)
+	var t: Vector2 = inside - Vector2(low)
+	var near: float = lerpf(_point_m(low), _point_m(low + Vector2i(1, 0)), t.x)
+	var far: float = lerpf(_point_m(low + Vector2i(0, 1)), _point_m(low + Vector2i.ONE), t.x)
+	return lerpf(near, far, t.y)
+
+
+static func _point_m(point: Vector2i) -> float:
+	if not _point_cache.has(point):
+		_point_cache[point] = Terrain.point_height(point, _dug)
+	return _point_cache[point]
 
 
 static func _lowest_point_m(cell: Vector2i) -> float:
 	var low: float = INF
 	for x: int in Terrain.CELL_M + 1:
 		for z: int in Terrain.CELL_M + 1:
-			low = minf(low, Terrain.point_height(cell * Terrain.CELL_M + Vector2i(x, z), _dug))
+			low = minf(low, _point_m(cell * Terrain.CELL_M + Vector2i(x, z)))
 	return low

@@ -185,6 +185,10 @@ static func _gap_m(at: Vector2) -> float:
 
 ## Whether a cell is in or by the water, so it can't be dug [ASSUMPTION].
 static func is_near_water(cell: Vector2i) -> bool:
+	var reach: Vector2 = WASH_RADII + Vector2.ONE * WASH_NEAR_M
+	var low: Vector2 = Vector2(cell * CELL_M)
+	if low.x > WASH_AT.x + reach.x or low.x + CELL_M < WASH_AT.x - reach.x or low.y > WASH_AT.y + reach.y or low.y + CELL_M < WASH_AT.y - reach.y:
+		return false
 	for x: int in CELL_M + 1:
 		for z: int in CELL_M + 1:
 			if _out(Vector2(cell * CELL_M + Vector2i(x, z)), WASH_AT, WASH_RADII + Vector2.ONE * WASH_NEAR_M) < 1.0:

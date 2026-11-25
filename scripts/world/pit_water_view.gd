@@ -1,8 +1,10 @@
 class_name PitWaterView
 extends Node3D
 ## Draws PitWater: a VoxelWater for each stretch of wet cells, and the boxes that
-## stop a rover in deep water. It only works when the ground or a stone piece
-## changes, and only redraws the stretches that differ.
+## stop a rover in deep water. It works the water out again only when the dug ground
+## or the channels are not as they were last time (a boulder, a wall or a pad changes
+## neither), once a frame however many changes came, and it only redraws the
+## stretches that differ.
 
 ## Said when the deep water is not where it was, so a rover in it can be moved.
 signal changed
@@ -13,14 +15,24 @@ var _deep: Node3D = null
 ## The deep water the boxes were last built for.
 var _built: Array[Rect2] = []
 var _built_levels: Array[float] = []
+## What the water was last worked out from: the dug steps and the channel cells.
+var _seen_dug: Dictionary[Vector2i, int] = {}
+var _seen_channels: Dictionary[Vector2i, bool] = {}
+var _worked: bool = false
+var _asked: bool = false
+## How often the water was worked out, and how often a look was put off to the end of
+## the frame, for the tests.
+var worked_count: int = 0
+var queued_count: int = 0
 
 
 func _ready() -> void:
 	_deep = Node3D.new()
 	_deep.name = "Deep"
 	add_child(_deep)
-	GameState.terrain_changed.connect(_refresh)
-	GameState.stone_changed.connect(_refresh)
+	GameState.terrain_changed.connect(_ask)
+	GameState.stone_changed.connect(_ask)
+	# At once, so the water is there before the first physics step of a loaded farm.
 	_refresh()
 
 
@@ -28,8 +40,31 @@ func _exit_tree() -> void:
 	PitWater.clear()
 
 
-## Works the water out again and draws what is new.
+## Asks for the water to be looked at again, once, at the end of this frame.
+func _ask() -> void:
+	if not _asked:
+		_asked = true
+		queued_count += 1
+		_refresh_asked.call_deferred()
+
+
+func _refresh_asked() -> void:
+	_asked = false
+	if is_inside_tree():
+		_refresh()
+
+
+## Works the water out again, if what it comes from changed, and draws what is new.
 func _refresh() -> void:
+	var channels: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in StonePieces.channel_cells(GameState.stone_pieces):
+		channels[cell] = true
+	if _worked and GameState.dug == _seen_dug and channels == _seen_channels:
+		return
+	_worked = true
+	worked_count += 1
+	_seen_dug = GameState.dug.duplicate()
+	_seen_channels = channels
 	PitWater.use(PitWater.work_out(GameState.dug, GameState.stone_pieces), GameState.dug)
 	var keep: Dictionary[int, bool] = {}
 	for stretch: Array[Vector2i] in _stretches_of(PitWater.levels(), PitWater.film()):
@@ -100,8 +135,13 @@ func _draw(stretch: Array[Vector2i]) -> VoxelWater:
 		high = high.max(cell)
 	var water := VoxelWater.new()
 	water.name = "Water_%d_%d" % [low.x, low.y]
+	var members: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in stretch:
+		members[cell] = true
+	# Water that is not of this stretch is drawn by its own, not twice and not stale.
 	water.fill_levels(
-		Rect2(Vector2(low * Terrain.CELL_M), Vector2(high - low + Vector2i.ONE) * Terrain.CELL_M), PitWater.level_m,
+		Rect2(Vector2(low * Terrain.CELL_M), Vector2(high - low + Vector2i.ONE) * Terrain.CELL_M),
+		func(at: Vector2) -> float: return PitWater.level_m(at) if members.has(Terrain.cell_at(at)) else -INF,
 		func(at: Vector2) -> float: return Terrain.height(at, GameState.dug)
 	)
 	add_child(water)

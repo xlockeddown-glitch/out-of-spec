@@ -130,6 +130,7 @@ func _ready() -> void:
 	_walkers.rover = _rover
 	_walkers.camera = $WorldView/WorldViewport/World/IsoCamera
 	$WorldView/WorldViewport/World.add_child(_walkers)
+	pit_water.changed.connect(_walkers.leave_deep_water)
 	_show_dug()
 	_last_band = _rover.get_drift_band()
 	_rover.broadcast_state()
