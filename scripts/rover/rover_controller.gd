@@ -169,6 +169,11 @@ func _unpark() -> void:
 	_put_back_on_land()
 
 
+## Out of water that has become too deep, after a dig or a stone changed it.
+func leave_deep_water() -> void:
+	_put_back_on_land()
+
+
 ## A farm saved before the hills may have it parked inside one, or off the land.
 ## In the tunnels, one in the rock is back at the mouth.
 func _put_back_on_land() -> void:
@@ -349,7 +354,8 @@ func _execute(cmd: UplinkCommand) -> void:
 func _drive(delta: float) -> void:
 	var top_speed: float = max_speed_mps if _applied_throttle >= 0.0 else reverse_speed_mps
 	# Slower wading [PLACEHOLDER].
-	if Terrain.water_depth_m(Vector2(global_position.x, global_position.z)) > 0.0:
+	var here := Vector2(global_position.x, global_position.z)
+	if Terrain.water_depth_m(here) > 0.0 or PitWater.is_wading(here):
 		top_speed *= Terrain.WATER_SPEED
 	var target_speed: float = _applied_throttle * top_speed
 	var rate: float = acceleration_mps2 if absf(target_speed) > absf(_speed_mps) else braking_mps2

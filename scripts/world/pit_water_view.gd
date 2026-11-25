@@ -1,0 +1,127 @@
+class_name PitWaterView
+extends Node3D
+## Draws PitWater: a VoxelWater for each stretch of wet cells, and the boxes that
+## stop a rover in deep water. It only works when the ground or a stone piece
+## changes, and only redraws the stretches that differ.
+
+## Said when the deep water is not where it was, so a rover in it can be moved.
+signal changed
+
+## Each stretch, by what it was drawn from.
+var _stretches: Dictionary[int, VoxelWater] = {}
+var _deep: Node3D = null
+
+
+func _ready() -> void:
+	_deep = Node3D.new()
+	_deep.name = "Deep"
+	add_child(_deep)
+	GameState.terrain_changed.connect(_refresh)
+	GameState.stone_changed.connect(_refresh)
+	_refresh()
+
+
+func _exit_tree() -> void:
+	PitWater.clear()
+
+
+## Works the water out again and draws what is new.
+func _refresh() -> void:
+	var before: Array[Rect2] = PitWater.blocks().duplicate()
+	var before_levels: Array[float] = PitWater.block_levels().duplicate()
+	PitWater.use(PitWater.work_out(GameState.dug, GameState.stone_pieces), GameState.dug)
+	var keep: Dictionary[int, bool] = {}
+	for stretch: Array[Vector2i] in _stretches_of(PitWater.levels(), PitWater.film()):
+		var key: int = _signature(stretch)
+		keep[key] = true
+		if not _stretches.has(key):
+			_stretches[key] = _draw(stretch)
+	for key: int in _stretches.keys():
+		if not keep.has(key):
+			remove_child(_stretches[key])
+			_stretches[key].queue_free()
+			_stretches.erase(key)
+	if before != PitWater.blocks() or before_levels != PitWater.block_levels():
+		_build_blocks()
+		changed.emit()
+
+
+## Wet cells that touch, with the film's.
+static func _stretches_of(levels: Dictionary[Vector2i, float], film: Dictionary[Vector2i, bool]) -> Array[Array]:
+	var stretches: Array[Array] = []
+	var seen: Dictionary[Vector2i, bool] = {}
+	var wet: Array[Vector2i] = levels.keys()
+	wet.append_array(film.keys())
+	for start: Vector2i in wet:
+		if seen.has(start):
+			continue
+		var stretch: Array[Vector2i] = []
+		var todo: Array[Vector2i] = [start]
+		seen[start] = true
+		while not todo.is_empty():
+			var cell: Vector2i = todo.pop_back()
+			stretch.append(cell)
+			for next: Vector2i in Terrain.neighbors(cell):
+				if not seen.has(next) and (levels.has(next) or film.has(next)):
+					seen[next] = true
+					todo.append(next)
+		stretches.append(stretch)
+	return stretches
+
+
+## What a stretch looks like depends on its cells, their levels, and the digging in
+## and round them.
+static func _signature(stretch: Array[Vector2i]) -> int:
+	var sorted: Array[Vector2i] = stretch.duplicate()
+	sorted.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.x < b.x or (a.x == b.x and a.y < b.y))
+	var parts: Array = []
+	var around: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in sorted:
+		parts.append(cell)
+		parts.append(snappedf(PitWater.levels()[cell], 0.001) if PitWater.levels().has(cell) else -1.0)
+		around[cell] = true
+		for next: Vector2i in Terrain.neighbors(cell):
+			around[next] = true
+	var steps: Array[Vector2i] = around.keys()
+	steps.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.x < b.x or (a.x == b.x and a.y < b.y))
+	for cell: Vector2i in steps:
+		parts.append(GameState.dug.get(cell, 0))
+	return parts.hash()
+
+
+func _draw(stretch: Array[Vector2i]) -> VoxelWater:
+	var low: Vector2i = stretch[0]
+	var high: Vector2i = stretch[0]
+	for cell: Vector2i in stretch:
+		low = low.min(cell)
+		high = high.max(cell)
+	var water := VoxelWater.new()
+	water.name = "Water_%d_%d" % [low.x, low.y]
+	water.fill_levels(
+		Rect2(Vector2(low * Terrain.CELL_M), Vector2(high - low + Vector2i.ONE) * Terrain.CELL_M), PitWater.level_m,
+		func(at: Vector2) -> float: return Terrain.height(at, GameState.dug)
+	)
+	add_child(water)
+	return water
+
+
+## One box for each of PitWater's runs, set as the ford's are.
+func _build_blocks() -> void:
+	for old: Node in _deep.get_children():
+		_deep.remove_child(old)
+		old.queue_free()
+	var height_m: float = Ford.BLOCK_BELOW_M + Ford.BLOCK_ABOVE_M
+	for i: int in PitWater.blocks().size():
+		var run: Rect2 = PitWater.blocks()[i]
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(run.size.x, height_m, run.size.y)
+		var holder := CollisionShape3D.new()
+		holder.shape = shape
+		var body := StaticBody3D.new()
+		body.name = "Deep"
+		body.collision_layer = Ford.LAYER_WORLD
+		body.collision_mask = 0
+		var middle: Vector2 = run.get_center()
+		body.position = Vector3(middle.x, PitWater.block_levels()[i] + (Ford.BLOCK_ABOVE_M - Ford.BLOCK_BELOW_M) * 0.5, middle.y)
+		body.add_child(holder)
+		_deep.add_child(body, true)

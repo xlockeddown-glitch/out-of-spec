@@ -170,12 +170,17 @@ static func is_deep(at: Vector2) -> bool:
 ## `at`, or a place south of it, away from the arch, where a rover turned any way is
 ## clear of the deep, if one at `at` would stand in it whichever way it was turned.
 static func clear_of_deep(at: Vector2) -> Vector2:
-	if Ford.gap_m(at) >= ROVER_HALF_WIDTH_M - 0.05:
+	if _gap_m(at) >= ROVER_HALF_WIDTH_M - 0.05:
 		return at
 	var out: Vector2 = at
-	while Ford.gap_m(out) < ROVER_REACH_M + 0.1:
+	while _gap_m(out) < ROVER_REACH_M + 0.1 and out.y < HALF_M:
 		out.y += 0.25
 	return out
+
+
+## How far a point is from deep water, the ford's or a pit's.
+static func _gap_m(at: Vector2) -> float:
+	return minf(Ford.gap_m(at), PitWater.gap_m(at))
 
 
 ## Whether a cell is in or by the water, so it can't be dug [ASSUMPTION].
