@@ -10,7 +10,7 @@ extends Node
 ## [PLACEHOLDER].
 const HOLD_MS: int = 500
 ## A guest drives this long before it needs the host's word that it may [PLACEHOLDER].
-const CLAIM_MS: int = 1000
+const CLAIM_MS: int = 1500
 ## A moving rover's pose is sent this often, and a still one's this often
 ## [PLACEHOLDER].
 const MOVING_MS: int = 50
@@ -102,10 +102,10 @@ func moves_here(rover_id: String, wants: bool, now: int = Time.get_ticks_msec())
 
 
 ## Where a rover that moves here is now.
-func moved(rover_id: String, at: Transform3D, speed: float, has_los: bool, now: int = Time.get_ticks_msec()) -> void:
+func moved(rover_id: String, at: Transform3D, speed_mps: float, has_los: bool, now: int = Time.get_ticks_msec()) -> void:
 	if not together():
 		return
-	var pose: Array = [at.origin.x, at.origin.y, at.origin.z, at.basis.get_euler().y, speed, has_los]
+	var pose: Array = [at.origin.x, at.origin.y, at.origin.z, at.basis.get_euler().y, speed_mps, has_los]
 	_poses[rover_id] = [pose, now]
 	if _is_guest() and _is_due(rover_id, now, MOVING_MS):
 		session.drive(rover_id, pose)
@@ -131,10 +131,17 @@ func speed(rover_id: String) -> float:
 ## Host: says where the rovers are.
 func tick(now: int) -> void:
 	_expire(now)
+	if not together():
+		# Where it was with friends in isn't where it is when the next one joins.
+		for known: Dictionary in [_drivers, _poses, _sent_at, _said_driver, _reach]:
+			known.clear()
 	if not session.is_hosting() or session.players.size() < 2:
 		return
 	for rover_id: String in farm.rover_transforms:
 		if not _poses.has(rover_id):
+			# A rover in the scene here says where it is itself; the farm may lag it.
+			if now - _here_at.get(rover_id, -STILL_MS) < STILL_MS:
+				continue
 			_poses[rover_id] = [_pose(farm.rover_transforms[rover_id]), now]
 		var who: String = driver(rover_id)
 		# At once, so that someone else may drive.

@@ -119,7 +119,7 @@ func test_a_guest_the_host_never_answers_stops() -> String:
 	theirs._on_told(ID, "", _pose(5.0), 1400)
 	if not theirs.moves_here(ID, true, 1400):
 		return _end_with("An old word must not stop a guest who just began")
-	theirs._on_told(ID, "", _pose(5.0), 2001)
+	theirs._on_told(ID, "", _pose(5.0), 2501)
 	return _end_with("" if theirs.driver(ID) == "" and theirs.place(ID) == _at(5.0) else "The host's word must win")
 
 
@@ -184,3 +184,28 @@ func test_driving_spends_none_of_the_commands_rate() -> String:
 	var answer: Array = _request(guest, &"till", [Vector3i(0, 0, 0)])
 	_until(func() -> bool: return not answer.is_empty())
 	return _end_with("" if host.players.size() == 2 and not answer.is_empty() else "60 poses at once must not drop a guest")
+
+
+func test_a_friend_who_comes_later_is_told_where_it_is_now() -> String:
+	var all: Array = _pair()
+	var host: Node = all[0]
+	var guest: Node = all[1]
+	var mine: Node = all[2]
+	mine.moves_here(ID, true)
+	mine.moved(ID, _at(5.0), 0.0, true)
+	guest.leave()
+	if not _until(func() -> bool: return host.players.size() == 1):
+		return _end_with("The guest must be gone")
+	mine.tick(FAR)
+	host.commands.state.rover_transforms[ID] = _at(40.0)
+	var late: Node = _guest(host)
+	var theirs: Node = _rovers(late)
+	# The farm scene has it, but has not said where yet.
+	mine.moves_here(ID, false, FAR)
+	mine.tick(FAR)
+	if mine._poses.has(ID):
+		return _end_with("The farm's place must wait for the scene's own")
+	mine.moved(ID, _at(42.0), 0.0, true, FAR)
+	mine.tick(FAR)
+	_until(func() -> bool: return theirs._told_driver.has(ID))
+	return _end_with("" if theirs.place(ID) == _at(42.0) else "Told %s" % theirs.place(ID))
