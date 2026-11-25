@@ -1165,3 +1165,6 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - High ground is a little warmer and valleys a little cooler in color; level ground is unchanged [PLACEHOLDER].
 - The land rises 1.5 m toward its edge [PLACEHOLDER], but the rover can still drive off, as before. A rover parked inside a hill by an older save, or off the land, comes back on the ground [ASSUMPTION].
 - Open with Ryan: what should stop the rover at the land's edge.
+- Hill plants and rocks are the same on every PC and in no save. Rocks stop rovers and the uplink, as boulders do, but can't be broken; plants stop nothing [ASSUMPTION]. None is on level ground or hides the relay from it. Numbers, sizes and places are [PLACEHOLDER].
+- Ground within 0.5 m of a rock can't be dug [PLACEHOLDER; ASSUMPTION]; an older save's digging there loads, and the rock sits lower. A plant is gone while ground under it is dug and back when it is filled [ASSUMPTION]. A rover an older save left inside a rock comes back beside it [ASSUMPTION].
+- The gulch's west end has a bend, to look at only [ASSUMPTION].

@@ -142,7 +142,8 @@ static func can_dig(cell: Vector2i) -> bool:
 ## Why a cell can't be dug one step deeper, or "". It is at most one step deeper
 ## than any of its neighbors, so a rover can always drive out.
 static func dig_problem(cell: Vector2i, dug: Dictionary[Vector2i, int]) -> String:
-	if not can_dig(cell):
+	# Not in can_dig, so a save with older digging here still loads.
+	if not can_dig(cell) or HillDressing.is_at_rock(cell):
 		return "This ground can't be dug."
 	var steps: int = dug.get(cell, 0)
 	if steps >= MAX_DIG_STEPS:

@@ -20,6 +20,7 @@
 [ext_resource type="Script" path="res://scripts/world/terrain_ground.gd" id="31_ground"]
 [ext_resource type="Script" path="res://scripts/world/dig_outline.gd" id="32_outline"]
 [ext_resource type="Script" path="res://scripts/world/boulder.gd" id="33_boulder"]
+[ext_resource type="Script" path="res://scripts/world/hill_dressing.gd" id="34_dress"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -919,6 +920,12 @@ shape = SubResource("Inspect_shipping_pallet")
 
 [node name="Gulch" type="Node3D" parent="WorldView/WorldViewport/World"]
 
+[node name="GulchBend" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, -0.4, -25)
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/gulch_bend_corner.glb"
+model_scale = 0.2
+
 [node name="GulchTileA" type="Node3D" parent="WorldView/WorldViewport/World/Gulch"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, -0.4, -25)
 script = ExtResource("12_slot")
@@ -1026,3 +1033,6 @@ transform = Transform3D(0, 0, -1, 0, 1, 0, 1, 0, 0, 9, 0, -30)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/plateau_rim_corner.glb"
 model_scale = 0.2
+
+[node name="HillDressing" type="Node3D" parent="WorldView/WorldViewport/World"]
+script = ExtResource("34_dress")

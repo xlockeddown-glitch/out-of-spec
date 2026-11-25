@@ -174,6 +174,10 @@ func _put_back_on_land() -> void:
 	var edge_m: float = Terrain.HALF_M - wheelbase_m
 	global_position.x = clampf(global_position.x, -edge_m, edge_m)
 	global_position.z = clampf(global_position.z, -edge_m, edge_m)
+	# Or where a rock now stands.
+	var clear: Vector2 = HillDressing.clear_of_rocks(Vector2(global_position.x, global_position.z))
+	global_position.x = clear.x
+	global_position.z = clear.y
 	var ground_m: float = ground.height_at(global_position)
 	# Resting on level ground it may be a hair under.
 	if global_position.y < ground_m - 0.1:
