@@ -219,6 +219,9 @@ static func _placed(rng: RandomNumberGenerator, plant: Plant, at: Vector2, sizes
 static func _is_free(at: Vector2) -> bool:
 	if maxf(absf(at.x), absf(at.y)) > Terrain.HALF_M - EDGE_MARGIN_M:
 		return false
+	# Nothing grows in the wash or its banks [ASSUMPTION].
+	if Terrain.wash_out(at) < Terrain.WASH_REACH:
+		return false
 	for x: int in range(-1, 2):
 		for z: int in range(-1, 2):
 			if Terrain.is_level(at + Vector2(x, z) * LEVEL_MARGIN_M):

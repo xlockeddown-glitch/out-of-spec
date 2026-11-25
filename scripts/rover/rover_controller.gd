@@ -181,6 +181,8 @@ func _put_back_on_land() -> void:
 	global_position.z = clampf(global_position.z, -edge_m, edge_m)
 	# Or where a rock now stands.
 	var clear: Vector2 = HillDressing.clear_of_rocks(Vector2(global_position.x, global_position.z))
+	# Or in water too deep to wade.
+	clear = Terrain.clear_of_deep(clear)
 	global_position.x = clear.x
 	global_position.z = clear.y
 	var ground_m: float = ground.height_at(global_position)
@@ -345,6 +347,9 @@ func _execute(cmd: UplinkCommand) -> void:
 
 func _drive(delta: float) -> void:
 	var top_speed: float = max_speed_mps if _applied_throttle >= 0.0 else reverse_speed_mps
+	# Slower wading [PLACEHOLDER].
+	if Terrain.water_depth_m(Vector2(global_position.x, global_position.z)) > 0.0:
+		top_speed *= Terrain.WATER_SPEED
 	var target_speed: float = _applied_throttle * top_speed
 	var rate: float = acceleration_mps2 if absf(target_speed) > absf(_speed_mps) else braking_mps2
 	_speed_mps = move_toward(_speed_mps, target_speed, rate * delta)
