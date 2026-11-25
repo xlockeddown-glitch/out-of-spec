@@ -84,7 +84,7 @@ scenes/          playable scenes
 scripts/         GDScript (autoload/, rover/, world/, camera/, ui/)
 ui/              UI scenes (field phone HUD)
 data/            JSON game data, loaded by the DataManager autoload
-scripts/autoload/   DataManager, GameClock, GameState (live state across scenes), SaveGame, SceneSwitcher
+scripts/autoload/   DataManager, GameClock, GameState (live state across scenes), FarmCommands, CoopSession, SaveGame, SceneSwitcher
 scripts/metrology/  DriftingSensor: shared instrument drift + guard-band status
 scripts/dome/       dome interior + terrarium visuals
 assets/voxels/   MagicaVoxel exports (Week 4)
