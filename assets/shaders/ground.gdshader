@@ -8,7 +8,8 @@ uniform vec4 band_2 : source_color = vec4(0.557, 0.208, 0.133, 1.0);
 uniform vec4 band_3 : source_color = vec4(0.431, 0.149, 0.09, 1.0);
 uniform vec4 band_4 : source_color = vec4(0.761, 0.42, 0.29, 1.0);
 // The upward part of a normal where a face starts, and ends, to read as a wall.
-// Hills are under 15 degrees (0.966); dug sides are 27 degrees or more (0.89).
+// Hills are under 15 degrees (0.966); dug sides are about 27 degrees (0.89) on
+// level land. One that faces up a steep hill can be flatter and stay ground.
 uniform float wall_from = 0.955;
 uniform float wall_to = 0.925;
 uniform float band_m = 0.25;

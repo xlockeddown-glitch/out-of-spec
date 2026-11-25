@@ -296,7 +296,10 @@ func _mesh_of(path: String) -> Mesh:
 	model.free()
 	# Instance colors only show on materials that read vertex colors.
 	for surface: int in mesh.get_surface_count():
-		var material := mesh.surface_get_material(surface).duplicate() as StandardMaterial3D
+		var own := mesh.surface_get_material(surface) as StandardMaterial3D
+		if own == null:
+			continue
+		var material: StandardMaterial3D = own.duplicate()
 		material.vertex_color_use_as_albedo = true
 		mesh.surface_set_material(surface, material)
 	return mesh

@@ -66,10 +66,11 @@ func show_dug(dug: Dictionary[Vector2i, int]) -> void:
 				if absi(x) > Terrain.HALF_M or absi(z) > Terrain.HALF_M:
 					continue
 				_heights[_index(x, z)] = Terrain.point_height(Vector2i(x, z), _dug)
-				# A point on a square's edge is in the squares on both sides.
-				for dx: int in 2:
-					for dz: int in 2:
-						rebuild[_chunk_of(Vector2i(x - dx, z - dz))] = true
+				# A point's height also sets its neighbors' normals, and a point on a
+				# square's edge is in the squares on both sides.
+				for dx: int in range(-2, 2):
+					for dz: int in range(-2, 2):
+						rebuild[_chunk_of(Vector2i(x + dx, z + dz))] = true
 	_shape.map_data = _heights
 	for chunk: Vector2i in rebuild:
 		if _chunks.has(chunk):

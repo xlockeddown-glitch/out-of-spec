@@ -252,7 +252,7 @@ func test_shrubs_differ_in_shape_tint_and_size_and_repeat_exactly() -> String:
 		heights[int(first[i].stretch().y * 100.0)] = true
 		if first[i].stretch().x > 1.0:
 			return "A shrub is wider than the room the hills gave it."
-	if loose < shrubs / 5 or loose > shrubs * 3 / 5:
+	if loose * 5 < shrubs or loose * 5 > shrubs * 3:
 		return "%d of %d shrubs are loose; the mix is off." % [loose, shrubs]
 	if tints.size() < 4 or heights.size() < 8:
 		return "Shrubs barely vary: %d tints, %d heights." % [tints.size(), heights.size()]
