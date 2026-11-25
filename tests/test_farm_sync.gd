@@ -235,6 +235,15 @@ func test_bad_bytes_change_nothing() -> String:
 			var data: Dictionary = whole.duplicate(true)
 			data["farm"][list].append({ "instrument_id": "x", "standard_id": "x" })
 			bad[list] = SaveGame.to_bytes(data)
+		var record: Dictionary = host.calibrate_at_bench(GameStateScript.HYGROMETER_ID, host.local_player_id)
+		for field: String in ["", "as_found_in_tolerance", "result", "day"]:
+			var data: Dictionary = whole.duplicate(true)
+			data["farm"]["cal_log"].append(record.duplicate())
+			data["farm"]["cal_log"][-1].erase(field)
+			if field != "":
+				bad["cal_log without " + field] = SaveGame.to_bytes(data)
+			elif host.farm_dict_problem(data["farm"]) != "":
+				return "A whole record must load: %s" % host.farm_dict_problem(data["farm"])
 		for clock: Array in [["elapsed_days", NAN], ["elapsed_days", -1.0], ["seconds_per_day", INF], ["paused", 1]]:
 			var data: Dictionary = whole.duplicate(true)
 			data["clock"][clock[0]] = clock[1]

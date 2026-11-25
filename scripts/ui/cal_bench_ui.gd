@@ -115,6 +115,10 @@ func _on_pod_or_oirm_changed() -> void:
 	var index: int = _ids.find(_current_id)
 	if not visible or index < 0:
 		return
+	if _current_id.begins_with(JOB_PREFIX):
+		# The standard it would use may have changed.
+		_show_job(GameState.active_job(_current_id.trim_prefix(JOB_PREFIX)))
+		return
 	var standard: bool = _is_standard(_current_id)
 	# With no reference there is no reading to keep.
 	if not _calibrated and (_away_text() != _away or (standard and (not _has_reference or not GameState.has_bench_reference(_current_id)))):

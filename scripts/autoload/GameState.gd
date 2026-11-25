@@ -454,6 +454,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 		for entry: Dictionary in data[needs[0]]:
 			if not _has_fields(entry, needs[1], needs[2]):
 				return "'%s' has an entry with a field missing." % needs[0]
+	for record: Dictionary in data["cal_log"]:
+		if not record.get("as_found_in_tolerance") is bool or not record.get("traceable", true) is bool 				or not record.get("performed_by", "") is String or not record.get("standard_problem", "") is String:
+			return "'cal_log' has an entry with a field missing."
 	for cert: Dictionary in data["certificate_log"]:
 		# A maker's certificate has no as-found; an in-house one names its reference.
 		if not cert.has("as_found") or not (cert["as_found"] == null or cert["as_found"] is float or cert["as_found"] is int) 				or not cert.get("as_found_in_tolerance") is bool 				or (cert.has("reference_id") and not _has_fields(cert, ["reference_id", "reference_certificate"], [])):
