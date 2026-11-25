@@ -140,3 +140,32 @@ func test_height_unchanged() -> String:
 	if absf(top - 1.6) > 0.001:
 		return "top is %f m, expected 1.6" % top
 	return ""
+
+
+func test_players_getting_out_together_try_different_spots() -> String:
+	var firsts: Array[Vector3] = []
+	for place: int in FarmWalkers.SPOTS.size():
+		var spots: Array[Vector3] = FarmWalkers.spots_for(place)
+		if spots[0] in firsts:
+			return "two players try %s first" % spots[0]
+		firsts.append(spots[0])
+		for spot: Vector3 in FarmWalkers.SPOTS:
+			if not spot in spots:
+				return "player %d never tries %s" % [place, spot]
+	if FarmWalkers.spots_for(-1) != FarmWalkers.SPOTS:
+		return "solo tries them as before"
+	var out: Dictionary = CoopWalkers.out.duplicate()
+	CoopWalkers.out.clear()
+	CoopWalkers.out["someone_else"] = [5.0, 0.0, 5.0, 0.0, 0.0]
+	var problem: String = ""
+	if not FarmWalkers._is_taken(Vector3(5, 0, 5)):
+		problem = "a spot someone stands on is taken"
+	elif FarmWalkers._is_taken(Vector3(7, 0, 5)):
+		problem = "a spot 2 m from them is not"
+	CoopWalkers.out.clear()
+	CoopWalkers.out[GameState.local_player_id] = [5.0, 0.0, 5.0, 0.0, 0.0]
+	if problem == "" and FarmWalkers._is_taken(Vector3(5, 0, 5)):
+		problem = "one's own place is not taken"
+	CoopWalkers.out.clear()
+	CoopWalkers.out.merge(out)
+	return problem
