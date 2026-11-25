@@ -319,7 +319,7 @@ var farm_skill_xp: Dictionary = {}
 var robots: Dictionary = {}
 ## The farm's water cistern. It runs down as growing plots are irrigated and is
 ## refilled at each morning. Nothing else reads it: an empty cistern changes no
-## crop yet (open with Ryan). All three numbers are [PLACEHOLDER]: 36 growing
+## crop yet (open with Ryan). Both numbers are [PLACEHOLDER]: 36 growing
 ## plots use about 140 L a day, all 144 about 550 L.
 const CISTERN_CAPACITY_L: float = 600.0
 const CISTERN_DRAW_L_PER_PLOT_HOUR: float = 0.16
@@ -567,7 +567,7 @@ func farm_dict_problem(data: Dictionary) -> String:
 				or not hits[boulder] is int or hits[boulder] < 1 or hits[boulder] > BOULDER_HITS:
 			return "'boulder_hits' has a boulder that can't be hit like that."
 	var liters: Variant = data.get("cistern_liters", CISTERN_CAPACITY_L)
-	if not (liters is float or liters is int) or not is_finite(float(liters)) or liters < 0.0 or liters > CISTERN_CAPACITY_L:
+	if not liters is float or liters < 0.0 or liters > CISTERN_CAPACITY_L:
 		return "'cistern_liters' is out of range."
 	if data.get("sentinel_days_unseen", 0) < 0 or data.get("sentinel_days_unseen", 0) > SENTINEL_DAYS_MAX:
 		return "'sentinel_days_unseen' is out of range."
@@ -4658,13 +4658,16 @@ func growing_plots() -> int:
 ## The cistern gives water for `delta_days` of irrigation. It never goes below
 ## empty; what that does is not decided. Time-based, so frame rate does not matter.
 func _draw_cistern(delta_days: float) -> void:
+	if cistern_liters <= 0.0:
+		return
 	var draw: float = float(growing_plots()) * CISTERN_DRAW_L_PER_PLOT_HOUR * delta_days * GameClock.HOURS_PER_DAY
 	cistern_liters = maxf(cistern_liters - draw, 0.0)
 
 
 ## "Cistern: 420 L of 600 L."
 func cistern_text() -> String:
-	var text: String = "Cistern: %s L of %s L." % [SP811.integer(roundi(cistern_liters)), SP811.integer(roundi(CISTERN_CAPACITY_L))]
+	# Rounded up, so only an empty one reads 0 L.
+	var text: String = "Cistern: %s L of %s L." % [SP811.integer(ceili(cistern_liters)), SP811.integer(roundi(CISTERN_CAPACITY_L))]
 	return text + " Empty." if cistern_liters <= 0.0 else text
 
 

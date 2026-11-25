@@ -12,29 +12,31 @@ const FRAME_COLOR := Color("#6c7a89")
 const STEPS: int = 20
 const SLOT_COLOR := Color("#1d222b")
 
-var _slot: MeshInstance3D
 var _water: MeshInstance3D
 var _material := StandardMaterial3D.new()
 var _shown: int = -1
+var _color: Color = VoxelWater.SHALLOW
 
 
 func _ready() -> void:
 	var frame: MeshInstance3D = _box(FRAME_SIZE, FRAME_COLOR)
 	frame.position.y = SLOT_SIZE.y * 0.5
 	add_child(frame)
-	_slot = _box(SLOT_SIZE, SLOT_COLOR)
-	_slot.position.y = SLOT_SIZE.y * 0.5
+	var slot: MeshInstance3D = _box(SLOT_SIZE, SLOT_COLOR)
+	slot.position.y = SLOT_SIZE.y * 0.5
 	_water = _box(Vector3(SLOT_SIZE.x * 0.8, SLOT_SIZE.y - 0.04, SLOT_SIZE.z + 0.03), VoxelWater.SHALLOW)
 	_water.material_override = _material
 	_material.roughness = 1.0
+	# It stands on the tank's shaded face, where lit water reads almost black.
 	_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	add_child(_slot)
+	add_child(slot)
 	add_child(_water)
 	_update()
 
 
 func _process(_delta: float) -> void:
 	_update()
+	_dim()
 
 
 ## Steps of water for a level, 0 only when empty.
@@ -54,7 +56,14 @@ func _update() -> void:
 	_water.scale.y = maxf(height, 0.001) / (SLOT_SIZE.y - 0.04)
 	# The water's foot stays on the slot's bottom.
 	_water.position.y = 0.02 + height * 0.5
-	_material.albedo_color = VoxelWater.SHALLOW.lerp(VoxelWater.DEEP, 1.0 - float(steps) / STEPS)
+	_color = VoxelWater.SHALLOW.lerp(VoxelWater.DEEP, 1.0 - float(steps) / STEPS)
+
+
+## Unshaded water would glow at night, so it dims with the farm's ambient light.
+func _dim() -> void:
+	var environment: Environment = get_world_3d().environment
+	var level: float = clampf(environment.ambient_light_energy, 0.0, 1.0) if environment else 1.0
+	_material.albedo_color = _color * Color(level, level, level)
 
 
 func _box(size: Vector3, color: Color) -> MeshInstance3D:

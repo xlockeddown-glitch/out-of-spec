@@ -222,6 +222,9 @@ func test_the_text() -> String:
 	var problem: String = ""
 	if gs.cistern_text() != "Cistern: 420 L of 600 L.":
 		problem = "Got '%s'." % gs.cistern_text()
+	gs.cistern_liters = 0.3
+	if problem == "" and gs.cistern_text() != "Cistern: 1 L of 600 L.":
+		problem = "A little got '%s'." % gs.cistern_text()
 	gs.cistern_liters = 0.0
 	if problem == "" and gs.cistern_text() != "Cistern: 0 L of 600 L. Empty.":
 		problem = "Empty got '%s'." % gs.cistern_text()
@@ -237,7 +240,7 @@ func test_the_gauge_shows_empty_only_when_empty() -> String:
 		return "A little water must show a little."
 	if CisternGauge.steps_for(cap, cap) != CisternGauge.STEPS:
 		return "Full must fill the glass."
-	if CisternGauge.steps_for(cap * 0.5, cap) != CisternGauge.STEPS / 2:
+	if CisternGauge.steps_for(cap * 0.5, cap) != roundi(CisternGauge.STEPS * 0.5):
 		return "Half must be half."
 	return ""
 
