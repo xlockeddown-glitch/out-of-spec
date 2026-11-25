@@ -214,6 +214,7 @@ func _physics_process(delta: float) -> void:
 	if moves:
 		_drive(delta)
 		CoopRovers.moved(rover_id, global_transform, _speed_mps, has_line_of_sight)
+		FarmCommands.rover_at(rover_id, global_position, _speed_mps)
 	else:
 		_follow(delta)
 	_lie_on_ground(delta)

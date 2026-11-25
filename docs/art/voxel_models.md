@@ -337,3 +337,4 @@ Where the generated models differ from the footprints above:
 
   The two underground ones are for the tunnels.
 - **On the hills** (`HillDressing`): shrubs and poppies on the slopes, seven basalt clusters, three buttes, the arch and three outcrops (`rim_inner_corner`). Plants have no collision; each rock is a whole box that stops rovers and the uplink.
+- **Cobalt Sentinel** (Ryan's rigged spider and crib, 2026-11-24): `cobalt_body` 6 × 5 × 12 voxels and `cobalt_leg` 6 × 4 × 2 at 0.025 m, joined by `TarantulaRig`; `sentinel_crib` 14 × 12 × 12 at 0.05 m, G1 as a see-through part `glass`, the 62 voxels of its built-in spider left out.

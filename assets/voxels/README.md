@@ -70,6 +70,8 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `rim_inner_corner.glb` | Banded outcrop, a convex outer corner despite its name, 2.0 m × 2.0 m × 2.0 m tall; three on the farm's hills | 0.2 m voxels, origin at ground level. Built from Ryan's More Environment Variants grid (`tools/voxgen/sheets/rim_inner_corner.txt`). |
 | `sub_crystal_seam_wall.glb` | Underground wall with a lit crystal seam, 2.0 m × 2.0 m × 2.0 m tall; not placed | 0.2 m voxels, origin at ground level. Built from Ryan's More Environment Variants grid (`tools/voxgen/sheets/sub_crystal_seam_wall.txt`). |
 | `sub_pillar_vault.glb` | Underground vault on two pillars, 2.4 m × 2.4 m × 2.0 m tall; not placed | 0.2 m voxels, origin at ground level. Built from Ryan's More Environment Variants grid (`tools/voxgen/sheets/sub_pillar_vault.txt`). |
+| `cobalt_body.glb`, `cobalt_leg.glb` | The Cobalt Sentinel's body and one leg, put together and moved by `TarantulaRig` (the wild one in the tunnels and the one in its tank) | 0.025 m voxels, origin at ground level. Built from Ryan's rigged spider grids (`tools/voxgen/sheets/cobalt_body.txt`, `cobalt_leg.txt`). |
+| `sentinel_crib.glb` | The Cobalt Sentinel's tank in the dome | 0.05 m voxels, origin at ground level, glass see-through. Built from Ryan's crib grid (`tools/voxgen/sheets/sentinel_crib.txt`), without its built-in spider. |
 
 Each slot's `model_scale` sets the voxel size (0.025 m, 0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 
