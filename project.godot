@@ -25,6 +25,7 @@ DataManager="*res://scripts/autoload/DataManager.gd"
 GameClock="*res://scripts/autoload/GameClock.gd"
 GameState="*res://scripts/autoload/GameState.gd"
 FarmCommands="*res://scripts/autoload/FarmCommands.gd"
+CoopSession="*res://scripts/autoload/CoopSession.gd"
 SaveGame="*res://scripts/autoload/SaveGame.gd"
 SceneSwitcher="*res://scripts/autoload/SceneSwitcher.gd"
 

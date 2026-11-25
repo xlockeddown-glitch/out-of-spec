@@ -233,6 +233,9 @@ var seed_crop_id: String = ""
 var planting_offset_steps: int = 0
 ## Player id -> { skill id: XP }, for the skills each player has of their own.
 var player_skill_xp: Dictionary = {}
+## The next guest is this player. Kept with the farm, so a newcomer never takes
+## the skills or records of someone who played before.
+var next_player_number: int = 2
 ## Skill id -> XP, for the skills the whole farm shares.
 var farm_skill_xp: Dictionary = {}
 ## Robot id ("TR-1") -> { frame, name, state (ROBOT_STATES), done_day,
@@ -393,7 +396,7 @@ const SAVED_FIELDS: Array[String] = [
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
-	"_spool_damaged", "slotted_spool_damaged"]
+	"_spool_damaged", "slotted_spool_damaged", "next_player_number"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -449,6 +452,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 	for own: Variant in data.get("player_skill_xp", {}).values():
 		if typeof(own) != TYPE_DICTIONARY or not _holds_only_ints(own):
 			return "'player_skill_xp' has a player whose XP is not whole numbers."
+	if data.get("next_player_number", 2) < 2:
+		return "'next_player_number' is below 2."
 	if not _holds_only_ints(data.get("farm_skill_xp", {})):
 		return "'farm_skill_xp' has XP that is not a whole number."
 	var robot_problem: String = _robots_dict_problem(data.get("robots", {}))
