@@ -9,6 +9,8 @@ extends Node
 ## Host and guests: someone else is in, or out.
 signal player_joined(player_id: String)
 signal player_left(player_id: String)
+## Host: a guest's command is done and its answer goes next.
+signal command_done(player_id: String)
 ## Guest: the host let us in as `player_id`.
 signal joined(player_id: String)
 ## Guest: we never got in.
@@ -144,6 +146,12 @@ func leave() -> void:
 		_own_id = ""
 
 
+## Guest: ends the connection, as if the host had. `lost` follows.
+func hang_up() -> void:
+	if _accepted:
+		_end(NO_HOST)
+
+
 func is_hosting() -> bool:
 	return _hosting
 
@@ -153,7 +161,7 @@ func port() -> int:
 	return _peer.host.get_local_port() if _hosting else 0
 
 
-## Host: sends `data`, for a later syncing layer, to one guest or ("") to all.
+## Host: sends `data`, for CoopSync, to one guest or ("") to all.
 ## It arrives in order with answers. False if it can't be sent.
 func send_state(data: Dictionary, player_id: String = "") -> bool:
 	if not _hosting or not is_plain([STATE, data]):
@@ -257,6 +265,9 @@ func _host_read(from: int, packet: PackedByteArray, now: int) -> bool:
 		if (argument is String or argument is StringName) and str(argument).length() > MAX_TEXT:
 			return false
 	var answer: Variant = _farm_commands().execute(link["player"], StringName(action), arguments)
+	# What the command changed must reach the guest before the answer does.
+	if _links.has(from):
+		command_done.emit(link["player"])
 	# What the command set off may have ended the session.
 	if _links.has(from):
 		_send(from, [ANSWER, message[1], answer if is_plain([answer]) else null])
