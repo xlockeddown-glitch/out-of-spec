@@ -1171,8 +1171,9 @@ func let_in_guest(key: String, brought: Dictionary, players: Array[String]) -> S
 	if player_id in players:
 		return ""
 	if player_id == "":
-		player_id = "player_%d" % next_player_number
-		next_player_number += 1
+		while player_id == "" or player_id in players:
+			player_id = "player_%d" % next_player_number
+			next_player_number += 1
 		if guest_ids.size() >= MAX_KNOWN_GUESTS:
 			_forget_a_guest(players)
 		guest_ids[hashed] = player_id

@@ -1,13 +1,14 @@
 extends Node
 ## Who this player is on friends' farms, and the skills earned there: a file on
-## this PC that the player may edit. Autoloaded as `CoopProfile`. Nothing is read
-## until a farm is joined, or written but as a guest.
+## this PC that the player may edit. Autoloaded as `CoopProfile`. It is read
+## and written only to join a farm, and as a guest.
 
 const PATH: String = "user://coop_player.json"
 const KEY_BYTES: int = 16
 ## More XP than any skill can need. JSON keeps whole numbers this big exactly.
 const MOST_XP: int = 1000000000
-const MOST_SKILLS: int = 32
+## So that they fit in a guest's message.
+const MOST_SKILLS: int = 16
 const MAX_FILE_BYTES: int = 8192
 
 ## Only tests set others. "" keeps no file.
