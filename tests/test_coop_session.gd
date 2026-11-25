@@ -17,6 +17,26 @@ func test_a_bad_address_opens_nothing() -> String:
 	return _finish("")
 
 
+func test_only_enet_is_available() -> String:
+	var session: Node = _session()
+	for way: String in ["steam", "Enet", ""]:
+		var host_problem: String = session.host(0, LOCAL, way)
+		var join_problem: String = session.join(LOCAL, 1, way)
+		if host_problem == "" or join_problem != host_problem or (host_problem == SessionScript.NO_STEAM) != (way == "steam"):
+			return _finish("'%s' got '%s', '%s'" % [way, host_problem, join_problem])
+		if session._peer != null or session.is_hosting() or session.port() != 0 or session.is_processing():
+			return _finish("'%s' must open nothing" % way)
+	if session.host(0, LOCAL, "enet") != "" or not session._peer is ENetMultiplayerPeer or session.port() == 0:
+		return _finish("ENet must still open after a refusal")
+	if session.host(0, LOCAL, "steam") != "Leave the co-op farm first.":
+		return _finish("An open farm comes first")
+	var guest: Node = _session()
+	if guest.join(LOCAL, session.port(), "enet") != "" or not _until(func() -> bool: return _got(guest, "joined")):
+		return _finish("And be joined")
+	session.leave()
+	return _finish("" if session.port() == 0 else "A closed farm has no port")
+
+
 func test_joining_and_leaving() -> String:
 	var host: Node = _host()
 	var first: Node = _guest(host)

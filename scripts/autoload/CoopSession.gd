@@ -41,6 +41,7 @@ const REASONS: Dictionary = {
 	"version": "The host has another version of the game.",
 }
 const NO_HOST: String = "The host did not answer."
+const NO_STEAM: String = "Steam unavailable."
 
 ## Connections beyond the players, so a full farm can still say so.
 const SPARE_CONNECTIONS: int = 4
@@ -107,8 +108,8 @@ func _exit_tree() -> void:
 
 
 ## Opens the farm to guests. Returns "" or why not.
-func host(listen_port: int = DEFAULT_PORT, bind_ip: String = "*") -> String:
-	var problem: String = _start_problem()
+func host(listen_port: int = DEFAULT_PORT, bind_ip: String = "*", transport: String = "enet") -> String:
+	var problem: String = _start_problem(transport)
 	if problem != "":
 		return problem
 	var made: Variant = _make_host_peer(listen_port, bind_ip)
@@ -126,8 +127,8 @@ func host(listen_port: int = DEFAULT_PORT, bind_ip: String = "*") -> String:
 ## Asks to join the host at `address`. Returns "" or why not; then joined or
 ## refused follows. From the title menu: a guest has no farm of its own open,
 ## so nothing autosaves the host's farm over it.
-func join(address: String, host_port: int = DEFAULT_PORT) -> String:
-	var problem: String = _start_problem()
+func join(address: String, host_port: int = DEFAULT_PORT, transport: String = "enet") -> String:
+	var problem: String = _start_problem(transport)
 	if problem != "":
 		return problem
 	if SaveGame.farm_open:
@@ -485,8 +486,15 @@ func _end(reason: String) -> void:
 		refused.emit(reason)
 
 
-func _start_problem() -> String:
-	return "Leave the co-op farm first." if _peer != null or _own_id != "" else ""
+func _start_problem(transport: String) -> String:
+	if _peer != null or _own_id != "":
+		return "Leave the co-op farm first."
+	match transport:
+		"enet":
+			return ""
+		"steam":
+			return NO_STEAM
+	return "'%s' is not a way to connect." % transport
 
 
 ## A peer listening for guests, or why not. Its own id must be 1.
