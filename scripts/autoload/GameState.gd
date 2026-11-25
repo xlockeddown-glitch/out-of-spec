@@ -238,6 +238,9 @@ var player_skill_xp: Dictionary = {}
 ## The next guest is this player. Kept with the farm, so a newcomer never takes
 ## the skills or records of someone who played before.
 var next_player_number: int = 2
+## A guest's key, hashed (each guest gets the whole farm) -> player id, so a
+## friend who comes back is the same player.
+var guest_ids: Dictionary = {}
 ## Skill id -> XP, for the skills the whole farm shares.
 var farm_skill_xp: Dictionary = {}
 ## Robot id ("TR-1") -> { frame, name, state (ROBOT_STATES), done_day,
@@ -395,10 +398,12 @@ const SAVED_FIELDS: Array[String] = [
 	"_board_day", "_board_band", "_board_taken", "lab_size", "lab_areas", "lab_build",
 	"lab_layout", "plantings", "harvest_bin", "seed_crop_id", "planting_offset_steps",
 ]
+## Guests a farm remembers [PLACEHOLDER].
+const MAX_KNOWN_GUESTS: int = 64
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
-	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number"]
+	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -499,6 +504,13 @@ func farm_dict_problem(data: Dictionary) -> String:
 			return "'player_skill_xp' has a player whose XP is not whole numbers."
 	if data.get("next_player_number", 2) < 2:
 		return "'next_player_number' is below 2."
+	var guests: Dictionary = data.get("guest_ids", {})
+	for key: Variant in guests:
+		if not key is String or not guests[key] is String or guests.values().count(guests[key]) > 1:
+			return "'guest_ids' has an entry that is not a player."
+		var number: int = (guests[key] as String).trim_prefix("player_").to_int()
+		if guests[key] != "player_%d" % number or number < 2 or number >= data.get("next_player_number", 2):
+			return "'guest_ids' has an entry that is not a player."
 	if not _holds_only_ints(data.get("farm_skill_xp", {})):
 		return "'farm_skill_xp' has XP that is not a whole number."
 	var robot_problem: String = _robots_dict_problem(data.get("robots", {}))
@@ -1148,6 +1160,41 @@ func skill_effects_text(skill_id: String, player_id: String = "") -> String:
 
 func max_skill_level() -> int:
 	return int(DataManager.get_number(SKILLS_TABLE, "level_curve/max_level", 10.0))
+
+
+## Host: the player this guest is, new or back again, or "" if already in. Each
+## own skill is the better of what the farm has and what the guest brings, up to
+## the top level [ASSUMPTION].
+func let_in_guest(key: String, brought: Dictionary, players: Array[String]) -> String:
+	var hashed: String = key.sha256_text()
+	var player_id: String = guest_ids.get(hashed, "")
+	if player_id in players:
+		return ""
+	if player_id == "":
+		player_id = "player_%d" % next_player_number
+		next_player_number += 1
+		if guest_ids.size() >= MAX_KNOWN_GUESTS:
+			_forget_a_guest(players)
+		guest_ids[hashed] = player_id
+	if not player_skill_xp.has(player_id):
+		player_skill_xp[player_id] = {}
+	for skill: String in skill_ids():
+		var xp: int = mini(brought.get(skill, 0), xp_for_level(max_skill_level()))
+		if not is_farm_skill(skill) and xp > skill_xp(skill, player_id):
+			player_skill_xp[player_id][skill] = xp
+			skill_xp_changed.emit(player_id, skill)
+	return player_id
+
+
+## So strangers can't fill the farm: the first guest who isn't in, and the skills
+## they had here.
+func _forget_a_guest(players: Array[String]) -> void:
+	for hashed: String in guest_ids:
+		var player_id: String = guest_ids[hashed]
+		if not player_id in players:
+			guest_ids.erase(hashed)
+			player_skill_xp.erase(player_id)
+			return
 
 
 ## Total XP that reaches `level`: base × (level − 1) × level / 2.

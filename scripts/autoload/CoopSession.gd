@@ -22,7 +22,7 @@ signal lost
 signal state_received(data: Dictionary)
 
 ## Raise it whenever two versions could disagree about the farm or the messages.
-const PROTOCOL: int = 2
+const PROTOCOL: int = 3
 const DEFAULT_PORT: int = 24711
 const MAX_PLAYERS: int = 4
 
@@ -30,6 +30,7 @@ enum { HELLO, COMMAND, WELCOME, REFUSED, JOINED, LEFT, ANSWER, STATE }
 
 const REASONS: Dictionary = {
 	"full": "The farm is full.",
+	"here": "You are already in this farm. If your connection was lost, try again in a minute.",
 	"version": "The host has another version of the game.",
 }
 const NO_HOST: String = "The host did not answer."
@@ -53,8 +54,9 @@ var protocol: int = PROTOCOL
 ## A connection gets this long to be let in, and a command to be answered.
 var join_timeout_ms: int = 10000
 var answer_timeout_ms: int = 10000
-## Only tests set another.
+## Only tests set others.
 var commands: Node
+var profile: Node
 
 var _peer: ENetMultiplayerPeer
 var _hosting: bool = false
@@ -156,6 +158,11 @@ func is_hosting() -> bool:
 	return _hosting
 
 
+## Let in by a host, and still connected.
+func is_guest() -> bool:
+	return _accepted
+
+
 ## The port hosted on, or 0.
 func port() -> int:
 	return _peer.host.get_local_port() if _hosting else 0
@@ -249,9 +256,17 @@ func _host_read(from: int, packet: PackedByteArray, now: int) -> bool:
 		return false
 	var message: Array = _unpack(packet)
 	if link["player"] == "":
-		if not _is_shape(message, [HELLO, TYPE_INT]):
+		if not _is_shape(message.slice(0, 2), [HELLO, TYPE_INT]):
 			return false
-		_let_in(from, message[1])
+		# Another version may say hello in another way.
+		if message[1] != protocol:
+			_send(from, [REFUSED, "version"])
+			return true
+		if not _is_shape(message, [HELLO, TYPE_INT, TYPE_STRING, TYPE_DICTIONARY]):
+			return false
+		if not CoopProfile.is_key(message[2]) or not CoopProfile.are_skills(message[3]):
+			return false
+		_let_in(from, message[2], message[3])
 		return true
 	if not _is_shape(message, [COMMAND, TYPE_INT, TYPE_STRING, TYPE_ARRAY]):
 		return false
@@ -274,21 +289,16 @@ func _host_read(from: int, packet: PackedByteArray, now: int) -> bool:
 	return true
 
 
-func _let_in(id: int, version: int) -> void:
-	var reason: String = ""
-	if version != protocol:
-		reason = "version"
-	elif players.size() >= MAX_PLAYERS:
-		reason = "full"
+func _let_in(id: int, key: String, skills: Dictionary) -> void:
+	var reason: String = "full" if players.size() >= MAX_PLAYERS else ""
+	var player_id: String = ""
+	if reason == "":
+		player_id = _farm_commands()._farm().let_in_guest(key, skills, players)
+		reason = "here" if player_id == "" else ""
 	if reason != "":
 		# The guest hangs up, or is dropped when its time is up.
 		_send(id, [REFUSED, reason])
 		return
-	var player_id: String = ""
-	var farm: Node = _farm_commands()._farm()
-	while player_id == "" or player_id in players:
-		player_id = "player_%d" % farm.next_player_number
-		farm.next_player_number += 1
 	_send(id, [WELCOME, player_id, players])
 	_tell_guests([JOINED, player_id])
 	_links[id]["player"] = player_id
@@ -334,7 +344,8 @@ func _poll_guest() -> void:
 		return
 	if not _hello_sent and status == MultiplayerPeer.CONNECTION_CONNECTED:
 		_hello_sent = true
-		_send(1, [HELLO, protocol])
+		var card: Dictionary = (profile if profile != null else CoopProfile).card()
+		_send(1, [HELLO, protocol, card["key"], card["skills"]])
 
 
 func _expire(now: int) -> void:
