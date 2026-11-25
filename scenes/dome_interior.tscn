@@ -138,6 +138,9 @@ size = Vector3(0.7, 0.6, 0.5)
 [sub_resource type="BoxShape3D" id="Inspect_md2p_humidity_generator"]
 size = Vector3(0.7, 1.2, 0.6)
 
+[sub_resource type="BoxShape3D" id="SentinelShape"]
+size = Vector3(0.7, 0.6, 0.5)
+
 [node name="DomeInterior" type="Node3D"]
 script = ExtResource("1_dome")
 
@@ -739,6 +742,84 @@ prop_id = "brazilian_black_tank"
 
 [node name="Shape" type="CollisionShape3D" parent="BrazilianBlackTank/Inspect"]
 shape = SubResource("Inspect_brazilian_black_tank")
+
+[node name="SentinelStand" type="CSGBox3D" parent="."]
+position = Vector3(-3.8, 0.3, 2)
+size = Vector3(1.4, 0.6, 0.8)
+material = SubResource("MatBench")
+
+[node name="SentinelTank" type="Node3D" parent="." node_paths=PackedStringArray("status_led", "heat_lamp", "tarantula", "exuvia", "spool_pickup")]
+unique_name_in_owner = true
+position = Vector3(-4.05, 0.6, 2)
+script = ExtResource("2_terr")
+species_id = "cobalt_sentinel"
+status_led = NodePath("StatusLED")
+heat_lamp = NodePath("HeatLamp")
+tarantula = NodePath("Tarantula")
+exuvia = NodePath("Exuvia")
+spool_pickup = NodePath("SpoolPickup")
+
+[node name="TankModel" type="Node3D" parent="SentinelTank"]
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/terrarium.glb"
+model_scale = 0.05
+
+[node name="Tarantula" type="Node3D" parent="SentinelTank"]
+position = Vector3(0.1, 0.1, -0.025)
+
+[node name="SpiderModel" type="Node3D" parent="SentinelTank/Tarantula"]
+position = Vector3(0, 0.05, 0)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/live_tarantula.glb"
+model_scale = 0.05
+
+[node name="Exuvia" type="Node3D" parent="SentinelTank"]
+visible = false
+position = Vector3(0.1, 0.15, -0.025)
+
+[node name="ExuviaModel" type="Node3D" parent="SentinelTank/Exuvia"]
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/tarantula_exuvia.glb"
+model_scale = 0.05
+
+[node name="StatusLED" type="CSGSphere3D" parent="SentinelTank"]
+position = Vector3(0.3, 0.05, 0.28)
+radius = 0.03
+
+[node name="HeatLamp" type="OmniLight3D" parent="SentinelTank"]
+position = Vector3(0, 0.5, 0)
+light_color = Color(1, 0.72, 0.42, 1)
+light_energy = 0.8
+omni_range = 1.2
+
+[node name="SentinelClick" type="Area3D" parent="SentinelTank"]
+unique_name_in_owner = true
+position = Vector3(0, 0.3, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("3_click")
+hint = "Empty tank"
+
+[node name="Shape" type="CollisionShape3D" parent="SentinelTank/SentinelClick"]
+shape = SubResource("SentinelShape")
+
+[node name="SpoolPickup" type="Area3D" parent="SentinelTank"]
+visible = false
+position = Vector3(0.65, 0.15, 0.1)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("3_click")
+hint = "Collect optical silk spool"
+enabled = false
+
+[node name="Shape" type="CollisionShape3D" parent="SentinelTank/SpoolPickup"]
+shape = SubResource("SpoolShape")
+
+[node name="SkeinModel" type="Node3D" parent="SentinelTank/SpoolPickup"]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.15, 0)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/tarantula_silk_skein.glb"
+model_scale = 0.05
 
 [node name="SilkSpoolModel" type="Node3D" parent="."]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -3.7, 1, 0.55)

@@ -11,6 +11,8 @@ const TOAST_SECONDS_PER_CHAR: float = 0.04
 @onready var _airlock: Clickable = %AirlockClick
 @onready var _terrarium_click: Clickable = %TerrariumClick
 @onready var _spool: Clickable = %SpoolPickup
+@onready var _sentinel_tank: Terrarium = %SentinelTank
+@onready var _sentinel_click: Clickable = %SentinelClick
 @onready var _bench_ui: CalBenchUI = %CalBenchUI
 @onready var _plan_board: Clickable = %PlanBoardClick
 @onready var _plan_board_ui: PlanBoardUI = %PlanBoardUI
@@ -47,6 +49,10 @@ func _ready() -> void:
 	_airlock.clicked.connect(func() -> void: SceneSwitcher.swap_to(SceneSwitcher.outside))
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)
+	_sentinel_click.clicked.connect(_on_sentinel_clicked)
+	_sentinel_tank.spool_pickup.clicked.connect(_on_sentinel_spool_clicked)
+	GameState.enclosures_changed.connect(_refresh_sentinel_hint)
+	_refresh_sentinel_hint()
 	for prop: Inspectable in get_tree().get_nodes_in_group(Inspectable.GROUP):
 		prop.inspected.connect(_toast)
 	GameState.calibration_recorded.connect(_on_calibration_recorded)
@@ -126,6 +132,33 @@ func _on_terrarium_clicked() -> void:
 func _on_spool_clicked() -> void:
 	if await FarmCommands.request(&"collect_spool"):
 		_toast("Collected 1 optical silk spool. Install it at the farm relay.")
+
+
+func _refresh_sentinel_hint() -> void:
+	var id: String = _sentinel_tank.species_id
+	_sentinel_click.hint = "Inspect " + _sentinel_name() if GameState.is_caught(id) else "Empty tank"
+
+
+func _sentinel_name() -> String:
+	return _field(DataManager.get_record(GameState.SPECIES_TABLE, StringName(_sentinel_tank.species_id)), "common_name", "?")
+
+
+## The tank's humidity is as the dome's one hygrometer shows it.
+func _on_sentinel_clicked() -> void:
+	var id: String = _sentinel_tank.species_id
+	if not GameState.is_caught(id):
+		_toast("Empty tank, ready for a rare tarantula.")
+		return
+	var species: Dictionary = DataManager.get_record(GameState.SPECIES_TABLE, StringName(id))
+	var reading: float = GameState.enclosure_humidity_reading(id)
+	_toast("%s: ideal relative humidity (%s ± %s) %%, now %s. %s." % [_sentinel_name(),
+		_field(species, "ideal_humidity_pct", "?"), _field(species, "humidity_tolerance_pct", "?"),
+		"not set" if is_nan(reading) else SP811.number(reading, 1) + " %", GameState.enclosure_text(id)])
+
+
+func _on_sentinel_spool_clicked() -> void:
+	if await FarmCommands.request(&"collect_enclosure_spool", [_sentinel_tank.species_id]):
+		_toast("Collected 1 optical silk spool, %s. Install it at the farm relay." % _sentinel_name())
 
 
 func _on_calibration_recorded(record: Dictionary) -> void:
