@@ -23,6 +23,7 @@
 [ext_resource type="Script" path="res://scripts/world/survey_line.gd" id="36_survey"]
 [ext_resource type="Script" path="res://scripts/world/hill_dressing.gd" id="34_dress"]
 [ext_resource type="Shader" path="res://assets/shaders/ground.gdshader" id="35_groundshader"]
+[ext_resource type="Script" path="res://scripts/world/ford.gd" id="36_ford"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -1148,3 +1149,6 @@ model_scale = 0.2
 
 [node name="HillDressing" type="Node3D" parent="WorldView/WorldViewport/World"]
 script = ExtResource("34_dress")
+
+[node name="Ford" type="Node3D" parent="WorldView/WorldViewport/World"]
+script = ExtResource("36_ford")

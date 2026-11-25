@@ -3,7 +3,7 @@ extends RefCounted
 
 const STEEPEST_DEG: float = 15.0
 const ANTENNA_M: float = 2.0
-const HASH: int = 971151723
+const HASH: int = 1162163701
 
 var _none: Dictionary[Vector2i, int] = {}
 
@@ -16,6 +16,9 @@ func test_every_triangle_of_the_land_is_gentle() -> String:
 	var steepest: float = tan(deg_to_rad(STEEPEST_DEG))
 	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M):
 		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M):
+			# The wash's banks are steeper; test_ford keeps them drivable.
+			if Terrain.wash_out(Vector2(x + 0.5, z + 0.5)) < Terrain.WASH_REACH + 0.3:
+				continue
 			# Either way a square is cut in two, a triangle has one side along x and one along z.
 			for x_side: float in [_at(x + 1, z) - _at(x, z), _at(x + 1, z + 1) - _at(x, z + 1)]:
 				for z_side: float in [_at(x, z + 1) - _at(x, z), _at(x + 1, z + 1) - _at(x + 1, z)]:

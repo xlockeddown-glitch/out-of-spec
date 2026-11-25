@@ -22,7 +22,7 @@ static var _cells_seed: int = 0
 
 
 ## The cells that hold a pocket on the farm with `world_seed`: the first few drawn
-## that can be dug and hold no reference block. One stream, as a hash of each cell
+## that can be dug, are not by water and hold no reference block. One stream, as a hash of each cell
 ## would put them in clumps. Kept for the next call: don't change what it gives.
 static func cells(world_seed: int) -> Array[Vector2i]:
 	if _cells.is_empty() or _cells_seed != world_seed:
@@ -34,7 +34,7 @@ static func cells(world_seed: int) -> Array[Vector2i]:
 		rng.seed = hash("%d:ore" % world_seed)
 		while _cells.size() < COUNT:
 			var cell := Vector2i(rng.randi_range(-limit, limit - 1), rng.randi_range(-limit, limit - 1))
-			if Terrain.can_dig(cell) and not HillDressing.is_at_rock(cell) and not cell in _cells and ReferenceBlock.at(world_seed, cell).is_empty():
+			if Terrain.can_dig(cell) and not Terrain.is_near_water(cell) and not HillDressing.is_at_rock(cell) and not cell in _cells and ReferenceBlock.at(world_seed, cell).is_empty():
 				_cells.append(cell)
 	return _cells
 

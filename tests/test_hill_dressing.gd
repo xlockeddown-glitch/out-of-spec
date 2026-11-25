@@ -4,7 +4,7 @@ extends RefCounted
 const ANTENNA_M: float = 2.0
 const ROVER_M: float = 1.6
 ## Every plant's place in whole centimeters (moved once when the arch grew, so shrubs keep clear of it).
-const HASH: int = 2585882081
+const HASH: int = 894339969
 
 var _none: Dictionary[Vector2i, int] = {}
 
