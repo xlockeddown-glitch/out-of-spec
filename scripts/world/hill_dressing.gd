@@ -15,11 +15,13 @@ const ROCK_MODELS: Dictionary[Rock, String] = {
 	Rock.OUTCROP: "res://assets/voxels/rim_inner_corner.glb",
 }
 const ROCK_VOXEL_M: float = 0.2
+## The arch is drawn larger than its pack size, and its box with it [PLACEHOLDER].
+const ROCK_SCALE: Dictionary[Rock, float] = {Rock.ARCH: 1.25}
 ## A whole box, so nobody drives into the arch, which is too small for a rover.
 const ROCK_SIZE_M: Dictionary[Rock, Vector3] = {
 	Rock.BUTTE: Vector3(2.4, 2.8, 2.4),
 	Rock.BASALT: Vector3(2.0, 2.8, 2.0),
-	Rock.ARCH: Vector3(2.8, 2.4, 2.0),
+	Rock.ARCH: Vector3(3.5, 3.0, 2.5),
 	Rock.OUTCROP: Vector3(2.0, 2.0, 2.0),
 }
 ## The arch is wider than deep, and the outcrop's steps face the camera; the others
@@ -62,6 +64,16 @@ const SLOPE: float = 0.08
 const SHRUB_CHANCE_SLOPE: float = 0.45
 const SHRUB_CHANCE_FLAT: float = 0.1
 const SHRUB_SCALE := Vector2(0.75, 1.2)
+## A second, looser shrub shape mixed in [ASSUMPTION], from Ryan's pack.
+const LOOSE_SHRUB_MODEL: String = "res://assets/voxels/mesa_scrub_bush.glb"
+const LOOSE_SHRUB_SHARE: float = 0.4
+## Width and height factors per shrub; width stays under 1 so half_m holds [PLACEHOLDER].
+const SHRUB_WIDTH := Vector2(0.8, 1.0)
+const SHRUB_HEIGHT := Vector2(0.85, 1.25)
+## Muted green and ochre tints, multiplied onto the model's colors [PLACEHOLDER].
+const SHRUB_TINTS: Array[Color] = [
+	Color("ffffff"), Color("d9ebc7"), Color("c9dba6"), Color("ecdcab"), Color("e0c48a"), Color("b8cf9a"),
+]
 ## Poppies come in drifts: this many tries, how many each, how far out, and only
 ## where the ground is this high. At full size the model is 1.1 m tall [PLACEHOLDER].
 const DRIFT_TRIES: int = 90
@@ -90,8 +102,28 @@ class Placed:
 	func half_m() -> float:
 		return PLANT_HALF_M[plant] * size
 
+	## Same spot, same look, from the position alone, so the random stream is not touched.
+	func roll(salt: float) -> float:
+		return fposmod(sin(at.x * 12.9898 + at.z * 78.233 + salt * 37.719) * 43758.5453, 1.0)
+
+	## Only shrubs vary in shape.
+	func is_loose() -> bool:
+		return plant == Plant.SHRUB and roll(1.0) < LOOSE_SHRUB_SHARE
+
+	func tint() -> Color:
+		if plant != Plant.SHRUB:
+			return Color.WHITE
+		return SHRUB_TINTS[int(roll(2.0) * SHRUB_TINTS.size())]
+
+	func stretch() -> Vector3:
+		if plant != Plant.SHRUB:
+			return Vector3.ONE
+		var wide: float = lerpf(SHRUB_WIDTH.x, SHRUB_WIDTH.y, roll(3.0))
+		return Vector3(wide, lerpf(SHRUB_HEIGHT.x, SHRUB_HEIGHT.y, roll(4.0)), wide)
+
 	func place() -> Transform3D:
-		return Transform3D(Basis(Vector3.UP, PI / 2.0 * quarter_turns).scaled(Vector3.ONE * size * PLANT_VOXEL_M), at)
+		var turned := Basis(Vector3.UP, PI / 2.0 * quarter_turns)
+		return Transform3D(turned.scaled(stretch() * size * PLANT_VOXEL_M), at)
 
 
 func _ready() -> void:
@@ -219,7 +251,7 @@ func _add_rock(at: Vector2i) -> void:
 	shape.position.y = box.size.y / 2.0
 	var model := ModelSlot.new()
 	model.model_path = ROCK_MODELS[kind]
-	model.model_scale = ROCK_VOXEL_M
+	model.model_scale = ROCK_VOXEL_M * ROCK_SCALE.get(kind, 1.0)
 	model.rotation.y = PI / 2.0 * ROCK_QUARTER_TURNS.get(kind, _rocks.size())
 	var body := StaticBody3D.new()
 	body.collision_layer = ROCK_LAYERS
@@ -234,11 +266,14 @@ func _add_plants() -> void:
 	var groups: Dictionary[Vector3i, Array] = {}
 	for placed: Placed in plants():
 		var chunk: Vector2i = Vector2i((Vector2(placed.at.x, placed.at.z) / CHUNK_M).floor())
-		groups.get_or_add(Vector3i(chunk.x, placed.plant, chunk.y), []).append(placed)
+		# y is the plant, plus 2 for the loose shrub.
+		var kind: int = placed.plant + (2 if placed.is_loose() else 0)
+		groups.get_or_add(Vector3i(chunk.x, kind, chunk.y), []).append(placed)
 	for group: Vector3i in groups:
 		var multi := MultiMesh.new()
 		multi.transform_format = MultiMesh.TRANSFORM_3D
-		multi.mesh = _mesh_of(PLANT_MODELS[group.y])
+		multi.use_colors = true
+		multi.mesh = _mesh_of(LOOSE_SHRUB_MODEL if group.y >= 2 else PLANT_MODELS[group.y])
 		multi.instance_count = groups[group].size()
 		var drawing := MultiMeshInstance3D.new()
 		drawing.multimesh = multi
@@ -248,8 +283,13 @@ func _add_plants() -> void:
 
 func _mesh_of(path: String) -> Mesh:
 	var model: Node = (load(path) as PackedScene).instantiate()
-	var mesh: Mesh = (model.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).mesh
+	var mesh: Mesh = (model.find_children("*", "MeshInstance3D", true, false)[0] as MeshInstance3D).mesh.duplicate()
 	model.free()
+	# Instance colors only show on materials that read vertex colors.
+	for surface: int in mesh.get_surface_count():
+		var material := mesh.surface_get_material(surface).duplicate() as StandardMaterial3D
+		material.vertex_color_use_as_albedo = true
+		mesh.surface_set_material(surface, material)
 	return mesh
 
 
@@ -262,5 +302,6 @@ func _refresh() -> void:
 		for placed: Placed in _drawn[multi]:
 			if stands(placed, GameState.dug):
 				multi.set_instance_transform(shown, placed.place())
+				multi.set_instance_color(shown, placed.tint())
 				shown += 1
 		multi.visible_instance_count = shown

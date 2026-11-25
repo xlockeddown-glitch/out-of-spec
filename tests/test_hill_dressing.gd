@@ -3,8 +3,8 @@ extends RefCounted
 
 const ANTENNA_M: float = 2.0
 const ROVER_M: float = 1.6
-## Every plant's place in whole centimeters.
-const HASH: int = 2248224254
+## Every plant's place in whole centimeters (moved once when the arch grew, so shrubs keep clear of it).
+const HASH: int = 2585882081
 
 var _none: Dictionary[Vector2i, int] = {}
 
@@ -226,3 +226,39 @@ func test_a_rover_saved_where_a_rock_stands_comes_back_beside_it() -> String:
 	ground.free()
 	GameState.rover_transforms.assign(parked)
 	return problem
+
+
+func test_shrubs_differ_in_shape_tint_and_size_and_repeat_exactly() -> String:
+	var first: Array[HillDressing.Placed] = HillDressing.plants()
+	var again: Array[HillDressing.Placed] = HillDressing.plants()
+	var loose: int = 0
+	var shrubs: int = 0
+	var tints: Dictionary[Color, bool] = {}
+	var heights: Dictionary[int, bool] = {}
+	for i: int in first.size():
+		if first[i].tint() != again[i].tint() or first[i].stretch() != again[i].stretch() or first[i].is_loose() != again[i].is_loose():
+			return "Shrub %d looks different on a second run." % i
+		if first[i].plant != HillDressing.Plant.SHRUB:
+			if first[i].tint() != Color.WHITE or first[i].stretch() != Vector3.ONE or first[i].is_loose():
+				return "Only shrubs may vary."
+			continue
+		shrubs += 1
+		loose += 1 if first[i].is_loose() else 0
+		tints[first[i].tint()] = true
+		heights[int(first[i].stretch().y * 100.0)] = true
+		if first[i].stretch().x > 1.0:
+			return "A shrub is wider than the room the hills gave it."
+	if loose < shrubs / 5 or loose > shrubs * 3 / 5:
+		return "%d of %d shrubs are loose; the mix is off." % [loose, shrubs]
+	if tints.size() < 4 or heights.size() < 8:
+		return "Shrubs barely vary: %d tints, %d heights." % [tints.size(), heights.size()]
+	return ""
+
+
+func test_the_arch_is_drawn_larger_and_its_box_matches() -> String:
+	var kind: HillDressing.Rock = HillDressing.Rock.ARCH
+	var pack := Vector3(2.8, 2.4, 2.0)
+	var want: Vector3 = pack * HillDressing.ROCK_SCALE[kind]
+	if not HillDressing.ROCK_SIZE_M[kind].is_equal_approx(want):
+		return "The arch's box %s does not match its drawn size %s." % [HillDressing.ROCK_SIZE_M[kind], want]
+	return ""

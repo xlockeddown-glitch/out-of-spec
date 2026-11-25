@@ -108,8 +108,8 @@ func _build(chunk: Vector2i) -> void:
 	var tints := PackedColorArray()
 	for x: int in range(chunk.x, chunk.x + CHUNK_M):
 		for z: int in range(chunk.y, chunk.y + CHUNK_M):
-			_add_face(points, normals, _point(x, z), _point(x + 1, z), _point(x, z + 1))
-			_add_face(points, normals, _point(x + 1, z), _point(x + 1, z + 1), _point(x, z + 1))
+			_add_face(points, normals, [Vector2i(x, z), Vector2i(x + 1, z), Vector2i(x, z + 1)])
+			_add_face(points, normals, [Vector2i(x + 1, z), Vector2i(x + 1, z + 1), Vector2i(x, z + 1)])
 			for corner: int in [_index(x, z), _index(x + 1, z), _index(x, z + 1), _index(x + 1, z), _index(x + 1, z + 1), _index(x, z + 1)]:
 				tints.append(_tints[corner])
 	var arrays: Array = []
@@ -122,12 +122,24 @@ func _build(chunk: Vector2i) -> void:
 	_chunks[chunk].mesh = mesh
 
 
-## Corners run clockwise from above.
-func _add_face(points: PackedVector3Array, normals: PackedVector3Array, a: Vector3, b: Vector3, c: Vector3) -> void:
-	var normal: Vector3 = (c - a).cross(b - a).normalized()
-	for corner: Vector3 in [a, b, c]:
-		points.append(corner)
-		normals.append(normal)
+## Corners run clockwise from above. Each takes the slope of the land around it,
+## not of its own face, so a slope is not shaded in zigzags where the squares'
+## diagonals alternate.
+func _add_face(points: PackedVector3Array, normals: PackedVector3Array, corners: Array[Vector2i]) -> void:
+	for corner: Vector2i in corners:
+		points.append(_point(corner.x, corner.y))
+		normals.append(_normal(corner.x, corner.y))
+
+
+func _normal(x: int, z: int) -> Vector3:
+	var limit: int = Terrain.HALF_M
+	var west: float = _heights[_index(maxi(x - 1, -limit), z)]
+	var east: float = _heights[_index(mini(x + 1, limit), z)]
+	var north: float = _heights[_index(x, maxi(z - 1, -limit))]
+	var south: float = _heights[_index(x, mini(z + 1, limit))]
+	var run_x: float = float(mini(x + 1, limit) - maxi(x - 1, -limit))
+	var run_z: float = float(mini(z + 1, limit) - maxi(z - 1, -limit))
+	return Vector3((west - east) / run_x, 1.0, (north - south) / run_z).normalized()
 
 
 func _tint(natural_m: float) -> Color:
