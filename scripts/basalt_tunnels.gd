@@ -131,7 +131,7 @@ func _on_slot_spool_pressed() -> void:
 			return
 		_hud.push_log("%s installed%s. Uplink lag × %s." % [
 			"Damaged silk spool" if GameState.slotted_spool_damaged else "Optical silk spool",
-			", the damaged one thrown away" if replaced else "", SP811.number(GameState.get_relay_lag_multiplier(), 2)])
+			", the old one taken out" if replaced else "", SP811.number(GameState.get_relay_lag_multiplier(), 2)])
 
 
 func _on_silk_changed(_spools: int) -> void:

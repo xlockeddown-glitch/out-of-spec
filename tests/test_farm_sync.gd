@@ -43,6 +43,10 @@ func _play(gs: GameStateScript, from_day: int, days: int) -> void:
 			gs.accept_job(0)
 
 
+func _tank(progress: Variant, stage: Variant, exuvia: Variant = 0) -> Dictionary:
+	return { "molt_progress": progress, "molt_stage": stage, "exuvia_until_day": exuvia }
+
+
 func _worn() -> GameStateScript:
 	var gs: GameStateScript = _make_state()
 	gs.buy_standard("reference_gauge")
@@ -50,6 +54,7 @@ func _worn() -> GameStateScript:
 	gs.mined_fissures[&"FissureA"] = 2
 	gs.dig(Vector3i(20, 0, 20))
 	gs.hit_boulder(&"RockA")
+	gs.catch_species("cobalt_sentinel")
 	gs._spool_species.append(&"curlyhair")
 	gs._spool_damaged.append(true)
 	gs.slotted_spool_damaged = true
@@ -253,7 +258,11 @@ func test_bad_bytes_change_nothing() -> String:
 				["lab_build", { "kind": "refit", "discipline": [] }], ["owned_standards", { 3: true }], ["_untraceable_since_cal", { 3: true }],
 				["dug", { Vector2i(20, 20): 2 }], ["dug", { Vector2i(0, 0): 1 }], ["dug", { Vector2i(20, 20): "1" }], ["dug", { 3: 1 }], ["dug", []],
 				["boulder_hits", { &"RockE": 1 }], ["boulder_hits", { &"RockA": 0 }], ["boulder_hits", { &"RockA": 6 }], ["boulder_hits", { &"RockA": 1.0 }],
-				["boulder_hits", { 3: 1 }], ["boulder_hits", []]]:
+				["boulder_hits", { 3: 1 }], ["boulder_hits", []],
+				["enclosures", []], ["enclosures", { "mexican_curlyhair": _tank(0.0, 0) }], ["enclosures", { 3: _tank(0.0, 0) }], ["enclosures", { "cobalt_sentinel": 1 }],
+				["enclosures", { "cobalt_sentinel": {} }], ["enclosures", { "cobalt_sentinel": _tank(1.5, 2) }], ["enclosures", { "cobalt_sentinel": _tank(-0.1, 0) }],
+				["enclosures", { "cobalt_sentinel": _tank(0.1, 2) }], ["enclosures", { "cobalt_sentinel": _tank(0.1, "no") }], ["enclosures", { "cobalt_sentinel": _tank(1, 2) }],
+				["enclosures", { "cobalt_sentinel": _tank(0.0, 0, -1) }], ["enclosures", { "cobalt_sentinel": _tank(0.0, 0, 1.0) }]]:
 			var data: Dictionary = whole.duplicate(true)
 			data["farm"][values[0]] = values[1]
 			bad[str(values)] = SaveGame.to_bytes(data)
@@ -456,4 +465,27 @@ func test_a_guest_sees_boulders_break_and_old_farms_have_them_whole() -> String:
 		old["boulder_hits"] = { "RockC": 5 }
 		if guest.farm_from_dict(old) != "" or not guest.is_boulder_broken(&"RockC"):
 			return "Boulders must load whatever their dictionary's type."
+		return "")
+
+
+func test_a_guest_sees_the_caught_tarantula_and_old_farms_have_none() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		if FarmSync.join(bytes, guest) != "" or not guest.is_caught("cobalt_sentinel") or guest.enclosures != host.enclosures:
+			return "A guest must have the host's caught tarantula: %s" % [guest.enclosures]
+		var counts: Dictionary = _count(guest)
+		host.enclosures["cobalt_sentinel"] = _tank(1.0, 2)
+		if FarmSync.update(FarmSync.capture(host), guest) != "" or not guest.is_enclosure_spool_ready("cobalt_sentinel"):
+			return "A guest must see its spool."
+		var loaded: Dictionary = host.farm_to_dict()
+		host.collect_enclosure_spool("cobalt_sentinel", "player_2")
+		if FarmSync.update(FarmSync.capture(host), guest) != "" or guest.is_enclosure_spool_ready("cobalt_sentinel") \
+				or not guest._spool_species.has(&"cobalt_sentinel"):
+			return "A guest must see it collected."
+		if counts.get("enclosures_changed", 0) != 2:
+			return "A guest must be told once of each change."
+		if guest.farm_from_dict(loaded) != "" or not guest.is_enclosure_spool_ready("cobalt_sentinel"):
+			return "The tank must load."
+		loaded.erase("enclosures")
+		if guest.farm_from_dict(loaded) != "" or not guest.enclosures.is_empty() or counts["enclosures_changed"] != 4:
+			return "A farm from before this must load with an empty tank, and be shown."
 		return "")

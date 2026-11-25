@@ -15,6 +15,7 @@ const SENDER: String = "The host's farm"
 ## Each signal is emitted when one of these variables changed.
 const SHOWN_BY: Dictionary = {
 	&"molt_changed": ["dome_species_id", "molt_progress", "molt_stage", "exuvia_until_day"],
+	&"enclosures_changed": ["enclosures"],
 	&"silk_changed": ["optical_silk_spools", "_spool_species", "_spool_damaged"],
 	&"relay_changed": ["relay_slotted", "slotted_spool_species", "slotted_spool_damaged"],
 	&"credits_changed": ["credits"],
@@ -33,7 +34,7 @@ const SHOWN_BY: Dictionary = {
 	&"rover_place_changed": ["rover_in_tunnels"],
 }
 ## These also show the day.
-const SHOW_THE_DAY: Array[StringName] = [&"molt_changed", &"fissures_changed", &"jobs_changed"]
+const SHOW_THE_DAY: Array[StringName] = [&"molt_changed", &"enclosures_changed", &"fissures_changed", &"jobs_changed"]
 ## The variables some of them carry.
 const CARRIES: Dictionary = {
 	&"molt_changed": ["molt_progress", "molt_stage"], &"silk_changed": ["optical_silk_spools"],
