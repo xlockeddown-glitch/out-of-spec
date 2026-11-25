@@ -16,8 +16,6 @@ signal tile_changed(cell: Vector3i, tile: int)
 enum Tile { SOIL_UNTILLED = 0, SOIL_TILLED = 1 }
 enum TillResult { TILLED, ALREADY_TILLED, NOT_SOIL, REFUSED }
 
-@export var plot_origin_cell: Vector2i = Vector2i(-6, -6)
-@export var plot_size_cells: Vector2i = Vector2i(12, 12)
 @export var mesh_library_override: MeshLibrary
 
 ## Filled in with the crop's model set, then 0 to 3 or "wilted".
@@ -67,9 +65,9 @@ func _on_soil_tilled(cell: Vector3i) -> void:
 
 
 func _fill_plot() -> void:
-	for x: int in plot_size_cells.x:
-		for z: int in plot_size_cells.y:
-			var cell := Vector3i(plot_origin_cell.x + x, 0, plot_origin_cell.y + z)
+	for x: int in range(GameState.PLOT.position.x, GameState.PLOT.end.x):
+		for z: int in range(GameState.PLOT.position.y, GameState.PLOT.end.y):
+			var cell := Vector3i(x, 0, z)
 			if get_cell_item(cell) == INVALID_CELL_ITEM:
 				set_cell_item(cell, Tile.SOIL_UNTILLED)
 	for tilled: Variant in GameState.tilled_cells:

@@ -2660,7 +2660,8 @@ func bram_line(section: String) -> String:
 	var lines: Variant = DataManager.get_value(DISPATCH_TABLE, "npcs/bram/" + section)
 	if typeof(lines) != TYPE_ARRAY or (lines as Array).is_empty():
 		return ""
-	return str(_pick(lines as Array))
+	# Only words: a guest's copy of the generator is the host's to draw from.
+	return str((lines as Array).pick_random() if FarmCommands.guest else _pick(lines as Array))
 
 
 func _on_day_started_regrow() -> void:
@@ -3775,7 +3776,7 @@ func crop_name(crop_id: String) -> String:
 	return str(crop(crop_id).get("name", crop_id))
 
 
-## The soil plot, in cells. FarmGrid's defaults match it.
+## The soil plot, in cells. FarmGrid draws it.
 const PLOT: Rect2i = Rect2i(-6, -6, 12, 12)
 
 

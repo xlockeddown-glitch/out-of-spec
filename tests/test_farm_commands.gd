@@ -125,10 +125,6 @@ func test_a_guest_cannot_make_soil_or_ore() -> String:
 	if typeof(kinds[0]) != TYPE_INT or kinds[0] != 0 or kinds[1] != -1.0:
 		problems.append("Refusals of the wrong kind: %s" % [kinds])
 	_free(commands)
-	var grid := FarmGrid.new()
-	if Rect2i(grid.plot_origin_cell, grid.plot_size_cells) != GameStateScript.PLOT:
-		problems.append("GameState.PLOT is not the grid's plot")
-	grid.free()
 	var named: RegEx = RegEx.create_from_string(r"\[node name=.(\w+). type=.Node3D. parent=.WorldView/WorldViewport/World/Fissures.")
 	var fissures: Array[StringName] = []
 	for found: RegExMatch in named.search_all(FileAccess.get_file_as_string("res://scenes/main_farm.tscn")):

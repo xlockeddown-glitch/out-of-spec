@@ -142,6 +142,10 @@ func _on_steering_zeroed(record: Dictionary) -> void:
 func _on_slot_spool_pressed() -> void:
 	var replaced: bool = GameState.relay_slotted
 	if await FarmCommands.request(&"slot_spool_into_relay") and is_inside_tree():
+		if FarmCommands.guest:
+			# The relay itself may not have reached this copy yet.
+			_hud.push_log("Silk spool installed.")
+			return
 		_hud.push_log("%s installed%s. Uplink lag × %s." % [
 			"Damaged silk spool" if GameState.slotted_spool_damaged else "Optical silk spool",
 			", the damaged one thrown away" if replaced else "", SP811.number(GameState.get_relay_lag_multiplier(), 2)])
@@ -236,8 +240,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _adjust_setpoint(cell: Vector3i, step: int) -> void:
-	await FarmCommands.request(&"adjust_setpoint", [cell, step])
-	if is_inside_tree() and GameState.plantings.has(cell):
+	var setpoint: float = await FarmCommands.request(&"adjust_setpoint", [cell, step])
+	if not is_inside_tree():
+		return
+	if setpoint < 0.0:
+		_hud.push_log("SET POINT NOT MOVED.")
+	elif FarmCommands.guest:
+		# The crop itself may not have reached this copy yet.
+		_hud.push_log("Irrigation set point %s %%" % SP811.number(setpoint * 100.0, 0))
+	else:
 		_hud.push_log(GameState.crop_status_text(cell))
 
 
