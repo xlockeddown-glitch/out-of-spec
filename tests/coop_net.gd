@@ -8,12 +8,16 @@ const ProfileScript: GDScript = preload("res://scripts/autoload/CoopProfile.gd")
 const LOCAL: String = "127.0.0.1"
 
 var _sessions: Array[Node] = []
-var _raw: Array[ENetMultiplayerPeer] = []
+var _raw: Array[MultiplayerPeer] = []
 var _log: Array = []
 
 
+func _new_session() -> Node:
+	return SessionScript.new()
+
+
 func _session() -> Node:
-	var session: Node = SessionScript.new()
+	var session: Node = _new_session()
 	session.commands = CommandsScript.new()
 	session.commands.state = GameStateScript.new()
 	session.commands.state.build_registry()
@@ -67,7 +71,7 @@ func _until(done: Callable) -> bool:
 	while Time.get_ticks_msec() < deadline:
 		for session: Node in _sessions:
 			session.poll()
-		for peer: ENetMultiplayerPeer in _raw:
+		for peer: MultiplayerPeer in _raw:
 			if peer.get_connection_status() != MultiplayerPeer.CONNECTION_DISCONNECTED:
 				peer.poll()
 		if done.call():
@@ -85,7 +89,7 @@ func _request(session: Node, action: StringName, arguments: Array = []) -> Array
 
 
 func _finish(problem: String) -> String:
-	for peer: ENetMultiplayerPeer in _raw:
+	for peer: MultiplayerPeer in _raw:
 		peer.close()
 	for session: Node in _sessions:
 		session.leave()
