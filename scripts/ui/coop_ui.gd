@@ -121,7 +121,7 @@ static func strip_text(players: Array[String], own_id: String, hosting: bool, to
 	if players.is_empty():
 		return ""
 	if hosting and too_big:
-		return "CO-OP  THE FARM IS TOO BIG TO SHARE: FRIENDS NO LONGER SEE CHANGES"
+		return "CO-OP  THE FARM IS TOO BIG TO SHARE, SO FRIENDS CAN'T STAY"
 	if players.size() == 1:
 		return "CO-OP  WAITING FOR FRIENDS  (F7)"
 	return "CO-OP  %d PLAYERS, YOU ARE %s  (F7)" % [players.size(), player_name(own_id)]
