@@ -131,6 +131,7 @@ func _ready() -> void:
 		_add_rock(at)
 	_add_plants()
 	GameState.terrain_changed.connect(_refresh)
+	GameState.stone_changed.connect(_refresh)
 	_refresh()
 
 
@@ -312,10 +313,13 @@ func _refresh() -> void:
 	# An older save may have dug under a rock: it sits down with the ground.
 	for at: Vector2i in _rocks:
 		_rocks[at].position = Vector3(at.x, lowest_under(at, rock_half_m(at), GameState.dug) - SINK_M, at.y)
+	# A plant is gone under a stone piece as under digging.
+	var gone: Dictionary[Vector2i, int] = GameState.dug.duplicate()
+	gone.merge(GameState.stone_pieces)
 	for multi: MultiMesh in _drawn:
 		var shown: int = 0
 		for placed: Placed in _drawn[multi]:
-			if stands(placed, GameState.dug):
+			if stands(placed, gone):
 				multi.set_instance_transform(shown, placed.place())
 				multi.set_instance_color(shown, placed.tint())
 				shown += 1

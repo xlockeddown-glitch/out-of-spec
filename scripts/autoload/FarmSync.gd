@@ -33,6 +33,7 @@ const SHOWN_BY: Dictionary = {
 	&"boulders_changed": ["boulder_hits"],
 	&"blocks_changed": ["found_blocks"],
 	&"pockets_changed": ["found_pockets"],
+	&"stone_changed": ["stone", "stone_pieces"],
 	&"rover_place_changed": ["rover_in_tunnels"],
 	&"sentinel_changed": ["sentinel_out", "sentinel_days_unseen"],
 	&"rover_lights_changed": ["rover_lights"],
