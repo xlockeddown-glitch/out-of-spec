@@ -304,7 +304,9 @@ func _host_read(from: int, packet: PackedByteArray, now: int, reliable: bool) ->
 	if action.length() > MAX_TEXT or arguments.size() > MAX_ARGUMENTS or arguments.is_typed():
 		return false
 	for argument: Variant in arguments:
-		if not typeof(argument) in [TYPE_BOOL, TYPE_INT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR3I]:
+		if not typeof(argument) in [TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR3I]:
+			return false
+		if argument is float and not is_finite(argument):
 			return false
 		if (argument is String or argument is StringName) and str(argument).length() > MAX_TEXT:
 			return false

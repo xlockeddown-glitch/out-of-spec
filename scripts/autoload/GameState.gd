@@ -9,6 +9,9 @@ signal molt_changed(progress: float, stage: int)
 signal silk_changed(spools: int)
 ## A tarantula was caught, or one in a tank of its own molted or gave its spool.
 signal enclosures_changed
+## The Cobalt Sentinel came out in the tunnels, or is gone.
+signal sentinel_changed
+signal rover_lights_changed
 signal relay_changed(slotted: bool)
 signal calibration_recorded(record: Dictionary)
 signal phone_message(text: String)
@@ -92,6 +95,18 @@ const PRE_MOLT_AT: float = 0.8
 const EXUVIA_LINGER_DAYS: int = 1
 ## Tarantulas that can be caught. Each has a tank waiting in the dome.
 const CATCHABLE: Array[StringName] = [&"cobalt_sentinel"]
+const SENTINEL: StringName = &"cobalt_sentinel"
+## Where the wild one sits, off the sump's edge. How near it notices the rover, how
+## fast is calm, how close is on top of it, and how far the cup reaches. [PLACEHOLDER]
+const SENTINEL_AT := Vector3(-19.0, 0.0, -24.0)
+const SENTINEL_SEES_M: float = 8.0
+const SENTINEL_CALM_MPS: float = 3.5
+const SENTINEL_CROWDED_M: float = 1.8
+const SENTINEL_REACH_M: float = 4.0
+## The chance on its first morning, and again for each morning it isn't met. [PLACEHOLDER]
+const SENTINEL_CHANCE: float = 0.10
+## How far the cup's relative humidity may really be from its ideal. [PLACEHOLDER]
+const CUP_TOLERANCE_PCT: float = 5.0
 ## The dome hygrometer starts out of tolerance ("gold sticker expired at 03:00")
 ## so the first dome visit has something to calibrate. |error| = MPE * this.
 const HYGROMETER_START_ERROR_RATIO: float = 1.12
@@ -118,6 +133,13 @@ var exuvia_until_day: int = 0
 ## The caught tarantulas, each in a tank of its own beside the main terrarium.
 ## Species id (String) -> { molt_progress, molt_stage, exuvia_until_day }.
 var enclosures: Dictionary = {}
+## The wild Cobalt Sentinel: out by the sump today, and the mornings since it was
+## last scared off.
+var sentinel_out: bool = false
+var sentinel_days_unseen: int = 0
+## Past this the chance is certain anyway.
+const SENTINEL_DAYS_MAX: int = 10
+var rover_lights: bool = true
 var optical_silk_spools: int = 0
 var relay_slotted: bool = false
 ## Species that spun the spool now in the relay (its lag_reduction_pct stacks).
@@ -449,7 +471,8 @@ const MAX_KNOWN_GUESTS: int = 64
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
-	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces"]
+	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
+	"sentinel_out", "sentinel_days_unseen", "rover_lights"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -520,8 +543,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 			return "'found_blocks' has a cell that holds no block."
 	for cell: Variant in data.get("found_pockets", {}):
 		if not cell is Vector2i or not data["found_pockets"][cell] is bool or not data["found_pockets"][cell] \
-				or not cell in OrePocket.cells(data["world_seed"]):
-			return "'found_pockets' has a cell that holds no ore."
+				or not Terrain.can_dig(cell):
+			return "'found_pockets' has a cell that can't be dug."
 	if data.get("stone", 0) < 0 or data.get("stone", 0) > StonePieces.MAX_STONE:
 		return "'stone' is not a stock that can be held."
 	var pieces_problem: String = StonePieces.pieces_problem(data.get("stone_pieces", {}))
@@ -532,6 +555,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if not (boulder is String or boulder is StringName) or not StringName(boulder) in BOULDERS \
 				or not hits[boulder] is int or hits[boulder] < 1 or hits[boulder] > BOULDER_HITS:
 			return "'boulder_hits' has a boulder that can't be hit like that."
+	if data.get("sentinel_days_unseen", 0) < 0 or data.get("sentinel_days_unseen", 0) > SENTINEL_DAYS_MAX:
+		return "'sentinel_days_unseen' is out of range."
+	if data.get("sentinel_out", false) and data.get("enclosures", {}).has(String(SENTINEL)):
+		return "'sentinel_out' is set for a caught Sentinel."
 	var tanks: Dictionary = data.get("enclosures", {})
 	for id: Variant in tanks:
 		if not id is String or not StringName(id) in CATCHABLE or not _is_tank(tanks[id]):
@@ -691,6 +718,8 @@ func farm_from_dict(data: Dictionary) -> String:
 	pockets_changed.emit()
 	stone_changed.emit()
 	rover_place_changed.emit()
+	sentinel_changed.emit()
+	rover_lights_changed.emit()
 	return ""
 
 
@@ -2151,6 +2180,7 @@ func _on_day_started(day: int) -> void:
 	if not _morning_notes.is_empty():
 		post_phone(" ".join(_morning_notes))
 		_morning_notes.clear()
+	_roll_sentinel()
 
 
 ## One morning dispatch per day, no repeats until the whole deck is used.
@@ -3154,6 +3184,86 @@ func is_caught(species_id: String) -> bool:
 ## dome's one hygrometer's error [ASSUMPTION]. NAN while the ideal isn't set.
 func enclosure_humidity(species_id: String) -> float:
 	return _species_number(species_id, "ideal_humidity_pct") + hygrometer.error
+
+
+## Each morning, once: is the Cobalt Sentinel out by the sump? Likelier each day it
+## isn't met. From the saved generator, so a loaded farm gets the same mornings.
+func _roll_sentinel() -> void:
+	if FarmCommands.guest or is_caught(SENTINEL):
+		return
+	sentinel_out = rng.randf() < sentinel_chance()
+	sentinel_days_unseen = mini(sentinel_days_unseen + 1, SENTINEL_DAYS_MAX)
+	sentinel_changed.emit()
+
+
+func sentinel_chance() -> float:
+	return minf(1.0, SENTINEL_CHANCE * (1 + sentinel_days_unseen))
+
+
+func set_rover_lights(on: bool, player_id: String = "") -> String:
+	if not rover_in_tunnels:
+		return "The rover is not in the tunnels."
+	if not CoopRovers.driver(rover_here()) in ["", player_id]:
+		return "Someone else is driving the rover."
+	if on == rover_lights:
+		return ""
+	rover_lights = on
+	rover_lights_changed.emit()
+	SaveGame.saving.emit()  # it says where it is
+	watch_sentinel(TUNNEL_ROVER, parked_rover_transform(TUNNEL_ROVER).origin, 0.0)
+	return ""
+
+
+## The rover's place and speed, from whoever drives it. Lit, fast or on top of it,
+## it scares the Sentinel.
+func watch_sentinel(rover_id: String, at: Vector3, speed_mps: float) -> void:
+	if FarmCommands.guest or not sentinel_out or rover_id != TUNNEL_ROVER or not rover_in_tunnels:
+		return
+	var away: float = at.distance_to(SENTINEL_AT)
+	if away > SENTINEL_SEES_M:
+		return
+	if rover_lights:
+		_scare_sentinel("The rover's lights were on.")
+	elif absf(speed_mps) > SENTINEL_CALM_MPS:
+		_scare_sentinel("The rover came too fast.")
+	elif away < SENTINEL_CROWDED_M:
+		_scare_sentinel("The rover came too close.")
+
+
+func _scare_sentinel(why: String) -> void:
+	sentinel_out = false
+	sentinel_days_unseen = 0
+	sentinel_changed.emit()
+	post_phone("SENTINEL: %s It bolted, and hides until another day." % why)
+
+
+## True if the cup reaches it from the rover's place.
+func sentinel_in_reach(at: Vector3) -> bool:
+	return sentinel_out and at.distance_to(SENTINEL_AT) <= SENTINEL_REACH_M
+
+
+## Closes the cup with its relative humidity at `reading_pct` as the hygrometer
+## shows it. What the air really is decides. Returns "" or why nothing was tried.
+func catch_sentinel(reading_pct: float, player_id: String = "") -> String:
+	if not is_finite(reading_pct) or reading_pct < 0.0 or reading_pct > 100.0:
+		return "The cup can't hold that."
+	if not rover_in_tunnels:
+		return "The rover is not in the tunnels."
+	if not CoopRovers.driver(rover_here()) in ["", player_id]:
+		return "Someone else is driving the rover."
+	SaveGame.saving.emit()  # it says where it is
+	watch_sentinel(TUNNEL_ROVER, parked_rover_transform(TUNNEL_ROVER).origin, 0.0)
+	if is_caught(SENTINEL) or not rover_transforms.has(TUNNEL_ROVER) or not sentinel_in_reach(parked_rover_transform(TUNNEL_ROVER).origin):
+		return "Nothing is in the cup's reach."
+	var off: float = reading_pct - hygrometer.error - _species_number(SENTINEL, "ideal_humidity_pct")
+	if absf(off) <= CUP_TOLERANCE_PCT:
+		sentinel_out = false
+		catch_species(SENTINEL)
+		sentinel_changed.emit()
+		post_phone("SENTINEL: caught. It goes to its tank in the dome.")
+	else:
+		_scare_sentinel("The cup was too %s." % ("damp" if off > 0.0 else "dry"))
+	return ""
 
 
 ## enclosure_humidity() as the hygrometer shows it.

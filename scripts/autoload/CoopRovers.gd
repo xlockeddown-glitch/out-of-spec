@@ -178,6 +178,7 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 	_poses[rover_id] = [pose, now]
 	farm.add_rover_usage(Vector2(to.origin.x - from.origin.x, to.origin.z - from.origin.z).length(), player_id)
 	farm.park_rover(rover_id, to)
+	farm.watch_sentinel(rover_id, to.origin, pose[4])
 	# A rover in the host's own scene looks for the relay itself.
 	if now - _here_at.get(rover_id, -STILL_MS) >= STILL_MS:
 		farm.set_rover_uplink(rover_id, pose[5])

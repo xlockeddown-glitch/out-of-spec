@@ -38,7 +38,7 @@ func test_every_action_is_a_typed_function() -> String:
 			bad.append(action)
 			continue
 		for arg: Dictionary in method["args"]:
-			if not arg["type"] in [TYPE_STRING, TYPE_STRING_NAME, TYPE_BOOL, TYPE_INT, TYPE_VECTOR3I]:
+			if not arg["type"] in [TYPE_STRING, TYPE_STRING_NAME, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_VECTOR3I]:
 				bad.append("%s %s" % [action, arg["name"]])
 	_free(commands)
 	return "" if bad.is_empty() else "Not plain, typed actions: " + ", ".join(bad)
@@ -67,7 +67,8 @@ func test_bad_requests_are_refused() -> String:
 			[&"rover_drove", [1.0]], [&"till", [Vector3(0.0, 0.0, 0.0)]], [&"mine_fissure", ["FissureA"]],
 			[&"calibrate_at_bench", [null]],
 			[&"calibrate_at_bench", ["air_hygrometer", "player_9"]], [&"collect_spool", ["player_9", true, true]],
-			[&"catch_species", ["cobalt_sentinel"]], [&"collect_enclosure_spool", []], [&"collect_enclosure_spool", [3]]]:
+			[&"catch_species", ["cobalt_sentinel"]], [&"collect_enclosure_spool", []], [&"collect_enclosure_spool", [3]],
+			[&"catch_sentinel", ["80"]], [&"catch_sentinel", []], [&"set_rover_lights", [1]], [&"watch_sentinel", ["rover_1_tunnels", Vector3.ZERO, 0.0]]]:
 		if commands.problem(bad[0], bad[1]) == "":
 			problems.append(str(bad))
 	var kinds: Array = [commands.refusal(&"start_lab_grow", "no"), commands.refusal(&"collect_spool", "no"),

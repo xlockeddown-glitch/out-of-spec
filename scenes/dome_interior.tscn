@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://scripts/ui/plan_board_ui.gd" id="7_plan"]
 [ext_resource type="Script" path="res://scripts/ui/kestrel_ui.gd" id="8_kestrel"]
 [ext_resource type="Script" path="res://scripts/world/inspectable.gd" id="30_inspect"]
+[ext_resource type="Script" path="res://scripts/world/tarantula_rig.gd" id="40_rig"]
 
 [sub_resource type="Environment" id="Env"]
 background_mode = 1
@@ -760,18 +761,18 @@ exuvia = NodePath("Exuvia")
 spool_pickup = NodePath("SpoolPickup")
 
 [node name="TankModel" type="Node3D" parent="SentinelTank"]
+rotation = Vector3(0, 3.1415927, 0)
 script = ExtResource("5_slot")
-model_path = "res://assets/voxels/terrarium.glb"
+model_path = "res://assets/voxels/sentinel_crib.glb"
 model_scale = 0.05
 
 [node name="Tarantula" type="Node3D" parent="SentinelTank"]
-position = Vector3(0.1, 0.1, -0.025)
+position = Vector3(0, 0.15, 0.09)
 
-[node name="SpiderModel" type="Node3D" parent="SentinelTank/Tarantula"]
-position = Vector3(0, 0.05, 0)
-script = ExtResource("5_slot")
-model_path = "res://assets/voxels/live_tarantula.glb"
-model_scale = 0.05
+[node name="Rig" type="Node3D" parent="SentinelTank/Tarantula"]
+rotation = Vector3(0, 2.6, 0)
+scale = Vector3(0.75, 0.75, 0.75)
+script = ExtResource("40_rig")
 
 [node name="Exuvia" type="Node3D" parent="SentinelTank"]
 visible = false
@@ -789,7 +790,7 @@ radius = 0.03
 [node name="HeatLamp" type="OmniLight3D" parent="SentinelTank"]
 position = Vector3(0, 0.5, 0)
 light_color = Color(1, 0.72, 0.42, 1)
-light_energy = 0.8
+light_energy = 0.3
 omni_range = 1.2
 
 [node name="SentinelClick" type="Area3D" parent="SentinelTank"]

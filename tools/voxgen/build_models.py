@@ -884,6 +884,18 @@ def prop_sheet(name: str, colors: dict[str, str] | None = None, part: str = "pro
     return front_to_minus_z(name, cells, w, d, colors or FIELD_PROPS[name], part, parts)
 
 
+# The Cobalt Sentinel's parts and its tank; G1 is see-through, as the camera looks down.
+COBALT = {"B1": "#1F4E8C", "B2": "#3A7BC8", "B3": "#162642", "H1": "#5CA8C9", "F1": "#2E3844", "S": SHADOW}
+CRIB = {"M3": "#2E3844", "M2": "#6C7A89", "G1": "#9EB8C4", "B1": "#D9A13B", "T1": "#3D2919",
+        "P1": "#A8422B", "F1": "#6D7A4C", "S": SHADOW}
+
+
+def sentinel_crib() -> Model:
+    m = prop_sheet("sentinel_crib", CRIB, "prop", {"G1": "glass"})
+    m.glass_parts.add("glass")
+    return m
+
+
 MODELS = [
     (lambda: tractor(False), 0.1), (lambda: tractor(True), 0.1),
     (terrarium, 0.1), (curlyhair, 0.1), (bram_bay, 0.2), (ore_fissure, 0.2),
@@ -918,6 +930,8 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, *HILL_DRESS[n][:2])), HILL_DRESS[n][2]) for n in HILL_DRESS],
     *[((lambda n=n: prop_sheet(n, ENV_VARIANTS[n], "rock", {"EC": "emit_crystal"})), 0.2)
       for n in ENV_VARIANTS],
+    *[((lambda n=n: prop_sheet(n, COBALT, "spider")), 0.025) for n in ("cobalt_body", "cobalt_leg")],
+    (sentinel_crib, 0.05),
 ]
 
 

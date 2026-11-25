@@ -6,13 +6,17 @@ extends Node
 const LOG_REPLAY_LINES: int = 6
 ## With the rover in the other scene, these only say where it is.
 const ROVER_KEYS: Array[StringName] = [
-	&"rover_forward", &"rover_reverse", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill"]
+	&"rover_forward", &"rover_reverse", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill", &"rover_lights"]
 
 var _had_los: bool = true
 var _last_band: int = DriftingSensor.Band.IN_BAND
 ## This player asked to move the rover; the host said yes.
 var _moving: bool = false
 var _move_granted: bool = false
+@onready var _cup := CatchCupUI.new()
+## The cup can reach the Cobalt Sentinel.
+var _in_reach: bool = false
+var _told_reach: bool = false
 
 @onready var _rover: RoverController = %Rover
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
@@ -56,12 +60,25 @@ func _ready() -> void:
 	_on_credibility_changed(0)
 	_hud.get_parent().add_child(SkillsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())
+	_hud.get_parent().add_child(_cup)
+	_cup.closed.connect(_on_cup_closed)
+	if _rover.away_text() == "":
+		_hud.push_log("LIGHTS: press L to turn them low or on.")
 	_say_if_away()
 
 
 func _process(_delta: float) -> void:
 	_hud.set_clock(GameClock.format_now())
 	_hud.set_molt(GameState.molt_text() if GameState.has_skill_unlock("molt_on_phone") else "")
+	var reach: bool = _can_catch()
+	if reach and not _told_reach:
+		_told_reach = true
+		_hud.push_log("SENTINEL: in reach. Press E for the catch cup.")
+	if not reach and _cup.visible:
+		_cup.hide()
+	_in_reach = reach
+	if not reach:
+		_told_reach = false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -75,6 +92,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"interact") and _exit_pad.rover_inside:
 		get_viewport().set_input_as_handled()
 		_leave_tunnels()
+	elif event.is_action_pressed(&"interact") and _in_reach:
+		get_viewport().set_input_as_handled()
+		_cup.open()
+	elif event.is_action_pressed(&"rover_lights"):
+		get_viewport().set_input_as_handled()
+		_toggle_lights()
 	elif event.is_action_pressed(&"rover_dig"):
 		get_viewport().set_input_as_handled()
 		_rover.queue_command(RoverController.Command.DIG)
@@ -85,6 +108,24 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _on_rover_entered_exit() -> void:
 	_hud.push_log("TUNNEL MOUTH: press E to leave.")
+
+
+func _can_catch() -> bool:
+	return (_rover.away_text() == "" and _rover.is_stopped() and not GameState.rover_lights
+		and GameState.sentinel_in_reach(_rover.global_position))
+
+
+func _toggle_lights() -> void:
+	var on: bool = not GameState.rover_lights
+	var problem: String = await FarmCommands.request(&"set_rover_lights", [on])
+	if is_inside_tree():
+		_hud.push_log("LIGHTS: " + (problem if problem != "" else "on." if on else "low."))
+
+
+func _on_cup_closed(reading_pct: float) -> void:
+	var problem: String = await FarmCommands.request(&"catch_sentinel", [reading_pct])
+	if is_inside_tree() and problem != "":
+		_hud.push_log("CATCH CUP: " + problem)
 
 
 func _on_uplink_changed(has_los: bool, quality: float, lag_s: float) -> void:
