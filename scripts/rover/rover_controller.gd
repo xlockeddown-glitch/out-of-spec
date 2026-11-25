@@ -21,6 +21,12 @@ signal till_rejected(reason: String)
 signal tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int)
 signal ore_mined(fissure_id: StringName)
 
+## Following another player's driving: how fast it closes in, and from how far it
+## jumps there instead; and how far ahead of the last word it runs [PLACEHOLDER].
+const FOLLOW_PER_S: float = 12.0
+const FOLLOW_JUMP_M: float = 4.0
+const FOLLOW_LEAD_S: float = 0.15
+
 enum Command { TILL, ZERO_STEERING }
 
 
@@ -108,6 +114,8 @@ var _commands: Array[UplinkCommand] = []
 var _till_presses: Array[Dictionary] = []
 ## Where the scene puts this rover, for a farm that has not parked it yet.
 var _start_transform: Transform3D
+## Another player drives, or on a guest nobody does: it shows where it is told.
+var _following: bool = false
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 
 
@@ -133,10 +141,13 @@ func _exit_tree() -> void:
 
 
 func _unpark() -> void:
-	global_transform = GameState.parked_rover_transform(rover_id, _start_transform)
+	global_transform = CoopRovers.place(rover_id) if CoopRovers.together() and CoopRovers.has_place(rover_id) else GameState.parked_rover_transform(rover_id, _start_transform)
 
 
 func _park() -> void:
+	# Whoever drives says where it is.
+	if _following:
+		return
 	FarmCommands.rover_parked(rover_id, global_transform)
 
 
@@ -148,9 +159,17 @@ func _input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	_uplink_clock += delta
 	_update_line_of_sight(delta)
-	_sample_local_input()
+	var throttle: float = Input.get_axis(&"rover_reverse", &"rover_forward")
+	var moves: bool = CoopRovers.moves_here(rover_id, throttle != 0.0 or (not _following and not is_stopped()))
+	if moves == _following:
+		_set_following(not moves)
+	_sample_local_input(throttle if moves else 0.0)
 	_deliver_uplink()
-	_drive(delta)
+	if moves:
+		_drive(delta)
+		CoopRovers.moved(rover_id, global_transform, _speed_mps, has_line_of_sight)
+	else:
+		_follow(delta)
 
 
 # --- Public API -------------------------------------------------------------
@@ -211,8 +230,7 @@ func _raycast_to_relay() -> bool:
 	return get_world_3d().direct_space_state.intersect_ray(query).is_empty()
 
 
-func _sample_local_input() -> void:
-	var throttle: float = Input.get_axis(&"rover_reverse", &"rover_forward")
+func _sample_local_input(throttle: float) -> void:
 	# +steer = left = +yaw about Y.
 	var steer: float = Input.get_axis(&"rover_steer_right", &"rover_steer_left")
 	_frames.append(UplinkFrame.new(_uplink_clock, throttle, steer))
@@ -269,6 +287,30 @@ func _drive(delta: float) -> void:
 	# Horizontal displacement actually achieved; pushing into a rock adds no drift.
 	var driven: float = Vector2(global_position.x - before.x, global_position.z - before.z).length()
 	FarmCommands.rover_drove(driven)
+
+
+func _set_following(following: bool) -> void:
+	_following = following
+	# No key pressed before counts after. Commands on their way still arrive.
+	_frames.clear()
+	_applied_throttle = 0.0
+	_applied_steer = 0.0
+	_speed_mps = 0.0
+	velocity = Vector3.ZERO
+	# The host goes on from the very place, a guest from where it shows it.
+	if not following and not FarmCommands.guest:
+		global_transform = CoopRovers.place(rover_id)
+
+
+func _follow(delta: float) -> void:
+	_speed_mps = CoopRovers.speed(rover_id)
+	if not CoopRovers.has_place(rover_id):
+		return
+	var to: Transform3D = CoopRovers.place(rover_id, FOLLOW_LEAD_S)
+	if global_position.distance_to(to.origin) > FOLLOW_JUMP_M:
+		global_transform = to
+	else:
+		global_transform = global_transform.interpolate_with(to, 1.0 - exp(-FOLLOW_PER_S * delta))
 
 
 func _zero_steering() -> void:
