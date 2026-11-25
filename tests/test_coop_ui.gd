@@ -14,6 +14,10 @@ func test_the_strip_says_who_is_in() -> String:
 		return "Got %s" % [got]
 	if not "TOO BIG" in CoopUI.strip_text(both, "player_1", true, true):
 		return "The host must hear that the farm is not shared any more"
+	var none_in_bed: Array[String] = []
+	if not "PLAYER 1 IS DRIVING" in CoopUI.strip_text(both, "player_2", false, false, none_in_bed, "player_1") \
+			or "DRIVING" in CoopUI.strip_text(both, "player_1", true, false, none_in_bed, "player_1"):
+		return "The strip must say who else drives"
 	var who: String = CoopUI.players_text(both, "player_2")
 	return "" if who == "PLAYER 1  HOST\nPLAYER 2  YOU" else "Got %s" % who
 

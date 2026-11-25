@@ -20,13 +20,16 @@ signal refused(reason: String)
 signal lost
 ## Guest: what the host gave send_state(). Plain data, but unchecked otherwise.
 signal state_received(data: Dictionary)
+## Host: a guest drives a rover. Guest: the host says who does, or "". See CoopRovers.
+signal rover_driven(player_id: String, rover_id: String, pose: Array)
+signal rover_told(rover_id: String, driver_id: String, pose: Array)
 
 ## Raise it whenever two versions could disagree about the farm or the messages.
-const PROTOCOL: int = 3
+const PROTOCOL: int = 4
 const DEFAULT_PORT: int = 24711
 const MAX_PLAYERS: int = 4
 
-enum { HELLO, COMMAND, WELCOME, REFUSED, JOINED, LEFT, ANSWER, STATE }
+enum { HELLO, COMMAND, WELCOME, REFUSED, JOINED, LEFT, ANSWER, STATE, DRIVE, ROVER }
 
 const REASONS: Dictionary = {
 	"full": "The farm is full.",
@@ -48,6 +51,9 @@ const LIST_TYPES: Array[int] = [TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_
 ## A guest's messages: this many at once, then this many each second.
 const BURST: int = 20
 const RATE: float = 10.0
+## And its rover poses, which come on their own, maybe late, bunched or not at all.
+const DRIVE_BURST: int = 100
+const DRIVE_RATE: float = 40.0
 
 var players: Array[String] = []
 var protocol: int = PROTOCOL
@@ -66,7 +72,7 @@ var _hello_sent: bool = false
 var _join_by: int = 0
 ## Guest: who this player was before joining, until leave().
 var _own_id: String = ""
-## Host: peer -> { player ("" until let in), join_by, tokens, at, gone (hung up) }.
+## Host: peer -> { player ("" until let in), join_by, tokens, drive_tokens, at, gone (hung up) }.
 var _links: Dictionary = {}
 ## Host: [peer, came or went], in order, noted while polling.
 var _events: Array = []
@@ -184,6 +190,21 @@ func send_state(data: Dictionary, player_id: String = "") -> bool:
 	return sent
 
 
+## Guest: tells the host where the rover it drives is. It may not arrive, and
+## comes in order only with others like it.
+func drive(rover_id: String, pose: Array) -> void:
+	if _accepted:
+		_put(1, var_to_bytes([DRIVE, rover_id, pose]), false)
+
+
+## Host: tells every guest who drives a rover and where it is, as drive() does.
+func tell_rover(rover_id: String, driver_id: String, pose: Array) -> void:
+	var message: PackedByteArray = var_to_bytes([ROVER, rover_id, driver_id, pose])
+	for id: int in _links:
+		if _links[id]["player"] != "" and not _links[id].get("gone", false):
+			_put(id, message, false)
+
+
 ## Only these kinds of data: nothing that is, holds or calls an object.
 static func is_plain(value: Variant, depth: int = 0) -> bool:
 	match typeof(value):
@@ -236,27 +257,30 @@ func _poll_host() -> void:
 			return
 		if event[1]:
 			# The other end picks its peer id. One Godot wouldn't pick is never let in.
-			_links[id] = { "player": "", "join_by": now + (join_timeout_ms if id > 1 else -1), "tokens": float(BURST), "at": now }
+			_links[id] = { "player": "", "join_by": now + (join_timeout_ms if id > 1 else -1), "tokens": float(BURST), "drive_tokens": float(DRIVE_BURST), "at": now }
 	for id: int in _links.keys():
 		if _links.has(id) and _links[id]["player"] == "" and now > _links[id]["join_by"]:
 			_drop(id)
 	while _peer != null and _peer.get_available_packet_count() > 0:
 		var from: int = _peer.get_packet_peer()
+		var reliable: bool = _peer.get_packet_mode() == MultiplayerPeer.TRANSFER_MODE_RELIABLE
 		var packet: PackedByteArray = _peer.get_packet()
-		if _links.has(from) and not _host_read(from, packet, now):
+		if _links.has(from) and not _host_read(from, packet, now, reliable):
 			_drop(from)
 
 
 ## False if the peer must go.
-func _host_read(from: int, packet: PackedByteArray, now: int) -> bool:
+func _host_read(from: int, packet: PackedByteArray, now: int, reliable: bool) -> bool:
 	var link: Dictionary = _links[from]
-	link["tokens"] = minf(BURST, link["tokens"] + (now - link["at"]) * RATE / 1000.0) - 1.0
+	link["tokens"] = minf(BURST, link["tokens"] + (now - link["at"]) * RATE / 1000.0)
+	link["drive_tokens"] = minf(DRIVE_BURST, link["drive_tokens"] + (now - link["at"]) * DRIVE_RATE / 1000.0)
 	link["at"] = now
-	if link["tokens"] < 0.0 or packet.size() > MAX_GUEST_BYTES:
+	link["tokens" if reliable else "drive_tokens"] -= 1.0
+	if link["tokens"] < 0.0 or link["drive_tokens"] < 0.0 or packet.size() > MAX_GUEST_BYTES:
 		return false
 	var message: Array = _unpack(packet)
 	if link["player"] == "":
-		if not _is_shape(message.slice(0, 2), [HELLO, TYPE_INT]):
+		if not reliable or not _is_shape(message.slice(0, 2), [HELLO, TYPE_INT]):
 			return false
 		# Another version may say hello in another way.
 		if message[1] != protocol:
@@ -267,6 +291,11 @@ func _host_read(from: int, packet: PackedByteArray, now: int) -> bool:
 		if not CoopProfile.is_key(message[2]) or not CoopProfile.are_skills(message[3]):
 			return false
 		_let_in(from, message[2], message[3])
+		return true
+	if not reliable:
+		if not _is_shape(message, [DRIVE, TYPE_STRING, TYPE_ARRAY]) or message[1].length() > MAX_TEXT or not CoopRovers.is_pose(message[2]):
+			return false
+		rover_driven.emit(link["player"], message[1], message[2])
 		return true
 	if not _is_shape(message, [COMMAND, TYPE_INT, TYPE_STRING, TYPE_ARRAY]):
 		return false
@@ -359,6 +388,13 @@ func _guest_read(packet: PackedByteArray) -> bool:
 	if packet.size() > MAX_HOST_BYTES:
 		return false
 	var message: Array = _unpack(packet)
+	if _is_shape(message, [ROVER, TYPE_STRING, TYPE_STRING, TYPE_ARRAY]):
+		if message[2].length() > MAX_TEXT or not CoopRovers.is_pose(message[3]):
+			return false
+		# It may overtake the welcome.
+		if _accepted:
+			rover_told.emit(message[1], message[2], message[3])
+		return true
 	if not _accepted:
 		if _is_shape(message, [REFUSED, TYPE_STRING]):
 			_end(REASONS.get(message[1], NO_HOST))
@@ -430,7 +466,6 @@ func _start_problem() -> String:
 
 func _open(peer: ENetMultiplayerPeer) -> void:
 	_peer = peer
-	_peer.transfer_mode = MultiplayerPeer.TRANSFER_MODE_RELIABLE
 	set_process(true)
 
 
@@ -455,10 +490,11 @@ func _send(to: int, message: Array) -> bool:
 	return _put(to, var_to_bytes(message))
 
 
-func _put(to: int, bytes: PackedByteArray) -> bool:
+func _put(to: int, bytes: PackedByteArray, reliable: bool = true) -> bool:
 	if _peer == null or _peer.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED:
 		return false
 	_peer.set_target_peer(to)
+	_peer.transfer_mode = MultiplayerPeer.TRANSFER_MODE_RELIABLE if reliable else MultiplayerPeer.TRANSFER_MODE_UNRELIABLE_ORDERED
 	return _peer.put_packet(bytes) == OK
 
 

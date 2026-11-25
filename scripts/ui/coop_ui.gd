@@ -62,7 +62,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	_strip.text = strip_text(CoopSession.players, GameState.local_player_id, CoopSession.is_hosting(), CoopSync.is_too_big(), CoopBeds.in_bed)
+	_strip.text = strip_text(CoopSession.players, GameState.local_player_id, CoopSession.is_hosting(), CoopSync.is_too_big(), CoopBeds.in_bed, CoopRovers.driver("rover_1"))
 	if _panel.visible:
 		_refresh()
 
@@ -138,7 +138,7 @@ static func player_name(player_id: String) -> String:
 
 
 ## The line at the top of the screen; "" when playing alone.
-static func strip_text(players: Array[String], own_id: String, hosting: bool, too_big: bool, in_bed: Array[String] = []) -> String:
+static func strip_text(players: Array[String], own_id: String, hosting: bool, too_big: bool, in_bed: Array[String] = [], driver: String = "") -> String:
 	if players.is_empty():
 		return ""
 	if hosting and too_big:
@@ -151,7 +151,8 @@ static func strip_text(players: Array[String], own_id: String, hosting: bool, to
 			if not player_id in in_bed:
 				up.append(player_name(player_id))
 		return "CO-OP  %d OF %d IN BED, STILL UP: %s  (F7)" % [players.size() - up.size(), players.size(), ", ".join(up)]
-	return "CO-OP  %d PLAYERS, YOU ARE %s  (F7)" % [players.size(), player_name(own_id)]
+	var driving: String = ", %s IS DRIVING" % player_name(driver) if driver in players and driver != own_id else ""
+	return "CO-OP  %d PLAYERS, YOU ARE %s%s  (F7)" % [players.size(), player_name(own_id), driving]
 
 
 ## The host is first.
