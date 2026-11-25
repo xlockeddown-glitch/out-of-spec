@@ -23,6 +23,8 @@ var _tints := PackedColorArray()
 
 
 func _ready() -> void:
+	# The rover looks for the ground under it before the scene shows what was dug.
+	_dug = GameState.dug.duplicate()
 	_heights.resize((Terrain.SIZE_M + 1) * (Terrain.SIZE_M + 1))
 	_tints.resize(_heights.size())
 	for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):

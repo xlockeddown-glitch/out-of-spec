@@ -3,6 +3,7 @@ extends MeshInstance3D
 ## A teal line around the cell a standing rover would dig or fill.
 
 const COLOR := Color("#38e1c6")
+## How far above the ground, and how wide [PLACEHOLDER].
 const LIFT_M: float = 0.06
 const WIDTH_M: float = 0.08
 

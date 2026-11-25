@@ -343,6 +343,8 @@ func _set_following(following: bool) -> void:
 	if not following and not FarmCommands.guest:
 		global_transform = CoopRovers.place(rover_id)
 	if not following:
+		# The ground may have risen while it was shown.
+		keep_above_ground()
 		_put_back_on_land()
 
 

@@ -128,6 +128,7 @@ static func cell_at(at: Vector2) -> Vector2i:
 
 ## Whether a cell may be dug at all: not on level ground, nor at the land's edge.
 static func can_dig(cell: Vector2i) -> bool:
+	@warning_ignore("integer_division")
 	var edge: int = HALF_M / CELL_M - 1
 	if cell.x < -edge or cell.y < -edge or cell.x >= edge or cell.y >= edge:
 		return false
