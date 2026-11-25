@@ -21,7 +21,9 @@ func _between(rock: TunnelRock, from: Vector3, to: Vector3, layers: int) -> Pack
 	for body: Node in rock.get_children():
 		if not body is StaticBody3D or (body as StaticBody3D).collision_layer & layers == 0:
 			continue
-		var box: BoxShape3D = (body.get_child(0) as CollisionShape3D).shape
+		var box := (body.get_child(0) as CollisionShape3D).shape as BoxShape3D
+		if box == null:
+			continue  # the pool's ground
 		var middle: Vector3 = (body as StaticBody3D).position
 		if AABB(middle - box.size * 0.5, box.size).intersects_segment(from, to) != null:
 			found.append(String(body.name).rstrip("0123456789"))
@@ -343,3 +345,106 @@ func test_a_guest_drives_the_rover_only_where_it_is() -> String:
 	theirs.free()
 	return _finish("" if not early and went and told and drives and followed and not forged
 		else "early %s, went %s %s, told %s, drives %s, followed %s, forged %s" % [early, went, asked, told, drives, followed, forged])
+
+
+func test_pieces_cover_no_path_and_hide_no_floor() -> String:
+	var rock: TunnelRock = _rock()
+	var scene: Node = TunnelsScene.instantiate()
+	var found: PackedStringArray = []
+	var problem: String = ""
+	for y: int in TunnelRock.MAP.size():
+		for x: int in TunnelRock.MAP[y].length():
+			var cell := Vector2i(x, y)
+			var kind: String = TunnelRock.tile(cell)
+			if not TunnelRock.PIECES.has(kind):
+				continue
+			found.append(kind)
+			var at: Vector3 = TunnelRock.at(cell)
+			var size: Vector3 = TunnelRock.PIECES[kind][1]
+			if maxf(size.x, size.z) > TunnelRock.CELL_M or TunnelRock.holds(at):
+				problem = "%s must fill its cell and no more" % kind
+			if _between(rock, at + Vector3(-3.0, 0.5, 0.0), at + Vector3(3.0, 0.5, 0.0), TunnelRock.LAYER_WORLD).has("Piece") == false:
+				problem = "%s must stop the rover" % kind
+			# At the antenna's height. The sump is lower.
+			if _between(rock, at + Vector3(-3.0, 1.88, 0.0), at + Vector3(3.0, 1.88, 0.0), TunnelRock.LAYER_OCCLUDER).has("Piece") == (kind == "S"):
+				problem = "%s must stop the signal, or be the low sump" % kind
+			# The camera looks toward -x and -z, so this is what it hides.
+			for behind: Vector2i in [Vector2i(-1, -1), Vector2i(-1, 0), Vector2i(0, -1)]:
+				if TunnelRock.is_floor(cell + behind):
+					problem = "%s hides floor" % kind
+			for node: String in ["Beacon", "ExitPad", "Rover"]:
+				if at.distance_to(_place(scene, node)) < 5.0:
+					problem = "%s is at the %s" % [kind, node]
+	found.sort()
+	if found != PackedStringArray(["G", "S", "V", "W"]):
+		problem = "Each piece must stand once, not %s" % [found]
+	scene.free()
+	rock.free()
+	return problem
+
+
+func test_shallow_water_is_driven_and_deep_water_is_not() -> String:
+	var rock: TunnelRock = _rock()
+	var sump := Vector2(TunnelRock.SUMP.x, TunnelRock.SUMP.z)
+	var problem: String = ""
+	if TunnelRock.holds(TunnelRock.SUMP) or TunnelRock.ground_m(sump) != TunnelRock.DEEP_GROUND_M:
+		problem = "The middle is deep"
+	if not _between(rock, TunnelRock.SUMP + Vector3(-4.0, 0.2, 0.0), TunnelRock.SUMP + Vector3(4.0, 0.2, 0.0), TunnelRock.LAYER_WORLD).has("Low"):
+		problem = "Deep water must stop the rover"
+	# From level ground south and east of it up to where the rover's nose meets the deep.
+	for way: Vector2 in [Vector2.DOWN, Vector2.RIGHT]:
+		var lowest_m: float = 0.0
+		var last_m: float = 0.0
+		for i: int in 14:
+			var place: Vector2 = sump + way * (6.0 - i * 0.25)
+			var ground_m: float = TunnelRock.ground_m(place)
+			if i == 0 and ground_m != 0.0:
+				problem = "The shore must be level"
+			if last_m - ground_m > 0.25 * tan(deg_to_rad(30.0)):
+				problem = "Too steep to drive at %s" % place
+			last_m = ground_m
+			lowest_m = minf(lowest_m, ground_m)
+			var at := Vector3(place.x, ground_m, place.y)
+			var found: PackedStringArray = _between(rock, at + Vector3.UP * 0.1, at + Vector3.UP * 1.8, TunnelRock.LAYER_WORLD)
+			if not TunnelRock.holds(at) or not found.is_empty():
+				problem = "The rover can't be in the shallows at %s (%s)" % [at, found]
+		if lowest_m >= TunnelRock.WATER_M or lowest_m <= TunnelRock.DEEP_GROUND_M:
+			problem = "The shelf must be under shallow water"
+	# The floor's own boxes must not fill the hollow.
+	for place: Vector2 in [sump + Vector2(0.0, 3.0), sump]:
+		if _between(rock, Vector3(place.x, -0.05, place.y), Vector3(place.x, -0.95, place.y), TunnelRock.LAYER_WORLD).has("Floor"):
+			problem = "The floor covers the pool"
+	var hollow: HeightMapShape3D = (rock.get_node("Hollow").get_child(0) as CollisionShape3D).shape
+	if not is_equal_approx(hollow.get_min_height(), TunnelRock.DEEP_GROUND_M) or hollow.get_max_height() != 0.0:
+		problem = "The ground must go from level to deep"
+	for z: int in hollow.map_depth:
+		for x: int in hollow.map_width:
+			var at := Vector2(rock.get_node("Hollow").position.x, rock.get_node("Hollow").position.z) + Vector2(x - (hollow.map_width - 1) * 0.5, z - (hollow.map_depth - 1) * 0.5)
+			if not is_equal_approx(hollow.map_data[z * hollow.map_width + x], TunnelRock.ground_m(at)):
+				problem = "The ground to stand on is not the ground at %s" % at
+	if not TunnelRock.in_deep(TunnelRock.SUMP + Vector3(2.0, 0.0, 0.0)) or TunnelRock.in_deep(TunnelRock.SUMP + Vector3(0.0, 0.0, 2.5)):
+		problem = "Only a rover over the deep's edge is in it"
+	rock.free()
+	return problem
+
+
+func test_water_is_where_the_ground_is_lower_and_darker_where_deeper() -> String:
+	var tints: Array[Color] = []
+	for i: int in 17:
+		var tint: Color = VoxelWater.tint(i * 0.1)
+		if not tint in tints:
+			tints.append(tint)
+	if tints.size() != VoxelWater.TINT_STEPS + 1 or tints[0] != VoxelWater.SHALLOW or tints[-1] != VoxelWater.DEEP:
+		return "The tint must go from shallow to deep in steps, not %s" % [tints]
+	var water := VoxelWater.new()
+	# Half a meter of dry ground, then half a meter that is 0.3 m under water.
+	water.fill(Rect2(0.0, 0.0, 1.0, 0.25), -0.1, func(place: Vector2) -> float: return 0.0 if place.x < 0.5 else -0.4)
+	var problem: String = ""
+	if water.places.size() != 2 or water.multimesh.instance_count != 2:
+		problem = "Only the low ground has water, not %d columns" % water.places.size()
+	elif not is_equal_approx(water.places[0].basis.y.length(), 0.3) or not is_equal_approx(water.places[0].origin.y, -0.25):
+		problem = "A column goes from the ground to the level"
+	elif water.colors[0].a != 1.0 or water.colors[1].a != 0.0:
+		problem = "Only the column at the shore is foam"
+	water.free()
+	return problem
