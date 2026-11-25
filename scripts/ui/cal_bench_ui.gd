@@ -20,8 +20,9 @@ var _ids: Array[String] = []
 var _current_id: String = ""
 ## The shown result is from this session's calibration.
 var _calibrated: bool = false
-## That result's text, and the budget it was done with.
+## That result's text and colour, and the budget it was done with.
 var _finished_text: String = ""
+var _finished_color: Color
 var _finished_budget: Dictionary = {}
 ## Counts openings, closings and picks: an answer asked for in an earlier one
 ## is not shown.
@@ -113,7 +114,8 @@ func _on_pod_or_oirm_changed() -> void:
 	if not visible or index < 0:
 		return
 	var standard: bool = _is_standard(_current_id)
-	if not _calibrated and (_away_text() != _away or (standard and GameState.has_bench_reference(_current_id) != _has_reference)):
+	# With no reference there is no reading to keep.
+	if not _calibrated and (_away_text() != _away or (standard and (not _has_reference or not GameState.has_bench_reference(_current_id)))):
 		_on_instrument_selected(index)
 	elif standard:
 		if _calibrated:
@@ -392,6 +394,7 @@ func _on_calibrate_pressed() -> void:
 		_result_label.text = "AS-FOUND WITHIN ACCEPTANCE LIMIT, LATE: PASS. Interval unchanged. " + interval_note
 	_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
 	_finished_text = _result_label.text
+	_finished_color = DriftingSensor.band_color(band)
 	_finished_budget = _recorded_budget(record)
 	_show_finished()
 
@@ -418,6 +421,7 @@ func _recorded_budget(record: Dictionary) -> Dictionary:
 ## A finished result, with a trip to OIRM and the certificate as they are now.
 func _show_finished() -> void:
 	_result_label.text = _finished_text
+	_result_label.add_theme_color_override("font_color", _finished_color)
 	if GameState.at_oirm.has(_current_id):
 		_result_label.text += " Sent to OIRM, back on day %d." % GameState.at_oirm[_current_id]
 	_standard_label.text = _reference_text(_current_id, _finished_budget)
