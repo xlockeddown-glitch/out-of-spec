@@ -237,7 +237,9 @@ func _host_read(from: int, packet: PackedByteArray, now: int) -> bool:
 	if action.length() > MAX_TEXT or arguments.size() > MAX_ARGUMENTS or arguments.is_typed():
 		return false
 	for argument: Variant in arguments:
-		if not typeof(argument) in [TYPE_BOOL, TYPE_INT, TYPE_STRING] or (argument is String and argument.length() > MAX_TEXT):
+		if not typeof(argument) in [TYPE_BOOL, TYPE_INT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR3I]:
+			return false
+		if (argument is String or argument is StringName) and str(argument).length() > MAX_TEXT:
 			return false
 	var answer: Variant = _farm_commands().execute(link["player"], StringName(action), arguments)
 	# What the command set off may have ended the session.

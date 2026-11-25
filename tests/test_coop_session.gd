@@ -176,6 +176,23 @@ func test_a_command_runs_as_the_sender() -> String:
 	return _finish("")
 
 
+func test_cells_and_names_arrive() -> String:
+	var host: Node = _host()
+	var guest: Node = _guest(host)
+	var host_farm: Node = host.commands.state
+	var cell := Vector3i(GameStateScript.PLOT.position.x, 0, GameStateScript.PLOT.position.y)
+	var tilled: Array = _request(guest, &"till", [cell])
+	_until(func() -> bool: return not tilled.is_empty())
+	var ore: int = host_farm.crystal_ore
+	var mined: Array = _request(guest, &"mine_fissure", [&"FissureA"])
+	_until(func() -> bool: return not mined.is_empty())
+	if tilled != [true] or not host_farm.tilled_cells.has(cell) or not guest.commands.state.tilled_cells.is_empty():
+		return _finish("A cell must reach the host's farm, got %s" % [tilled])
+	if mined != [true] or host_farm.crystal_ore <= ore:
+		return _finish("A fissure's name must reach the host's farm, got %s" % [mined])
+	return _finish("")
+
+
 func test_strangers_and_forgeries_are_dropped() -> String:
 	var bench: Array = [SessionScript.COMMAND, 1, "calibrate_at_bench", [GameStateScript.HYGROMETER_ID]]
 	var too_long: String = "x".repeat(SessionScript.MAX_TEXT + 1)
@@ -188,7 +205,8 @@ func test_strangers_and_forgeries_are_dropped() -> String:
 		[true, [SessionScript.LEFT, "player_1"]], [true, [SessionScript.HELLO, SessionScript.PROTOCOL]],
 		# Bad parts, or too much of them.
 		[true, []], [true, {}], [true, bench + ["player_1"]], [true, [SessionScript.COMMAND, 1, too_long, []]],
-		[true, [SessionScript.COMMAND, 1, "start_lab_grow", [too_long]]], [true, [SessionScript.COMMAND, 1, "start_lab_grow", [{}]]],
+		[true, [SessionScript.COMMAND, 1, "start_lab_grow", [too_long]]], [true, [SessionScript.COMMAND, 1, "mine_fissure", [StringName(too_long)]]],
+		[true, [SessionScript.COMMAND, 1, "till", [Vector3.ZERO]]], [true, [SessionScript.COMMAND, 1, "start_lab_grow", [{}]]],
 		[true, [SessionScript.COMMAND, 1, "start_lab_grow", range(SessionScript.MAX_ARGUMENTS + 1)]],
 		[true, [SessionScript.COMMAND, 1, "x".repeat(SessionScript.MAX_GUEST_BYTES), []]],
 		[true, [SessionScript.COMMAND, 1, "calibrate_at_bench", typed]],
