@@ -39,7 +39,7 @@ static var _point_cache: Dictionary[Vector2i, float] = {}
 
 ## The water for these steps and pieces: { levels: cell -> level, film: cell -> true }.
 static func work_out(dug: Dictionary[Vector2i, int], pieces: Dictionary[Vector2i, int]) -> Dictionary:
-	var levels: Dictionary[Vector2i, float] = {}
+	var wet: Dictionary[Vector2i, float] = {}
 	var seen: Dictionary[Vector2i, bool] = {}
 	_ground_cache.clear()
 	_natural_cache.clear()
@@ -55,21 +55,21 @@ static func work_out(dug: Dictionary[Vector2i, int], pieces: Dictionary[Vector2i
 		var level: float = minf(table_m, _rim_m(body, dug))
 		if level > low_m + MIN_DEPTH_M:
 			for member: Vector2i in body:
-				levels[member] = level
-	var film: Dictionary[Vector2i, bool] = {}
-	var pits: Dictionary[Vector2i, float] = levels.duplicate()
+				wet[member] = level
+	var filmed: Dictionary[Vector2i, bool] = {}
+	var pits: Dictionary[Vector2i, float] = wet.duplicate()
 	for net: Array[Vector2i] in _networks(pieces):
 		if not _is_fed(net, pits):
 			continue
 		for cell: Vector2i in net:
 			if not pits.has(cell):
-				film[cell] = true
+				filmed[cell] = true
 		for cell: Vector2i in net:
 			for side: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
-				_fill_dimple(cell + side, cell, dug, pits, pieces, levels)
+				_fill_dimple(cell + side, cell, dug, pits, pieces, wet)
 	_ground_cache.clear()
 	_natural_cache.clear()
-	return { "levels": levels, "film": film }
+	return { "levels": wet, "film": filmed }
 
 
 ## Takes this work as the farm's water.
@@ -144,13 +144,13 @@ static func gap_m(at: Vector2) -> float:
 
 ## Whether any of these blocks touches a box of `half` (across, along) at `at`, its
 ## front toward `ahead`.
-static func box_hits(blocks: Array[Rect2], at: Vector2, ahead: Vector2, half: Vector2) -> bool:
+static func box_hits(boxes: Array[Rect2], at: Vector2, ahead: Vector2, half: Vector2) -> bool:
 	var along: Vector2 = ahead.normalized()
 	var across := Vector2(-along.y, along.x)
 	var reach := Vector2(
 		half.y * absf(along.x) + half.x * absf(across.x), half.y * absf(along.y) + half.x * absf(across.y)
 	)
-	for block: Rect2 in blocks:
+	for block: Rect2 in boxes:
 		var gap: Vector2 = at - block.get_center()
 		var block_half: Vector2 = block.size * 0.5
 		if absf(gap.x) > block_half.x + reach.x or absf(gap.y) > block_half.y + reach.y:
@@ -253,9 +253,9 @@ static func _is_fed(net: Array[Vector2i], pits: Dictionary[Vector2i, float]) -> 
 ## ground is part of.
 static func _fill_dimple(
 	cell: Vector2i, from: Vector2i, dug: Dictionary[Vector2i, int], pits: Dictionary[Vector2i, float],
-	pieces: Dictionary[Vector2i, int], levels: Dictionary[Vector2i, float]
+	pieces: Dictionary[Vector2i, int], wet: Dictionary[Vector2i, float]
 ) -> void:
-	if _steps(cell, dug) != 1 or pits.has(cell) or levels.has(cell) or pieces.get(cell, -1) == StonePieces.CHANNEL:
+	if _steps(cell, dug) != 1 or pits.has(cell) or wet.has(cell) or pieces.get(cell, -1) == StonePieces.CHANNEL:
 		return
 	var floor_m: float = _ground_m(cell, dug)
 	if floor_m >= _ground_m(from, dug) - MIN_DEPTH_M:
@@ -263,7 +263,7 @@ static func _fill_dimple(
 	var alone: Dictionary[Vector2i, bool] = { cell: true }
 	var level: float = _rim_m(alone, dug)
 	if level > floor_m + MIN_DEPTH_M:
-		levels[cell] = level
+		wet[cell] = level
 
 
 ## The deep blocks, as the ford's: a block stands where its middle or a corner is deep.

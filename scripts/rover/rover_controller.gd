@@ -178,7 +178,7 @@ func _unpark() -> void:
 ## Out of water that has become too deep, after a dig or a stone changed it: to the
 ## nearest place where the whole body is clear, not just its middle.
 func leave_deep_water() -> void:
-	if ground == null:
+	if ground == null or _following:
 		return
 	var at := Vector2(global_position.x, global_position.z)
 	var to: Vector2 = clear_of_pit_water(at, Vector2(-global_basis.z.x, -global_basis.z.z), Terrain.HALF_M - wheelbase_m)
@@ -221,9 +221,18 @@ static func _touches_pit_water(at: Vector2, heading: Vector2) -> bool:
 	return PitWater.box_hits(PitWater.blocks(), at, heading, half) or PitWater.box_hits(Ford.blocks(), at, heading, half)
 
 
+## Rocks, at the middle and both ends of the body.
+static func _touches_rock(at: Vector2, heading: Vector2) -> bool:
+	for along: float in [-StonePieces.ROVER_HALF.y, 0.0, StonePieces.ROVER_HALF.y]:
+		var point: Vector2 = at + heading * along
+		if HillDressing.clear_of_rocks(point) != point:
+			return true
+	return false
+
+
 ## Whether a rover facing `heading` at `at` is clear of deep water, rocks and walls.
 static func _stands_clear(at: Vector2, heading: Vector2) -> bool:
-	if _touches_pit_water(at, heading) or HillDressing.clear_of_rocks(at) != at:
+	if _touches_pit_water(at, heading) or _touches_rock(at, heading):
 		return false
 	var pose := Transform3D(
 		Basis(Vector3(-heading.y, 0.0, heading.x), Vector3.UP, Vector3(-heading.x, 0.0, -heading.y)), Vector3(at.x, 0.0, at.y)
