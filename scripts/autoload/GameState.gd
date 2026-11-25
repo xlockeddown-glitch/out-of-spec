@@ -25,6 +25,10 @@ signal credibility_changed(points: int)
 signal crops_changed
 ## A soil cell was tilled.
 signal soil_tilled(cell: Vector3i)
+## Ground was dug or filled.
+signal terrain_changed
+## A boulder was hit or broken.
+signal boulders_changed
 ## The job board or the accepted jobs changed (paid calibration jobs).
 signal jobs_changed
 ## The lab grew, a build started or finished, or an area changed.
@@ -182,6 +186,10 @@ var rng := RandomNumberGenerator.new()
 var rover_transforms: Dictionary = {}
 ## Vector3i -> true for every tilled soil cell.
 var tilled_cells: Dictionary = {}
+## How deep each dug cell of Terrain is, in steps.
+var dug: Dictionary[Vector2i, int] = {}
+## How often each boulder was hit; BOULDER_HITS is broken. None is 0.
+var boulder_hits: Dictionary[StringName, int] = {}
 
 ## Lab credibility (Ryan, 2026-11-22): audits and overdue instruments move it;
 ## the phone shows its band. See data/economy.json "credibility".
@@ -403,7 +411,8 @@ const MAX_KNOWN_GUESTS: int = 64
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
-	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids"]
+	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
+	"boulder_hits"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -465,6 +474,14 @@ func farm_dict_problem(data: Dictionary) -> String:
 	for cell: Variant in data["tilled_cells"]:
 		if not cell is Vector3i:
 			return "'tilled_cells' has an entry that is not a cell."
+	var dug_problem: String = Terrain.dug_problem(data.get("dug", {}))
+	if dug_problem != "":
+		return "'dug' %s" % dug_problem
+	var hits: Dictionary = data.get("boulder_hits", {})
+	for boulder: Variant in hits:
+		if not (boulder is String or boulder is StringName) or not StringName(boulder) in BOULDERS \
+				or not hits[boulder] is int or hits[boulder] < 1 or hits[boulder] > BOULDER_HITS:
+			return "'boulder_hits' has a boulder that can't be hit like that."
 	if not _optional_fields(data["lab_build"], ["kind", "discipline"], ["size", "done_day"]):
 		return "'lab_build' has a field of the wrong type."
 	for list: String in ["job_board", "active_jobs"]:
@@ -603,6 +620,8 @@ func farm_from_dict(data: Dictionary) -> String:
 	jobs_changed.emit()
 	lab_changed.emit()
 	robots_changed.emit()
+	terrain_changed.emit()
+	boulders_changed.emit()
 	return ""
 
 
@@ -632,6 +651,8 @@ func put_farm(data: Dictionary) -> void:
 		var value: Variant = data.get(field, fresh.get(field))
 		if value is Array:
 			(get(field) as Array).assign((value as Array).duplicate(true))
+		elif value is Dictionary and (get(field) as Dictionary).is_typed():
+			(get(field) as Dictionary).assign(value)
 		elif value is Dictionary:
 			set(field, (value as Dictionary).duplicate(true))
 		else:
@@ -2599,6 +2620,27 @@ func mine_fissure(fissure_id: StringName, player_id: String = "") -> bool:
 	return true
 
 
+## The boulders in scenes/main_farm.tscn.
+const BOULDERS: Array[StringName] = [&"RockA", &"RockB", &"RockC", &"RockD"]
+## Hits that break a boulder [PLACEHOLDER].
+const BOULDER_HITS: int = 5
+
+
+func is_boulder_broken(boulder_id: StringName) -> bool:
+	return boulder_hits.get(boulder_id, 0) >= BOULDER_HITS
+
+
+## Returns how often it has now been hit, or 0 if it can't be. A broken one stays
+## broken. It costs and gives nothing [ASSUMPTION].
+@warning_ignore("unused_parameter")
+func hit_boulder(boulder_id: StringName, player_id: String = "") -> int:
+	if not boulder_id in BOULDERS or is_boulder_broken(boulder_id):
+		return 0
+	boulder_hits[boulder_id] = boulder_hits.get(boulder_id, 0) + 1
+	boulders_changed.emit()
+	return boulder_hits[boulder_id]
+
+
 func treads_ore_cost() -> int:
 	return int(DataManager.get_number(ITEMS_TABLE, "wide_treads/ore_cost", 6.0))
 
@@ -3968,6 +4010,31 @@ func till(cell: Vector3i, player_id: String = "") -> bool:
 	_award_xp("till", player_id)
 	soil_tilled.emit(cell)
 	return true
+
+
+## Digs a cell of Terrain (y = 0) one step deeper. Returns "" or why not. It costs
+## and gives nothing [ASSUMPTION].
+@warning_ignore("unused_parameter")
+func dig(cell: Vector3i, player_id: String = "") -> String:
+	var at := Vector2i(cell.x, cell.z)
+	var problem: String = Terrain.dig_problem(at, dug) if cell.y == 0 else "This ground can't be dug."
+	if problem == "":
+		dug[at] = dug.get(at, 0) + 1
+		terrain_changed.emit()
+	return problem
+
+
+## Fills a dug cell one step. Returns "" or why not.
+@warning_ignore("unused_parameter")
+func fill(cell: Vector3i, player_id: String = "") -> String:
+	var at := Vector2i(cell.x, cell.z)
+	var problem: String = Terrain.fill_problem(at, dug) if cell.y == 0 else "There is nothing to fill here."
+	if problem == "":
+		dug[at] -= 1
+		if dug[at] == 0:
+			dug.erase(at)
+		terrain_changed.emit()
+	return problem
 
 
 ## Plants `crop_id` (default: the current seed) on a tilled, empty cell.

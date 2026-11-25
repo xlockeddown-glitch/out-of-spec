@@ -159,3 +159,30 @@ func test_a_rover_saved_inside_a_hill_comes_back_on_it() -> String:
 	ground.free()
 	GameState.rover_transforms.assign(parked)
 	return problem
+
+
+func test_a_rover_parked_in_a_pit_stays_there_on_load() -> String:
+	var tree: SceneTree = Engine.get_main_loop()
+	var parked: Dictionary = GameState.rover_transforms.duplicate()
+	var dug: Dictionary[Vector2i, int] = GameState.dug.duplicate()
+	for x: int in range(23, 26):
+		for z: int in range(22, 25):
+			GameState.dug[Vector2i(x, z)] = 2
+	var at := Vector3(49, Terrain.height(Vector2(49, 47), GameState.dug), 47)
+	var ground := TerrainGround.new()
+	tree.root.add_child(ground)
+	var rover := RoverController.new()
+	rover.ground = ground
+	tree.root.add_child(rover)
+	rover.global_position = at
+	rover._put_back_on_land()
+	var problem: String = "" if is_equal_approx(rover.global_position.y, at.y) else "It was put on top of the pit."
+	GameState.rover_transforms[rover.rover_id] = Transform3D(Basis.IDENTITY, at + Vector3.DOWN * 0.05)
+	rover._set_following(false)
+	if problem == "" and (rover.global_position.x != at.x or rover.global_position.y < at.y):
+		problem = "Taken over, it must be above the ground."
+	rover.free()
+	ground.free()
+	GameState.dug.assign(dug)
+	GameState.rover_transforms.assign(parked)
+	return problem

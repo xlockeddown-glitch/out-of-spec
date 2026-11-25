@@ -18,6 +18,8 @@
 [ext_resource type="Script" path="res://scripts/world/parking_pad.gd" id="16_pad"]
 [ext_resource type="Script" path="res://scripts/world/inspectable.gd" id="30_inspect"]
 [ext_resource type="Script" path="res://scripts/world/terrain_ground.gd" id="31_ground"]
+[ext_resource type="Script" path="res://scripts/world/dig_outline.gd" id="32_outline"]
+[ext_resource type="Script" path="res://scripts/world/boulder.gd" id="33_boulder"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -195,6 +197,10 @@ collision_mask = 0
 script = ExtResource("31_ground")
 material = SubResource("MatGround")
 
+[node name="DigOutline" type="MeshInstance3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("rover")]
+script = ExtResource("32_outline")
+rover = NodePath("../Rover")
+
 [node name="SoilGrid" type="GridMap" parent="WorldView/WorldViewport/World" unique_id=56551322]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
 cell_size = Vector3(2, 0.2, 2)
@@ -209,6 +215,7 @@ mesh_library_override = ExtResource("14_soil")
 position = Vector3(-17, 0, -10)
 collision_layer = 5
 collision_mask = 0
+script = ExtResource("33_boulder")
 
 [node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rocks/RockA"]
 position = Vector3(0, 2, 0)
@@ -228,6 +235,7 @@ material = SubResource("MatRock")
 position = Vector3(-9, 0, -17)
 collision_layer = 5
 collision_mask = 0
+script = ExtResource("33_boulder")
 
 [node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rocks/RockB"]
 position = Vector3(0, 1.75, 0)
@@ -247,6 +255,7 @@ material = SubResource("MatRock")
 position = Vector3(16, 0, 9)
 collision_layer = 5
 collision_mask = 0
+script = ExtResource("33_boulder")
 
 [node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rocks/RockC"]
 position = Vector3(0, 2, 0)
@@ -266,6 +275,7 @@ material = SubResource("MatRock")
 position = Vector3(5, 0, -16)
 collision_layer = 5
 collision_mask = 0
+script = ExtResource("33_boulder")
 
 [node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rocks/RockD"]
 position = Vector3(0, 1.5, 0)
@@ -555,7 +565,7 @@ radius = 0.4
 height = 0.8
 material = SubResource("MatCyanGlow")
 
-[node name="Rover" type="CharacterBody3D" parent="WorldView/WorldViewport/World" unique_id=221386182 node_paths=PackedStringArray("satellite_relay", "soil_grid", "antenna", "ore_fissures_root", "ground")]
+[node name="Rover" type="CharacterBody3D" parent="WorldView/WorldViewport/World" unique_id=221386182 node_paths=PackedStringArray("satellite_relay", "soil_grid", "antenna", "ore_fissures_root", "boulders_root", "ground")]
 unique_name_in_owner = true
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 2)
 collision_layer = 2
@@ -564,6 +574,7 @@ satellite_relay = NodePath("../SatelliteRelay")
 soil_grid = NodePath("../SoilGrid")
 antenna = NodePath("Antenna")
 ore_fissures_root = NodePath("../Fissures")
+boulders_root = NodePath("../Rocks")
 ground = NodePath("../Ground")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rover" unique_id=806680600]

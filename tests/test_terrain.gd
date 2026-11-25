@@ -81,3 +81,136 @@ func test_a_body_lies_level_on_level_ground_and_tips_into_a_hole() -> String:
 	if rolled.x.y >= -0.1:
 		return "It must roll toward the hole."
 	return ""
+
+
+func test_digging_keeps_to_one_step_between_neighbors() -> String:
+	var dug: Dictionary[Vector2i, int] = {}
+	var cell := Vector2i(20, 20)
+	if Terrain.dig_problem(cell, dug) != "":
+		return "Open ground must be dug."
+	dug[cell] = 1
+	for neighbor: Vector2i in Terrain.neighbors(cell):
+		if Terrain.dig_problem(cell, dug) == "":
+			return "Each of the eight neighbors must count."
+		dug[neighbor] = 1
+	if dug.size() != 9 or Terrain.dig_problem(cell, dug) != "":
+		return "With its neighbors dug it must go deeper."
+	for at: Vector2i in dug:
+		dug[at] = Terrain.MAX_DIG_STEPS
+	if Terrain.dig_problem(cell, dug) == "":
+		return "There must be a deepest depth."
+	return ""
+
+
+func test_digging_keeps_off_the_edge_and_level_ground() -> String:
+	for cell: Vector2i in [Vector2i(-40, 20), Vector2i(39, 20), Vector2i(20, -40), Vector2i(20, 39), Vector2i(20, 1000),
+			Vector2i(0, 0), Vector2i(14, 0), Vector2i(16, 0), Vector2i(-17, 0), Vector2i(0, 14), Vector2i(-35, -35), Vector2i(-31, -35)]:
+		if Terrain.dig_problem(cell, {}) == "" or Terrain.dug_problem({ cell: 1 }) == "":
+			return "%s must not be dug." % cell
+	for cell: Vector2i in [Vector2i(-39, 20), Vector2i(38, 38), Vector2i(17, 0), Vector2i(0, -18), Vector2i(-29, -35)]:
+		if Terrain.dig_problem(cell, {}) != "":
+			return "%s must be dug." % cell
+	return ""
+
+
+func test_the_most_digging_there_can_be_never_sinks_level_ground() -> String:
+	var deep: Dictionary[Vector2i, int] = {}
+	for x: int in range(-40, 40):
+		for z: int in range(-40, 40):
+			if Terrain.can_dig(Vector2i(x, z)):
+				deep[Vector2i(x, z)] = 1
+	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
+		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
+			var point := Vector2i(x, z)
+			if Terrain.is_level(Vector2(point)) and Terrain.point_height(point, deep) != Terrain.natural(point):
+				return "%s sank." % point
+	return ""
+
+
+func test_filling_keeps_to_one_step_between_neighbors() -> String:
+	var cell := Vector2i(20, 20)
+	if Terrain.fill_problem(cell, {}) == "":
+		return "Only dug ground may be filled."
+	for neighbor: Vector2i in Terrain.neighbors(cell):
+		if Terrain.fill_problem(cell, { cell: 1, neighbor: 1 }) != "":
+			return "A step must be filled."
+		if Terrain.fill_problem(cell, { cell: 1, neighbor: 2 }) == "":
+			return "Filling must not leave a neighbor two steps deeper."
+	return ""
+
+
+func test_any_digging_the_rules_allow_loads() -> String:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 5
+	var dug: Dictionary[Vector2i, int] = {}
+	var filled: int = 0
+	var deepest: int = 0
+	for i: int in 4000:
+		var cell := Vector2i(rng.randi_range(18, 24), rng.randi_range(18, 24))
+		if rng.randf() < 0.7:
+			if Terrain.dig_problem(cell, dug) == "":
+				dug[cell] = dug.get(cell, 0) + 1
+				deepest = maxi(deepest, dug[cell])
+		elif Terrain.fill_problem(cell, dug) == "":
+			filled += 1
+			dug[cell] -= 1
+			if dug[cell] == 0:
+				dug.erase(cell)
+		if Terrain.dug_problem(dug) != "":
+			return "After dig or fill %d the digging %s" % [i, Terrain.dug_problem(dug)]
+	if filled < 100 or deepest < 3:
+		return "It must fill (%d) and go deep (%d)." % [filled, deepest]
+	return ""
+
+
+func test_bad_digging_is_refused() -> String:
+	var cell := Vector2i(20, 20)
+	for bad: Dictionary in [{ cell: 0 }, { cell: -1 }, { cell: 2 }, { cell: 1.0 }, { cell: "1" }, { cell: true }, { "here": 1 },
+			{ Vector3i(20, 0, 20): 1 }, { Vector2(20, 20): 1 }, { cell: 99 }, { Vector2i(99, 99): 1 }]:
+		if Terrain.dug_problem(bad) == "":
+			return "%s must be refused." % bad
+	return ""
+
+
+func test_the_highest_ground_under_a_rover_is_found() -> String:
+	var ground := TerrainGround.new()
+	ground._ready()
+	var dug: Dictionary[Vector2i, int] = { Vector2i(20, 20): 1, Vector2i(20, 21): 1, Vector2i(20, 22): 1 }
+	ground.show_dug(dug)
+	var found := PackedFloat32Array()
+	var problem: String = ""
+	# In the trench along z, and across it.
+	for turn: float in [0.0, PI * 0.5]:
+		var at := Transform3D(Basis(Vector3.UP, turn), Vector3(41, 0, 43))
+		var highest_m: float = -INF
+		for x: int in range(-8, 9):
+			for z: int in range(-12, 13):
+				highest_m = maxf(highest_m, ground.height_at(at * Vector3(x * 0.1, 0, z * 0.1)))
+		found.append(ground.highest_under(at, 1.2, 0.8))
+		if absf(found[-1] - highest_m) > 0.1:
+			problem = "Found %s, not %s." % [found[-1], highest_m]
+	ground.free()
+	if problem == "" and found[1] <= found[0]:
+		return "Across the trench it must reach the rim."
+	return problem
+
+
+func test_dug_hills_can_be_driven_everywhere() -> String:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var dug: Dictionary[Vector2i, int] = {}
+	for i: int in 60000:
+		var cell := Vector2i(rng.randi_range(-40, 39), rng.randi_range(-40, 39))
+		if Terrain.dig_problem(cell, dug) == "":
+			dug[cell] = dug.get(cell, 0) + 1
+	# Rovers climb 45 degrees, a rise of 1 in 1.
+	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M):
+		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M):
+			var a: float = Terrain.point_height(Vector2i(x, z), dug)
+			var b: float = Terrain.point_height(Vector2i(x + 1, z), dug)
+			var c: float = Terrain.point_height(Vector2i(x, z + 1), dug)
+			var d: float = Terrain.point_height(Vector2i(x + 1, z + 1), dug)
+			for rise: Vector2 in [Vector2(b - a, c - a), Vector2(d - c, d - b), Vector2(b - a, d - b), Vector2(d - c, c - a)]:
+				if rise.length() >= 0.98:
+					return "%s, %s rises %s." % [x, z, rise.length()]
+	return ""

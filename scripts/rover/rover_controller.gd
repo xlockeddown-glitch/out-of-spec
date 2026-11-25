@@ -20,6 +20,10 @@ signal till_rejected(reason: String)
 ## the command was sent.
 signal tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int)
 signal ore_mined(fissure_id: StringName)
+## A boulder was drilled, `hits` times by now.
+signal boulder_hit(hits: int)
+signal dig_rejected(reason: String)
+signal fill_rejected(reason: String)
 
 ## Following another player's driving: how fast it closes in, and from how far it
 ## jumps there instead; and how far ahead of the last word it runs [PLACEHOLDER].
@@ -27,7 +31,7 @@ const FOLLOW_PER_S: float = 12.0
 const FOLLOW_JUMP_M: float = 4.0
 const FOLLOW_LEAD_S: float = 0.15
 
-enum Command { TILL, ZERO_STEERING }
+enum Command { TILL, ZERO_STEERING, DIG, FILL }
 
 
 ## One timestamped control sample travelling up the link.
@@ -70,6 +74,8 @@ class UplinkCommand:
 ## Parent of OreFissure nodes. The till/drill action mines a fissure in reach
 ## before it tries to till soil.
 @export var ore_fissures_root: Node3D
+## Parent of Boulder nodes. One close in front is drilled before soil is tilled.
+@export var boulders_root: Node3D
 ## What VisualRoot lies on. Always level if unset.
 @export var ground: TerrainGround
 ## Greybox wheels (VisualRoot children named Wheel*) widen with Bram's treads.
@@ -91,6 +97,10 @@ class UplinkCommand:
 @export var tip_per_s: float = 10.0
 ## It keeps to ground that falls away this far in a tick [PLACEHOLDER].
 @export var ground_snap_m: float = 0.5
+## It digs the cell this far ahead of its middle [PLACEHOLDER].
+@export var dig_reach_m: float = 2.0
+## Half the length of its body, for staying above ground that rises.
+@export var half_length_m: float = 1.2
 
 @export_group("Uplink")
 @export var lag_clear_s: float = 0.05
@@ -289,6 +299,10 @@ func _execute(cmd: UplinkCommand) -> void:
 			_till_under_rover(cmd.seed_id, cmd.offset_steps)
 		Command.ZERO_STEERING:
 			_zero_steering()
+		Command.DIG:
+			_change_ground(true)
+		Command.FILL:
+			_change_ground(false)
 
 
 # --- Drive & drift ----------------------------------------------------------
@@ -329,6 +343,8 @@ func _set_following(following: bool) -> void:
 	if not following and not FarmCommands.guest:
 		global_transform = CoopRovers.place(rover_id)
 	if not following:
+		# The ground may have risen while it was shown.
+		keep_above_ground()
 		_put_back_on_land()
 
 
@@ -362,6 +378,12 @@ func _lie_on_ground(delta: float) -> void:
 	_visual.position.y = lerpf(_visual.position.y, sits_m, share)
 
 
+## Lifts it out of ground that rose under it. To ground that sank it falls.
+func keep_above_ground() -> void:
+	if ground != null:
+		global_position.y = maxf(global_position.y, ground.highest_under(global_transform, half_length_m, half_track_m))
+
+
 func _zero_steering() -> void:
 	var record: Dictionary = await FarmCommands.request(&"zero_steering")
 	if is_inside_tree():
@@ -377,6 +399,8 @@ func _on_steering_error_changed(_error: float, _band: int) -> void:
 
 func _till_under_rover(seed_id: String, offset_steps: int) -> void:
 	if await _try_mine() or not is_inside_tree():
+		return
+	if await _try_boulder() or not is_inside_tree():
 		return
 	if soil_grid == null:
 		till_rejected.emit("No soil grid linked.")
@@ -394,6 +418,29 @@ func _till_under_rover(seed_id: String, offset_steps: int) -> void:
 			till_rejected.emit("No soil under tractor.")
 		FarmGrid.TillResult.REFUSED:
 			till_rejected.emit("The host did not till it.")
+
+
+## The cell of Terrain it digs: the one in front of it.
+func dig_cell() -> Vector2i:
+	var at: Vector3 = to_global(Vector3.FORWARD * dig_reach_m)
+	return Terrain.cell_at(Vector2(at.x, at.z))
+
+
+## Digs or fills in front of it. It must stand, so that the cell outlined is the
+## cell dug [ASSUMPTION].
+func _change_ground(deeper: bool) -> void:
+	var rejected: Signal = dig_rejected if deeper else fill_rejected
+	if not is_stopped():
+		rejected.emit("Stop the rover first.")
+		return
+	var cell := Vector3i(dig_cell().x, 0, dig_cell().y)
+	var problem: String
+	if deeper:
+		problem = await FarmCommands.request(&"dig", [cell])
+	else:
+		problem = await FarmCommands.request(&"fill", [cell])
+	if problem != "" and is_inside_tree():
+		rejected.emit(problem)
 
 
 ## The soil cell under the rover (y = 0), or (0, -1, 0) without a grid.
@@ -427,6 +474,24 @@ func _try_mine() -> bool:
 	else:
 		till_rejected.emit("The fissure was not drilled.")
 	return true
+
+
+## True if a boulder close in front was tried, so the ground is not tilled.
+func _try_boulder() -> bool:
+	if boulders_root == null:
+		return false
+	for child: Node in boulders_root.get_children():
+		var boulder := child as Boulder
+		if boulder == null or not boulder.is_in_reach(to_global(Vector3.FORWARD * half_length_m)):
+			continue
+		var hits: int = await FarmCommands.request(&"hit_boulder", [boulder.name])
+		if is_inside_tree():
+			if hits > 0:
+				boulder_hit.emit(hits)
+			else:
+				till_rejected.emit("The boulder was not drilled.")
+		return true
+	return false
 
 
 func _apply_upgrades() -> void:
