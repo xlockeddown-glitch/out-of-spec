@@ -164,6 +164,21 @@ func _exit_tree() -> void:
 
 func _unpark() -> void:
 	global_transform = CoopRovers.place(rover_id) if CoopRovers.together() and CoopRovers.has_place(rover_id) else GameState.parked_rover_transform(rover_id, _start_transform)
+	_put_back_on_land()
+
+
+## A farm saved before the hills may have it parked inside one, or off the land.
+func _put_back_on_land() -> void:
+	if ground == null:
+		return
+	var edge_m: float = Terrain.HALF_M - wheelbase_m
+	global_position.x = clampf(global_position.x, -edge_m, edge_m)
+	global_position.z = clampf(global_position.z, -edge_m, edge_m)
+	var ground_m: float = ground.height_at(global_position)
+	# Resting on level ground it may be a hair under.
+	if global_position.y < ground_m - 0.1:
+		# Above its uphill corners; it drops the rest of the way.
+		global_position.y = ground_m + ground_snap_m
 
 
 func _park() -> void:
@@ -354,7 +369,9 @@ func _lie_on_ground(delta: float) -> void:
 	for side: float in [-half_track_m, half_track_m]:
 		for end: float in [-wheelbase_m * 0.5, wheelbase_m * 0.5]:
 			highest_m = maxf(highest_m, ground.height_at(to_global(Vector3(side, 0.0, end))))
-	_visual.position.y = lerpf(_visual.position.y, middle_m - highest_m, share)
+	# Another player's rover is told its height late, so it is seen on the ground.
+	var sits_m: float = middle_m - (global_position.y if _following else highest_m)
+	_visual.position.y = lerpf(_visual.position.y, sits_m, share)
 
 
 ## Lifts it out of ground that rose under it. To ground that sank it falls.
