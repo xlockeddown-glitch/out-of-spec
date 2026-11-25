@@ -205,18 +205,27 @@ func _park() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"rover_till", false):
+	if event.is_action_pressed(&"rover_till", false) and not CoopWalkers.on_foot():
 		_till_presses.append({"seed": GameState.current_seed(), "offset": GameState.planting_offset_steps})
 
 
 func _physics_process(delta: float) -> void:
 	_uplink_clock += delta
 	_update_line_of_sight(delta)
-	var throttle: float = Input.get_axis(&"rover_reverse", &"rover_forward")
+	# The keys move whoever is out, and nothing sent before reaches the rover.
+	var on_foot: bool = CoopWalkers.on_foot()
+	if on_foot:
+		_frames.clear()
+		_commands.clear()
+		_till_presses.clear()
+		_applied_throttle = 0.0
+		_applied_steer = 0.0
+	var throttle: float = 0.0 if on_foot else Input.get_axis(&"rover_reverse", &"rover_forward")
 	var moves: bool = CoopRovers.moves_here(rover_id, throttle != 0.0 or (not _following and not is_stopped()))
 	if moves == _following:
 		_set_following(not moves)
-	_sample_local_input(throttle if moves else 0.0)
+	if not on_foot:
+		_sample_local_input(throttle if moves else 0.0)
 	_deliver_uplink()
 	if moves:
 		_drive(delta)
@@ -232,7 +241,7 @@ func _physics_process(delta: float) -> void:
 ## Queue a one-shot command. It executes after the current uplink lag. A TILL
 ## carries `seed_id` and `offset_steps`, or the current ones if no seed is given.
 func queue_command(command: Command, seed_id: String = "", offset_steps: int = 0) -> void:
-	if GameState.rover_is_away(rover_id):
+	if GameState.rover_is_away(rover_id) or CoopWalkers.on_foot():
 		return
 	if command == Command.TILL and seed_id == "":
 		seed_id = GameState.current_seed()

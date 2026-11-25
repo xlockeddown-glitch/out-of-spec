@@ -1146,6 +1146,32 @@ Agent's notes (flagged for Ryan, not his words):
 - Rover: Ryan asked for it ("Rover next!"). One player drives at a time, whoever pressed first, until it has stood still half a second [ASSUMPTION; PLACEHOLDER time]. Nobody can take it from a driver. Everyone else sees it follow and the co-op line says who drives. Space and R still work for everyone, on the ground under the rover they see [ASSUMPTION].
 - The driver's own PC moves the rover and says where it is 20 times a second, so it answers as it does alone, with the driver's own uplink lag, and can be driven while the host is in the dome. The host says who drives, refuses moves beyond 15 m at once and 7.5 m/s after, and places over 500 m out, and parks it. It counts the distance to wear, and the driver's Field Ops counts [ASSUMPTION]. With the host in the dome the driver's PC says whether the rover sees the relay [ASSUMPTION]. A lost connection stops a guest's rover for everyone else within about a second. Walls aren't checked: friends trust each other [ASSUMPTION].
 - Poses may be lost or late, so only the newest counts. They have their own limit: 100 at once, then 40 a second. All these numbers are [PLACEHOLDER]. Protocol 4. One player notices no change.
+- Walking, first slice. F gets out of the stopped rover on the farm and back in
+  within 6 m, as near as the tunnel pad wants the rover. All of this is
+  [ASSUMPTION]:
+  - On foot the player only walks, looks, clicks props, opens the skills and
+    co-op panels, goes to bed and gets up. Farm work, stations, Bram, the dome
+    and the tunnels need the rover: the host refuses everything else from
+    someone on foot, and the screen says "On foot. Get in the rover first."
+  - The rover stays where it was left and anyone may drive it, as before. If it
+    goes into the tunnels, everyone on foot is back in it.
+  - WASD goes by the camera: W is up the screen. The rover's keys are throttle
+    and steering, which would not suit a walker.
+  - Rocks, boulders, stone walls and deep water stop a walker. Shallow water
+    slows it as it slows the rover. The host takes no guest into deep water.
+  - Walkers pass through each other, and the rover pushes its own player's
+    walker aside on that player's screen. Nobody is hurt.
+  - Nothing about walking is saved. Loading, joining again or losing the
+    connection puts the player in the rover.
+  - Guests send where they walk and the host sends everyone's, as rover poses
+    are sent: plain numbers that may be lost. The host takes a guest's if it is
+    out, on the land, near the ground and no faster than it could walk.
+  - [PLACEHOLDER]: walks 4 m/s, climbs 50°, 1.6 m tall; poses each 50 ms moving
+    and 1 s still; a guest may go 12 m at once and 5 m/s after, is put back
+    beyond 10 m, and is in the rover again after 5 s of silence; 5 m off the
+    ground is too far; its own F holds for 1.5 s against older word.
+  - The model is original voxels in code: orange suit, dark boots and pack,
+    teal visor. Protocol 13.
 
 ## 2026-11-24: Hills, digging, tunnels
 
@@ -1210,8 +1236,8 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - The ford, the first surface water (Ryan approved the gulch ford and a shallow wash under the arch). Where: a pool 12 m by 7.4 m at (63, 8.0), directly south of the mesa arch. The arch's own solid box covers z 1.75 to 4.25 and the hill it stands on has no room to cut a wash through it, so the pool sits beside it at its foot, not under it [ASSUMPTION]. The gulch on the farm is level ground and in use, so it was left alone. It is a short drive from the farm and clear of the plot, pad, spawn, gate, relay, calibration pad and tunnel mouth (a test checks each).
 - A carve [ASSUMPTION]: the pool is cut into the land, by height, with one rule in Terrain. Away from it the land is unchanged (a hash test covers every point outside the cut). The numbers are [PLACEHOLDER]: water at 1.7 m; shallow floor 0.4 m below it, deep floor 1.0 m below it; lip 0.3 m above; deep ellipse (63, 7.9) radii (4.2, 1.2); cut reaches 1.6 widths out; fades in over 3.4 m north of z 4.3. The north bank by the arch is steep, about 37 degrees, so the 15 degree land test skips the cut and a ford test holds banks to 40 degrees.
 - The cut moved the land hash (test_hills) and the plants hash (test_hill_dressing): plants and rocks keep out of the cut's reach, so no shrub, block or boulder stands in water. Reference blocks are unchanged: a wet cell cannot be dug, so no block there can be reached. Ore pockets keep out of those cells.
-- The rover drives the shallows, at 0.7 of its speed and with no damage [PLACEHOLDER]. Water 0.6 m deep or more stops it with invisible boxes on the world layer, like the sump's, wider than the deep cells so none is left bare and 3.0 m over the water, so the rover cannot drive on from the high north bank [PLACEHOLDER]. The uplink does not see them. A rover put back on land goes south until its whole footprint is clear of the deep; one over it by a corner only is left to the physics [ASSUMPTION]. Row z 9.8 is the ford line: wet in the middle and drivable its whole width, tested and checked live. No swimming, flow or rain.
-- Digging is refused in the water and within 1 m of it [PLACEHOLDER], with "Too near the water to dig.", and the dig outline is hidden there. An older save with dug cells there keeps loading and driving: the bed ignores them, so the water holds, and deep digging right beside the zone can leave a side of about 2 m per 1 m [ASSUMPTION]. Nothing is added to co-op sync: the pool is constants, so host and guests agree on ground.
+- The rover drives the shallows, at 0.7 of its speed and with no damage [PLACEHOLDER]. Water 0.6 m deep or more stops it with invisible boxes on the world layer, like the sump's, covering the deep cells but for slivers 5 cm wide no rover can reach, and 3.0 m over the water, so the rover cannot drive on from the high north bank [PLACEHOLDER]. The uplink does not see them. A rover put back on land goes south until its whole footprint is clear of the deep; one over it by a corner only is left to the physics [ASSUMPTION]. Row z 9.8 is the ford line: wet in the middle and drivable its whole width, tested and checked live. No swimming, flow or rain.
+- Digging is refused in the water and within 1 m of it [PLACEHOLDER], with "Too near the water to dig.", and the dig outline is hidden there. An older save with dug cells there keeps loading and driving: the bed ignores them, so the water holds, and deep digging right beside the zone can leave a side of about 2 m per 1 m, and filling beside it can be refused, since a save with a steep side is refused [ASSUMPTION]. Nothing is added to co-op sync: the pool is constants, so host and guests agree on ground.
 - Ore pockets, the second digging reward (Ryan approved: hinted by a survey reading, so a drifted sensor points to the wrong spot). 6 cells on a farm, 2 crystal ore each [PLACEHOLDER], picked by the seed alone from cells that can be dug and hold no reference block. A fissure gives 1 and the 8 fissures come back daily, so all the pockets are a day and a half of fissures, once. A pocket comes up on the cell's first dig, once only, with the same record and older-save rule as the blocks, and gives no XP [ASSUMPTION]. Protocol 10.
 - V surveys while the rover stands on the farm. Its coil turns with the steering until the ground answers strongest, and the steering encoder reads the angle [ASSUMPTION]. The bearing is clockwise from north (-Z, up and to the right on the farm view), to the nearest pocket not dug up within 40 m [PLACEHOLDER], plus the encoder's true error. At 40 m the MPE of 4 degrees is 1.4 cells off, the 12 degrees the encoder can drift is 4 cells. The rover's own heading is taken as true [ASSUMPTION].
 - The log gives the bearing and says it is good to the MPE if the encoder is within it; the distance, the true spot and the true error are never told. No usable encoder gives a reason and no reading. A survey costs no time or credits and changes nothing [ASSUMPTION].

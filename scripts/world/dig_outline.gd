@@ -27,6 +27,7 @@ func _process(_delta: float) -> void:
 	var cell: Vector2i = rover.dig_cell()
 	visible = (
 		rover.visible and rover.is_stopped() and Terrain.can_dig(cell) and not HillDressing.is_at_rock(cell) and not Terrain.is_near_water(cell)
+		and not CoopWalkers.on_foot()
 	)
 	if visible and cell != _cell:
 		_cell = cell
