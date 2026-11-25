@@ -26,6 +26,7 @@ var _blocks_told: Array[Vector2i] = []
 var _pockets_told: Array[Vector2i] = []
 ## The stone stock last told, and the kind of piece B builds.
 var _stone_told: int = 0
+var _pieces_told: int = 0
 var _stone_kind: int = StonePieces.WALL
 var _last_band: int = DriftingSensor.Band.IN_BAND
 
@@ -70,6 +71,7 @@ func _ready() -> void:
 	stone_view.name = "StonePieces"
 	$WorldView/WorldViewport/World.add_child(stone_view)
 	_stone_told = GameState.stone
+	_pieces_told = GameState.stone_pieces.size()
 	GameState.stone_changed.connect(_on_stone_changed)
 	_rover.tilled_cell_used.connect(_on_tilled_cell_used)
 	_hud.zero_steering_pressed.connect(_on_zero_pressed)
@@ -271,10 +273,12 @@ func _on_pockets_changed() -> void:
 
 
 func _on_stone_changed() -> void:
-	if GameState.stone > _stone_told:
+	# Taking a piece up has its own line.
+	if GameState.stone > _stone_told and GameState.stone_pieces.size() >= _pieces_told:
 		_hud.push_log("STONE +%d%s" % [GameState.stone - _stone_told,
 				"" if FarmCommands.guest else " (%d)" % GameState.stone])
 	_stone_told = GameState.stone
+	_pieces_told = GameState.stone_pieces.size()
 
 
 ## N: the next kind of piece for B to build.
@@ -295,7 +299,7 @@ func _place_stone() -> void:
 	var at: Vector2i = _rover.dig_cell()
 	var taking: bool = GameState.stone_pieces.has(at)
 	var kind: int = GameState.stone_pieces.get(at, _stone_kind)
-	var problem: String = await FarmCommands.request(&"place_stone", [Vector3i(at.x, 0, at.y), _stone_kind])
+	var problem: String = await FarmCommands.request(&"place_stone", [Vector3i(at.x, 0, at.y), StonePieces.TAKE_UP if taking else _stone_kind])
 	if not is_inside_tree():
 		return
 	if problem != "":

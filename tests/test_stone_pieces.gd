@@ -75,13 +75,17 @@ func test_a_piece_costs_its_stone_and_taking_it_up_gives_all_back() -> String:
 			problems.append("%s: building must cost %d" % [StonePieces.kind_name(kind), StonePieces.cost(kind)])
 	for round: int in 5:
 		for kind: int in 3:
-			# The key takes up whatever is there, not the kind chosen.
-			if gs.place_stone(_at(cells[kind]), (kind + 1) % 3) != "":
+			# A build where something stands is refused, so a late press takes nothing up.
+			if gs.place_stone(_at(cells[kind]), (kind + 1) % 3) == "":
+				problems.append("A piece was built on another")
+			if gs.place_stone(_at(cells[kind]), StonePieces.TAKE_UP) != "":
 				problems.append("A piece could not be taken up")
 			if gs.place_stone(_at(cells[kind]), kind) != "":
 				problems.append("A piece could not be built again")
 	for kind: int in 3:
-		gs.place_stone(_at(cells[kind]), 0)
+		gs.place_stone(_at(cells[kind]), StonePieces.TAKE_UP)
+		if gs.place_stone(_at(cells[kind]), StonePieces.TAKE_UP) == "":
+			problems.append("A bare cell was taken up")
 	if gs.stone != 10 or not gs.stone_pieces.is_empty():
 		problems.append("Building and taking up must leave the stock as it was, not %d" % gs.stone)
 	gs.free()
@@ -101,7 +105,7 @@ func test_a_piece_is_refused_without_stone_or_where_it_cannot_stand() -> String:
 	for bad: Vector3i in [Vector3i(0, 0, 0), Vector3i(cell.x, 1, cell.y), Vector3i(10000, 0, 0)]:
 		if gs.place_stone(bad, StonePieces.PAD) == "":
 			problems.append("A piece was built at %s" % [bad])
-	if gs.place_stone(_at(cell), 7) == "" or gs.place_stone(_at(cell), -1) == "":
+	if gs.place_stone(_at(cell), 7) == "" or gs.place_stone(_at(cell), -2) == "":
 		problems.append("A piece of no kind was built.")
 	if gs.stone != 50 or not gs.stone_pieces.is_empty():
 		problems.append("A refusal changed the stock or the pieces.")
@@ -123,13 +127,13 @@ func test_a_wall_needs_room_and_never_traps_a_rover() -> String:
 		problems.append("A wall was built under the rover.")
 	if gs.place_stone(_at(cell), StonePieces.PAD) != "" or gs.stone_pieces.get(cell, -1) != StonePieces.PAD:
 		problems.append("A pad is for driving over, so it may go under the rover.")
-	gs.place_stone(_at(cell), StonePieces.PAD)
+	gs.place_stone(_at(cell), StonePieces.TAKE_UP)
 	if not gs.stone_pieces.is_empty():
-		problems.append("The second press must take the pad up.")
+		problems.append("The second press must take the pad up, as TAKE_UP.")
 	# Walls around the rover: only the one that shuts the last way out is a trap.
 	var around: Array[Vector2i] = []
-	for neighbor: Vector2i in Terrain.neighbors(cell):
-		around.append(neighbor)
+	for neighbor: Vector2i in [Vector2i.LEFT, Vector2i.UP, Vector2i.DOWN, Vector2i.RIGHT]:
+		around.append(cell + neighbor)
 	var rovers: Array[Transform3D] = [_pose(cell)]
 	var walls: Dictionary[Vector2i, int] = {}
 	for i: int in around.size():
@@ -165,7 +169,7 @@ func test_ground_under_a_piece_cannot_be_dug_or_filled() -> String:
 		problems.append("The ground under a pad was changed.")
 	if gs.dug.get(cell, 0) != 1:
 		problems.append("The dug depth under a pad moved: %d" % gs.dug.get(cell, 0))
-	gs.place_stone(_at(cell), StonePieces.PAD)
+	gs.place_stone(_at(cell), StonePieces.TAKE_UP)
 	var problem: String = gs.fill(_at(cell))
 	if problem != "" or gs.dug.has(cell):
 		problems.append("The ground could not be filled once the pad was up: %s" % problem)
@@ -216,6 +220,9 @@ func test_stone_and_pieces_survive_a_save_and_bad_ones_are_refused() -> String:
 	old.erase("stone_pieces")
 	if gs.farm_from_dict(old) != "" or gs.stone != 0 or not gs.stone_pieces.is_empty():
 		problems.append("A save from before stone must load with none.")
+	old["boulder_hits"] = { &"RockA": gs.BOULDER_HITS, &"RockB": 1 }
+	if gs.farm_from_dict(old) != "" or gs.stone != StonePieces.PER_BOULDER:
+		problems.append("A save from before stone must get the stone of its broken boulders: %d" % gs.stone)
 	gs.free()
 	back.free()
 	return "\n".join(problems)
@@ -230,7 +237,7 @@ func test_a_guest_builds_and_takes_up_through_the_host() -> String:
 	gs.stone = 5
 	if commands.execute("player_2", &"place_stone", [_at(cell), StonePieces.WALL]) != "" or gs.stone != 5 - StonePieces.cost(StonePieces.WALL):
 		problems.append("A guest's wall must be built and paid for from the farm's stone.")
-	if commands.execute("player_2", &"place_stone", [_at(cell), StonePieces.PAD]) != "" or gs.stone != 5 or not gs.stone_pieces.is_empty():
+	if commands.execute("player_2", &"place_stone", [_at(cell), StonePieces.TAKE_UP]) != "" or gs.stone != 5 or not gs.stone_pieces.is_empty():
 		problems.append("A guest must be able to take it up for all its stone.")
 	if commands.execute("player_2", &"place_stone", [_at(cell), "wall"]) == "":
 		problems.append("A kind that is no number must be refused before it reaches the farm.")

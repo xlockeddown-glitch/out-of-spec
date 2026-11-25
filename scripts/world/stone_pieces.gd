@@ -4,6 +4,8 @@ class_name StonePieces
 ## the stock and the pieces (cell -> kind), StonePiecesView draws them.
 
 enum { WALL, PAD, CHANNEL }
+## Asks to take up what is on the cell, not to build.
+const TAKE_UP: int = -1
 
 const KIND_NAMES: Array[String] = ["wall", "pad", "channel"]
 ## Stone a piece costs, by kind; taking it up gives all of it back [PLACEHOLDER].
@@ -70,11 +72,13 @@ static func covers(cell: Vector2i, pose: Transform3D) -> bool:
 	return false
 
 
-## True if a wall on `wall` leaves every cell around `middle` walled.
+## True if a wall on `wall` leaves all four sides of `middle` walled: a rover
+## is too wide for the gap at a corner.
 static func _boxed_in(middle: Vector2i, wall: Vector2i, pieces: Dictionary[Vector2i, int]) -> bool:
-	if absi(wall.x - middle.x) > 1 or absi(wall.y - middle.y) > 1:
+	var sides: Array[Vector2i] = [middle + Vector2i.LEFT, middle + Vector2i.RIGHT, middle + Vector2i.UP, middle + Vector2i.DOWN]
+	if not wall in sides:
 		return false
-	for around: Vector2i in Terrain.neighbors(middle):
+	for around: Vector2i in sides:
 		if around != wall and pieces.get(around, -1) != WALL:
 			return false
 	return true
@@ -85,7 +89,7 @@ static func pieces_problem(pieces: Dictionary) -> String:
 	for cell: Variant in pieces:
 		if not cell is Vector2i or not pieces[cell] is int or not is_kind(pieces[cell]):
 			return "has an entry that is not a piece."
-		if not Terrain.can_dig(cell):
+		if not Terrain.can_dig(cell) or HillDressing.is_at_rock(cell):
 			return "has a piece where nothing can be built."
 	return ""
 

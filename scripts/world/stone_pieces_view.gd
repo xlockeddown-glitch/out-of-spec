@@ -7,7 +7,8 @@ const STONE := Color("#807a73")
 const STONE_DARK := Color("#6b665f")
 const BASALT := Color("#232832")
 const BASALT_FLOOR := Color("#495261")
-## How thick a pad's slabs are, and how high a channel's lips stand [PLACEHOLDER].
+## How thick a pad's slabs are, and how high and wide a channel's
+## lips are [PLACEHOLDER]. So are the wall's tiers and the slabs' lifts below.
 const SLAB_M: float = 0.16
 const LIP_M: float = 0.3
 const LIP_WIDTH_M: float = 0.22
@@ -100,8 +101,8 @@ func _ground(point: Vector2i) -> float:
 
 ## A tint that differs a little from cell to cell, so a row of them is not flat.
 func _tint(color: Color, cell: Vector2i, spread: float = 0.07) -> Color:
-	var hash: int = ((cell.x * 73856093) ^ (cell.y * 19349663)) & 0xff
-	return color.lightened((hash / 255.0 - 0.5) * spread * 2.0)
+	var shade: int = ((cell.x * 73856093) ^ (cell.y * 19349663)) & 0xff
+	return color.lightened((shade / 255.0 - 0.5) * spread * 2.0)
 
 
 func _wall(tool: SurfaceTool, cell: Vector2i) -> void:
@@ -132,7 +133,7 @@ func _slabs(tool: SurfaceTool, cell: Vector2i, lift: float, color: Color, other:
 			var along_z := Vector3(0.0, ((h01 + h11) - (h00 + h10)) / 2.0, 1.0).normalized()
 			var up: Vector3 = along_z.cross(along_x).normalized()
 			var middle := Vector3(origin.x + x + 0.5, (h00 + h10 + h01 + h11) / 4.0, origin.y + z + 0.5)
-			_box(tool, Transform3D(Basis(along_x, up, along_z), middle + up * (lift - SLAB_M / 2.0 + SLAB_M * 0.5)),
+			_box(tool, Transform3D(Basis(along_x, up, along_z), middle + up * lift),
 					Vector3(0.98, SLAB_M, 0.98), _tint(color if (x + z) % 2 == 0 else other, cell))
 
 

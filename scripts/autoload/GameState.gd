@@ -756,6 +756,11 @@ func put_farm(data: Dictionary) -> void:
 		else:
 			set(field, value)
 	fresh.free()
+	if not data.has("stone"):
+		# From before stone, so its broken boulders gave none.
+		for boulder: StringName in BOULDERS:
+			if is_boulder_broken(boulder):
+				stone += StonePieces.PER_BOULDER
 	_morning = false
 	_morning_notes.clear()
 	# These hold the logs' own entries (a recall marks a record suspect in both).
@@ -4374,15 +4379,16 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 const STONE_IN_THE_WAY: String = "Stone is built here. Take it up first."
 
 
-## Builds a piece of `kind` (StonePieces) on a cell of Terrain (y = 0), or takes
-## up the one there, whatever its kind, for all its stone back. Returns "" or why
-## not. The host works out where the rovers stand.
+## Builds a piece of `kind` (StonePieces) on a cell of Terrain (y = 0), or with
+## TAKE_UP takes up the one there for all its stone back. Returns "" or why not. The host works out where the rovers stand.
 @warning_ignore("unused_parameter")
 func place_stone(cell: Vector3i, kind: int, player_id: String = "") -> String:
 	var at := Vector2i(cell.x, cell.z)
 	if cell.y != 0:
 		return "Nothing can be built here."
-	if stone_pieces.has(at):
+	if kind == StonePieces.TAKE_UP:
+		if not stone_pieces.has(at):
+			return "Nothing is built here."
 		stone = mini(stone + StonePieces.cost(stone_pieces[at]), StonePieces.MAX_STONE)
 		stone_pieces.erase(at)
 		stone_changed.emit()
@@ -4392,6 +4398,8 @@ func place_stone(cell: Vector3i, kind: int, player_id: String = "") -> String:
 	for id: String in rover_transforms:
 		if not rover_is_away(id):
 			rovers.append(rover_transforms[id])
+	if rover_in_tunnels:
+		rovers.clear()  # its place is in there
 	var problem: String = StonePieces.problem(at, kind, stone_pieces, rovers)
 	if problem != "":
 		return problem
