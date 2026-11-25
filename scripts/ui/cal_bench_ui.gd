@@ -20,6 +20,15 @@ var _ids: Array[String] = []
 var _current_id: String = ""
 ## The shown result is from this session's calibration.
 var _calibrated: bool = false
+## That result's text and colour, and the budget it was done with.
+var _finished_text: String = ""
+var _finished_color: Color
+var _finished_budget: Dictionary = {}
+## Counts openings, closings and picks: an answer asked for in an earlier one
+## is not shown.
+var _visit: int = 0
+## Whether the selected instrument had a reference when shown.
+var _has_reference: bool = false
 ## _away_text() as shown.
 var _away: String = ""
 ## Budget and acceptance limit of the selected instrument against its standard.
@@ -45,7 +54,7 @@ var _send_button := Button.new()
 func _ready() -> void:
 	hide()
 	_rebuild_list()
-	_instrument_option.item_selected.connect(_on_instrument_selected)
+	_instrument_option.item_selected.connect(_on_row_picked)
 	_calibrate_button.pressed.connect(_on_calibrate_pressed)
 	_send_button.custom_minimum_size = _calibrate_button.custom_minimum_size
 	_send_button.size_flags_horizontal = _calibrate_button.size_flags_horizontal
@@ -71,6 +80,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func open(instrument_id: String = "hygrometer") -> void:
+	_visit += 1
 	_rebuild_list()
 	show()
 	var index: int = maxi(_ids.find(instrument_id), 0)
@@ -91,6 +101,7 @@ func _rebuild_list() -> void:
 
 
 func close() -> void:
+	_visit += 1
 	hide()
 	closed.emit()
 
@@ -103,9 +114,12 @@ func _on_pod_or_oirm_changed() -> void:
 	if not visible or index < 0:
 		return
 	var standard: bool = _is_standard(_current_id)
-	if not _calibrated and (_away_text() != _away or (standard and not GameState.has_bench_reference(_current_id))):
+	# With no reference there is no reading to keep.
+	if not _calibrated and (_away_text() != _away or (standard and (not _has_reference or not GameState.has_bench_reference(_current_id)))):
 		_on_instrument_selected(index)
 	elif standard:
+		if _calibrated:
+			_show_finished()
 		_show_send()
 
 
@@ -147,10 +161,16 @@ func _is_standard(instrument_id: String) -> bool:
 	return sensor != null and sensor.role == "standard"
 
 
+func _on_row_picked(index: int) -> void:
+	_visit += 1
+	_on_instrument_selected(index)
+
+
 func _on_instrument_selected(index: int) -> void:
 	_current_id = _ids[index]
 	_calibrated = false
 	_away = _away_text()
+	_has_reference = GameState.has_bench_reference(_current_id)
 	_calibrate_button.show()
 	_send_button.hide()
 	if _current_id.begins_with(JOB_PREFIX):
@@ -171,7 +191,7 @@ func _on_instrument_selected(index: int) -> void:
 		meter.mpe = sensor.mpe
 		meter.acceptance_ratio = _limit / sensor.mpe if sensor.mpe > 0.0 else 1.0
 	_mpe_label.text = "%s   MPE ±%s" % [sensor.quantity_title(), _unsigned(sensor, sensor.mpe)]
-	_standard_label.text = _reference_text(_current_id)
+	_standard_label.text = _reference_text(_current_id, _budget)
 	# What the bench would read: the unit's error seen through the standard's.
 	var standard: DriftingSensor = GameState.get_sensor(_budget.get("standard_id", ""))
 	_show_as_found(sensor, sensor.error - (standard.error if standard else 0.0))
@@ -296,10 +316,11 @@ func _chain_text(instrument_id: String) -> String:
 
 func _on_calibrate_pressed() -> void:
 	var id: String = _current_id
+	var visit: int = _visit
 	if _current_id.begins_with(JOB_PREFIX):
 		var result: Dictionary = await FarmCommands.request(&"complete_job", [id.trim_prefix(JOB_PREFIX)])
 		# The host's answer may come after another row was chosen.
-		if _current_id != id:
+		if _visit != visit:
 			return
 		if result.get("no_answer", false):
 			_show_refusal("", result)
@@ -315,7 +336,7 @@ func _on_calibrate_pressed() -> void:
 		_current_id = ""
 		return
 	var record: Dictionary = await FarmCommands.request(&"calibrate_at_bench", [id])
-	if record.is_empty() or _current_id != id:
+	if record.is_empty() or _visit != visit:
 		return
 	if record.get("no_answer", false):
 		_show_refusal("", record)
@@ -372,21 +393,48 @@ func _on_calibrate_pressed() -> void:
 	else:
 		_result_label.text = "AS-FOUND WITHIN ACCEPTANCE LIMIT, LATE: PASS. Interval unchanged. " + interval_note
 	_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
-	var used: String = record["standard_id"]
-	if used == GameState.calibration_budget(_current_id).get("standard_id", ""):
-		_standard_label.text = _reference_text(_current_id)
-	else:
-		_standard_label.text = "Standard: %s   Limit ±%s" % [
-			GameState.instrument_name(used, true), _unsigned_precise(sensor, _limit)]
+	_finished_text = _result_label.text
+	_finished_color = DriftingSensor.band_color(band)
+	_finished_budget = _recorded_budget(record)
+	_show_finished()
+
+
+## The budget the host recorded. Its terms are not recorded: they stay only if
+## the shown budget came to the same U.
+func _recorded_budget(record: Dictionary) -> Dictionary:
+	if record["standard_id"] == "":
+		return {}
+	var budget: Dictionary = {
+		"standard_id": record["standard_id"],
+		"expanded_uncertainty": record["standard_uncertainty"],
+		"tur": record["tur"],
+		"acceptance_limit": record["acceptance_limit"],
+		"refused": false,
+		"clean": float(record["tur"]) >= CalUncertainty.tur_clean(),
+	}
+	if _budget.get("standard_id", "") == budget["standard_id"] \
+			and is_equal_approx(_budget["expanded_uncertainty"], budget["expanded_uncertainty"]):
+		budget.merge(_budget)
+	return budget
+
+
+## A finished result, with a trip to OIRM and the certificate as they are now.
+func _show_finished() -> void:
+	_result_label.text = _finished_text
+	_result_label.add_theme_color_override("font_color", _finished_color)
+	if GameState.at_oirm.has(_current_id):
+		_result_label.text += " Sent to OIRM, back on day %d." % GameState.at_oirm[_current_id]
+	_standard_label.text = _reference_text(_current_id, _finished_budget)
 
 
 func _on_send_pressed() -> void:
-	var id: String = _current_id
-	var sent: Dictionary = await FarmCommands.request(&"send_to_oirm", [id])
-	if _current_id != id:
+	var visit: int = _visit
+	var sent: Dictionary = await FarmCommands.request(&"send_to_oirm", [_current_id])
+	if _visit != visit:
 		return
 	if sent["ok"] and _calibrated:
-		_result_label.text += " Sent to OIRM, back on day %d." % sent["return_day"]
+		_show_finished()
+		# A guest's count of what is away may lag.
 		_send_button.disabled = true
 		return
 	if sent["ok"]:
@@ -444,17 +492,16 @@ func _last_record_text(instrument_id: String) -> String:
 
 
 ## The standard used and the chain; for a standard its own certificate first.
-func _reference_text(instrument_id: String) -> String:
-	var text: String = _standard_text(instrument_id) + "\n" + _chain_text(instrument_id)
+func _reference_text(instrument_id: String, budget: Dictionary) -> String:
+	var text: String = _standard_text(instrument_id, budget) + "\n" + _chain_text(instrument_id)
 	if GameState.has_skill_unlock("budget_view"):
-		text += _budget_text(instrument_id)
+		text += _budget_text(instrument_id, budget)
 	return _certificate_text(instrument_id) + "\n" + text if _is_standard(instrument_id) else text
 
 
-## The terms of U, once the Uncertainty skill shows them. "" with no standard.
-func _budget_text(instrument_id: String) -> String:
-	var budget: Dictionary = GameState.calibration_budget(instrument_id)
-	if budget.is_empty():
+## The terms of U, once the Uncertainty skill shows them. "" if not known.
+func _budget_text(instrument_id: String, budget: Dictionary) -> String:
+	if not budget.has("u_spec"):
 		return ""
 	var sensor: DriftingSensor = GameState.get_sensor(instrument_id)
 	return "\nStandard uncertainties, k = %s for U:\nspec %s, certificate %s, resolution %s, operator %s" % [
@@ -463,8 +510,7 @@ func _budget_text(instrument_id: String) -> String:
 
 
 ## "Standard: Pavonis Indexworks PX-1 Rotary Table   U ±0.0x°   TUR 47:1   Limit ±0.9x°"
-func _standard_text(instrument_id: String) -> String:
-	var budget: Dictionary = GameState.calibration_budget(instrument_id)
+func _standard_text(instrument_id: String, budget: Dictionary) -> String:
 	if budget.is_empty():
 		return "No reference standard for this instrument."
 	var sensor: DriftingSensor = GameState.get_sensor(instrument_id)
