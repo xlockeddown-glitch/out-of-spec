@@ -47,14 +47,19 @@ func test_everyone_differs() -> String:
 	return ""
 
 
-func test_same_on_every_screen() -> String:
-	# The host's roster, and a guest's: others first, itself last.
-	var host: Array[String] = _roster(["player_1", "player_2", "player_3"])
-	var guest: Array[String] = _roster(["player_1", "player_2", "player_3"])
-	for id: String in host:
-		if WalkerModel.suit_for(id, host) != WalkerModel.suit_for(id, guest):
-			return "%s differs between screens" % id
+func test_a_full_roster_and_more_still_answers() -> String:
+	var roster: Array[String] = _roster(["player_1", "player_2", "player_3", "player_4", "player_5", "player_6", "player_7"])
+	for id: String in roster.slice(1):
+		if not WalkerModel.suit_for(id, roster) in WalkerModel.GUEST_SUITS:
+			return "%s has no guest suit" % id
 	return ""
+
+
+func test_leaving_gives_back_a_shared_preference() -> String:
+	var after: Array[String] = _roster(["player_1", "player_6"])
+	if WalkerModel.suit_for("player_6", _roster(["player_1", "player_2", "player_6"])) == WalkerModel.suit_for("player_6", after):
+		return "player_6 had no need to give way"
+	return "" if WalkerModel.suit_for("player_6", after) == WalkerModel.GUEST_SUITS[0] else "player_6 did not get its own suit back"
 
 
 func test_leaving_recolors_nobody() -> String:
@@ -79,7 +84,7 @@ func test_colors_are_safe() -> String:
 	# Lightness apart, for color-blind players.
 	for i: int in all.size():
 		for j: int in range(i + 1, all.size()):
-			if absf(_lightness(all[i]) - _lightness(all[j])) < 0.08 and i != 0:
+			if absf(_lightness(all[i]) - _lightness(all[j])) < 0.08:
 				return "suits %d and %d are alike in lightness" % [i, j]
 	return ""
 

@@ -92,7 +92,7 @@ static func suit_for(player_id: String, roster: Array[String]) -> Color:
 	var taken: Array[int] = []
 	for other: String in roster.slice(1):
 		var at: int = _preferred(other)
-		while at in taken:
+		while at in taken and taken.size() < GUEST_SUITS.size():
 			at = (at + 1) % GUEST_SUITS.size()
 		if other == player_id:
 			return GUEST_SUITS[at]
