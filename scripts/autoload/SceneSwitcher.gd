@@ -36,6 +36,8 @@ func toggle_farm_dome() -> void:
 	var current: Node = get_tree().current_scene
 	if current != null and current.scene_file_path == TITLE_SCENE:
 		return  # no farm is open yet
+	if CoopWalkers.on_foot():
+		return  # only the rover goes anywhere
 	var on_dome: bool = current != null and current.scene_file_path == DOME_SCENE
 	swap_to(outside if on_dome else DOME_SCENE)
 
