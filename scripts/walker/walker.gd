@@ -61,7 +61,11 @@ func walk(to: Vector3, delta: float) -> void:
 	velocity = to * speed_mps + Vector3.UP * fall
 	if to != Vector3.ZERO:
 		rotation.y = atan2(-to.x, -to.z)
+	var before: Vector3 = global_position
 	move_and_slide()
+	# The host refuses deep water by its exact edge; the blocks are coarser.
+	if Terrain.is_deep(Vector2(global_position.x, global_position.z)) and not Terrain.is_deep(Vector2(before.x, before.z)):
+		global_position = Vector3(before.x, global_position.y, before.z)
 	var edge_m: float = Terrain.HALF_M - RADIUS_M
 	global_position.x = clampf(global_position.x, -edge_m, edge_m)
 	global_position.z = clampf(global_position.z, -edge_m, edge_m)

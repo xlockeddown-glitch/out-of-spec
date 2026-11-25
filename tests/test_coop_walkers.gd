@@ -203,3 +203,18 @@ func test_the_keys_follow_the_camera() -> String:
 		if not is_equal_approx(Walker.heading(Vector2(1.0, 1.0), view).length(), 1.0):
 			return "Two keys are no faster than one"
 	return ""
+
+
+func test_a_guest_takes_no_bad_word_of_walkers() -> String:
+	var crowd: Dictionary = {}
+	for i: int in CoopSession.MAX_PLAYERS + 1:
+		crowd["player_%d" % i] = _pose(1.0)
+	for bad: Dictionary in [crowd, { 7: _pose(1.0) }, { "player_1": [NAN, 0.0, 0.0, 0.0, 0.0] }, { "player_1": [1.0] }]:
+		var pair: Array = _pair()
+		var told: Array = []
+		pair[1].walkers_told.connect(func(poses: Dictionary) -> void: told.append(poses))
+		pair[0].tell_walkers(bad)
+		if not _until(func() -> bool: return _got(pair[1], "lost")) or not told.is_empty():
+			return _end_with("The guest must leave a host that sends this: %s" % [bad])
+		_end_with("")
+	return _end_with("")
