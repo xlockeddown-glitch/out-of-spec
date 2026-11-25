@@ -152,12 +152,14 @@ func test_first_failed_audit_is_a_warning_then_fines() -> String:
 	var manager_cal: Dictionary = gs.last_cal_records.get(gs.STEERING_ID, {})
 	var first_credits: int = gs.credits
 	var offences_after_grace: Dictionary = gs.offence_counts.duplicate()
+	var records_after_grace: Array = [first["cal_records"], first["cal_fails_found"]]
 
 	# Second audit: out of tolerance again -> fined, credits drop by the total.
 	_set_day(2 * cadence)
 	gs.steering.error = gs.steering.mpe * 2.0
 	gs.steering.cal_due_day = 4 * cadence  # out of tolerance, not overdue
 	gs._run_audit(2 * cadence)
+	var later_records: int = gs.audit_log[-1]["cal_records"]
 	var second: Dictionary = gs.audit_log[-1]
 	var expected_fine: int = 0
 	for line: Dictionary in second["lines"]:
@@ -174,6 +176,8 @@ func test_first_failed_audit_is_a_warning_then_fines() -> String:
 		return "The warning must not change credits (%d -> %d)." % [start_credits, first_credits]
 	if manager_cal.get("performed_by", "") != GameStateScript.MANAGER_ID:
 		return "The manager must calibrate the violating instrument before Vance inspects: %s" % manager_cal
+	if records_after_grace != [1, 1] or later_records != 0:
+		return "The manager's calibration belongs to the first audit alone, got %s then %d." % [records_after_grace, later_records]
 	if not offences_after_grace.is_empty():
 		return "The warning must not raise repeat-offence counts: %s" % offences_after_grace
 	if second["passed"] or second.get("warning", false):

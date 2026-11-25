@@ -1939,6 +1939,12 @@ func _run_audit(day: int) -> void:
 
 	if not report["passed"] and not audit_grace_used:
 		_apply_audit_grace(report)
+		# Vance reads the manager's records at this audit, not the next.
+		for record: Dictionary in cal_log.slice(_cal_index_at_last_audit):
+			report["cal_records"] += 1
+			if not record.get("as_found_in_tolerance", true):
+				report["cal_fails_found"] += 1
+		_cal_index_at_last_audit = cal_log.size()
 
 	var departure_hour: float = _schedule("drop_pod_departs_hour", 18.0)
 	_drop_pod_departure_at = GameClock.elapsed_at_hour(day, departure_hour)
@@ -2959,12 +2965,15 @@ func _excused_until_audit(unit_id: String, day: int) -> bool:
 
 ## Using an overdue standard costs more. The contract counts a run of on-time,
 ## traceable calibrations by the player; a late or untraceable one restarts it.
+## The manager's one-time favor counts for nothing either way.
 func _credibility_after_calibration(record: Dictionary) -> void:
+	if record.get("performed_by", "") == MANAGER_ID:
+		return
 	if record.get("standard_overdue", false):
 		change_credibility(int(_cred_number("overdue_standard_used_points", -5.0)))
 	if is_commissioning(record["instrument_id"]):
 		return  # not the colony's unit until its robot is released
-	if contract_state != "active" or record.get("performed_by", "") == MANAGER_ID:
+	if contract_state != "active":
 		return
 	if record.get("programmed_by", "") != "":
 		return  # a robot's work neither counts nor breaks the player's run
