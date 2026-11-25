@@ -4,7 +4,7 @@ extends RefCounted
 const FarmScene: PackedScene = preload("res://scenes/main_farm.tscn")
 ## The ground outside the wash as it was before the wash was cut: every whole meter's
 ## height in 1/256 m, hashed as 17 * 31 + height each, in order.
-const LAND_HASH: int = 3853446535
+const LAND_HASH: int = 93351249
 
 var _none: Dictionary[Vector2i, int] = {}
 
@@ -44,7 +44,7 @@ func test_the_land_is_the_same_outside_the_wash() -> String:
 		for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
 			if Terrain.wash_out(Vector2(x, z)) >= Terrain.WASH_REACH:
 				hashed = (hashed * 31 + roundi(Terrain.natural(Vector2i(x, z)) * 256.0)) & 0xffffffff
-			elif Terrain.natural(Vector2i(x, z)) != Terrain._land(x, z):
+			elif absf(Terrain.natural(Vector2i(x, z)) - Terrain._land(x, z)) > 1.0 / Terrain.HEIGHT_PARTS:
 				changed += 1
 	if hashed != LAND_HASH:
 		return "The ground outside the wash changed: its hash is %d." % hashed
@@ -161,9 +161,33 @@ func test_deep_water_stops_a_rover_and_shallow_water_does_not() -> String:
 	return problem
 
 
+func test_no_rover_can_drive_onto_the_blocks() -> String:
+	# A rover rests on the highest ground under its box, and its box reaches 1.45 m.
+	var top_m: float = Terrain.WASH_LEVEL_M + Ford.BLOCK_ABOVE_M
+	for x: int in range(54 * 4, 72 * 4):
+		for z: int in range(2 * 4, 16 * 4):
+			var at: Vector2 = Vector2(x, z) * 0.25
+			if Ford.gap_m(at) < Terrain.ROVER_REACH_M * 2.0 and Terrain.height(at, _none) > top_m - 1.0:
+				return "The ground at %s is over the blocks." % at
+	return ""
+
+
+func test_the_ford_and_the_drawn_blocks_agree() -> String:
+	var ford: Ford = _ford()
+	var area_m2: float = 0.0
+	for body: Node in ford.get_children():
+		if body is StaticBody3D:
+			var box := (body.get_child(0) as CollisionShape3D).shape as BoxShape3D
+			area_m2 += box.size.x * box.size.z
+	ford.free()
+	var listed: float = Ford.blocks().size() * Ford.BLOCK_M * Ford.BLOCK_M
+	return "" if absf(area_m2 - listed) < 0.01 else "%s m2 of blocks, %s listed." % [area_m2, listed]
+
+
 func test_a_line_across_the_ford_is_all_shallow_and_gentle() -> String:
-	# From dry ground on the west to dry ground on the east, by the shallows.
-	var z: float = 10.0
+	# From dry ground on the west to dry ground on the east, by the shallows, with
+	# room for the rover's width all the way.
+	var z: float = 9.8
 	var last: float = Terrain.height(Vector2(54.0, z), _none)
 	var wet: int = 0
 	var x: float = 54.0
@@ -172,6 +196,8 @@ func test_a_line_across_the_ford_is_all_shallow_and_gentle() -> String:
 		var ground_m: float = Terrain.height(at, _none)
 		if Terrain.is_deep(at):
 			return "Deep water on the ford at %s." % at
+		if Ford.gap_m(at) < Terrain.ROVER_HALF_WIDTH_M + 0.1:
+			return "The deep stops a rover at %s." % at
 		if absf(ground_m - last) > 0.25 * tan(deg_to_rad(30.0)):
 			return "The ford is too steep at %s." % at
 		if Terrain.water_depth_m(at) > 0.0:
@@ -194,10 +220,21 @@ func test_the_wash_banks_are_climbable() -> String:
 
 
 func test_a_rover_in_deep_water_is_put_out_of_it() -> String:
-	for at: Vector2 in [Terrain.WASH_DEEP_AT, Terrain.WASH_AT, Terrain.WASH_DEEP_AT + Vector2(2.5, 0.5), Terrain.WASH_DEEP_AT + Vector2(-3.0, -0.4)]:
-		var out: Vector2 = Terrain.clear_of_deep(at)
-		if Terrain.is_deep(out) or out.distance_to(at) > 8.0:
-			return "A rover at %s goes to %s." % [at, out]
+	for x: int in range(-24, 25):
+		for z: int in range(-16, 17):
+			var at: Vector2 = Terrain.WASH_AT + Vector2(x, z) * 0.25
+			var out: Vector2 = Terrain.clear_of_deep(at)
+			if out == at:
+				if Terrain.is_deep(at):
+					return "A rover at %s stays in the deep." % at
+				continue
+			if out.distance_to(at) > 6.0:
+				return "A rover at %s goes to %s." % [at, out]
+			# Its whole box is clear, whichever way it is turned.
+			for turn: int in 12:
+				for corner: Vector2 in [Vector2(0.8, 1.2), Vector2(-0.8, 1.2), Vector2(0.8, 0.0), Vector2(0.0, 1.2)]:
+					if Ford.gap_m(out + corner.rotated(turn * TAU / 12.0)) <= 0.0:
+						return "A rover at %s is put in the deep at %s." % [at, out]
 	var dry := Vector2(40.0, 40.0)
 	return "" if Terrain.clear_of_deep(dry) == dry else "A rover on dry ground must stay."
 

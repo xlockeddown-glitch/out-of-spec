@@ -47,11 +47,11 @@ const HEIGHT_PARTS: int = 256
 ## in meters. Inside it the shallows have a flat floor to WASH_FLOOR of the way out,
 ## rising to a lip above the water; the deep part has its own ellipse and sits
 ## against the arch. North, by the arch's own ground, the cut fades out.
-const WASH_AT := Vector2(63.0, 7.8)
-const WASH_RADII := Vector2(6.0, 3.4)
-const WASH_FLOOR: float = 0.55
-const WASH_DEEP_AT := Vector2(63.0, 8.1)
-const WASH_DEEP_RADII := Vector2(4.2, 1.5)
+const WASH_AT := Vector2(63.0, 8.0)
+const WASH_RADII := Vector2(6.0, 3.7)
+const WASH_FLOOR: float = 0.68
+const WASH_DEEP_AT := Vector2(63.0, 7.9)
+const WASH_DEEP_RADII := Vector2(4.2, 1.2)
 const WASH_DEEP_FLOOR: float = 0.2
 ## Past the deep ellipse the bed climbs to the lip over this much more of its width.
 const WASH_DEEP_BANK: float = 0.6
@@ -73,6 +73,9 @@ const WASH_BLOCK_M: float = 0.6
 const WATER_SPEED: float = 0.7
 ## No digging this close to the water [PLACEHOLDER].
 const WASH_NEAR_M: float = 1.0
+## The rover's box is 1.6 by 2.4 m: half its width, and its middle to a corner.
+const ROVER_HALF_WIDTH_M: float = 0.8
+const ROVER_REACH_M: float = 1.45
 
 ## What natural() found before, by point.
 static var _natural: PackedFloat32Array = PackedFloat32Array()
@@ -164,15 +167,14 @@ static func is_deep(at: Vector2) -> bool:
 	return water_depth_m(at) >= WASH_BLOCK_M
 
 
-## `at`, or the nearest shore outward from the wash if it is in deep water.
+## `at`, or a place south of it, away from the arch, where a rover turned any way is
+## clear of the deep, if one at `at` would stand in it whichever way it was turned.
 static func clear_of_deep(at: Vector2) -> Vector2:
-	if not is_deep(at):
+	if Ford.gap_m(at) >= ROVER_HALF_WIDTH_M - 0.05:
 		return at
-	var away: Vector2 = (at - WASH_AT) / WASH_RADII
-	var way: Vector2 = Vector2.RIGHT if away.is_zero_approx() else away.normalized()
 	var out: Vector2 = at
-	while is_deep(out):
-		out += way * 0.5
+	while Ford.gap_m(out) < ROVER_REACH_M + 0.1:
+		out.y += 0.25
 	return out
 
 
@@ -250,7 +252,7 @@ static func dig_problem(cell: Vector2i, dug: Dictionary[Vector2i, int]) -> Strin
 	if steps >= MAX_DIG_STEPS:
 		return "This is as deep as it can be dug."
 	for neighbor: Vector2i in neighbors(cell):
-		if dug.get(neighbor, 0) < steps:
+		if _dug_steps(neighbor, dug) < steps:
 			return "Dig around it first."
 	return ""
 

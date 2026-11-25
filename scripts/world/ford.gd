@@ -6,11 +6,14 @@ extends Node3D
 
 ## The blocks that stop a rover are this wide [PLACEHOLDER].
 const BLOCK_M: float = 0.5
-## They reach from this far below the water to this far above it, so they stop a
-## wheel at the water's edge but not the signal [PLACEHOLDER].
+## They reach from this far below the water to this far above it, over the highest
+## bank a rover could come from, so none can drive onto them [PLACEHOLDER].
 const BLOCK_BELOW_M: float = 1.0
-const BLOCK_ABOVE_M: float = 0.8
+const BLOCK_ABOVE_M: float = 3.0
 const LAYER_WORLD: int = 1
+
+## The deep blocks, worked out once: each one's box on the ground.
+static var _blocks: Array[Rect2] = []
 
 
 ## The wash's ellipse's box.
@@ -22,6 +25,24 @@ static func area() -> Rect2:
 static func ground_m(at: Vector2) -> float:
 	var none: Dictionary[Vector2i, int] = {}
 	return Terrain.height(at, none) if Terrain.wash_out(at) < 1.0 else INF
+
+
+static func blocks() -> Array[Rect2]:
+	if _blocks.is_empty():
+		var box: Rect2 = area()
+		for z: int in ceili(box.size.y / BLOCK_M):
+			for x: int in ceili(box.size.x / BLOCK_M):
+				if _is_deep_block(box, x, z):
+					_blocks.append(Rect2(box.position + Vector2(x, z) * BLOCK_M, Vector2.ONE * BLOCK_M))
+	return _blocks
+
+
+## How far a point is from the deep blocks; 0 inside one.
+static func gap_m(at: Vector2) -> float:
+	var gap: float = INF
+	for block: Rect2 in blocks():
+		gap = minf(gap, at.distance_to(at.clamp(block.position, block.end)))
+	return gap
 
 
 func _ready() -> void:
@@ -64,7 +85,7 @@ func _build_blocks() -> void:
 
 ## A block stands where its middle or any corner is deep, so no deep water is left
 ## uncovered.
-func _is_deep_block(box: Rect2, x: int, z: int) -> bool:
+static func _is_deep_block(box: Rect2, x: int, z: int) -> bool:
 	for dx: float in [0.0, 0.5, 1.0]:
 		for dz: float in [0.0, 0.5, 1.0]:
 			if Terrain.is_deep(box.position + (Vector2(x + dx, z + dz)) * BLOCK_M):

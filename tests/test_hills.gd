@@ -3,7 +3,7 @@ extends RefCounted
 
 const STEEPEST_DEG: float = 15.0
 const ANTENNA_M: float = 2.0
-const HASH: int = 4247132889
+const HASH: int = 1162163701
 
 var _none: Dictionary[Vector2i, int] = {}
 
