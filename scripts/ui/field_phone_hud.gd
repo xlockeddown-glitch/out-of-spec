@@ -106,6 +106,14 @@ func set_uplink(has_los: bool, quality: float, lag_s: float) -> void:
 	_lag_label.text = "UPLINK LAG  %d ms" % roundi(lag_s * 1000.0)
 
 
+## The rover is in the other scene, so there is no link to show.
+func set_rover_away() -> void:
+	set_uplink(false, 0.0, 0.0)
+	_link_label.text = "NO ROVER HERE"
+	_link_label.add_theme_color_override("font_color", COLOR_WARN)
+	_lag_label.text = "UPLINK LAG  --"
+
+
 ## band is a DriftingSensor.Band value.
 func set_drift(drift_deg: float, band: int) -> void:
 	_drift_value.text = SP811.signed(drift_deg) + "°"

@@ -40,7 +40,7 @@ const ROCKS: Dictionary[Vector2i, Rock] = {
 }
 ## Cells this near a rock can't be dug [PLACEHOLDER].
 const ROCK_MARGIN_M: float = 0.5
-## A rover whose middle is this near a rock's side is inside it, and one this far
+## A rover whose middle is this near a rock is inside it, and one this far
 ## from a rock's corner is clear however it faces.
 const ROVER_INSIDE_M: float = 0.7
 const ROVER_CLEAR_M: float = 1.5
@@ -149,7 +149,7 @@ static func is_at_rock(cell: Vector2i) -> bool:
 ## `at`, or just clear of a rock if a rover there would be inside it.
 static func clear_of_rocks(at: Vector2) -> Vector2:
 	for rock: Vector2i in ROCKS:
-		if _rock_gap(at, rock) < ROVER_INSIDE_M:
+		if _rover_gap(at, rock) < ROVER_INSIDE_M:
 			var away: Vector2 = at - Vector2(rock)
 			var way: Vector2 = Vector2.RIGHT if away.is_zero_approx() else away.normalized()
 			return Vector2(rock) + way * (rock_half_m(rock).length() + ROVER_CLEAR_M)
@@ -233,13 +233,22 @@ static func _slope(at: Vector2) -> float:
 
 
 static func _is_near_rock(at: Vector2, within_m: float) -> bool:
-	return ROCKS.keys().any(func(rock: Vector2i) -> bool: return _rock_gap(at, rock) < within_m)
+	for rock: Vector2i in ROCKS:
+		if _rock_gap(at, rock) < within_m:
+			return true
+	return false
 
 
 ## How far a point is from a rock's side along x or z, whichever is more.
 static func _rock_gap(at: Vector2, rock: Vector2i) -> float:
 	var gap: Vector2 = (at - Vector2(rock)).abs() - rock_half_m(rock)
 	return maxf(gap.x, gap.y)
+
+
+## As the crow flies, so a rover resting diagonally at a corner is outside.
+static func _rover_gap(at: Vector2, rock: Vector2i) -> float:
+	var gap: Vector2 = (at - Vector2(rock)).abs() - rock_half_m(rock)
+	return gap.max(Vector2.ZERO).length()
 
 
 func _add_rock(at: Vector2i) -> void:
