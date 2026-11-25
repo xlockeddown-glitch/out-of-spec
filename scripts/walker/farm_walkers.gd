@@ -83,11 +83,13 @@ func _show_friend(player_id: String, pose: Array, delta: float) -> void:
 	model.speed_mps = pose[4]
 
 
-## Clear ground beside the rover, or not finite if there is none.
+## Clear ground beside the rover, or not finite if there is none. Each player has
+## a spot of their own to try first, and one someone stands on comes last.
 func clear_spot() -> Vector3:
 	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
 	var middle: Vector3 = rover.global_position
-	for offset: Vector3 in SPOTS:
+	var shared := Vector3.INF
+	for offset: Vector3 in spots_for(CoopSession.players.find(GameState.local_player_id)):
 		var at: Vector3 = middle + offset.rotated(Vector3.UP, rover.global_rotation.y)
 		if maxf(absf(at.x), absf(at.z)) > Terrain.HALF_M - Walker.RADIUS_M:
 			continue
@@ -99,8 +101,24 @@ func clear_spot() -> Vector3:
 		var way := PhysicsRayQueryParameters3D.create(
 			middle + Vector3.UP, at + Vector3.UP, 1, [rover.get_rid()])
 		if space.intersect_shape(shape, 1).is_empty() and space.intersect_ray(way).is_empty():
-			return at
-	return Vector3.INF
+			if not _is_taken(at):
+				return at
+			if not shared.is_finite():
+				shared = at
+	return shared
+
+
+## `SPOTS` from the player's own on; `place` is theirs in the roster, or -1.
+static func spots_for(place: int) -> Array[Vector3]:
+	var first: int = maxi(place, 0) % SPOTS.size()
+	return SPOTS.slice(first) + SPOTS.slice(0, first)
+
+
+static func _is_taken(at: Vector3) -> bool:
+	for player_id: String in CoopWalkers.out:
+		if player_id != GameState.local_player_id and CoopWalkers.spot(CoopWalkers.out[player_id]).distance_to(at) < 2.0 * Walker.RADIUS_M:
+			return true
+	return false
 
 
 func hint() -> String:
