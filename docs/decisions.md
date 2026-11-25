@@ -1146,3 +1146,14 @@ Agent's notes (flagged for Ryan, not his words):
 - Rover: Ryan asked for it ("Rover next!"). One player drives at a time, whoever pressed first, until it has stood still half a second [ASSUMPTION; PLACEHOLDER time]. Nobody can take it from a driver. Everyone else sees it follow and the co-op line says who drives. Space and R still work for everyone, on the ground under the rover they see [ASSUMPTION].
 - The driver's own PC moves the rover and says where it is 20 times a second, so it answers as it does alone, with the driver's own uplink lag, and can be driven while the host is in the dome. The host says who drives, refuses moves beyond 15 m at once and 7.5 m/s after, and places over 500 m out, and parks it. It counts the distance to wear, and the driver's Field Ops counts [ASSUMPTION]. With the host in the dome the driver's PC says whether the rover sees the relay [ASSUMPTION]. A lost connection stops a guest's rover for everyone else within about a second. Walls aren't checked: friends trust each other [ASSUMPTION].
 - Poses may be lost or late, so only the newest counts. They have their own limit: 100 at once, then 40 a second. All these numbers are [PLACEHOLDER]. Protocol 4. One player notices no change.
+
+## 2026-11-24: Hills, digging, tunnels
+
+Ryan: "Hills then tunnels for growth if we can do digging and destruction in parallel that would be amazing."
+
+- One shaped ground for all of it: the natural land less what was dug, worked out alike on every PC from a point each meter. Digging is by the soil grid's 2 m cells in 0.5 m steps [PLACEHOLDER]. Points between cells are as deep as the shallowest that meet there, so sides slope at about 27° and no hole has a wall.
+- A cell may be at most one step deeper than any of its eight neighbors, so no one digs the rover into a trap [ASSUMPTION]. The dig command will hold to it.
+- The land stays level within 30 m of the farm's middle and 10 m of the relay [PLACEHOLDER].
+- The ground blocks the uplink, hills and pit walls alike [ASSUMPTION].
+- Tunnels are a scene of their own: the camera can't see under the ground [ASSUMPTION].
+- Open with Ryan: what digging gives or costs, whether dug ground fills back in, what breaking a boulder gives.
