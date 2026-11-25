@@ -4,6 +4,9 @@ extends Node
 
 ## Phone-log lines replayed into the HUD when the tunnels load.
 const LOG_REPLAY_LINES: int = 6
+## With the rover in the other scene, these only say where it is.
+const ROVER_KEYS: Array[StringName] = [
+	&"rover_forward", &"rover_reverse", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill"]
 
 var _had_los: bool = true
 var _last_band: int = DriftingSensor.Band.IN_BAND
@@ -31,6 +34,7 @@ func _ready() -> void:
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.skill_leveled.connect(_on_skill_leveled)
 	SaveGame.save_failed.connect(_hud.push_log)
+	GameState.rover_place_changed.connect(_say_if_away)
 	GameState.credits_changed.connect(_hud.set_credits)
 	GameState.ore_changed.connect(_hud.set_ore)
 	GameState.credibility_changed.connect(_on_credibility_changed)
@@ -49,6 +53,7 @@ func _ready() -> void:
 	_on_credibility_changed(0)
 	_hud.get_parent().add_child(SkillsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())
+	_say_if_away()
 
 
 func _process(_delta: float) -> void:
@@ -57,9 +62,16 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"interact") and _exit_pad.rover_inside:
+	var away: bool = _rover.away_text() != ""
+	if away and event.is_action_pressed(&"interact"):
 		get_viewport().set_input_as_handled()
 		SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE)
+	elif away and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
+		get_viewport().set_input_as_handled()
+		_say_if_away()
+	elif event.is_action_pressed(&"interact") and _exit_pad.rover_inside:
+		get_viewport().set_input_as_handled()
+		_leave_tunnels()
 	elif event.is_action_pressed(&"rover_dig"):
 		get_viewport().set_input_as_handled()
 		_rover.queue_command(RoverController.Command.DIG)
@@ -73,6 +85,9 @@ func _on_rover_entered_exit() -> void:
 
 
 func _on_uplink_changed(has_los: bool, quality: float, lag_s: float) -> void:
+	if _rover.away_text() != "":
+		_hud.set_rover_away()
+		return
 	_hud.set_uplink(has_los, quality, lag_s)
 	if _had_los != has_los:
 		_hud.push_log("SYS: LOS %s" % ("restored" if has_los else "lost; uplink lag rising"))
@@ -87,6 +102,9 @@ func _on_drift_changed(drift_deg: float, band: int) -> void:
 
 
 func _on_zero_pressed() -> void:
+	if _rover.away_text() != "":
+		_say_if_away()
+		return
 	_rover.queue_command(RoverController.Command.ZERO_STEERING)
 	_hud.push_log("> ZERO STEERING sent (%d ms lag)" % roundi(_rover.get_current_lag() * 1000.0))
 
@@ -168,3 +186,24 @@ func _try_accept_job(index: int) -> void:
 
 func _go_to_dome() -> void:
 	SceneSwitcher.swap_to(SceneSwitcher.DOME_SCENE)
+
+
+## Says where the rover is if it is not here.
+func _say_if_away() -> void:
+	if _rover.away_text() != "":
+		_hud.push_log(_rover.away_text())
+
+
+## Takes the rover out and goes with it.
+func _leave_tunnels() -> void:
+	var problem: String = await FarmCommands.request(&"move_rover", [false])
+	if not is_inside_tree():
+		return
+	if problem != "":
+		_hud.push_log("TUNNEL MOUTH: " + problem)
+		return
+	if _rover.away_text() == "":
+		# A guest's copy of the farm comes a little later.
+		await GameState.rover_place_changed
+	if is_inside_tree():
+		SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE)
