@@ -80,6 +80,11 @@ func send_farm(player_id: String = "") -> int:
 	return packed.size() if session.send_state({ "farm": packed, "size": bytes.size() }, player_id) else 0
 
 
+## Host: guests see no changes, because the farm is too big to send.
+func is_too_big() -> bool:
+	return _was_too_big
+
+
 ## Emitted on guests too, who send nothing.
 func _on_player_joined(player_id: String) -> void:
 	send_farm(player_id)

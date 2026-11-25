@@ -2,7 +2,7 @@ extends Node3D
 ## Composition root for the dome interior: wires clickables to GameState,
 ## the bench UI, and the scene switcher, and refreshes the status panel.
 
-const DEFAULT_HINT: String = "Click the bench to calibrate  ·  Plan board: grow the lab  ·  K: skills  ·  Airlock or Tab: back to farm"
+const DEFAULT_HINT: String = "Click the bench to calibrate  ·  Plan board: grow the lab  ·  K: skills  ·  F7: co-op  ·  Airlock or Tab: back to farm"
 const TOAST_SECONDS: float = 3.0
 ## Long messages (dispatches, audit lines) stay up longer.
 const TOAST_SECONDS_PER_CHAR: float = 0.04
@@ -43,6 +43,7 @@ func _ready() -> void:
 	_plan_board.clicked.connect(_plan_board_ui.open)
 	_kestrel_click.clicked.connect(_kestrel_ui.open)
 	$UI.add_child(SkillsUI.new())
+	$UI.add_child(CoopUI.new())
 	_airlock.clicked.connect(func() -> void: SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE))
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)

@@ -1,5 +1,5 @@
 extends Control
-## Title screen: continue the saved farm or start a new one. The clock is
+## Title screen: continue the saved farm, start a new one or join a friend's. The clock is
 ## stopped here; it runs once a farm opens.
 
 const COLOR_TEXT := Color(0.8, 0.86, 0.82)
@@ -15,13 +15,25 @@ var _starting: bool = false
 var _note: Label
 var _main_buttons: VBoxContainer
 var _confirm_buttons: VBoxContainer
+var _join_buttons: VBoxContainer
+var _address: LineEdit
+var _join_button: Button
 
 
 func _ready() -> void:
+	# No farm's scene is open here, so a friend's farm is left for good.
+	CoopSession.leave()
+	GameClock.seconds_per_day = GameClock.DEFAULT_SECONDS_PER_DAY
 	GameClock.paused = true
+	CoopSession.joined.connect(_on_joined.unbind(1))
+	CoopSession.refused.connect(_on_refused)
+	CoopSync.farm_ready.connect(_on_farm_ready)
 	_save = SaveGame.check()
 	_build()
 	_show_main()
+	var note: String = CoopScenes.take_note()
+	if note != "":
+		_note.text = note
 
 
 func _build() -> void:
@@ -52,10 +64,22 @@ func _build() -> void:
 	if _save.has("data"):
 		_button(_main_buttons, "CONTINUE (DAY %d)" % SaveGame.day_of(_save["data"]), _on_continue)
 	_button(_main_buttons, "NEW FARM", _on_new_farm)
+	_button(_main_buttons, "JOIN A FRIEND", _show_join)
 	_button(_main_buttons, "QUIT", get_tree().quit)
 	_confirm_buttons = _button_box(column)
 	_button(_confirm_buttons, "START A NEW FARM", _start_new)
 	_button(_confirm_buttons, "BACK", _show_main)
+	_join_buttons = _button_box(column)
+	_address = LineEdit.new()
+	_address.placeholder_text = "Your friend's IP address"
+	_address.custom_minimum_size = BUTTON_SIZE
+	_address.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_address.add_theme_font_size_override("font_size", FONT_TEXT)
+	_address.text_submitted.connect(_on_join.unbind(1))
+	_join_buttons.add_child(_address)
+	_button(_join_buttons, "JOIN", _on_join)
+	_join_button = _join_buttons.get_child(1) as Button
+	_button(_join_buttons, "BACK", _on_join_back)
 
 
 func _button_box(parent: Node) -> VBoxContainer:
@@ -78,6 +102,7 @@ func _button(parent: Node, text: String, on_pressed: Callable) -> void:
 func _show_main() -> void:
 	_main_buttons.visible = true
 	_confirm_buttons.visible = false
+	_join_buttons.visible = false
 	_note.text = note_for(_save)
 	(_main_buttons.get_child(0) as Button).grab_focus()
 
@@ -112,6 +137,49 @@ func _start_new() -> void:
 	if _starting:
 		return
 	_open(SaveGame.start_new())
+
+
+func _show_join() -> void:
+	_main_buttons.visible = false
+	_join_buttons.visible = true
+	_note.text = "Your friend opens their farm, presses F7 and hosts it. Your own saved farm is not touched."
+	_set_joining(false)
+	_address.grab_focus()
+
+
+func _set_joining(joining: bool) -> void:
+	_address.editable = not joining
+	_join_button.disabled = joining
+
+
+func _on_join() -> void:
+	if _starting or _join_button.disabled:
+		return
+	var problem: String = CoopSession.join(_address.text.strip_edges())
+	_set_joining(problem == "")
+	_note.text = problem if problem != "" else "Asking to join."
+
+
+func _on_join_back() -> void:
+	if _starting:
+		return
+	CoopSession.leave()
+	_show_main()
+
+
+func _on_joined() -> void:
+	_note.text = "Joined. Getting the farm."
+
+
+func _on_refused(reason: String) -> void:
+	CoopSession.leave()
+	_set_joining(false)
+	_note.text = reason
+
+
+func _on_farm_ready() -> void:
+	_starting = true
+	_note.text = "Opening the farm."
 
 
 func _open(problem: String) -> void:
