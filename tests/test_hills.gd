@@ -189,3 +189,34 @@ func test_a_rover_parked_in_a_pit_stays_there_on_load() -> String:
 	GameState.dug.assign(dug)
 	GameState.rover_transforms.assign(parked)
 	return problem
+
+
+func test_a_rover_cannot_drive_off_the_land() -> String:
+	var tree: SceneTree = Engine.get_main_loop()
+	var ground := TerrainGround.new()
+	var parked: Dictionary = GameState.rover_transforms.duplicate()
+	var rover := RoverController.new()
+	rover.ground = ground
+	tree.root.add_child(rover)
+	var edge_m: float = Terrain.HALF_M - rover.wheelbase_m
+	var problem: String = ""
+	for way: Vector3 in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]:
+		rover.global_position = way * (edge_m + 0.5)
+		rover._drive(0.0)
+		if not rover.global_position.is_equal_approx(way * edge_m):
+			problem = "Toward %s it got to %s." % [way, rover.global_position]
+	var inside := Vector3(edge_m - 0.5, 0.0, 0.0)
+	rover.global_position = inside
+	rover._drive(0.0)
+	if problem == "" and not rover.global_position.is_equal_approx(inside):
+		problem = "On the land it must be left alone."
+	rover.ground = null
+	rover.global_position = Vector3(edge_m + 0.5, 0.0, 0.0)
+	rover._drive(0.0)
+	if problem == "" and not is_equal_approx(rover.global_position.x, edge_m + 0.5):
+		problem = "The tunnels have no land to keep it on."
+	tree.root.remove_child(rover)
+	rover.free()
+	ground.free()
+	GameState.rover_transforms.assign(parked)
+	return problem

@@ -253,9 +253,7 @@ func _put_back_on_land() -> void:
 		global_transform = GameState.TUNNEL_START
 	if ground == null:
 		return
-	var edge_m: float = Terrain.HALF_M - wheelbase_m
-	global_position.x = clampf(global_position.x, -edge_m, edge_m)
-	global_position.z = clampf(global_position.z, -edge_m, edge_m)
+	_keep_off_edge()
 	# Or where a rock now stands.
 	var clear: Vector2 = HillDressing.clear_of_rocks(Vector2(global_position.x, global_position.z))
 	# Or in water too deep to wade.
@@ -267,6 +265,13 @@ func _put_back_on_land() -> void:
 	if global_position.y < ground_m - 0.1:
 		# Above its uphill corners; it drops the rest of the way.
 		global_position.y = ground_m + ground_snap_m
+
+
+## The land ends, with nothing under a rover beyond it.
+func _keep_off_edge() -> void:
+	var edge_m: float = Terrain.HALF_M - wheelbase_m
+	global_position.x = clampf(global_position.x, -edge_m, edge_m)
+	global_position.z = clampf(global_position.z, -edge_m, edge_m)
 
 
 func _park() -> void:
@@ -455,6 +460,9 @@ func _drive(delta: float) -> void:
 
 	var before: Vector3 = global_position
 	move_and_slide()
+	# The tunnels have no land.
+	if ground != null:
+		_keep_off_edge()
 	# Horizontal displacement actually achieved; pushing into a rock adds no drift.
 	var driven: float = Vector2(global_position.x - before.x, global_position.z - before.z).length()
 	FarmCommands.rover_drove(driven)
