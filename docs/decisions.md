@@ -1151,8 +1151,8 @@ Agent's notes (flagged for Ryan, not his words):
 
 Ryan: "Hills then tunnels for growth if we can do digging and destruction in parallel that would be amazing."
 
-- One shaped ground for all of it: the natural land less what was dug, worked out alike on every PC from a point each meter. Digging is by the soil grid's 2 m cells in 0.5 m steps [PLACEHOLDER]. Points between cells are as deep as the shallowest that meet there, so sides slope at about 27° and no hole has a wall.
-- A cell may be at most one step deeper than any of its eight neighbors, so no one digs the rover into a trap [ASSUMPTION]. The dig command will hold to it.
+- One shaped ground for all of it: the natural land less what was dug, worked out alike on every PC from a point each meter. Digging is by the soil grid's 2 m cells in 0.5 m steps [PLACEHOLDER]. Points between cells are as deep as the shallowest that meet there, so sides slope.
+- A cell may be at most one step deeper than any of its eight neighbors, so sides slope at about 27° along the grid and at most about 35° at corners, no hole has a wall, and no one digs the rover into a trap [ASSUMPTION]. The dig command will hold to it.
 - The land stays level within 30 m of the farm's middle and 10 m of the relay [PLACEHOLDER].
 - The ground blocks the uplink, hills and pit walls alike [ASSUMPTION].
 - Tunnels are a scene of their own: the camera can't see under the ground [ASSUMPTION].

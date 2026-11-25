@@ -355,7 +355,9 @@ func _lie_on_ground(delta: float) -> void:
 	for side: float in [-half_track_m, half_track_m]:
 		for end: float in [-wheelbase_m * 0.5, wheelbase_m * 0.5]:
 			highest_m = maxf(highest_m, ground.height_at(to_global(Vector3(side, 0.0, end))))
-	_visual.position.y = lerpf(_visual.position.y, middle_m - highest_m, share)
+	# Another player's rover is told its height late, so it is seen on the ground.
+	var sits_m: float = middle_m - (global_position.y if _following else highest_m)
+	_visual.position.y = lerpf(_visual.position.y, sits_m, share)
 
 
 func _zero_steering() -> void:
