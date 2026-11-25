@@ -1,5 +1,5 @@
 extends RefCounted
-## For the co-op suites: sessions over real connections on this machine only.
+## For the co-op suites: sessions over connections on this machine, real or (with fake_peer.gd) in memory.
 
 const SessionScript: GDScript = preload("res://scripts/autoload/CoopSession.gd")
 const CommandsScript: GDScript = preload("res://scripts/autoload/FarmCommands.gd")
