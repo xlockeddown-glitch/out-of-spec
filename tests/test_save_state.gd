@@ -41,6 +41,7 @@ func _worn() -> GameStateScript:
 	gs.park_rover("rover_1", Transform3D(Basis(Vector3.UP, 0.1 + 0.2), Vector3(1.1, 2.2, 3.3)))
 	gs.mined_fissures[&"FissureA"] = 2
 	gs.dig(Vector3i(20, 0, 20))
+	gs.hit_boulder(&"RockA")
 	gs._spool_species.append(&"curlyhair")
 	gs._spool_damaged.append(true)
 	gs.slotted_spool_damaged = true

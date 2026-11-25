@@ -1158,4 +1158,5 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - Tunnels are a scene of their own: the camera can't see under the ground [ASSUMPTION].
 - G digs and H fills the cell 2 m ahead of the rover's middle, a step a press, at most 4 steps deep [PLACEHOLDER]. Both ride the uplink, and the rover must stand [ASSUMPTION]. They cost and give nothing [ASSUMPTION]. Level ground and the land's outermost cells are never dug. A teal line shows the cell.
 - In co-op anyone may dig where the rules allow; the host doesn't check where their rover is, as with tilling [ASSUMPTION]. A save whose digging breaks the rules is refused, like other bad data. Protocol 5.
+- Space drills a fissure first, then a boulder within 0.7 m of the rover's nose [PLACEHOLDER], then tills [ASSUMPTION]. 5 hits break a boulder for good [PLACEHOLDER]; each hit shrinks it 6 % [PLACEHOLDER]. A broken one blocks nothing and gives nothing [ASSUMPTION].
 - Open with Ryan: what digging gives or costs, whether dug ground fills back in, what breaking a boulder gives.

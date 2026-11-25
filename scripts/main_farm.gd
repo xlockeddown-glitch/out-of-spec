@@ -67,6 +67,7 @@ func _ready() -> void:
 	GameState.ore_changed.connect(_on_ore_changed)
 	GameState.credibility_changed.connect(_on_credibility_changed)
 	_rover.ore_mined.connect(_on_ore_mined)
+	_rover.boulder_hit.connect(_on_boulder_hit)
 	_bram_bay.rover_entered.connect(_on_rover_entered_bay)
 	_bram_bay.rover_exited.connect(_on_rover_exited_bay)
 	_cal_pad.rover_entered.connect(_on_rover_entered_cal_pad)
@@ -318,6 +319,13 @@ func _try_accept_job(index: int) -> void:
 
 func _on_ore_mined(_fissure_id: StringName) -> void:
 	_hud.push_log("Drilled 1 crystal ore." + ("" if FarmCommands.guest else " Carrying %d." % GameState.crystal_ore))
+
+
+func _on_boulder_hit(hits: int) -> void:
+	if hits < GameState.BOULDER_HITS:
+		_hud.push_log("Boulder: %d of %d hits." % [hits, GameState.BOULDER_HITS])
+	else:
+		_hud.push_log("Boulder broken.")
 
 
 func _on_credibility_changed(_points: int) -> void:

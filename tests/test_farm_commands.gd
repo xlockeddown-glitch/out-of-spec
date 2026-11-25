@@ -134,6 +134,68 @@ func test_a_guest_cannot_make_soil_or_ore() -> String:
 	return "\n".join(problems)
 
 
+func test_a_guest_breaks_only_boulders_that_stand() -> String:
+	var commands: Node = _make()
+	var problems: PackedStringArray = []
+	for arguments: Array in [[], [&""], [&"FissureA"], [&"RockE"], [&"rocka"], ["RockA"], [0], [&"RockA", "player_1"]]:
+		if commands.execute("player_2", &"hit_boulder", arguments) != 0:
+			problems.append("Hit %s" % [arguments])
+	if not commands.state.boulder_hits.is_empty():
+		problems.append("A refused hit must change nothing")
+	var told: Array = [0]
+	commands.state.boulders_changed.connect(func() -> void: told[0] += 1)
+	for hit: int in range(1, GameStateScript.BOULDER_HITS + 1):
+		if commands.state.is_boulder_broken(&"RockA") or commands.execute("player_2", &"hit_boulder", [&"RockA"]) != hit:
+			problems.append("Hit %d must count" % hit)
+	if not commands.state.is_boulder_broken(&"RockA") or commands.state.is_boulder_broken(&"RockB"):
+		problems.append("The last hit must break that boulder only")
+	if commands.execute("player_2", &"hit_boulder", [&"RockA"]) != 0 or told[0] != GameStateScript.BOULDER_HITS:
+		problems.append("A broken boulder can't be hit, and each hit is told once")
+	_free(commands)
+	var named: RegEx = RegEx.create_from_string(r"\[node name=.(\w+). type=.StaticBody3D. parent=.WorldView/WorldViewport/World/Rocks.")
+	var boulders: Array[StringName] = []
+	for found: RegExMatch in named.search_all(FileAccess.get_file_as_string("res://scenes/main_farm.tscn")):
+		boulders.append(StringName(found.get_string(1)))
+	if boulders != GameStateScript.BOULDERS:
+		problems.append("GameState.BOULDERS is not the scene's: %s" % [boulders])
+	return "\n".join(problems)
+
+
+func test_a_boulder_must_be_close_in_front_and_stand() -> String:
+	var boulder := Boulder.new()
+	boulder.name = "RockD"
+	var shape := CollisionShape3D.new()
+	shape.name = "Shape"
+	shape.shape = BoxShape3D.new()
+	(shape.shape as BoxShape3D).size = Vector3(4, 3, 2)
+	var model := Node3D.new()
+	model.name = "Model"
+	boulder.add_child(shape)
+	boulder.add_child(model)
+	var saved: Dictionary = GameState.boulder_hits.duplicate()
+	GameState.boulder_hits.clear()
+	(Engine.get_main_loop() as SceneTree).root.add_child(boulder)
+	boulder.position = Vector3(10, 0, 10)
+	var problems: PackedStringArray = []
+	for near: Vector3 in [Vector3(12.6, 5, 10), Vector3(10, 0, 8.4), Vector3(8, 0, 11.6), Vector3(10, 0, 10)]:
+		if not boulder.is_in_reach(near):
+			problems.append("%s must be in reach" % near)
+	for far: Vector3 in [Vector3(12.8, 0, 10), Vector3(10, 0, 8.2), Vector3(12.6, 0, 11.6), Vector3.ZERO]:
+		if boulder.is_in_reach(far):
+			problems.append("%s must be out of reach" % far)
+	var whole: float = model.scale.x
+	GameState.hit_boulder(&"RockD")
+	if model.scale.x >= whole or not model.visible:
+		problems.append("A hit must show")
+	for hit: int in GameState.BOULDER_HITS:
+		GameState.hit_boulder(&"RockD")
+	if boulder.is_in_reach(Vector3(10, 0, 8.4)) or model.visible:
+		problems.append("A broken boulder must be gone")
+	boulder.free()
+	GameState.boulder_hits.assign(saved)
+	return "\n".join(problems)
+
+
 func test_a_guest_digs_and_fills_only_by_the_rules() -> String:
 	var commands: Node = _make()
 	var problems: PackedStringArray = []

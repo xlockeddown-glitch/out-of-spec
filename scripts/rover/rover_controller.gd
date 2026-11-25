@@ -20,6 +20,8 @@ signal till_rejected(reason: String)
 ## the command was sent.
 signal tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int)
 signal ore_mined(fissure_id: StringName)
+## A boulder was drilled, `hits` times by now.
+signal boulder_hit(hits: int)
 signal dig_rejected(reason: String)
 signal fill_rejected(reason: String)
 
@@ -72,6 +74,8 @@ class UplinkCommand:
 ## Parent of OreFissure nodes. The till/drill action mines a fissure in reach
 ## before it tries to till soil.
 @export var ore_fissures_root: Node3D
+## Parent of Boulder nodes. One close in front is drilled before soil is tilled.
+@export var boulders_root: Node3D
 ## What VisualRoot lies on. Always level if unset.
 @export var ground: TerrainGround
 ## Greybox wheels (VisualRoot children named Wheel*) widen with Bram's treads.
@@ -375,6 +379,8 @@ func _on_steering_error_changed(_error: float, _band: int) -> void:
 func _till_under_rover(seed_id: String, offset_steps: int) -> void:
 	if await _try_mine() or not is_inside_tree():
 		return
+	if await _try_boulder() or not is_inside_tree():
+		return
 	if soil_grid == null:
 		till_rejected.emit("No soil grid linked.")
 		return
@@ -447,6 +453,24 @@ func _try_mine() -> bool:
 	else:
 		till_rejected.emit("The fissure was not drilled.")
 	return true
+
+
+## True if a boulder close in front was tried, so the ground is not tilled.
+func _try_boulder() -> bool:
+	if boulders_root == null:
+		return false
+	for child: Node in boulders_root.get_children():
+		var boulder := child as Boulder
+		if boulder == null or not boulder.is_in_reach(to_global(Vector3.FORWARD * half_length_m)):
+			continue
+		var hits: int = await FarmCommands.request(&"hit_boulder", [boulder.name])
+		if is_inside_tree():
+			if hits > 0:
+				boulder_hit.emit(hits)
+			else:
+				till_rejected.emit("The boulder was not drilled.")
+		return true
+	return false
 
 
 func _apply_upgrades() -> void:
