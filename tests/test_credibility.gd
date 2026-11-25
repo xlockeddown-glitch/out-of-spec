@@ -59,6 +59,21 @@ func _reach_offer(gs: GameStateScript) -> void:
 	gs.change_credibility(need - gs.credibility)
 
 
+func test_the_managers_favor_costs_no_credibility() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	for id: String in gs.standard_ids():
+		gs.get_sensor(id).cal_due_day = DAY - 1
+	var before: int = gs.credibility
+	var record: Dictionary = gs.calibrate(UNIT, gs.MANAGER_ID)
+	var after: int = gs.credibility
+	gs.free()
+	GameClock.elapsed_days = saved
+	if not record.get("standard_overdue", false):
+		return "The test needs an overdue standard, got %s" % record
+	return "" if after == before else "The manager's use of an overdue standard cost %d points." % (before - after)
+
+
 func test_audit_points_and_clamp() -> String:
 	var saved: float = GameClock.elapsed_days
 	var gs: GameStateScript = _make_state()

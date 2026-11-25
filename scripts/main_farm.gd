@@ -345,6 +345,10 @@ func _try_field_cal() -> void:
 		_hud.push_log(NO_FIELD_STANDARD)
 		return
 	for id: String in offered:
+		# It may have driven off while the host answered.
+		if not _cal_pad.rover_inside or not _rover.is_stopped():
+			_hud.push_log("FIELD CAL PAD: stop the rover on the pad first.")
+			return
 		await _field_cal_one(id)
 		if not is_inside_tree():
 			return
