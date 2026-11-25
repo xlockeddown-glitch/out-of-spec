@@ -31,6 +31,8 @@ signal soil_tilled(cell: Vector3i)
 signal terrain_changed
 ## A boulder was hit or broken.
 signal boulders_changed
+## The rover went into the tunnels or came out.
+signal rover_place_changed
 ## The job board or the accepted jobs changed (paid calibration jobs).
 signal jobs_changed
 ## The lab grew, a build started or finished, or an area changed.
@@ -191,9 +193,16 @@ var rng := RandomNumberGenerator.new()
 ## rover id -> Transform3D where it was parked. Rovers belong to the farm, not
 ## to a player. Change it with park_rover().
 var rover_transforms: Dictionary = {}
-## The rover while in the tunnels has a place of its own, so neither scene's
-## place is taken for the other's.
+## The one rover is on the farm or in the tunnels, and has an id in each, so
+## neither scene's place is taken for the other's. Change it with move_rover().
+var rover_in_tunnels: bool = false
+const ROVER: String = "rover_1"
 const TUNNEL_ROVER: String = "rover_1_tunnels"
+## The middles of the pads that lead in and out, and how near the rover must be
+## on the host, who hears of a friend's late [PLACEHOLDER].
+const TUNNEL_PAD := Vector3(20.5, 0.0, -15.5)
+const TUNNEL_EXIT := Vector3(-1.5, 0.0, 27.4)
+const TUNNEL_PAD_REACH_M: float = 6.0
 ## Just inside the tunnels' mouth [PLACEHOLDER].
 const TUNNEL_START := Transform3D(Basis.IDENTITY, Vector3(-1.5, 0.05, 22.5))
 ## Vector3i -> true for every tilled soil cell.
@@ -424,7 +433,7 @@ const MAX_KNOWN_GUESTS: int = 64
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
-	"boulder_hits", "enclosures"]
+	"boulder_hits", "rover_in_tunnels", "enclosures"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -649,6 +658,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	robots_changed.emit()
 	terrain_changed.emit()
 	boulders_changed.emit()
+	rover_place_changed.emit()
 	return ""
 
 
@@ -2707,6 +2717,34 @@ func add_rover_usage(meters: float, player_id: String = "") -> void:
 		return
 	steering.add_usage(meters * skill_factor("steering_usage", player_id))
 	add_tire_usage(meters)
+
+
+## The id the rover goes by where it is now.
+func rover_here() -> String:
+	return TUNNEL_ROVER if rover_in_tunnels else ROVER
+
+
+## True if this is the rover's id in the place it is not in.
+func rover_is_away(rover_id: String) -> bool:
+	return rover_id == (ROVER if rover_in_tunnels else TUNNEL_ROVER)
+
+
+## Takes the rover into the tunnels or out, from the pad there. Returns "" or why
+## not. It comes in at the mouth and comes out where it went in.
+func move_rover(into_tunnels: bool, player_id: String = "") -> String:
+	if into_tunnels == rover_in_tunnels:
+		return "The rover is already there."
+	if not CoopRovers.driver(rover_here()) in ["", player_id]:
+		return "Someone else is driving the rover."
+	SaveGame.saving.emit()  # it says where it is
+	var pad: Vector3 = TUNNEL_PAD if into_tunnels else TUNNEL_EXIT
+	if not rover_transforms.has(rover_here()) or parked_rover_transform(rover_here()).origin.distance_to(pad) > TUNNEL_PAD_REACH_M:
+		return "The rover is not on the pad."
+	if into_tunnels:
+		park_rover(TUNNEL_ROVER, TUNNEL_START)
+	rover_in_tunnels = into_tunnels
+	rover_place_changed.emit()
+	return ""
 
 
 ## Remembers where a rover is parked, so it is still there when the farm scene

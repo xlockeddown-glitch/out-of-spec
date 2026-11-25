@@ -62,8 +62,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	_strip.text = strip_text(CoopSession.players, GameState.local_player_id, CoopSession.is_hosting(), CoopSync.is_too_big(), CoopBeds.in_bed, CoopRovers.driver(
-		GameState.TUNNEL_ROVER if SceneSwitcher.outside == SceneSwitcher.TUNNELS_SCENE else "rover_1"))
+	_strip.text = strip_text(CoopSession.players, GameState.local_player_id, CoopSession.is_hosting(), CoopSync.is_too_big(), CoopBeds.in_bed, CoopRovers.driver(GameState.rover_here()))
 	if _panel.visible:
 		_refresh()
 

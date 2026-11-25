@@ -147,11 +147,12 @@ func _ready() -> void:
 	GameState.upgrades_changed.connect(_apply_upgrades)
 	SaveGame.saving.connect(_park)
 	GameState.farm_loaded.connect(_unpark)
+	GameState.rover_place_changed.connect(_show_place)
 	_apply_upgrades()
 	floor_snap_length = ground_snap_m
 	_visual = get_node_or_null("VisualRoot") as Node3D
 	_start_transform = global_transform
-	_unpark()
+	_show_place()
 	if satellite_relay == null:
 		push_warning("%s: no SatelliteRelay linked; uplink will read as occluded." % name)
 	# The tunnels have no soil and no ground to dig.
@@ -169,7 +170,10 @@ func _unpark() -> void:
 
 
 ## A farm saved before the hills may have it parked inside one, or off the land.
+## In the tunnels, one in the rock is back at the mouth.
 func _put_back_on_land() -> void:
+	if rover_id == GameState.TUNNEL_ROVER and not TunnelRock.holds(global_position):
+		global_transform = GameState.TUNNEL_START
 	if ground == null:
 		return
 	var edge_m: float = Terrain.HALF_M - wheelbase_m
@@ -188,7 +192,7 @@ func _put_back_on_land() -> void:
 
 func _park() -> void:
 	# Whoever drives says where it is.
-	if _following:
+	if _following or GameState.rover_is_away(rover_id):
 		return
 	FarmCommands.rover_parked(rover_id, global_transform)
 
@@ -220,6 +224,8 @@ func _physics_process(delta: float) -> void:
 ## Queue a one-shot command. It executes after the current uplink lag. A TILL
 ## carries `seed_id` and `offset_steps`, or the current ones if no seed is given.
 func queue_command(command: Command, seed_id: String = "", offset_steps: int = 0) -> void:
+	if GameState.rover_is_away(rover_id):
+		return
 	if command == Command.TILL and seed_id == "":
 		seed_id = GameState.current_seed()
 		offset_steps = GameState.planting_offset_steps
@@ -241,6 +247,31 @@ func get_drift_band() -> DriftingSensor.Band:
 ## True once the rover has braked to a standstill (the field cal pad needs it).
 func is_stopped() -> bool:
 	return absf(_speed_mps) < 0.05
+
+
+## "" if the rover is in this scene, or where it is.
+func away_text() -> String:
+	if not GameState.rover_is_away(rover_id):
+		return ""
+	return "The rover is %s. Press E to go there." % ("in the tunnels" if GameState.rover_in_tunnels else "on the farm")
+
+
+## The one rover is on the farm or in the tunnels. In the other scene it is gone.
+func _show_place() -> void:
+	var away: bool = GameState.rover_is_away(rover_id)
+	visible = not away
+	process_mode = Node.PROCESS_MODE_DISABLED if away else Node.PROCESS_MODE_INHERIT
+	# Nothing sent before counts after.
+	_frames.clear()
+	_commands.clear()
+	_till_presses.clear()
+	_applied_throttle = 0.0
+	_applied_steer = 0.0
+	_speed_mps = 0.0
+	velocity = Vector3.ZERO
+	if not away:
+		_unpark()
+	broadcast_state()
 
 
 ## Re-emit current state, e.g. right after a HUD connects.

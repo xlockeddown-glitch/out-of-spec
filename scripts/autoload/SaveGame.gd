@@ -23,6 +23,8 @@ const PREVIOUS_OLD: String = ".old.prev"
 ## True once a farm was opened from the title menu. A scene run on its own (the
 ## editor, tests) never autosaves over the player's farm.
 var farm_open: bool = false
+## The scene the farm opened from the title menu starts in.
+var open_scene: String = SceneSwitcher.FARM_SCENE
 var _autosave_queued: bool = false
 
 
@@ -60,6 +62,7 @@ func start_new(path: String = DEFAULT_PATH) -> String:
 	farm_open = false
 	GameClock.elapsed_days = 0.0
 	GameState.new_farm()
+	open_scene = SceneSwitcher.FARM_SCENE
 	# Written whole before anything is moved, so a full disk costs nothing.
 	var fresh: String = path + ".new"
 	if FileAccess.file_exists(fresh):
@@ -96,6 +99,10 @@ func start_new(path: String = DEFAULT_PATH) -> String:
 func continue_farm(path: String = DEFAULT_PATH) -> String:
 	var problem: String = read(path)
 	farm_open = problem == ""
+	# A farm that opens on the farm has its rover there, where it went in.
+	if farm_open and open_scene == SceneSwitcher.FARM_SCENE and GameState.rover_in_tunnels:
+		GameState.rover_in_tunnels = false
+		GameState.rover_place_changed.emit()
 	return problem
 
 
@@ -135,6 +142,7 @@ func snapshot() -> Dictionary:
 	return {
 		"clock": { "elapsed_days": GameClock.elapsed_days },
 		"farm": GameState.farm_to_dict(),
+		"scene": get_tree().current_scene.scene_file_path if get_tree().current_scene != null else "",
 	}
 
 
@@ -146,7 +154,11 @@ func restore(data: Dictionary) -> String:
 		return problem
 	# The clock first, so listeners see the loaded day.
 	GameClock.elapsed_days = data["clock"]["elapsed_days"]
-	return GameState.farm_from_dict(data["farm"])
+	problem = GameState.farm_from_dict(data["farm"])
+	# Anything else, and a save from before this, opens the farm.
+	var in_tunnels: bool = GameState.rover_in_tunnels and str(data.get("scene")) == SceneSwitcher.TUNNELS_SCENE
+	open_scene = SceneSwitcher.TUNNELS_SCENE if in_tunnels else SceneSwitcher.FARM_SCENE
+	return problem
 
 
 ## Why `data` can't load, or "" if it can. Changes nothing.
