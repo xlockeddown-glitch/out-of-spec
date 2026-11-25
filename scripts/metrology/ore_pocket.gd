@@ -23,7 +23,7 @@ static var _cells_seed: int = 0
 
 ## The cells that hold a pocket on the farm with `world_seed`: the first few drawn
 ## that can be dug and hold no reference block. One stream, as a hash of each cell
-## would put them in clumps.
+## would put them in clumps. Kept for the next call: don't change what it gives.
 static func cells(world_seed: int) -> Array[Vector2i]:
 	if _cells.is_empty() or _cells_seed != world_seed:
 		_cells.clear()
@@ -72,7 +72,7 @@ static func problem(sensor: DriftingSensor) -> String:
 
 
 ## What a survey at `at` says: { refused, found } and, if found, { bearing, mpe,
-## from }. The bearing is the true one plus the sensor's true error, to its digit.
+## from [x, z] }, all plain enough for a guest. The bearing is the true one plus the sensor's true error, to its digit.
 ## Reads the sensor and never writes it. { refused, reason } if it can't be done.
 static func survey(sensor: DriftingSensor, world_seed: int, found: Dictionary[Vector2i, bool], at: Vector2) -> Dictionary:
 	var why: String = problem(sensor)
@@ -84,4 +84,4 @@ static func survey(sensor: DriftingSensor, world_seed: int, found: Dictionary[Ve
 	var bearing: float = bearing_deg(at, to) + sensor.error
 	if sensor.resolution > 0.0:
 		bearing = snappedf(bearing, sensor.resolution)
-	return { "refused": false, "found": true, "bearing": fposmod(bearing, 360.0), "mpe": sensor.mpe, "from": at }
+	return { "refused": false, "found": true, "bearing": fposmod(bearing, 360.0), "mpe": sensor.mpe, "from": [at.x, at.y] }

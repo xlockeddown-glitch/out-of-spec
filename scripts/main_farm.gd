@@ -273,14 +273,15 @@ func _survey() -> void:
 	var record: Dictionary = await FarmCommands.request(&"survey_ore")
 	if record.is_empty() or not is_inside_tree():
 		return
-	_survey_line.forget()
+	if not record.get("no_answer", false):
+		_survey_line.forget()
 	if record.get("refused", false):
 		_hud.push_log("ORE SURVEY REFUSED: %s" % str(record["reason"]))
 	elif not record["found"]:
 		_hud.push_log("ORE SURVEY: no ore pocket within %s m" % SP811.number(OrePocket.RANGE_M, 0))
 	else:
-		_survey_line.show_bearing(record["from"], record["bearing"])
-		_hud.push_log("ORE SURVEY: %s° from north (±%s° if steering is in MPE)" % [
+		_survey_line.show_bearing(Vector2(record["from"][0], record["from"][1]), record["bearing"])
+		_hud.push_log("ORE SURVEY: %s° clockwise from north, up-right (±%s° if steering is in MPE)" % [
 			SP811.number(record["bearing"], 1), SP811.number(record["mpe"], 1)])
 
 

@@ -20,6 +20,7 @@ var _material := StandardMaterial3D.new()
 func _ready() -> void:
 	mesh = _mesh
 	visible = false
+	set_process(false)
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
@@ -30,6 +31,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_left_s -= delta
 	visible = _left_s > 0.0
+	set_process(visible)
 
 
 ## Shows the whole range, so its length tells nothing.
@@ -37,6 +39,7 @@ func show_bearing(from: Vector2, bearing: float) -> void:
 	_from = from
 	_way = OrePocket.way(bearing)
 	_left_s = SHOWN_S
+	set_process(true)
 	_draw()
 
 

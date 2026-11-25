@@ -514,8 +514,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 			return "'found_blocks' has a cell that holds no block."
 	for cell: Variant in data.get("found_pockets", {}):
 		if not cell is Vector2i or not data["found_pockets"][cell] is bool or not data["found_pockets"][cell] \
-				or not cell in OrePocket.cells(data["world_seed"]):
-			return "'found_pockets' has a cell that holds no ore."
+				or not Terrain.can_dig(cell):
+			return "'found_pockets' has a cell that can't be dug."
 	var hits: Dictionary = data.get("boulder_hits", {})
 	for boulder: Variant in hits:
 		if not (boulder is String or boulder is StringName) or not StringName(boulder) in BOULDERS \

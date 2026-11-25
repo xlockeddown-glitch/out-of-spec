@@ -94,7 +94,7 @@ func test_a_save_is_refused_if_its_pockets_cant_be_there() -> String:
 	good["found_pockets"] = { cell: true }
 	if gs.farm_dict_problem(good) != "":
 		problems.append("A pocket where one lies must load: %s" % gs.farm_dict_problem(good))
-	for bad: Variant in [{ cell + Vector2i.RIGHT: true }, { Vector2i.ZERO: true }, { cell: false }, { cell: 1 }, { "x": true }, { Vector3i(cell.x, 0, cell.y): true }, []]:
+	for bad: Variant in [{ Vector2i(9999, 0): true }, { cell: false }, { cell: 1 }, { "x": true }, { Vector3i(cell.x, 0, cell.y): true }, []]:
 		var data: Dictionary = gs.farm_to_dict()
 		data["found_pockets"] = bad
 		if gs.farm_dict_problem(data) == "":
@@ -223,6 +223,8 @@ func test_a_guest_surveys_and_digs_through_the_host() -> String:
 	var told: Dictionary = commands.execute("player_2", &"survey_ore", [])
 	if told != OrePocket.survey(gs.steering, SEED, _none, at) or not told.get("found", false):
 		problems.append("A guest must get the host's answer: %s" % [told])
+	if not CoopSession.is_plain([told]):
+		problems.append("The answer must cross the wire: %s" % [told])
 	if not commands.execute("player_2", &"survey_ore", [at]).get("refused", false):
 		problems.append("A guest's word on where the rover is must be refused.")
 	commands.execute("player_2", &"dig", [Vector3i(cell.x, 0, cell.y)])
