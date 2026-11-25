@@ -8,7 +8,7 @@ const NO_SIGNAL: Array[String] = [
 	"clean_audit_streak", "_next_certificate_number",
 	"offence_counts", "_drop_pod_departure_at", "audit_grace_used", "_cal_index_at_last_audit",
 	"_dispatch_deck", "rover_transforms", "_next_job_number", "_board_band", "_board_taken",
-	"seed_crop_id", "planting_offset_steps", "rover_uplinks", "next_player_number",
+	"seed_crop_id", "planting_offset_steps", "rover_uplinks", "next_player_number", "guest_ids",
 ]
 ## Saved variables _show_changes() or _show_news() shows.
 const NEWS: Array[String] = ["cal_log", "phone_log", "phone_count", "audit_log", "tilled_cells", "player_skill_xp", "farm_skill_xp"]
@@ -244,6 +244,7 @@ func test_bad_bytes_change_nothing() -> String:
 			data["farm"]["plantings"] = plants
 			bad[str(plants)] = SaveGame.to_bytes(data)
 		for values: Array in [["player_skill_xp", { 2: { "farming": 1 } }], ["player_skill_xp", { "player_2": { 3: 1 } }], ["farm_skill_xp", { 3: 1 }],
+				["guest_ids", { 3: "player_2" }], ["guest_ids", { "a": 2 }], ["guest_ids", { "a": "player_1" }], ["guest_ids", { "a": "player_99" }], ["guest_ids", { "a": "me" }],
 				["at_oirm", { "x": [] }], ["suspect_units", { "x": [] }], ["mined_fissures", { "x": [] }], ["lab_areas", { "x": [] }],
 				["offence_counts", { "x": [] }], ["rover_uplinks", { "x": [] }], ["rover_transforms", { "x": [] }], ["tilled_cells", { "here": true }],
 				["lab_build", { "kind": [] }], ["lab_build", { "kind": "grow", "size": [] }], ["lab_build", { "kind": "grow", "done_day": [] }],

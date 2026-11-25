@@ -162,9 +162,14 @@ func test_strangers_and_forgeries_are_dropped() -> String:
 	var bench: Array = [SessionScript.COMMAND, 1, "calibrate_at_bench", [GameStateScript.HYGROMETER_ID]]
 	var too_long: String = "x".repeat(SessionScript.MAX_TEXT + 1)
 	var typed: Array[String] = [GameStateScript.HYGROMETER_ID]
+	var hello: Callable = func(key: String, skills: Dictionary) -> Array: return [SessionScript.HELLO, SessionScript.PROTOCOL, key, skills]
 	var bad: Array = [
 		# Not let in yet.
-		[false, bench], [false, [SessionScript.HELLO, "1"]], [false, [SessionScript.WELCOME, "player_1", []]],
+		[false, bench], [false, [SessionScript.HELLO, "1"]], [false, [SessionScript.HELLO, SessionScript.PROTOCOL]],
+		[false, hello.call("0".repeat(31), {})], [false, hello.call("A".repeat(32), {})], [false, hello.call("0".repeat(32), { 1: 1 })],
+		[false, hello.call("0".repeat(32), { "calibration": -1 })], [false, hello.call("0".repeat(32), { "calibration": 1.5 })],
+		[false, hello.call("-" + "0".repeat(31), {})], [false, hello.call("0".repeat(32), {}) + [1]],
+		 [false, [SessionScript.WELCOME, "player_1", []]],
 		# The host's messages, from a guest.
 		[true, [SessionScript.WELCOME, "player_1", []]], [true, [SessionScript.STATE, {}]], [true, [SessionScript.ANSWER, 1, ""]],
 		[true, [SessionScript.LEFT, "player_1"]], [true, [SessionScript.HELLO, SessionScript.PROTOCOL]],

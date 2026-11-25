@@ -4,6 +4,7 @@ extends RefCounted
 const SessionScript: GDScript = preload("res://scripts/autoload/CoopSession.gd")
 const CommandsScript: GDScript = preload("res://scripts/autoload/FarmCommands.gd")
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
+const ProfileScript: GDScript = preload("res://scripts/autoload/CoopProfile.gd")
 const LOCAL: String = "127.0.0.1"
 
 var _sessions: Array[Node] = []
@@ -16,6 +17,8 @@ func _session() -> Node:
 	session.commands = CommandsScript.new()
 	session.commands.state = GameStateScript.new()
 	session.commands.state.build_registry()
+	session.profile = ProfileScript.new()
+	session.profile.path = ""
 	for what: String in ["joined", "refused", "player_joined", "player_left", "state_received"]:
 		session.connect(what, _note.bind(session.get_instance_id(), what))
 	session.connect("lost", _note.bind(null, session.get_instance_id(), "lost"))
@@ -54,7 +57,7 @@ func _stranger(host: Node, hello: bool) -> ENetMultiplayerPeer:
 	_raw.append(peer)
 	_until(func() -> bool: return peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and not host._links.is_empty())
 	if hello:
-		peer.put_packet(var_to_bytes([SessionScript.HELLO, SessionScript.PROTOCOL]))
+		peer.put_packet(var_to_bytes([SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}]))
 		_until(func() -> bool: return host.players.size() == 2)
 	return peer
 
@@ -86,6 +89,7 @@ func _finish(problem: String) -> String:
 		peer.close()
 	for session: Node in _sessions:
 		session.leave()
+		session.profile.free()
 		session.commands.state.free()
 		session.commands.free()
 		session.free()
