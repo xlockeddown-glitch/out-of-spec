@@ -56,7 +56,8 @@ func walk(to: Vector3, delta: float) -> void:
 	var fall: float = 0.0 if is_on_floor() else velocity.y - FALL_MPS2 * delta
 	var speed_mps: float = SPEED_MPS
 	# Wading, as the rover does.
-	if Terrain.water_depth_m(Vector2(global_position.x, global_position.z)) > 0.0:
+	var here := Vector2(global_position.x, global_position.z)
+	if Terrain.water_depth_m(here) > 0.0 or PitWater.is_wading(here):
 		speed_mps *= Terrain.WATER_SPEED
 	velocity = to * speed_mps + Vector3.UP * fall
 	if to != Vector3.ZERO:

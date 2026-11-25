@@ -162,9 +162,9 @@ static func water_depth_m(at: Vector2) -> float:
 	return maxf(WASH_LEVEL_M - height(at, none), 0.0)
 
 
-## Whether water here stops a rover.
+## Whether water here stops a rover or a walker: the wash's, or a dug pit's.
 static func is_deep(at: Vector2) -> bool:
-	return water_depth_m(at) >= WASH_BLOCK_M
+	return water_depth_m(at) >= WASH_BLOCK_M or PitWater.is_deep(at)
 
 
 ## `at`, or a place south of it, away from the arch, where a rover turned any way is

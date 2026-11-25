@@ -10,6 +10,9 @@ signal changed
 ## Each stretch, by what it was drawn from.
 var _stretches: Dictionary[int, VoxelWater] = {}
 var _deep: Node3D = null
+## The deep water the boxes were last built for.
+var _built: Array[Rect2] = []
+var _built_levels: Array[float] = []
 
 
 func _ready() -> void:
@@ -27,8 +30,6 @@ func _exit_tree() -> void:
 
 ## Works the water out again and draws what is new.
 func _refresh() -> void:
-	var before: Array[Rect2] = PitWater.blocks().duplicate()
-	var before_levels: Array[float] = PitWater.block_levels().duplicate()
 	PitWater.use(PitWater.work_out(GameState.dug, GameState.stone_pieces), GameState.dug)
 	var keep: Dictionary[int, bool] = {}
 	for stretch: Array[Vector2i] in _stretches_of(PitWater.levels(), PitWater.film()):
@@ -41,7 +42,9 @@ func _refresh() -> void:
 			remove_child(_stretches[key])
 			_stretches[key].queue_free()
 			_stretches.erase(key)
-	if before != PitWater.blocks() or before_levels != PitWater.block_levels():
+	if _built != PitWater.blocks() or _built_levels != PitWater.block_levels():
+		_built = PitWater.blocks().duplicate()
+		_built_levels = PitWater.block_levels().duplicate()
 		_build_blocks()
 		changed.emit()
 
