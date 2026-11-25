@@ -3,8 +3,8 @@ extends RefCounted
 
 const ANTENNA_M: float = 2.0
 const ROVER_M: float = 1.6
-## Every plant's place in whole centimeters (moved once when the arch grew, so shrubs keep clear of it).
-const HASH: int = 894339969
+## Every plant's place in whole centimeters (moved when the arch grew and when the terrace rows came, so shrubs keep clear).
+const HASH: int = 1516813843
 
 var _none: Dictionary[Vector2i, int] = {}
 
@@ -62,10 +62,18 @@ func test_rocks_stand_clear_on_high_ground() -> String:
 		for corner: Vector2 in _footprint(at, half + Vector2.ONE * ROVER_M * 2.0):
 			if Terrain.is_level(corner):
 				return "The rock at %s is too near level ground." % rock
+		var touches: bool = false
 		for other: Vector2i in HillDressing.ROCKS:
 			var gap: Vector2 = Vector2(rock - other).abs() - half - HillDressing.rock_half_m(other)
-			if other != rock and maxf(gap.x, gap.y) < ROVER_M * 2.0:
+			if other != rock and maxf(gap.x, gap.y) < -0.001:
+				return "The rocks at %s and %s overlap." % [rock, other]
+			# The terrace pieces of a row touch (below), with no gap to be caught in.
+			var in_row: bool = HillDressing.ROCK_TURNS.has(rock) and HillDressing.ROCK_TURNS.has(other) and Vector2(rock).distance_to(Vector2(other)) <= 4.0
+			touches = touches or (other != rock and is_zero_approx(maxf(gap.x, gap.y)))
+			if other != rock and not in_row and maxf(gap.x, gap.y) < ROVER_M * 2.0:
 				return "A rover can't pass between the rocks at %s and %s." % [rock, other]
+		if HillDressing.ROCK_TURNS.has(rock) and not touches:
+			return "The terrace piece at %s stands apart from its row." % rock
 		var buried_m: float = Terrain.height(at, _none) - HillDressing.lowest_under(at, half, _none)
 		if buried_m > 0.6:
 			return "The rock at %s is buried by %.2f m." % [rock, buried_m]
@@ -81,7 +89,8 @@ func test_rocks_hide_the_relay_from_no_level_ground() -> String:
 	var boxes: Array[AABB] = []
 	for rock: Vector2i in HillDressing.ROCKS:
 		var size: Vector3 = HillDressing.ROCK_SIZE_M[HillDressing.ROCKS[rock]]
-		boxes.append(AABB(Vector3(rock.x - size.x / 2.0, Terrain.height(Vector2(rock), _none) - 1.0, rock.y - size.z / 2.0), size + Vector3.UP))
+		var half: Vector2 = HillDressing.rock_half_m(rock)
+		boxes.append(AABB(Vector3(rock.x - half.x, Terrain.height(Vector2(rock), _none) - 1.0, rock.y - half.y), Vector3(half.x * 2.0, size.y + 1.0, half.y * 2.0)))
 	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
 		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
 			if Terrain.is_level(Vector2(x, z)):
@@ -185,9 +194,11 @@ func test_rocks_block_rovers_and_the_uplink_as_boulders_do() -> String:
 		if body.collision_layer != 5:
 			problem = "Rocks must block rovers and the uplink."
 		# What is seen and what is hit must agree.
-		var mesh: MeshInstance3D = body.find_children("*", "MeshInstance3D", true, false)[0]
 		var shape: CollisionShape3D = body.find_children("*", "CollisionShape3D", true, false)[0]
-		var seen: AABB = mesh.global_transform * mesh.get_aabb()
+		var seen := AABB()
+		for mesh: MeshInstance3D in body.find_children("*", "MeshInstance3D", true, false):
+			var part: AABB = mesh.global_transform * mesh.get_aabb()
+			seen = part if seen.size == Vector3.ZERO else seen.merge(part)
 		var size: Vector3 = (shape.shape as BoxShape3D).size
 		var hit := AABB(shape.global_position - size / 2.0, size)
 		if not seen.position.is_equal_approx(hit.position) or not seen.size.is_equal_approx(hit.size):
@@ -204,11 +215,15 @@ func test_a_rover_saved_where_a_rock_stands_comes_back_beside_it() -> String:
 			var gap: Vector2 = (away - Vector2(rock)).abs() - half
 			if maxf(gap.x, gap.y) < ROVER_M / 2.0:
 				return "At %s a rover comes back inside the rock at %s." % [at, rock]
+			for other: Vector2i in HillDressing.ROCKS:
+				gap = (away - Vector2(other)).abs() - HillDressing.rock_half_m(other)
+				if maxf(gap.x, gap.y) < ROVER_M / 2.0 - 0.1:
+					return "At %s a rover comes back inside the rock at %s." % [at, other]
 			if HillDressing.clear_of_rocks(away) != away:
 				return "Beside a rock a rover must stay where it was."
 		# Its long side against a corner.
 		var corner: Vector2 = Vector2(rock) + half + Vector2.ONE.normalized() * ROVER_M / 2.0
-		if HillDressing.clear_of_rocks(corner) != corner:
+		if not HillDressing.ROCK_TURNS.has(rock) and HillDressing.clear_of_rocks(corner) != corner:
 			return "A rover resting diagonally at a corner must stay where it was."
 	var parked: Dictionary = GameState.rover_transforms.duplicate()
 	var tree: SceneTree = Engine.get_main_loop()

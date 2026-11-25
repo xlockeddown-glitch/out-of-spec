@@ -4,7 +4,7 @@ extends Node3D
 ## rock stops rovers and the uplink, as a boulder does [ASSUMPTION].
 
 enum Plant { SHRUB, POPPY }
-enum Rock { BUTTE, BASALT, ARCH, OUTCROP }
+enum Rock { BUTTE, BASALT, ARCH, OUTCROP, DECK, BLUFF, SHELF, ENDCAP }
 
 ## The world's and the uplink's, as a boulder's.
 const ROCK_LAYERS: int = 5
@@ -13,6 +13,10 @@ const ROCK_MODELS: Dictionary[Rock, String] = {
 	Rock.BASALT: "res://assets/voxels/basalt_column_cluster.glb",
 	Rock.ARCH: "res://assets/voxels/mesa_arch_span.glb",
 	Rock.OUTCROP: "res://assets/voxels/rim_inner_corner.glb",
+	Rock.DECK: "res://assets/voxels/terrace_mid_deck.glb",
+	Rock.BLUFF: "res://assets/voxels/terrace_upper_bluff.glb",
+	Rock.SHELF: "res://assets/voxels/rim_overhang_shelf.glb",
+	Rock.ENDCAP: "res://assets/voxels/retaining_wall_endcap.glb",
 }
 const ROCK_VOXEL_M: float = 0.2
 ## The arch is drawn larger than its pack size, and its box with it [PLACEHOLDER].
@@ -23,6 +27,10 @@ const ROCK_SIZE_M: Dictionary[Rock, Vector3] = {
 	Rock.BASALT: Vector3(2.0, 2.8, 2.0),
 	Rock.ARCH: Vector3(3.5, 3.0, 2.5),
 	Rock.OUTCROP: Vector3(2.0, 2.0, 2.0),
+	Rock.DECK: Vector3(2.0, 1.4, 2.0),
+	Rock.BLUFF: Vector3(2.0, 2.8, 2.0),
+	Rock.SHELF: Vector3(2.0, 2.0, 2.0),
+	Rock.ENDCAP: Vector3(1.2, 1.8, 2.0),
 }
 ## The arch is wider than deep, and the outcrop's steps face the camera; the others
 ## can stand any way.
@@ -37,6 +45,18 @@ const ROCKS: Dictionary[Vector2i, Rock] = {
 	Vector2i(-65, 15): Rock.BASALT, Vector2i(15, -65): Rock.BASALT,
 	Vector2i(63, 3): Rock.ARCH,
 	Vector2i(57, 41): Rock.OUTCROP, Vector2i(39, -51): Rock.OUTCROP, Vector2i(-53, 55): Rock.OUTCROP,
+	Vector2i(47, 61): Rock.BLUFF, Vector2i(49, 61): Rock.DECK, Vector2i(51, 61): Rock.ENDCAP,
+	Vector2i(63, 47): Rock.SHELF, Vector2i(63, 49): Rock.DECK,
+	Vector2i(45, -33): Rock.SHELF, Vector2i(47, -33): Rock.DECK, Vector2i(49, -33): Rock.ENDCAP,
+	Vector2i(-31, 47): Rock.BLUFF, Vector2i(-31, 49): Rock.DECK, Vector2i(-31, 51): Rock.ENDCAP,
+}
+## The terrace pieces stand in short rows with their backs to a hillside, stepped
+## ends at one end, and face downhill toward the camera: +X is 3, +Z is 2 [ASSUMPTION].
+const ROCK_TURNS: Dictionary[Vector2i, int] = {
+	Vector2i(47, 61): 2, Vector2i(49, 61): 2, Vector2i(51, 61): 3,
+	Vector2i(63, 47): 3, Vector2i(63, 49): 3,
+	Vector2i(45, -33): 2, Vector2i(47, -33): 2, Vector2i(49, -33): 3,
+	Vector2i(-31, 47): 3, Vector2i(-31, 49): 3, Vector2i(-31, 51): 2,
 }
 ## Cells this near a rock can't be dug [PLACEHOLDER].
 const ROCK_MARGIN_M: float = 0.5
@@ -138,7 +158,8 @@ func _ready() -> void:
 ## Half a rock's size along x and z.
 static func rock_half_m(rock: Vector2i) -> Vector2:
 	var size: Vector3 = ROCK_SIZE_M[ROCKS[rock]]
-	return Vector2(size.x, size.z) / 2.0
+	# A quarter turn swaps the sides.
+	return Vector2(size.z, size.x) / 2.0 if ROCK_TURNS.get(rock, 0) % 2 == 1 else Vector2(size.x, size.z) / 2.0
 
 
 ## Whether a cell is under a rock or at its side, so it can't be dug [ASSUMPTION].
@@ -149,6 +170,16 @@ static func is_at_rock(cell: Vector2i) -> bool:
 
 ## `at`, or just clear of a rock if a rover there would be inside it.
 static func clear_of_rocks(at: Vector2) -> Vector2:
+	# Out of one rock may be into the next of its row.
+	for i: int in ROCKS.size():
+		var clear: Vector2 = _out_of_rock(at)
+		if clear == at:
+			break
+		at = clear
+	return at
+
+
+static func _out_of_rock(at: Vector2) -> Vector2:
 	for rock: Vector2i in ROCKS:
 		if _rover_gap(at, rock) < ROVER_INSIDE_M:
 			var away: Vector2 = at - Vector2(rock)
@@ -258,14 +289,15 @@ static func _rover_gap(at: Vector2, rock: Vector2i) -> float:
 func _add_rock(at: Vector2i) -> void:
 	var kind: Rock = ROCKS[at]
 	var box := BoxShape3D.new()
-	box.size = ROCK_SIZE_M[kind]
+	var half: Vector2 = rock_half_m(at)
+	box.size = Vector3(half.x * 2.0, ROCK_SIZE_M[kind].y, half.y * 2.0)
 	var shape := CollisionShape3D.new()
 	shape.shape = box
 	shape.position.y = box.size.y / 2.0
 	var model := ModelSlot.new()
 	model.model_path = ROCK_MODELS[kind]
 	model.model_scale = ROCK_VOXEL_M * ROCK_SCALE.get(kind, 1.0)
-	model.rotation.y = PI / 2.0 * ROCK_QUARTER_TURNS.get(kind, _rocks.size())
+	model.rotation.y = PI / 2.0 * ROCK_TURNS.get(at, ROCK_QUARTER_TURNS.get(kind, _rocks.size()))
 	var body := StaticBody3D.new()
 	body.collision_layer = ROCK_LAYERS
 	body.collision_mask = 0

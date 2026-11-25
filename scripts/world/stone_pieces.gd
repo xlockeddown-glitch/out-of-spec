@@ -89,7 +89,8 @@ static func pieces_problem(pieces: Dictionary) -> String:
 	for cell: Variant in pieces:
 		if not cell is Vector2i or not pieces[cell] is int or not is_kind(pieces[cell]):
 			return "has an entry that is not a piece."
-		if not Terrain.can_dig(cell) or HillDressing.is_at_rock(cell):
+		# Not at rocks, so a save with a piece from before a rock still loads.
+		if not Terrain.can_dig(cell):
 			return "has a piece where nothing can be built."
 	return ""
 
