@@ -62,6 +62,7 @@ func start_new(path: String = DEFAULT_PATH) -> String:
 	farm_open = false
 	GameClock.elapsed_days = 0.0
 	GameState.new_farm()
+	open_scene = SceneSwitcher.FARM_SCENE
 	# Written whole before anything is moved, so a full disk costs nothing.
 	var fresh: String = path + ".new"
 	if FileAccess.file_exists(fresh):

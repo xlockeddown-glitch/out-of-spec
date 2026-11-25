@@ -10,6 +10,9 @@ const ROVER_KEYS: Array[StringName] = [
 
 var _had_los: bool = true
 var _last_band: int = DriftingSensor.Band.IN_BAND
+## This player asked to move the rover; the host said yes.
+var _moving: bool = false
+var _move_granted: bool = false
 
 @onready var _rover: RoverController = %Rover
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
@@ -34,7 +37,7 @@ func _ready() -> void:
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.skill_leveled.connect(_on_skill_leveled)
 	SaveGame.save_failed.connect(_hud.push_log)
-	GameState.rover_place_changed.connect(_say_if_away)
+	GameState.rover_place_changed.connect(_on_rover_place_changed)
 	GameState.credits_changed.connect(_hud.set_credits)
 	GameState.ore_changed.connect(_hud.set_ore)
 	GameState.credibility_changed.connect(_on_credibility_changed)
@@ -196,14 +199,24 @@ func _say_if_away() -> void:
 
 ## Takes the rover out and goes with it.
 func _leave_tunnels() -> void:
+	if _moving:
+		return
+	_moving = true
 	var problem: String = await FarmCommands.request(&"move_rover", [false])
 	if not is_inside_tree():
 		return
 	if problem != "":
+		_moving = false
 		_hud.push_log("TUNNEL MOUTH: " + problem)
 		return
-	if _rover.away_text() == "":
-		# A guest's copy of the farm comes a little later.
-		await GameState.rover_place_changed
-	if is_inside_tree():
-		SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE)
+	_move_granted = true
+	_on_rover_place_changed()
+
+
+## A guest's copy of the farm may come after the host's yes.
+func _on_rover_place_changed() -> void:
+	if _move_granted and _rover.away_text() != "":
+		_move_granted = false
+		SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE)
+	elif not _moving:
+		_say_if_away()

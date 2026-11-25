@@ -36,6 +36,9 @@ var _inspect_left: float = 0.0
 ## (key or button) arms the offer and shows the price; a second press on the
 ## same offer buys it. Leaving the bay or pressing another offer re-arms.
 var _armed_standard: String = ""
+## This player asked to move the rover; the host said yes.
+var _moving: bool = false
+var _move_granted: bool = false
 
 
 func _ready() -> void:
@@ -67,7 +70,7 @@ func _ready() -> void:
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.skill_leveled.connect(_on_skill_leveled)
 	SaveGame.save_failed.connect(_hud.push_log)
-	GameState.rover_place_changed.connect(_say_if_away)
+	GameState.rover_place_changed.connect(_on_rover_place_changed)
 	GameState.credits_changed.connect(_on_credits_changed)
 	GameState.ore_changed.connect(_on_ore_changed)
 	GameState.credibility_changed.connect(_on_credibility_changed)
@@ -519,14 +522,24 @@ func _say_if_away() -> void:
 
 ## Takes the rover in and goes with it.
 func _enter_tunnels() -> void:
+	if _moving:
+		return
+	_moving = true
 	var problem: String = await FarmCommands.request(&"move_rover", [true])
 	if not is_inside_tree():
 		return
 	if problem != "":
+		_moving = false
 		_hud.push_log("TUNNEL MOUTH: " + problem)
 		return
-	if _rover.away_text() == "":
-		# A guest's copy of the farm comes a little later.
-		await GameState.rover_place_changed
-	if is_inside_tree():
-		SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+	_move_granted = true
+	_on_rover_place_changed()
+
+
+## A guest's copy of the farm may come after the host's yes.
+func _on_rover_place_changed() -> void:
+	if _move_granted and _rover.away_text() != "":
+		_move_granted = false
+		SceneSwitcher.go_to(SceneSwitcher.TUNNELS_SCENE)
+	elif not _moving:
+		_say_if_away()
