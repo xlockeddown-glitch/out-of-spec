@@ -1157,7 +1157,7 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - The ground blocks the uplink, hills and pit walls alike [ASSUMPTION].
 - Tunnels are a scene of their own: the camera can't see under the ground [ASSUMPTION].
 - Open with Ryan: what digging gives or costs, whether dug ground fills back in, what breaking a boulder gives.
-- Hills: seven placed by hand, three of them 6 m high, over land that rolls a little. No slope is over 15°, so a 27° dug side on a hill can still be driven up. All sizes and places are [PLACEHOLDER]. The level land is now 33 m around the farm, as rim rocks reach 32.6 m, with a level road 10 m wide to the relay [PLACEHOLDER].
+- Hills: seven placed by hand, three of them 6 m high, over land that rolls a little. No slope is over 15°, so a 27° dug side on a hill can still be driven up. All sizes and places are [PLACEHOLDER]. The level land is now 33 m around the farm, as rim rocks reach 32.6 m, with a level road 10 m wide to the relay [PLACEHOLDER]. Three hills' feet reach that edge, where the ground rises up to 0.23 m in its first meter. A rover loaded within a wheelbase of the land's edge comes back that far in.
 - The whole farm and the road see the relay. Three places behind the 6 m hills don't, about 2.5 % of the land [ASSUMPTION].
 - High ground is a little warmer and valleys a little cooler in color; level ground is unchanged [PLACEHOLDER].
 - The land rises 1.5 m toward its edge [PLACEHOLDER], but the rover can still drive off, as before. A rover parked inside a hill by an older save, or off the land, comes back on the ground [ASSUMPTION].
