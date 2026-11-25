@@ -36,6 +36,13 @@ func toggle_farm_dome() -> void:
 	swap_to(FARM_SCENE if on_dome else DOME_SCENE)
 
 
+## Like swap_to, but after a swap in progress instead of not at all.
+func go_to(path: String) -> void:
+	while _busy:
+		await scene_swapped
+	swap_to(path)
+
+
 func swap_to(path: String) -> void:
 	if _busy:
 		return

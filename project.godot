@@ -29,6 +29,7 @@ CoopSession="*res://scripts/autoload/CoopSession.gd"
 SaveGame="*res://scripts/autoload/SaveGame.gd"
 CoopSync="*res://scripts/autoload/CoopSync.gd"
 SceneSwitcher="*res://scripts/autoload/SceneSwitcher.gd"
+CoopScenes="*res://scripts/autoload/CoopScenes.gd"
 
 [display]
 

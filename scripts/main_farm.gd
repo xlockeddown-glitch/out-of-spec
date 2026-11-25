@@ -90,6 +90,7 @@ func _ready() -> void:
 	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text())
 	_refresh_jobs_hud()
 	_hud.get_parent().add_child(SkillsUI.new())
+	_hud.get_parent().add_child(CoopUI.new())
 	_robots_ui = RobotsUI.new()
 	_hud.get_parent().add_child(_robots_ui)
 
