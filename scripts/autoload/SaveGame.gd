@@ -45,7 +45,7 @@ func _on_day_started() -> void:
 
 func _autosave() -> void:
 	_autosave_queued = false
-	if not farm_open:
+	if not farm_open or FarmCommands.guest:
 		return
 	var problem: String = write()
 	if problem != "":
@@ -164,6 +164,8 @@ func data_problem(data: Dictionary) -> String:
 ## Saves the farm. The save before it is kept beside it as ".bak". Returns ""
 ## or why it failed.
 func write(path: String = DEFAULT_PATH) -> String:
+	if FarmCommands.guest:
+		return "Only the host saves the farm."
 	var data: Dictionary = snapshot()
 	# A farm that could not load again must not replace one that can.
 	var problem: String = data_problem(data)
@@ -173,16 +175,12 @@ func write(path: String = DEFAULT_PATH) -> String:
 
 
 func _write_data(data: Dictionary, path: String) -> String:
-	var payload: PackedByteArray = var_to_bytes(data)
 	# The new file is complete before it replaces the old one.
 	var temp: String = path + ".tmp"
 	var file: FileAccess = FileAccess.open(temp, FileAccess.WRITE)
 	if file == null:
 		return "Could not write %s (error %d)." % [temp, FileAccess.get_open_error()]
-	file.store_buffer(MAGIC.to_ascii_buffer())
-	file.store_32(VERSION)
-	file.store_buffer(_hash(payload))
-	file.store_buffer(payload)
+	file.store_buffer(to_bytes(data))
 	var write_error: Error = file.get_error()
 	file.close()
 	if write_error != OK:
@@ -254,7 +252,22 @@ func read(path: String = DEFAULT_PATH) -> String:
 func read_file(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return { "problem": "%s does not exist." % path }
-	var bytes: PackedByteArray = FileAccess.get_file_as_bytes(path)
+	return from_bytes(FileAccess.get_file_as_bytes(path), path)
+
+
+## `data` as a save file holds it.
+func to_bytes(data: Dictionary) -> PackedByteArray:
+	var payload: PackedByteArray = var_to_bytes(data)
+	var bytes: PackedByteArray = MAGIC.to_ascii_buffer()
+	bytes.resize(MAGIC.length() + 4)
+	bytes.encode_u32(MAGIC.length(), VERSION)
+	bytes.append_array(_hash(payload))
+	bytes.append_array(payload)
+	return bytes
+
+
+## { data } that can load from to_bytes(), or { problem } about `path`.
+func from_bytes(bytes: PackedByteArray, path: String) -> Dictionary:
 	var header: int = MAGIC.length() + 4 + HASH_BYTES
 	if bytes.size() <= header or bytes.slice(0, MAGIC.length()) != MAGIC.to_ascii_buffer():
 		return { "problem": "%s is not a save file." % path }

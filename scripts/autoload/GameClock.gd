@@ -12,6 +12,9 @@ signal day_started(day_index: int)
 ## Emitted after time_advanced when the clock ran on its own for a frame, and
 ## not for time jumps (a bench job, the F9 skip). The molt follows this.
 signal clock_ran(delta_days: float)
+## On a guest, each frame, for screens that show what the time allows. Nothing
+## may change the farm on it.
+signal guest_time_shown
 
 const DAY_START_HOUR: float = 6.0
 const HOURS_PER_DAY: float = 24.0
@@ -24,8 +27,20 @@ var paused: bool = false
 ## Days since the save started. 0.0 = day 1, 06:00.
 var elapsed_days: float = 0.0
 
+## A guest's clock may run this far past the host's last word (10 game minutes).
+const MAX_AHEAD_DAYS: float = 10.0 / 1440.0
+## It stops this short of 06:00 (one game second) until the host says it is
+## morning.
+const BEFORE_MORNING_DAYS: float = 1.0 / 86400.0
+## A guest's guess at the host's clock, and how far the guess may go.
+var _host_days: float = 0.0
+var _host_limit: float = 0.0
+
 
 func _process(delta: float) -> void:
+	if FarmCommands.guest:
+		_run_as_guest(delta)
+		return
 	if paused or seconds_per_day <= 0.0:
 		return
 	var delta_days: float = delta / seconds_per_day
@@ -38,7 +53,7 @@ func _process(delta: float) -> void:
 ## 06:00 is split at each morning, so day_started sees the clock and the drift
 ## exactly as they were at 06:00.
 func advance(delta_days: float) -> void:
-	if delta_days <= 0.0:
+	if FarmCommands.guest or delta_days <= 0.0:
 		return
 	var end: float = elapsed_days + delta_days
 	while floorf(end) > floorf(elapsed_days):
@@ -51,6 +66,28 @@ func advance(delta_days: float) -> void:
 		var rest: float = end - elapsed_days
 		elapsed_days = end
 		time_advanced.emit(rest)
+
+
+## On a guest: the host's clock, as it last said. A guest a little ahead waits
+## for the host; only a host that is paused or far behind moves it back.
+func follow(host_days: float, host_seconds_per_day: float, host_paused: bool) -> void:
+	seconds_per_day = host_seconds_per_day
+	_host_days = host_days
+	_host_limit = host_days if host_paused else maxf(host_days,
+		minf(host_days + MAX_AHEAD_DAYS, floorf(host_days) + 1.0 - BEFORE_MORNING_DAYS))
+	if host_paused or elapsed_days > host_days + MAX_AHEAD_DAYS or floorf(elapsed_days) > floorf(host_days):
+		elapsed_days = host_days
+	elapsed_days = maxf(elapsed_days, host_days)
+
+
+## Only shows the time, so no drift, no molt and no morning here:
+## those come from the host (FarmSync).
+func _run_as_guest(delta: float) -> void:
+	if seconds_per_day <= 0.0:
+		return
+	_host_days = minf(_host_days + delta / seconds_per_day, _host_limit)
+	elapsed_days = maxf(elapsed_days, _host_days)
+	guest_time_shown.emit()
 
 
 ## Debug helper: jump to the next 06:00. Sensors drift for the skipped time.

@@ -65,7 +65,9 @@ func _ready() -> void:
 	GameState.drop_pod_changed.connect(_on_pod_or_oirm_changed.unbind(1))
 	GameState.oirm_changed.connect(_on_pod_or_oirm_changed)
 	GameState.jobs_changed.connect(_on_jobs_changed)
+	GameState.upgrades_changed.connect(_on_upgrades_changed)
 	GameClock.time_advanced.connect(_on_time_advanced.unbind(1))
+	GameClock.guest_time_shown.connect(_on_time_advanced)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -113,6 +115,10 @@ func _on_pod_or_oirm_changed() -> void:
 	var index: int = _ids.find(_current_id)
 	if not visible or index < 0:
 		return
+	if _current_id.begins_with(JOB_PREFIX):
+		# The standard it would use may have changed.
+		_show_job(GameState.active_job(_current_id.trim_prefix(JOB_PREFIX)))
+		return
 	var standard: bool = _is_standard(_current_id)
 	# With no reference there is no reading to keep.
 	if not _calibrated and (_away_text() != _away or (standard and (not _has_reference or not GameState.has_bench_reference(_current_id)))):
@@ -144,6 +150,21 @@ func _on_jobs_changed() -> void:
 			_on_instrument_selected(index)
 		else:
 			_show_job({})
+
+
+## A bought standard, and the units it puts in service, join the list. The
+## selection stays. It is drawn again if its reference or job changes; a
+## finished result stays as it was.
+func _on_upgrades_changed() -> void:
+	if not visible:
+		return
+	_rebuild_list()
+	var index: int = _ids.find(_current_id)
+	_instrument_option.select(index)
+	if index >= 0 and not _calibrated and (_current_id.begins_with(JOB_PREFIX)
+			or _has_reference != GameState.has_bench_reference(_current_id)
+			or _budget.get("standard_id", "") != GameState.calibration_budget(_current_id).get("standard_id", "")):
+		_on_instrument_selected(index)
 
 
 ## A shown job can become impossible as the clock runs (the cancel cutoff

@@ -149,6 +149,8 @@ var owned_standards: Dictionary = {}
 var credits: int = 0
 ## Phone messages that should survive scene swaps (dispatches, audits).
 var phone_log: Array[String] = []
+## Lines ever posted, so a guest knows which of the kept ones are new.
+var phone_count: int = 0
 ## One report per audit (see AuditEngine.evaluate).
 var audit_log: Array[Dictionary] = []
 ## instrument_id -> number of audits that fined it (repeat surcharge).
@@ -396,7 +398,7 @@ const SAVED_FIELDS: Array[String] = [
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
-	"_spool_damaged", "slotted_spool_damaged", "next_player_number"]
+	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -445,12 +447,55 @@ func farm_dict_problem(data: Dictionary) -> String:
 					return "'%s' has an entry of the wrong type." % field
 	if data.has("_spool_damaged") and data["_spool_damaged"].size() > data["_spool_species"].size():
 		return "'_spool_damaged' has more entries than there are spools."
-	for pair: Array in [["cal_log", "instrument_id"], ["certificate_log", "standard_id"]]:
-		for entry: Dictionary in data[pair[0]]:
-			if typeof(entry.get(pair[1])) != TYPE_STRING:
-				return "'%s' has an entry with no %s." % pair
-	for own: Variant in data.get("player_skill_xp", {}).values():
-		if typeof(own) != TYPE_DICTIONARY or not _holds_only_ints(own):
+	for needs: Array in [["at_oirm", TYPE_INT], ["suspect_units", TYPE_INT], ["mined_fissures", TYPE_INT], ["lab_areas", TYPE_INT],
+			["offence_counts", TYPE_INT], ["rover_uplinks", TYPE_BOOL], ["rover_transforms", TYPE_TRANSFORM3D]]:
+		var values: Dictionary = data.get(needs[0], {})
+		for key: Variant in values:
+			if not (key is String or key is StringName) or not _fits(values[key], needs[1]):
+				return "'%s' has an entry of the wrong type." % needs[0]
+	for field: String in ["owned_standards", "_untraceable_since_cal"]:
+		for key: Variant in data[field]:
+			if not (key is String or key is StringName):
+				return "'%s' has a key that is not text." % field
+	for cell: Variant in data["tilled_cells"]:
+		if not cell is Vector3i:
+			return "'tilled_cells' has an entry that is not a cell."
+	if not _optional_fields(data["lab_build"], ["kind", "discipline"], ["size", "done_day"]):
+		return "'lab_build' has a field of the wrong type."
+	for list: String in ["job_board", "active_jobs"]:
+		for job: Dictionary in data[list]:
+			if not _optional_fields(job, ["id", "customer", "item", "discipline", "area", "min_band"],
+					["pay", "min_tier", "bench_minutes", "due_in_days", "accepted_day"]):
+				return "'%s' has a field of the wrong type." % list
+	for entry: Dictionary in data["harvest_bin"]:
+		if not _optional_fields(entry, [], ["advance"]):
+			return "'harvest_bin' has a field of the wrong type."
+	for cell: Variant in data["plantings"]:
+		if not cell is Vector3i or not _has_fields(data["plantings"][cell], ["crop_id"], ["days_grown", "out_of_band_days", "setpoint"]) or not _optional_fields(data["plantings"][cell], [], ["advance", "planted_day", "planted_at"]):
+			return "'plantings' has an entry that is not a planted cell."
+	for needs: Array in [["active_jobs", ["job_id"], ["due_day"]], ["oirm_trips", ["standard_id"], ["sent_day", "return_day"]],
+			["harvest_bin", ["crop_id"], []],
+			["cal_log", ["instrument_id", "standard_id", "result"], ["day", "as_found", "as_left", "mpe", "acceptance_limit", "due_day"]],
+			["certificate_log", ["id", "standard_id"], ["day", "due_day", "expanded_uncertainty", "k"]]]:
+		for entry: Dictionary in data[needs[0]]:
+			if not _has_fields(entry, needs[1], needs[2]):
+				return "'%s' has an entry with a field missing." % needs[0]
+	for record: Dictionary in data["cal_log"]:
+		if not record.get("as_found_in_tolerance") is bool or not record.get("traceable", true) is bool or not record.get("performed_by", "") is String or not record.get("standard_problem", "") is String:
+			return "'cal_log' has an entry with a field missing."
+	for cert: Dictionary in data["certificate_log"]:
+		if not _optional_fields(cert, ["issuer"], []):
+			return "'certificate_log' has a field of the wrong type."
+		# A maker's certificate has no as-found; an in-house one names its reference.
+		if not cert.has("as_found") or not (cert["as_found"] == null or cert["as_found"] is float or cert["as_found"] is int) or not cert.get("as_found_in_tolerance") is bool or (cert.has("reference_id") and not _has_fields(cert, ["reference_id", "reference_certificate"], [])):
+			return "'certificate_log' has an entry with a field missing."
+	for report: Dictionary in data["audit_log"]:
+		var report_problem: String = _audit_problem(report)
+		if report_problem != "":
+			return "'audit_log' has an entry with a bad %s." % report_problem
+	for player: Variant in data.get("player_skill_xp", {}):
+		var own: Variant = data["player_skill_xp"][player]
+		if not player is String or typeof(own) != TYPE_DICTIONARY or not _holds_only_ints(own):
 			return "'player_skill_xp' has a player whose XP is not whole numbers."
 	if data.get("next_player_number", 2) < 2:
 		return "'next_player_number' is below 2."
@@ -461,6 +506,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return robot_problem
 	var robot_sensors: Array[String] = _robot_sensor_ids(data.get("robots", {}))
 	for id: Variant in data["sensors"]:
+		if not (id is String or id is StringName):
+			return "'sensors' has a key that is not text."
 		var state: Variant = data["sensors"][id]
 		if typeof(state) != TYPE_DICTIONARY:
 			return "Sensor '%s' is not a dictionary." % id
@@ -473,8 +520,41 @@ func farm_dict_problem(data: Dictionary) -> String:
 	return ""
 
 
+## Whether a saved record has these texts and numbers.
+static func _has_fields(record: Variant, texts: Array, numbers: Array) -> bool:
+	return record is Dictionary and texts.all(func(key: String) -> bool: return record.get(key) is String) and numbers.all(
+		func(key: String) -> bool: return record.get(key) is int or record.get(key) is float)
+
+
+## What a screen would read from this audit and couldn't, or "".
+static func _audit_problem(report: Dictionary) -> String:
+	for key: String in ["day", "total_fine", "phone_count"]:
+		if not (report.get(key, 0) is int or report.get(key, 0) is float):
+			return key
+	for pair: Array in [["lines", "instrument_id"], ["interlocks", "robot_id"]]:
+		var entries: Variant = report.get(pair[0], [])
+		if not entries is Array:
+			return pair[0]
+		for entry: Variant in entries:
+			if not entry is Dictionary or typeof(entry.get(pair[1])) != TYPE_STRING:
+				return pair[0]
+	return "" if report.get("tire_check", {}) is Dictionary else "tire_check"
+
+
 static func _holds_only_ints(values: Dictionary) -> bool:
-	return values.values().all(func(value: Variant) -> bool: return value is int)
+	return values.keys().all(func(key: Variant) -> bool: return key is String or key is StringName) and values.values().all(
+		func(value: Variant) -> bool: return value is int)
+
+
+## Whether a value has this type. A number may be whole or not.
+static func _fits(value: Variant, type: int) -> bool:
+	return typeof(value) == type or (type == TYPE_INT and value is float)
+
+
+## Whether those of these texts and numbers a record has are such. Missing ones are read as their defaults.
+static func _optional_fields(record: Dictionary, texts: Array, numbers: Array) -> bool:
+	return texts.all(func(key: String) -> bool: return _fits(record.get(key, ""), TYPE_STRING)) and numbers.all(
+		func(key: String) -> bool: return _fits(record.get(key, 0), TYPE_INT))
 
 
 static func _has_nan(value: Variant) -> bool:
@@ -495,6 +575,28 @@ func farm_from_dict(data: Dictionary) -> String:
 	var problem: String = farm_dict_problem(data)
 	if problem != "":
 		return problem
+	put_farm(data)
+	farm_loaded.emit()
+	molt_changed.emit(molt_progress, molt_stage)
+	silk_changed.emit(optical_silk_spools)
+	relay_changed.emit(relay_slotted)
+	credits_changed.emit(credits)
+	drop_pod_changed.emit(drop_pod_present)
+	ore_changed.emit(crystal_ore)
+	fissures_changed.emit()
+	upgrades_changed.emit()
+	oirm_changed.emit()
+	credibility_changed.emit(credibility)
+	crops_changed.emit()
+	jobs_changed.emit()
+	lab_changed.emit()
+	robots_changed.emit()
+	return ""
+
+
+## farm_from_dict() without its check, and with no signal but the sensors' own:
+## `data` must have passed farm_dict_problem(). FarmSync says what changed.
+func put_farm(data: Dictionary) -> void:
 	var fresh: Node = (get_script() as GDScript).new()
 	fresh.build_registry()
 	fresh._sync_robot_sensors(data.get("robots", {}))
@@ -532,22 +634,6 @@ func farm_from_dict(data: Dictionary) -> String:
 	certificates.clear()
 	for cert: Dictionary in certificate_log:
 		certificates[cert["standard_id"]] = cert
-	farm_loaded.emit()
-	molt_changed.emit(molt_progress, molt_stage)
-	silk_changed.emit(optical_silk_spools)
-	relay_changed.emit(relay_slotted)
-	credits_changed.emit(credits)
-	drop_pod_changed.emit(drop_pod_present)
-	ore_changed.emit(crystal_ore)
-	fissures_changed.emit()
-	upgrades_changed.emit()
-	oirm_changed.emit()
-	credibility_changed.emit(credibility)
-	crops_changed.emit()
-	jobs_changed.emit()
-	lab_changed.emit()
-	robots_changed.emit()
-	return ""
 
 
 func get_sensor(instrument_id: String) -> DriftingSensor:
@@ -1547,7 +1633,7 @@ static func _is_card(card: Variant) -> bool:
 	for key: String in ["trigger", "job", "added_by"]:
 		if typeof(card.get(key)) != TYPE_STRING:
 			return false
-	if card["job"] == JOB_CALIBRATE and typeof(card.get("target")) != TYPE_STRING:
+	if typeof(card.get("target", "")) != TYPE_STRING or (card["job"] == JOB_CALIBRATE and not card.has("target")):
 		return false
 	return card["trigger"] in CARD_TRIGGERS.get(card["job"], []) \
 			and card["hour"] >= 0 and card["hour"] < 24 and card["every_days"] >= 1
@@ -1811,6 +1897,8 @@ func _interlock_findings() -> Array[Dictionary]:
 
 ## A rover reports its line of sight to the relay here.
 func set_rover_uplink(rover_id: String, has_los: bool) -> void:
+	if FarmCommands.guest:
+		return  # the host's rover says
 	if rover_uplinks.has(rover_id) and (rover_uplinks[rover_id] == true) == has_los:
 		return
 	rover_uplinks[rover_id] = has_los
@@ -1868,6 +1956,7 @@ func _note_holdover_lapses(day: int) -> void:
 
 func post_phone(text: String) -> void:
 	phone_log.append(text)
+	phone_count += 1
 	while phone_log.size() > PHONE_LOG_MAX:
 		phone_log.remove_at(0)
 	phone_message.emit(text)
@@ -2015,6 +2104,8 @@ func _run_audit(day: int) -> void:
 		post_phone("TOTAL FINE %s CR. Balance %s CR. %s" % [SP811.integer(report["total_fine"]), SP811.integer(credits), footer])
 	_update_clean_audit_gate(report)
 	_credibility_after_audit(report)
+	# Where it came among the phone's lines, so a guest sees the same order.
+	report["phone_count"] = phone_count
 	audit_log.append(report)
 	audit_completed.emit(report)
 
@@ -2471,6 +2562,8 @@ func add_tire_usage(meters: float) -> void:
 ## gauge. There is one of each, whichever rover drove. The driver's Field Ops
 ## skill spares the encoder.
 func add_rover_usage(meters: float, player_id: String = "") -> void:
+	if FarmCommands.guest:
+		return  # the host's rover wears the sensors
 	if not is_finite(meters) or meters < 0.0:
 		return
 	steering.add_usage(meters * skill_factor("steering_usage", player_id))
@@ -2480,6 +2573,8 @@ func add_rover_usage(meters: float, player_id: String = "") -> void:
 ## Remembers where a rover is parked, so it is still there when the farm scene
 ## loads again.
 func park_rover(rover_id: String, at: Transform3D) -> void:
+	if FarmCommands.guest:
+		return  # it is where the host parked it
 	if at.is_finite():
 		rover_transforms[rover_id] = at
 
