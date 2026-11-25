@@ -149,12 +149,18 @@ func _on_jobs_changed() -> void:
 
 
 ## A bought standard, and the units it puts in service, join the list. The
-## selection and what it shows stay as they were.
+## selection stays. It is drawn again if its reference or job changes; a
+## finished result stays as it was.
 func _on_upgrades_changed() -> void:
 	if not visible:
 		return
 	_rebuild_list()
-	_instrument_option.select(_ids.find(_current_id))
+	var index: int = _ids.find(_current_id)
+	_instrument_option.select(index)
+	if index >= 0 and not _calibrated and (_current_id.begins_with(JOB_PREFIX)
+			or _has_reference != GameState.has_bench_reference(_current_id)
+			or _budget.get("standard_id", "") != GameState.calibration_budget(_current_id).get("standard_id", "")):
+		_on_instrument_selected(index)
 
 
 ## A shown job can become impossible as the clock runs (the cancel cutoff

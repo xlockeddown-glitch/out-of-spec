@@ -134,9 +134,11 @@ func test_relay_renewed_certificate_matches_the_hosts() -> String:
 			if not host.sensors[id].relay_disciplined:
 				continue
 			host.owned_standards[id] = 1
-			host.certificate_log.append({ "standard_id": id, "due_day": 1 })
+			host.certificate_log.append({ "id": "OIRM-0099", "standard_id": id, "day": 0, "due_day": 1, "as_found": null,
+				"as_found_in_tolerance": true, "expanded_uncertainty": 0.1, "k": 2.0 })
 			host.sensors[id].cal_due_day = 9
-			host.certificates[id] = { "standard_id": id, "due_day": 9 }
+			host.certificates[id] = host.certificate_log[-1].duplicate()
+			host.certificates[id]["due_day"] = 9
 			var renewed: PackedByteArray = FarmSync.capture(host)
 			var problem: String = FarmSync.join(renewed, guest)
 			if problem == "" and guest.certificates != host.certificates:
@@ -229,9 +231,9 @@ func test_bad_bytes_change_nothing() -> String:
 			var data: Dictionary = whole.duplicate(true)
 			data["farm"]["plantings"] = plants
 			bad[str(plants)] = SaveGame.to_bytes(data)
-		for list: String in ["active_jobs", "oirm_trips", "harvest_bin"]:
+		for list: String in ["active_jobs", "oirm_trips", "harvest_bin", "cal_log", "certificate_log"]:
 			var data: Dictionary = whole.duplicate(true)
-			data["farm"][list].append({})
+			data["farm"][list].append({ "instrument_id": "x", "standard_id": "x" })
 			bad[list] = SaveGame.to_bytes(data)
 		for clock: Array in [["elapsed_days", NAN], ["elapsed_days", -1.0], ["seconds_per_day", INF], ["paused", 1]]:
 			var data: Dictionary = whole.duplicate(true)

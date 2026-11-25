@@ -444,18 +444,20 @@ func farm_dict_problem(data: Dictionary) -> String:
 					return "'%s' has an entry of the wrong type." % field
 	if data.has("_spool_damaged") and data["_spool_damaged"].size() > data["_spool_species"].size():
 		return "'_spool_damaged' has more entries than there are spools."
-	for pair: Array in [["cal_log", "instrument_id"], ["certificate_log", "standard_id"]]:
-		for entry: Dictionary in data[pair[0]]:
-			if typeof(entry.get(pair[1])) != TYPE_STRING:
-				return "'%s' has an entry with no %s." % pair
 	for cell: Variant in data["plantings"]:
-		if not cell is Vector3i or not _has_fields(data["plantings"][cell], "crop_id", ["days_grown", "out_of_band_days", "setpoint"]):
+		if not cell is Vector3i or not _has_fields(data["plantings"][cell], ["crop_id"], ["days_grown", "out_of_band_days", "setpoint"]):
 			return "'plantings' has an entry that is not a planted cell."
-	for needs: Array in [["active_jobs", "job_id", ["due_day"]], ["oirm_trips", "standard_id", ["sent_day", "return_day"]],
-			["harvest_bin", "crop_id", []]]:
+	for needs: Array in [["active_jobs", ["job_id"], ["due_day"]], ["oirm_trips", ["standard_id"], ["sent_day", "return_day"]],
+			["harvest_bin", ["crop_id"], []],
+			["cal_log", ["instrument_id", "standard_id", "result"], ["day", "as_found", "as_left", "mpe", "acceptance_limit", "due_day"]],
+			["certificate_log", ["id", "standard_id"], ["day", "due_day", "expanded_uncertainty", "k"]]]:
 		for entry: Dictionary in data[needs[0]]:
 			if not _has_fields(entry, needs[1], needs[2]):
 				return "'%s' has an entry with a field missing." % needs[0]
+	for cert: Dictionary in data["certificate_log"]:
+		# A maker's certificate has no as-found; an in-house one names its reference.
+		if not cert.has("as_found") or not (cert["as_found"] == null or cert["as_found"] is float or cert["as_found"] is int) 				or not cert.get("as_found_in_tolerance") is bool 				or (cert.has("reference_id") and not _has_fields(cert, ["reference_id", "reference_certificate"], [])):
+			return "'certificate_log' has an entry with a field missing."
 	for report: Dictionary in data["audit_log"]:
 		var report_problem: String = _audit_problem(report)
 		if report_problem != "":
@@ -482,9 +484,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 	return ""
 
 
-## Whether a saved record names its `text` and has these numbers.
-static func _has_fields(record: Variant, text: String, numbers: Array) -> bool:
-	return record is Dictionary and record.get(text) is String and numbers.all(
+## Whether a saved record has these texts and numbers.
+static func _has_fields(record: Variant, texts: Array, numbers: Array) -> bool:
+	return record is Dictionary and texts.all(func(key: String) -> bool: return record.get(key) is String) and numbers.all(
 		func(key: String) -> bool: return record.get(key) is int or record.get(key) is float)
 
 
