@@ -53,6 +53,8 @@ func test_the_sentinel_rules_are_told_once_per_sighting() -> String:
 			return "A new sighting gets the line again: %s" % [farm.phone_log]
 		if farm.farm_to_dict().has("sentinel_sighted"):
 			return "The told flag is not part of the save."
+		if farm.farm_from_dict(farm.farm_to_dict()) != "" or farm.sentinel_sighted:
+			return "A loaded farm has told nothing yet."
 		return "")
 
 
@@ -129,7 +131,11 @@ func test_overdue_has_one_wording_and_never_day_0() -> String:
 func test_no_script_says_day_0_or_lapsed() -> String:
 	var found: PackedStringArray = []
 	var pattern := RegEx.create_from_string("OVERDUE \\(due|lapsed \\(due|calibration lapsed|CAL OVERDUE \\(")
-	for dir: String in ["res://scripts", "res://scripts/ui", "res://scripts/dome", "res://scripts/autoload", "res://scripts/metrology"]:
+	var dirs: Array[String] = ["res://scripts"]
+	while not dirs.is_empty():
+		var dir: String = dirs.pop_back()
+		for sub: String in DirAccess.get_directories_at(dir):
+			dirs.append(dir + "/" + sub)
 		for file: String in DirAccess.get_files_at(dir):
 			if file.ends_with(".gd") and pattern.search(FileAccess.get_file_as_string(dir + "/" + file)) != null:
 				found.append(file)

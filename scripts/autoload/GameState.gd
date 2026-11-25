@@ -700,6 +700,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	if problem != "":
 		return problem
 	put_farm(data)
+	sentinel_sighted = false
 	farm_loaded.emit()
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
