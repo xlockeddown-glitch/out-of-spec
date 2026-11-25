@@ -4244,12 +4244,10 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 	return problem
 
 
-## The block a check uses: the first found, by cell. Not a choice, as all are the
-## same kind and uncertainty. {} with none.
+## The block a check uses: the last one found. {} with none.
 func block_in_hand() -> Dictionary:
 	var cells: Array[Vector2i] = found_blocks.keys()
-	cells.sort_custom(func(a: Vector2i, b: Vector2i) -> bool: return a.x < b.x or (a.x == b.x and a.y < b.y))
-	return ReferenceBlock.at(world_seed, cells[0]) if not cells.is_empty() else {}
+	return ReferenceBlock.at(world_seed, cells.back()) if not cells.is_empty() else {}
 
 
 ## Puts an instrument against a block the farm has dug up, as ReferenceBlock.check()

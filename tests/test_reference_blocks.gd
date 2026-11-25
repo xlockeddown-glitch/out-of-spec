@@ -33,7 +33,7 @@ func test_blocks_are_rare_and_the_same_for_a_seed() -> String:
 	var cells: Dictionary = _cells(SEED)
 	var blocks: int = cells["block"].size()
 	var total: int = blocks + cells["plain"].size()
-	if total < 300 or blocks < 1 or blocks > total / 10:
+	if total < 300 or blocks < 1 or blocks * 10 > total:
 		return "%d of %d diggable cells hold a block; it must be rare, and not none." % [blocks, total]
 	if _cells(SEED)["block"] != cells["block"]:
 		return "The same seed must hold the same blocks."
@@ -97,6 +97,24 @@ func test_a_reload_does_not_roll_again() -> String:
 	return "\n".join(problems)
 
 
+func test_a_check_uses_the_last_block_found() -> String:
+	var gs: Node = _make()
+	var cells: Array = _cells(SEED)["block"]
+	var problems: PackedStringArray = []
+	# The later cell first, so the order is the finding and not the cells'.
+	for cell: Vector2i in [cells[1], cells[0], cells[2]]:
+		gs.dig(Vector3i(cell.x, 0, cell.y))
+		if gs.block_in_hand() != ReferenceBlock.at(SEED, cell):
+			problems.append("Digging up %s must put its block in hand." % cell)
+	var back: Node = _make()
+	if back.farm_from_dict(str_to_var(var_to_str(gs.farm_to_dict()))) != "" or back.block_in_hand() != gs.block_in_hand():
+		problems.append("The same block must be in hand after a load.")
+	gs.free()
+	back.free()
+	return "
+".join(problems)
+
+
 func test_a_save_is_refused_if_its_blocks_cant_be_there() -> String:
 	var gs: Node = _make()
 	var cell: Vector2i = _block_cell(gs)
@@ -120,7 +138,7 @@ func test_a_save_is_refused_if_its_blocks_cant_be_there() -> String:
 	return "\n".join(problems)
 
 
-func test_a_guest_checks_through_the_host() -> String:
+func test_the_host_does_a_guests_check() -> String:
 	var commands: Node = CommandsScript.new()
 	commands.state = _make()
 	var gs: Node = commands.state

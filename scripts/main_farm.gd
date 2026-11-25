@@ -306,9 +306,9 @@ func _check_with_block() -> void:
 		ReferenceBlock.VERDICT_WITHIN: "WITHIN MPE",
 		ReferenceBlock.VERDICT_OUTSIDE: "OUTSIDE MPE",
 	}.get(record["verdict"], "CAN'T TELL IF WITHIN MPE")
-	_hud.push_log("BLOCK CHECK %s  Block %s°  Reads %s°  Error %s ±%s°  %s (MPE ±%s°)" % [
+	_hud.push_log("BLOCK CHECK %s  Block %s°  Reads %s°  Error (%s ± %s)°  %s (MPE ±%s°)" % [
 		GameState.instrument_name(id).to_upper(), SP811.number(record["certified"], 0),
-		SP811.number(record["reading"], places), sensor.format_value(record["error"], places),
+		SP811.number(record["reading"], places), SP811.signed(record["error"], 2),
 		SP811.number(record["error_u"], 2), verdict, SP811.number(record["mpe"], 2)])
 
 
