@@ -154,6 +154,21 @@ func _exit_tree() -> void:
 
 func _unpark() -> void:
 	global_transform = CoopRovers.place(rover_id) if CoopRovers.together() and CoopRovers.has_place(rover_id) else GameState.parked_rover_transform(rover_id, _start_transform)
+	_put_back_on_land()
+
+
+## A farm saved before the hills may have it parked inside one, or off the land.
+func _put_back_on_land() -> void:
+	if ground == null:
+		return
+	var edge_m: float = Terrain.HALF_M - wheelbase_m
+	global_position.x = clampf(global_position.x, -edge_m, edge_m)
+	global_position.z = clampf(global_position.z, -edge_m, edge_m)
+	var ground_m: float = ground.height_at(global_position)
+	# Resting on level ground it may be a hair under.
+	if global_position.y < ground_m - 0.1:
+		# Above its uphill corners; it drops the rest of the way.
+		global_position.y = ground_m + ground_snap_m
 
 
 func _park() -> void:
@@ -313,6 +328,8 @@ func _set_following(following: bool) -> void:
 	# The host goes on from the very place, a guest from where it shows it.
 	if not following and not FarmCommands.guest:
 		global_transform = CoopRovers.place(rover_id)
+	if not following:
+		_put_back_on_land()
 
 
 func _follow(delta: float) -> void:

@@ -38,9 +38,10 @@ func test_cells_are_two_meters_from_the_middle() -> String:
 
 func test_between_points_the_ground_slopes_evenly() -> String:
 	var dug: Dictionary[Vector2i, int] = { Vector2i(0, 0): 1, Vector2i(39, 39): 1 }
+	var none: Dictionary[Vector2i, int] = {}
 	if not is_equal_approx(Terrain.height(Vector2(0.5, 1.0), dug), -Terrain.DIG_STEP_M * 0.5):
 		return "Halfway down a side must be half a step down."
-	if not is_equal_approx(Terrain.height(Vector2(79.5, 79.0), dug) - Terrain.natural(Vector2i(80, 79)), -Terrain.DIG_STEP_M * 0.5):
+	if not is_equal_approx(Terrain.height(Vector2(79.5, 79.0), dug) - Terrain.height(Vector2(79.5, 79.0), none), -Terrain.DIG_STEP_M * 0.5):
 		return "The last cell must slope to the land's edge."
 	if not is_equal_approx(Terrain.height(Vector2(200.0, 200.0), dug), Terrain.natural(Vector2i(80, 80))):
 		return "Past the edge must be the ground at the edge."
