@@ -39,6 +39,9 @@ const MAX_HOST_BYTES: int = 4 * 1024 * 1024
 const MAX_ARGUMENTS: int = 8
 const MAX_TEXT: int = 64
 const MAX_DEPTH: int = 32
+## What a list may say it holds. TYPE_NIL is a list that doesn't say.
+const LIST_TYPES: Array[int] = [TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR3I,
+	TYPE_DICTIONARY, TYPE_ARRAY, TYPE_PACKED_BYTE_ARRAY]
 ## A guest's messages: this many at once, then this many each second.
 const BURST: int = 20
 const RATE: float = 10.0
@@ -92,6 +95,11 @@ func host(listen_port: int = DEFAULT_PORT, bind_ip: String = "*") -> String:
 	var problem: String = _start_problem()
 	if problem != "":
 		return problem
+	# Godot would report a bad address, then listen on all of them.
+	if bind_ip != "*" and not bind_ip.is_valid_ip_address():
+		return "'%s' is not an address." % bind_ip
+	if listen_port < 0 or listen_port > 65535:
+		return "%d is not a port." % listen_port
 	var peer := ENetMultiplayerPeer.new()
 	peer.set_bind_ip(bind_ip)
 	if peer.create_server(listen_port, MAX_PLAYERS - 1 + SPARE_CONNECTIONS) != OK:
@@ -164,16 +172,19 @@ func send_state(data: Dictionary, player_id: String = "") -> bool:
 ## Only these kinds of data: nothing that is, holds or calls an object.
 static func is_plain(value: Variant, depth: int = 0) -> bool:
 	match typeof(value):
-		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR3I, TYPE_PACKED_BYTE_ARRAY:
+		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_VECTOR3I, TYPE_PACKED_BYTE_ARRAY:
 			return true
+		TYPE_STRING, TYPE_STRING_NAME:
+			# Godot drops a byte order mark when it reads text.
+			return not str(value).begins_with("﻿")
 		TYPE_ARRAY:
-			if depth >= MAX_DEPTH or value.get_typed_builtin() == TYPE_OBJECT:
+			if depth >= MAX_DEPTH or not value.get_typed_builtin() in LIST_TYPES:
 				return false
 			for item: Variant in value:
 				if not is_plain(item, depth + 1):
 					return false
 		TYPE_DICTIONARY:
-			if depth >= MAX_DEPTH or value.get_typed_key_builtin() == TYPE_OBJECT or value.get_typed_value_builtin() == TYPE_OBJECT:
+			if depth >= MAX_DEPTH or not value.get_typed_key_builtin() in LIST_TYPES or not value.get_typed_value_builtin() in LIST_TYPES:
 				return false
 			for key: Variant in value:
 				if not is_plain(key, depth + 1) or not is_plain(value[key], depth + 1):
@@ -483,8 +494,7 @@ static func _end_of_list(bytes: PackedByteArray, at: int, type: int, flags: int,
 			return -1
 		types.append(bytes.decode_u32(at) if kind == 1 else TYPE_NIL)
 		at += 4 * kind
-		if kind == 1 and not types[-1] in [TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR3I,
-				TYPE_DICTIONARY, TYPE_ARRAY, TYPE_PACKED_BYTE_ARRAY]:
+		if kind == 1 and (types[-1] == TYPE_NIL or not types[-1] in LIST_TYPES):
 			return -1
 	if at + 4 > bytes.size() or bytes.decode_u32(at) > bytes.size():
 		return -1
@@ -500,8 +510,10 @@ static func _end_of_list(bytes: PackedByteArray, at: int, type: int, flags: int,
 	return at
 
 
-## UTF-8, with no NUL.
+## UTF-8, with no NUL and no byte order mark.
 static func _is_text(bytes: PackedByteArray, at: int, end: int) -> bool:
+	if end - at >= 3 and bytes[at] == 0xef and bytes[at + 1] == 0xbb and bytes[at + 2] == 0xbf:
+		return false
 	while at < end:
 		var lead: int = bytes[at]
 		var more: int = 0 if lead < 0x80 else 1 if lead >= 0xc2 and lead < 0xe0 else 2 if lead >= 0xe0 and lead < 0xf0 else 3 if lead >= 0xf0 and lead < 0xf5 else -1

@@ -101,6 +101,15 @@ func test_nothing_opens_unless_asked() -> String:
 	return ""
 
 
+func test_a_bad_address_opens_nothing() -> String:
+	var session: Node = _host()
+	session.leave()
+	for bad: Array in [["nowhere", 0], ["", 0], ["127.0.0.1", -1], ["127.0.0.1", 65536]]:
+		if session.host(bad[1], bad[0]) == "" or session._peer != null:
+			return _finish("%s must not open" % [bad])
+	return _finish("")
+
+
 func test_joining_and_leaving() -> String:
 	var host: Node = _host()
 	var first: Node = _guest(host)
@@ -339,6 +348,13 @@ func test_a_late_answer_is_dropped() -> String:
 	var guest: Node = _guest(host)
 	guest.answer_timeout_ms = -1
 	var late: Array = _request(guest, &"start_lab_grow")
+	# The answer is already here when the guest next looks.
+	for i: int in 20:
+		guest._peer.poll()
+		host.poll()
+		OS.delay_msec(2)
+	if not late.is_empty() or guest._peer.get_available_packet_count() == 0:
+		return _finish("The answer must be waiting, unread")
 	guest.poll()
 	if late != ["The host gave no answer."]:
 		return _finish("A late answer must not be waited for, got %s" % [late])
@@ -365,6 +381,14 @@ func test_state_reaches_guests_only() -> String:
 		deep = { "in": deep }
 	if host.send_state(deep) or not host.send_state(deep["in"]):
 		return _finish("What is sent must be what can be read")
+	var vectors: Array[Vector3] = []
+	var by_vector: Dictionary[Vector3, int] = {}
+	var ints: Array[int] = []
+	for odd: Variant in [vectors, by_vector, "﻿mark", &"﻿mark"]:
+		if host.send_state({ "odd": odd }) or SessionScript._end_of(var_to_bytes(odd), 0) >= 0:
+			return _finish("%s must not be sent" % [odd])
+	if not host.send_state({ "ints": ints }):
+		return _finish("An empty typed list is plain")
 	if host.send_state({ "huge": "x".repeat(SessionScript.MAX_HOST_BYTES) }):
 		return _finish("A state has a size limit")
 	return _finish("")
