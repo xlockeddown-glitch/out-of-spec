@@ -49,6 +49,8 @@ func _ready() -> void:
 	_close_button.pressed.connect(hide)
 	column.add_child(_close_button)
 	GameState.robots_changed.connect(_on_robots_changed)
+	# The other player may calibrate a commissioning robot's sensor.
+	GameState.calibration_recorded.connect(_on_robots_changed.unbind(1))
 	hide()
 
 
