@@ -276,3 +276,16 @@ func test_a_wall_stops_rovers_and_not_the_uplink() -> String:
 			problems.append("A wall must be drawn.")
 	view.free()
 	return "\n".join(problems)
+
+
+func test_a_save_with_a_piece_where_a_rock_now_stands_loads() -> String:
+	for rock: Vector2i in HillDressing.ROCKS:
+		var cell: Vector2i = Terrain.cell_at(Vector2(rock))
+		var pieces: Dictionary[Vector2i, int] = {cell: StonePieces.WALL}
+		if StonePieces.pieces_problem(pieces) != "":
+			return "The save with a wall at %s is refused." % cell
+		var none: Dictionary[Vector2i, int] = {}
+		var rovers: Array[Transform3D] = []
+		if StonePieces.problem(cell, StonePieces.WALL, none, rovers) == "":
+			return "A wall is built in the rock at %s." % cell
+	return ""

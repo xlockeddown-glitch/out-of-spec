@@ -317,6 +317,13 @@ var farm_skill_xp: Dictionary = {}
 ## Robot id ("TR-1") -> { frame, name, state (ROBOT_STATES), done_day,
 ## ordered_by }. Assembled robots' sensors are in `sensors` as "sensor@robot".
 var robots: Dictionary = {}
+## The farm's water cistern. It runs down as growing plots are irrigated and is
+## refilled at each morning. Nothing else reads it: an empty cistern changes no
+## crop yet (open with Ryan). Both numbers are [PLACEHOLDER]: 36 growing
+## plots use about 140 L a day, all 144 about 550 L.
+const CISTERN_CAPACITY_L: float = 600.0
+const CISTERN_DRAW_L_PER_PLOT_HOUR: float = 0.16
+var cistern_liters: float = CISTERN_CAPACITY_L
 ## Passed as plant_crop's offset to mean "use planting_offset_steps now".
 const OFFSET_CURRENT: int = -2147483648
 
@@ -476,7 +483,7 @@ const MAX_KNOWN_GUESTS: int = 64
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
-	"sentinel_out", "sentinel_days_unseen", "rover_lights"]
+	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -559,6 +566,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if not (boulder is String or boulder is StringName) or not StringName(boulder) in BOULDERS \
 				or not hits[boulder] is int or hits[boulder] < 1 or hits[boulder] > BOULDER_HITS:
 			return "'boulder_hits' has a boulder that can't be hit like that."
+	var liters: Variant = data.get("cistern_liters", CISTERN_CAPACITY_L)
+	if not liters is float or liters < 0.0 or liters > CISTERN_CAPACITY_L:
+		return "'cistern_liters' is out of range."
 	if data.get("sentinel_days_unseen", 0) < 0 or data.get("sentinel_days_unseen", 0) > SENTINEL_DAYS_MAX:
 		return "'sentinel_days_unseen' is out of range."
 	if data.get("sentinel_out", false) and data.get("enclosures", {}).has(String(SENTINEL)):
@@ -1147,6 +1157,7 @@ func _on_time_advanced(delta_days: float) -> void:
 	for id: Variant in sensors:
 		if is_in_service(str(id)) and not is_relay_locked(str(id)):
 			(sensors[id] as DriftingSensor).advance_days(delta_days)
+	_draw_cistern(delta_days)
 	_note_soil_excursions()
 	# At 06:00 the cards wait for _on_day_started, so what they change counts
 	# toward the new day.
@@ -2178,6 +2189,7 @@ func add_credits(amount: int) -> void:
 
 
 func _on_day_started(day: int) -> void:
+	cistern_liters = CISTERN_CAPACITY_L
 	_post_morning_dispatch(day)
 	# Courier returns land in the morning, before an audit that day.
 	_receive_oirm_returns(day)
@@ -4632,6 +4644,31 @@ func _grow_crops() -> void:
 	# drifts back in before anything checks again.
 	_note_soil_excursions(false)
 	crops_changed.emit()
+
+
+## Plots that are still growing, which is what the irrigation waters.
+func growing_plots() -> int:
+	var count: int = 0
+	for cell: Variant in plantings:
+		if not is_crop_ready(cell):
+			count += 1
+	return count
+
+
+## The cistern gives water for `delta_days` of irrigation. It never goes below
+## empty; what that does is not decided. Time-based, so frame rate does not matter.
+func _draw_cistern(delta_days: float) -> void:
+	if cistern_liters <= 0.0:
+		return
+	var draw: float = float(growing_plots()) * CISTERN_DRAW_L_PER_PLOT_HOUR * delta_days * GameClock.HOURS_PER_DAY
+	cistern_liters = maxf(cistern_liters - draw, 0.0)
+
+
+## "Cistern: 420 L of 600 L."
+func cistern_text() -> String:
+	# Rounded up, so only an empty one reads 0 L.
+	var text: String = "Cistern: %s L of %s L." % [SP811.integer(ceili(cistern_liters)), SP811.integer(roundi(CISTERN_CAPACITY_L))]
+	return text + " Empty." if cistern_liters <= 0.0 else text
 
 
 ## Moves the irrigation offset new plantings start with by `steps` × 1 %.

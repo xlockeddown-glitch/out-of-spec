@@ -17,6 +17,7 @@ const INSPECT_SECONDS: float = 3.0
 const INSPECT_SECONDS_PER_CHAR: float = 0.04
 ## The prop whose inspect text also carries the plot's soil readings.
 const SOIL_PROBE_PROP: String = "soil_moisture_probe"
+const CISTERN_PROP: String = "water_cistern"
 
 ## Within this far of the relay mast the Q check reads the dish; elsewhere, the
 ## rover's own steering encoder [PLACEHOLDER].
@@ -93,6 +94,9 @@ func _ready() -> void:
 			# Ryan (2026-11-22): "both". The probe also reads out the plot.
 			prop.inspected.connect(func(text: String) -> void:
 				_show_inspect(text + " " + GameState.soil_probe_text()))
+		elif prop.prop_id == CISTERN_PROP:
+			prop.inspected.connect(func(text: String) -> void:
+				_show_inspect(text + " " + GameState.cistern_text()))
 		else:
 			prop.inspected.connect(_show_inspect)
 	# Bound methods so the autoload drops them when this scene is freed.

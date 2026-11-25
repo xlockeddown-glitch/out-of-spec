@@ -24,6 +24,7 @@
 [ext_resource type="Script" path="res://scripts/world/hill_dressing.gd" id="34_dress"]
 [ext_resource type="Shader" path="res://assets/shaders/ground.gdshader" id="35_groundshader"]
 [ext_resource type="Script" path="res://scripts/world/ford.gd" id="36_ford"]
+[ext_resource type="Script" path="res://scripts/world/cistern_gauge.gd" id="37_gauge"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -870,6 +871,10 @@ transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -11.6, 0, 13.2)
 script = ExtResource("12_slot")
 model_path = "res://assets/voxels/water_cistern.glb"
 model_scale = 0.1
+
+[node name="Gauge" type="Node3D" parent="WorldView/WorldViewport/World/WaterCisternModel"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0.62)
+script = ExtResource("37_gauge")
 
 [node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/WaterCisternModel"]
 position = Vector3(0, 0.9, 0)
