@@ -70,6 +70,8 @@ class UplinkCommand:
 ## Parent of OreFissure nodes. The till/drill action mines a fissure in reach
 ## before it tries to till soil.
 @export var ore_fissures_root: Node3D
+## What VisualRoot lies on. Always level if unset.
+@export var ground: TerrainGround
 ## Greybox wheels (VisualRoot children named Wheel*) widen with Bram's treads.
 @export var wheel_width_m: float = 0.3
 @export var wide_wheel_width_m: float = 0.55
@@ -83,6 +85,12 @@ class UplinkCommand:
 @export var braking_mps2: float = 12.0
 @export var max_steer_deg: float = 32.0
 @export var wheelbase_m: float = 2.2
+## Half the width between its wheels, for lying on a slope [PLACEHOLDER].
+@export var half_track_m: float = 0.8
+## How fast it tips onto a new slope [PLACEHOLDER].
+@export var tip_per_s: float = 10.0
+## It keeps to ground that falls away this far in a tick [PLACEHOLDER].
+@export var ground_snap_m: float = 0.5
 
 @export_group("Uplink")
 @export var lag_clear_s: float = 0.05
@@ -116,6 +124,8 @@ var _till_presses: Array[Dictionary] = []
 var _start_transform: Transform3D
 ## Another player drives, or on a guest nobody does: it shows where it is told.
 var _following: bool = false
+var _visual: Node3D
+var _tip := Quaternion.IDENTITY
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 
 
@@ -128,6 +138,8 @@ func _ready() -> void:
 	SaveGame.saving.connect(_park)
 	GameState.farm_loaded.connect(_unpark)
 	_apply_upgrades()
+	floor_snap_length = ground_snap_m
+	_visual = get_node_or_null("VisualRoot") as Node3D
 	_start_transform = global_transform
 	_unpark()
 	if satellite_relay == null:
@@ -170,6 +182,7 @@ func _physics_process(delta: float) -> void:
 		CoopRovers.moved(rover_id, global_transform, _speed_mps, has_line_of_sight)
 	else:
 		_follow(delta)
+	_lie_on_ground(delta)
 
 
 # --- Public API -------------------------------------------------------------
@@ -311,6 +324,25 @@ func _follow(delta: float) -> void:
 		global_transform = to
 	else:
 		global_transform = global_transform.interpolate_with(to, 1.0 - exp(-FOLLOW_PER_S * delta))
+
+
+## Only what is seen lies on a slope. The body stays upright, so its heading is
+## its yaw, and it rests on its highest corner, so what is seen sits lower.
+func _lie_on_ground(delta: float) -> void:
+	if ground == null or _visual == null:
+		return
+	var lies: Basis = ground.lie_at(global_position, -global_basis.z, wheelbase_m * 0.5, half_track_m)
+	var share: float = 1.0 - exp(-tip_per_s * delta)
+	_tip = _tip.slerp((global_basis.inverse() * lies).get_rotation_quaternion(), share)
+	_visual.basis = Basis(_tip)
+	var highest_m: float = ground.height_at(global_position)
+	var middle_m: float = highest_m
+	for side: float in [-half_track_m, half_track_m]:
+		for end: float in [-wheelbase_m * 0.5, wheelbase_m * 0.5]:
+			highest_m = maxf(highest_m, ground.height_at(to_global(Vector3(side, 0.0, end))))
+	# Another player's rover is told its height late, so it is seen on the ground.
+	var sits_m: float = middle_m - (global_position.y if _following else highest_m)
+	_visual.position.y = lerpf(_visual.position.y, sits_m, share)
 
 
 func _zero_steering() -> void:

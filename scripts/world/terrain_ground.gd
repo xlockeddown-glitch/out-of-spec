@@ -1,0 +1,117 @@
+class_name TerrainGround
+extends StaticBody3D
+## Terrain as something to see and drive on. It has a mesh for each square of
+## land, so a dig rebuilds only what it touched.
+
+const CHUNK_M: int = 16
+
+@export var material: Material
+
+var _dug: Dictionary[Vector2i, int] = {}
+var _chunks: Dictionary[Vector2i, MeshInstance3D] = {}
+var _shape := HeightMapShape3D.new()
+## The ground at every point, row by row along z.
+var _heights := PackedFloat32Array()
+
+
+func _ready() -> void:
+	_heights.resize((Terrain.SIZE_M + 1) * (Terrain.SIZE_M + 1))
+	for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
+		for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
+			_heights[_index(x, z)] = Terrain.point_height(Vector2i(x, z), _dug)
+	_shape.map_width = Terrain.SIZE_M + 1
+	_shape.map_depth = Terrain.SIZE_M + 1
+	_shape.map_data = _heights
+	var collision := CollisionShape3D.new()
+	collision.shape = _shape
+	add_child(collision)
+	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M, CHUNK_M):
+		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M, CHUNK_M):
+			var chunk := MeshInstance3D.new()
+			chunk.material_override = material
+			add_child(chunk)
+			_chunks[Vector2i(x, z)] = chunk
+			_build(Vector2i(x, z))
+
+
+## Shows this digging (cell -> steps deep) instead of what was shown.
+func show_dug(dug: Dictionary[Vector2i, int]) -> void:
+	var changed: Array[Vector2i] = []
+	for cell: Vector2i in dug:
+		if _dug.get(cell, 0) != dug[cell]:
+			changed.append(cell)
+	for cell: Vector2i in _dug:
+		if not dug.has(cell):
+			changed.append(cell)
+	if changed.is_empty():
+		return
+	_dug = dug.duplicate()
+	var rebuild: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in changed:
+		var corner: Vector2i = cell * Terrain.CELL_M
+		for x: int in range(corner.x, corner.x + Terrain.CELL_M + 1):
+			for z: int in range(corner.y, corner.y + Terrain.CELL_M + 1):
+				if absi(x) > Terrain.HALF_M or absi(z) > Terrain.HALF_M:
+					continue
+				_heights[_index(x, z)] = Terrain.point_height(Vector2i(x, z), _dug)
+				# A point on a square's edge is in the squares on both sides.
+				for dx: int in 2:
+					for dz: int in 2:
+						rebuild[_chunk_of(Vector2i(x - dx, z - dz))] = true
+	_shape.map_data = _heights
+	for chunk: Vector2i in rebuild:
+		if _chunks.has(chunk):
+			_build(chunk)
+
+
+func height_at(at: Vector3) -> float:
+	return Terrain.height(Vector2(at.x, at.z), _dug)
+
+
+## How a body at `at` facing `forward` lies on the ground under its wheels.
+func lie_at(at: Vector3, forward: Vector3, half_length_m: float, half_width_m: float) -> Basis:
+	var ahead := Vector3(forward.x, 0.0, forward.z).normalized()
+	var right: Vector3 = ahead.cross(Vector3.UP)
+	var along: Vector3 = ahead * half_length_m * 2.0
+	along.y = height_at(at + ahead * half_length_m) - height_at(at - ahead * half_length_m)
+	var across: Vector3 = right * half_width_m * 2.0
+	across.y = height_at(at + right * half_width_m) - height_at(at - right * half_width_m)
+	var up: Vector3 = across.cross(along).normalized()
+	var back: Vector3 = -along.normalized()
+	return Basis(up.cross(back), up, back)
+
+
+func _build(chunk: Vector2i) -> void:
+	var points := PackedVector3Array()
+	var normals := PackedVector3Array()
+	for x: int in range(chunk.x, chunk.x + CHUNK_M):
+		for z: int in range(chunk.y, chunk.y + CHUNK_M):
+			_add_face(points, normals, _point(x, z), _point(x + 1, z), _point(x, z + 1))
+			_add_face(points, normals, _point(x + 1, z), _point(x + 1, z + 1), _point(x, z + 1))
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = points
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	_chunks[chunk].mesh = mesh
+
+
+## Corners run clockwise from above.
+func _add_face(points: PackedVector3Array, normals: PackedVector3Array, a: Vector3, b: Vector3, c: Vector3) -> void:
+	var normal: Vector3 = (c - a).cross(b - a).normalized()
+	for corner: Vector3 in [a, b, c]:
+		points.append(corner)
+		normals.append(normal)
+
+
+func _point(x: int, z: int) -> Vector3:
+	return Vector3(x, _heights[_index(x, z)], z)
+
+
+func _index(x: int, z: int) -> int:
+	return (z + Terrain.HALF_M) * (Terrain.SIZE_M + 1) + x + Terrain.HALF_M
+
+
+func _chunk_of(point: Vector2i) -> Vector2i:
+	return Vector2i((Vector2(point) / CHUNK_M).floor()) * CHUNK_M
