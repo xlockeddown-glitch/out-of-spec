@@ -30,6 +30,12 @@ signal fill_rejected(reason: String)
 const FOLLOW_PER_S: float = 12.0
 const FOLLOW_JUMP_M: float = 4.0
 const FOLLOW_LEAD_S: float = 0.15
+## Deep water must be at least this far from the body's box.
+const PIT_CLEAR_M: float = 0.1
+## Where the search for a clear place stops, and how it steps [ASSUMPTION].
+const PIT_SEARCH_M: float = 16.0
+const PIT_SEARCH_STEP_M: float = 0.25
+const PIT_SEARCH_WAYS: int = 24
 
 enum Command { TILL, ZERO_STEERING, DIG, FILL }
 
@@ -167,6 +173,77 @@ func _exit_tree() -> void:
 func _unpark() -> void:
 	global_transform = CoopRovers.place(rover_id) if CoopRovers.together() and CoopRovers.has_place(rover_id) else GameState.parked_rover_transform(rover_id, _start_transform)
 	_put_back_on_land()
+
+
+## Out of water that has become too deep, after a dig or a stone changed it: to the
+## nearest place where the whole body is clear, not just its middle.
+func leave_deep_water() -> void:
+	if ground == null or _following:
+		return
+	var at := Vector2(global_position.x, global_position.z)
+	var to: Vector2 = clear_of_pit_water(at, Vector2(-global_basis.z.x, -global_basis.z.z), Terrain.HALF_M - wheelbase_m)
+	if to == at:
+		return
+	global_position.x = to.x
+	global_position.z = to.y
+	var ground_m: float = ground.height_at(global_position)
+	if global_position.y < ground_m - 0.1:
+		global_position.y = ground_m + ground_snap_m
+
+
+## `at` if a rover facing `ahead` there touches no deep pit water; else the nearest
+## place, any way round, where it touches no deep water, rock or wall and stays
+## on the land. With none in reach, `at`.
+static func clear_of_pit_water(at: Vector2, ahead: Vector2, edge_m: float) -> Vector2:
+	var heading: Vector2 = ahead.normalized() if not ahead.is_zero_approx() else Vector2.UP
+	if not _touches_pit_water(at, heading):
+		return at
+	var radius: float = PIT_SEARCH_STEP_M
+	while radius <= PIT_SEARCH_M:
+		var best: Vector2 = at
+		var best_gap: float = -1.0
+		for way: int in PIT_SEARCH_WAYS:
+			var spot: Vector2 = at + Vector2.from_angle(TAU * way / PIT_SEARCH_WAYS) * radius
+			if maxf(absf(spot.x), absf(spot.y)) > edge_m or not _stands_clear(spot, heading):
+				continue
+			var gap: float = PitWater.gap_m(spot)
+			if gap > best_gap:
+				best = spot
+				best_gap = gap
+		if best_gap >= 0.0:
+			return best
+		radius += PIT_SEARCH_STEP_M
+	return at
+
+
+static func _touches_pit_water(at: Vector2, heading: Vector2) -> bool:
+	var half: Vector2 = StonePieces.ROVER_HALF + Vector2.ONE * PIT_CLEAR_M
+	return PitWater.box_hits(PitWater.blocks(), at, heading, half) or PitWater.box_hits(Ford.blocks(), at, heading, half)
+
+
+## Rocks, at the middle and both ends of the body.
+static func _touches_rock(at: Vector2, heading: Vector2) -> bool:
+	for along: float in [-StonePieces.ROVER_HALF.y, 0.0, StonePieces.ROVER_HALF.y]:
+		var point: Vector2 = at + heading * along
+		if HillDressing.clear_of_rocks(point) != point:
+			return true
+	return false
+
+
+## Whether a rover facing `heading` at `at` is clear of deep water, rocks and walls.
+static func _stands_clear(at: Vector2, heading: Vector2) -> bool:
+	if _touches_pit_water(at, heading) or _touches_rock(at, heading):
+		return false
+	var pose := Transform3D(
+		Basis(Vector3(-heading.y, 0.0, heading.x), Vector3.UP, Vector3(-heading.x, 0.0, -heading.y)), Vector3(at.x, 0.0, at.y)
+	)
+	var middle: Vector2i = Terrain.cell_at(at)
+	for x: int in range(-2, 3):
+		for z: int in range(-2, 3):
+			var cell: Vector2i = middle + Vector2i(x, z)
+			if GameState.stone_pieces.get(cell, -1) == StonePieces.WALL and StonePieces.covers(cell, pose):
+				return false
+	return true
 
 
 ## A farm saved before the hills may have it parked inside one, or off the land.
@@ -358,7 +435,8 @@ func _execute(cmd: UplinkCommand) -> void:
 func _drive(delta: float) -> void:
 	var top_speed: float = max_speed_mps if _applied_throttle >= 0.0 else reverse_speed_mps
 	# Slower wading [PLACEHOLDER].
-	if Terrain.water_depth_m(Vector2(global_position.x, global_position.z)) > 0.0:
+	var here := Vector2(global_position.x, global_position.z)
+	if Terrain.water_depth_m(here) > 0.0 or PitWater.is_wading(here):
 		top_speed *= Terrain.WATER_SPEED
 	var target_speed: float = _applied_throttle * top_speed
 	var rate: float = acceleration_mps2 if absf(target_speed) > absf(_speed_mps) else braking_mps2

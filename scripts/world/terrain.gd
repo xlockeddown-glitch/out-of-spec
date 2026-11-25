@@ -162,24 +162,33 @@ static func water_depth_m(at: Vector2) -> float:
 	return maxf(WASH_LEVEL_M - height(at, none), 0.0)
 
 
-## Whether water here stops a rover.
+## Whether water here stops a rover or a walker: the wash's, or a dug pit's.
 static func is_deep(at: Vector2) -> bool:
-	return water_depth_m(at) >= WASH_BLOCK_M
+	return water_depth_m(at) >= WASH_BLOCK_M or PitWater.is_deep(at)
 
 
 ## `at`, or a place south of it, away from the arch, where a rover turned any way is
 ## clear of the deep, if one at `at` would stand in it whichever way it was turned.
 static func clear_of_deep(at: Vector2) -> Vector2:
-	if Ford.gap_m(at) >= ROVER_HALF_WIDTH_M - 0.05:
+	if _gap_m(at) >= ROVER_HALF_WIDTH_M - 0.05:
 		return at
 	var out: Vector2 = at
-	while Ford.gap_m(out) < ROVER_REACH_M + 0.1:
+	while _gap_m(out) < ROVER_REACH_M + 0.1 and out.y < HALF_M:
 		out.y += 0.25
 	return out
 
 
+## How far a point is from deep water, the ford's or a pit's.
+static func _gap_m(at: Vector2) -> float:
+	return minf(Ford.gap_m(at), PitWater.gap_m(at))
+
+
 ## Whether a cell is in or by the water, so it can't be dug [ASSUMPTION].
 static func is_near_water(cell: Vector2i) -> bool:
+	var reach: Vector2 = WASH_RADII + Vector2.ONE * WASH_NEAR_M
+	var low: Vector2 = Vector2(cell * CELL_M)
+	if low.x > WASH_AT.x + reach.x or low.x + CELL_M < WASH_AT.x - reach.x or low.y > WASH_AT.y + reach.y or low.y + CELL_M < WASH_AT.y - reach.y:
+		return false
 	for x: int in CELL_M + 1:
 		for z: int in CELL_M + 1:
 			if _out(Vector2(cell * CELL_M + Vector2i(x, z)), WASH_AT, WASH_RADII + Vector2.ONE * WASH_NEAR_M) < 1.0:

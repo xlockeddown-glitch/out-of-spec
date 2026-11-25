@@ -45,7 +45,16 @@ func _physics_process(_delta: float) -> void:
 	elif _own.global_position.distance_to(at) > MOVED_M:
 		_own.global_position = at
 		_own.velocity = Vector3.ZERO
+		# The host may have refused its way out of water that turned deep.
+		_own.leave_deep_water()
 	_own.model.set_suit(WalkerModel.suit_for(own, CoopSession.players))
+
+
+## After a dig or a stone changed the water: this screen's walker, if it is in deep
+## water now, is moved out.
+func leave_deep_water() -> void:
+	if _own != null:
+		_own.leave_deep_water()
 
 
 func _process(delta: float) -> void:

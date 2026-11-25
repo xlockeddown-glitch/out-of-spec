@@ -29,17 +29,34 @@ static func tint(depth_m: float) -> Color:
 ## Fills `area` up to `level_m`. `ground_m` gives the ground's height at a Vector2
 ## of x and z.
 func fill(area: Rect2, level_m: float, ground_m: Callable) -> void:
+	fill_levels(area, func(_at: Vector2) -> float: return level_m, ground_m)
+
+
+## The same with a level for each point, `level_at`'s, which is -INF where there is
+## no water. The ground is asked for once for each column and the ring round them.
+func fill_levels(area: Rect2, level_at: Callable, ground_m: Callable) -> void:
 	places.clear()
 	colors.clear()
-	for x: int in ceili(area.size.x / COLUMN_M):
-		for z: int in ceili(area.size.y / COLUMN_M):
+	var across: int = ceili(area.size.x / COLUMN_M)
+	var along: int = ceili(area.size.y / COLUMN_M)
+	var stride: int = along + 2
+	var ground := PackedFloat64Array()
+	ground.resize((across + 2) * stride)
+	for x: int in across + 2:
+		for z: int in stride:
+			ground[x * stride + z] = ground_m.call(area.position + (Vector2(x - 1, z - 1) + Vector2.ONE * 0.5) * COLUMN_M)
+	for x: int in across:
+		for z: int in along:
 			var at: Vector2 = area.position + (Vector2(x, z) + Vector2.ONE * 0.5) * COLUMN_M
-			var depth_m: float = level_m - ground_m.call(at)
+			var level_m: float = level_at.call(at)
+			var here: float = ground[(x + 1) * stride + z + 1]
+			var depth_m: float = level_m - here
 			if depth_m <= 0.0:
 				continue
-			var shore: bool = false
-			for side: Vector2 in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
-				shore = shore or ground_m.call(at + side * COLUMN_M) >= level_m
+			var shore: bool = (
+				ground[x * stride + z + 1] >= level_m or ground[(x + 2) * stride + z + 1] >= level_m
+				or ground[(x + 1) * stride + z] >= level_m or ground[(x + 1) * stride + z + 2] >= level_m
+			)
 			places.append(Transform3D(Basis.from_scale(Vector3(COLUMN_M, depth_m, COLUMN_M)), Vector3(at.x, level_m - depth_m * 0.5, at.y)))
 			var color: Color = tint(depth_m).lightened(FOAM_LIGHTER if shore else 0.0).srgb_to_linear()
 			# Tells the shader which columns are foam.
