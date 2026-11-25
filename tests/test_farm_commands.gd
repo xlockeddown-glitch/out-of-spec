@@ -4,6 +4,9 @@ extends RefCounted
 const CommandsScript: GDScript = preload("res://scripts/autoload/FarmCommands.gd")
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 
+## Not actions, and not for a screen to call either.
+const RAW: Array[StringName] = [&"add_rover_usage", &"calibrate", &"park_rover", &"set_rover_uplink"]
+
 signal answered(answer: Variant)
 
 var _asked: Array = []
@@ -31,11 +34,11 @@ func test_every_action_is_a_typed_function() -> String:
 	var bad: PackedStringArray = []
 	for action: StringName in CommandsScript.ACTIONS:
 		var method: Dictionary = commands._method(action)
-		if method.is_empty() or not method["return"]["type"] in [TYPE_STRING, TYPE_BOOL, TYPE_DICTIONARY]:
+		if method.is_empty() or not method["return"]["type"] in [TYPE_STRING, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_DICTIONARY]:
 			bad.append(action)
 			continue
 		for arg: Dictionary in method["args"]:
-			if not arg["type"] in [TYPE_STRING, TYPE_BOOL, TYPE_INT]:
+			if not arg["type"] in [TYPE_STRING, TYPE_STRING_NAME, TYPE_BOOL, TYPE_INT, TYPE_VECTOR3I]:
 				bad.append("%s %s" % [action, arg["name"]])
 	_free(commands)
 	return "" if bad.is_empty() else "Not plain, typed actions: " + ", ".join(bad)
@@ -59,7 +62,10 @@ func test_bad_requests_are_refused() -> String:
 	var problems: PackedStringArray = []
 	var credits: int = commands.state.credits
 	for bad: Array in [[&"add_credits", [1000]], [&"free", []], [&"set_interlock_override", ["robot_1"]],
-			[&"set_interlock_override", ["robot_1", 1]], [&"calibrate_at_bench", [null]],
+			[&"set_interlock_override", ["robot_1", 1]],
+			[&"calibrate", ["steering"]], [&"add_rover_usage", [1.0]], [&"park_rover", ["tractor", Transform3D.IDENTITY]],
+			[&"rover_drove", [1.0]], [&"till", [Vector3(0.0, 0.0, 0.0)]], [&"mine_fissure", ["FissureA"]],
+			[&"calibrate_at_bench", [null]],
 			[&"calibrate_at_bench", ["air_hygrometer", "player_9"]], [&"collect_spool", ["player_9", true, true]]]:
 		if commands.problem(bad[0], bad[1]) == "":
 			problems.append(str(bad))
@@ -103,15 +109,100 @@ func test_a_guest_waits_for_the_host() -> String:
 	return ""
 
 
-## It knows only the listed actions: another GameState change would pass unseen.
-## main_farm.gd, the rover and the grid come in the next change.
+func test_a_guest_cannot_make_soil_or_ore() -> String:
+	var commands: Node = _make()
+	var problems: PackedStringArray = []
+	for cell: Vector3i in [Vector3i(6, 0, 0), Vector3i(0, 0, -7), Vector3i(0, 1, 0)]:
+		if commands.execute("player_2", &"till", [cell]):
+			problems.append("Tilled off the plot: %s" % cell)
+	if commands.execute("player_2", &"mine_fissure", [&"made_up"]) or commands.state.crystal_ore != 0:
+		problems.append("Mined a fissure that is not there")
+	if not commands.execute("player_2", &"till", [Vector3i(5, 0, -6)]) or not commands.execute("player_2", &"mine_fissure", [&"FissureH"]):
+		problems.append("Real soil and fissures must work")
+	if commands.execute("player_2", &"plant_crop", [Vector3i(5, 0, -6), "no_such_crop", 0]) == "":
+		problems.append("Planted a crop that is not in the data")
+	var kinds: Array = [commands.refusal(&"sell_harvest_to_lin", "no"), commands.refusal(&"adjust_setpoint", "no")]
+	if typeof(kinds[0]) != TYPE_INT or kinds[0] != 0 or kinds[1] != -1.0:
+		problems.append("Refusals of the wrong kind: %s" % [kinds])
+	_free(commands)
+	var named: RegEx = RegEx.create_from_string(r"\[node name=.(\w+). type=.Node3D. parent=.WorldView/WorldViewport/World/Fissures.")
+	var fissures: Array[StringName] = []
+	for found: RegExMatch in named.search_all(FileAccess.get_file_as_string("res://scenes/main_farm.tscn")):
+		fissures.append(StringName(found.get_string(1)))
+	if fissures != GameStateScript.FISSURES:
+		problems.append("GameState.FISSURES is not the scene's: %s" % [fissures])
+	return "\n".join(problems)
+
+
+func test_zero_steering_is_no_calibration() -> String:
+	var saved: float = GameClock.elapsed_days
+	var commands: Node = _make()
+	var record: Dictionary = commands.execute("player_2", &"zero_steering", [])
+	var logged: int = commands.state.cal_log.size()
+	GameClock.elapsed_days = saved
+	_free(commands)
+	if record.get("performed_by", "") != "player_2" or record.get("traceable", true) or logged != 1:
+		return "Got %s, %d logged" % [record, logged]
+	return ""
+
+
+func test_rover_reports_are_the_hosts_alone() -> String:
+	var commands: Node = _make()
+	var gs: Node = commands.state
+	var problems: PackedStringArray = []
+	var error: float = gs.steering.error
+	var asked: int = _asked.size()
+	commands.guest = true
+	commands.remote = _ask_host
+	commands.rover_drove(100.0)
+	commands.rover_uplink("tractor", true)
+	commands.rover_parked("tractor", Transform3D.IDENTITY)
+	if gs.steering.error != error or not gs.rover_uplinks.is_empty() or not gs.rover_transforms.is_empty() or _asked.size() != asked:
+		problems.append("A guest's rover must change and ask nothing")
+	commands.guest = false
+	for bad: float in [NAN, INF, -5.0]:
+		commands.rover_drove(bad)
+	commands.rover_parked("tractor", Transform3D(Basis.IDENTITY, Vector3(NAN, 0.0, 0.0)))
+	if gs.steering.error != error or not gs.rover_transforms.is_empty():
+		problems.append("Bad reports must be ignored")
+	commands.rover_drove(100.0)
+	commands.rover_uplink("tractor", true)
+	commands.rover_parked("tractor", Transform3D.IDENTITY)
+	if gs.steering.error == error or not gs.rover_uplinks.has("tractor") or not gs.rover_transforms.has("tractor"):
+		problems.append("The host's rover must count")
+	_free(commands)
+	return "\n".join(problems)
+
+
+func test_a_refused_till_is_not_shown() -> String:
+	var saved: Dictionary = GameState.tilled_cells.duplicate()
+	var grid := FarmGrid.new()
+	grid._ready()
+	var cell := Vector3i(2, 0, 2)
+	GameState.tilled_cells.erase(cell)
+	grid.set_cell_item(cell, FarmGrid.Tile.SOIL_UNTILLED)
+	FarmCommands.guest = true  # and not connected
+	var result: int = await grid.till_cell(cell)
+	FarmCommands.guest = false
+	var item: int = grid.get_cell_item(cell)
+	grid.free()
+	GameState.tilled_cells = saved
+	if result != FarmGrid.TillResult.REFUSED or item != FarmGrid.Tile.SOIL_UNTILLED:
+		return "Got result %d, tile %d" % [result, item]
+	return ""
+
+
+## It knows only the listed actions, and the calls named here that must not be
+## made raw: another GameState change would pass unseen. The seed and starting set
+## point (cycle_seed, adjust_planting_offset) are choices, sent with each planting.
 func test_screens_do_not_change_the_farm_directly() -> String:
-	var direct: RegEx = RegEx.create_from_string(r"GameState\s*\.\s*(%s)\b" % "|".join(CommandsScript.ACTIONS))
+	var direct: RegEx = RegEx.create_from_string(r"GameState\s*\.\s*(%s)\b" % "|".join(CommandsScript.ACTIONS + RAW))
 	var asks: RegEx = RegEx.create_from_string(r"FarmCommands\.request(?:\.bind)?\(&\"(\w+)\"")
 	var comment: RegEx = RegEx.create_from_string(r"(?m)(^|\s)#.*$")
 	var problems: PackedStringArray = []
 	var asked: Dictionary = {}
-	for dir: String in ["res://scripts/dome", "res://scripts/ui"]:
+	for dir: String in ["res://scripts", "res://scripts/camera", "res://scripts/dome", "res://scripts/metrology",
+			"res://scripts/rover", "res://scripts/ui", "res://scripts/world"]:
 		for file: String in DirAccess.get_files_at(dir):
 			if not file.ends_with(".gd"):
 				continue

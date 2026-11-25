@@ -28,7 +28,7 @@ func _play(gs: GameStateScript, from_day: int, days: int) -> void:
 		gs._tick_molt(0.001)
 		gs.calibrate(gs.unit_ids()[day % gs.unit_ids().size()])
 		gs.add_tire_usage(1000.0 / 3.0)
-		var cell := Vector3i(day, 0, -day)
+		var cell := Vector3i(day % 6, 0, -(day % 6))
 		if gs.till(cell):
 			gs.plant_crop(cell)
 		if not gs.job_board.is_empty():
