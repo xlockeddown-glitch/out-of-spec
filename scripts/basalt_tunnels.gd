@@ -13,7 +13,7 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 ## This player asked to move the rover; the host said yes.
 var _moving: bool = false
 var _move_granted: bool = false
-var _cup := CatchCupUI.new()
+@onready var _cup := CatchCupUI.new()
 ## The cup can reach the Cobalt Sentinel.
 var _in_reach: bool = false
 var _told_reach: bool = false

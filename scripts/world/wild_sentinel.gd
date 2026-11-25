@@ -8,7 +8,7 @@ const FACING: float = PI * 0.75
 const BOLT_MPS: float = 6.0  # [PLACEHOLDER]
 const BOLT_S: float = 1.2  # [PLACEHOLDER] into the north wall
 
-var _rig := TarantulaRig.new()
+@onready var _rig := TarantulaRig.new()
 var _bolt_s: float = 0.0
 
 
