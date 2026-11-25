@@ -1146,6 +1146,32 @@ Agent's notes (flagged for Ryan, not his words):
 - Rover: Ryan asked for it ("Rover next!"). One player drives at a time, whoever pressed first, until it has stood still half a second [ASSUMPTION; PLACEHOLDER time]. Nobody can take it from a driver. Everyone else sees it follow and the co-op line says who drives. Space and R still work for everyone, on the ground under the rover they see [ASSUMPTION].
 - The driver's own PC moves the rover and says where it is 20 times a second, so it answers as it does alone, with the driver's own uplink lag, and can be driven while the host is in the dome. The host says who drives, refuses moves beyond 15 m at once and 7.5 m/s after, and places over 500 m out, and parks it. It counts the distance to wear, and the driver's Field Ops counts [ASSUMPTION]. With the host in the dome the driver's PC says whether the rover sees the relay [ASSUMPTION]. A lost connection stops a guest's rover for everyone else within about a second. Walls aren't checked: friends trust each other [ASSUMPTION].
 - Poses may be lost or late, so only the newest counts. They have their own limit: 100 at once, then 40 a second. All these numbers are [PLACEHOLDER]. Protocol 4. One player notices no change.
+- Walking, first slice. F gets out of the stopped rover on the farm and back in
+  within 6 m, as near as the tunnel pad wants the rover. All of this is
+  [ASSUMPTION]:
+  - On foot the player only walks, looks, clicks props, opens the skills and
+    co-op panels, goes to bed and gets up. Farm work, stations, Bram, the dome
+    and the tunnels need the rover: the host refuses everything else from
+    someone on foot, and the screen says "On foot. Get in the rover first."
+  - The rover stays where it was left and anyone may drive it, as before. If it
+    goes into the tunnels, everyone on foot is back in it.
+  - WASD goes by the camera: W is up the screen. The rover's keys are throttle
+    and steering, which would not suit a walker.
+  - Rocks, boulders, stone walls and deep water stop a walker. Shallow water
+    slows it as it slows the rover. The host takes no guest into deep water.
+  - Walkers pass through each other, and the rover pushes its own player's
+    walker aside on that player's screen. Nobody is hurt.
+  - Nothing about walking is saved. Loading, joining again or losing the
+    connection puts the player in the rover.
+  - Guests send where they walk and the host sends everyone's, as rover poses
+    are sent: plain numbers that may be lost. The host takes a guest's if it is
+    out, on the land, near the ground and no faster than it could walk.
+  - [PLACEHOLDER]: walks 4 m/s, climbs 50°, 1.6 m tall; poses each 50 ms moving
+    and 1 s still; a guest may go 12 m at once and 5 m/s after, is put back
+    beyond 10 m, and is in the rover again after 5 s of silence; 5 m off the
+    ground is too far; its own F holds for 1.5 s against older word.
+  - The model is original voxels in code: orange suit, dark boots and pack,
+    teal visor. Protocol 13.
 
 ## 2026-11-24: Hills, digging, tunnels
 
@@ -1227,3 +1253,4 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - Playtest text fixes. Humidity differences (sensor error, MPE, U) print as "percentage points", since SP 811 does not allow "% RH" and a difference of two relative humidities is not a share of the reading [ASSUMPTION]. Soil moisture keeps "%", and the phone HUD is unchanged. tools/check_sp811.py is not taught a rule: it cannot tell an RH difference from an absolute RH by text alone.
 - One overdue wording everywhere: "OVERDUE since day N", N being the day after the due day, so never "day 0" [ASSUMPTION]. `DriftingSensor.overdue_text` makes it.
 - The Sentinel's rules ("Lights low (L), creep, stop short.") go to the phone log once per sighting, the first time the rover is within its 8 m, before any scare line; no speed readout. A bolt or a catch starts a new sighting. The told flag is not saved [ASSUMPTION]. A failed catch with a reading inside the 5 % cup band adds "The hygrometer read N %. Was it right?" to the host's phone line, so guests get it with the phone log and the protocol is unchanged [ASSUMPTION].
+- Terrace models (models only, not placed; Ryan's terrace pack as layer grids in `tools/voxgen/sheets/`): ramp, mid deck, upper bluff, endcap and switchback are built voxel for voxel from his scripts; letters map to the repo's colors (P1..P4 the boulders', D1, K1, F1/F2, EC the teal, S shadow) and O1 is his `#C97A3B`. [ASSUMPTION] The rim overhang shelf had only a summary: its Z=2 cells under the S recess (X=3..6, Y=2..3) are P1, so the recess does not float, and X=0 and X=9 are empty at Y=2..3 as written. Its other layers, Z=0's two rows and the empty cell at Z=1, Y=1, X=9 included, are the summary's. [ASSUMPTION] The upper bluff was built too, as it belongs to the pack. [ASSUMPTION] The switchback follows `build_terrace_switchback_vox.py`, the later of his two scripts by file time (4 s) and the one with EC in it as his summary has (8 voxels; the other has 2). It does not match his summary on every row (Z=0, 1, 3, 6, 7 and 11 differ); the other script matches those rows but not the EC, so neither fits. Open with Ryan: which is final? Ramp: his summary and his grid disagree (the summary's steps rise toward +Y at Y=9-z; the grid's shadow is at Y=z-1 with the mass toward -Y); the grid was built. Open with Ryan. [ASSUMPTION] Part `rock`, EC as `emit_crystal`; the border pass puts S around EC (8 voxels each, under the 9-voxel cutoff). Doubtful: the ramp does not read as a ramp, and the S cracks and recess read near black.

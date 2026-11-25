@@ -1107,6 +1107,17 @@ func get_up(player_id: String = "") -> String:
 	return ""
 
 
+## "" or why not. See CoopWalkers.
+func get_out_of_rover(x: float, z: float, player_id: String = "") -> String:
+	SaveGame.saving.emit()  # the rover says where it is
+	return CoopWalkers.get_out(_player(player_id), x, z)
+
+
+func get_into_rover(player_id: String = "") -> String:
+	SaveGame.saving.emit()
+	return CoopWalkers.get_in(_player(player_id))
+
+
 func _player(player_id: String) -> String:
 	return player_id if player_id != "" else local_player_id
 

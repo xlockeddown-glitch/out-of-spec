@@ -8,6 +8,9 @@ const LOG_REPLAY_LINES: int = 6
 ## With the rover in the other scene, these only say where it is.
 const ROVER_KEYS: Array[StringName] = [
 	&"rover_forward", &"rover_reverse", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill"]
+## On foot, these only say so.
+const FARM_KEYS: Array[StringName] = [
+	&"interact", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill", &"swap_scene"]
 ## A clicked prop's text stays in the hover label this long, like the dome's toast.
 const INSPECT_SECONDS: float = 3.0
 ## Long descriptions stay up longer.
@@ -42,6 +45,7 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 @onready var _tunnel_pad: ParkingPad = %TunnelPad
 
 var _robots_ui: RobotsUI
+var _walkers: FarmWalkers
 var _bram_line: String = ""
 ## Seconds left showing a clicked prop's text in the hover label.
 var _inspect_left: float = 0.0
@@ -118,6 +122,10 @@ func _ready() -> void:
 		_hud.push_log(line)
 	var relay_name: String = _rover.satellite_relay.relay_name if _rover.satellite_relay else "NO RELAY"
 	_hud.configure(relay_name, _rover.steering.mpe, _rover.steering.acceptance_ratio)
+	_walkers = FarmWalkers.new()
+	_walkers.rover = _rover
+	_walkers.camera = $WorldView/WorldViewport/World/IsoCamera
+	$WorldView/WorldViewport/World.add_child(_walkers)
 	_show_dug()
 	_last_band = _rover.get_drift_band()
 	_rover.broadcast_state()
@@ -140,7 +148,7 @@ func _process(delta: float) -> void:
 		_inspect_left -= delta
 		return
 	var hovered: Clickable = Clickable.hovered
-	_hover_hint.text = hovered.hint if hovered else _rover.away_text()
+	_hover_hint.text = hovered.hint if hovered else _rover.away_text() + _walkers.hint()
 
 
 func _show_inspect(text: String) -> void:
@@ -166,6 +174,8 @@ func _on_drift_changed(drift_deg: float, band: int) -> void:
 
 
 func _on_zero_pressed() -> void:
+	if _refuse_on_foot():
+		return
 	if _rover.away_text() != "":
 		_say_if_away()
 		return
@@ -185,6 +195,8 @@ func _on_steering_zeroed(record: Dictionary) -> void:
 
 
 func _on_slot_spool_pressed() -> void:
+	if _refuse_on_foot():
+		return
 	var replaced: bool = GameState.relay_slotted
 	if await FarmCommands.request(&"slot_spool_into_relay") and is_inside_tree():
 		if FarmCommands.guest:
@@ -370,7 +382,15 @@ func _show_dug() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var away: bool = _rover.away_text() != ""
-	if away and event.is_action_pressed(&"interact"):
+	if _is_key(event, KEY_F):
+		get_viewport().set_input_as_handled()
+		_get_out_or_in()
+	elif CoopWalkers.on_foot():
+		if (FARM_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key))
+				or [KEY_B, KEY_L, KEY_N, KEY_Q, KEY_T, KEY_V].any(func(key: Key) -> bool: return _is_key(event, key))):
+			get_viewport().set_input_as_handled()
+			_refuse_on_foot()
+	elif away and event.is_action_pressed(&"interact"):
 		get_viewport().set_input_as_handled()
 		SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
 	elif away and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
@@ -481,6 +501,8 @@ func _refresh_jobs_hud() -> void:
 
 
 func _try_accept_job(index: int) -> void:
+	if _refuse_on_foot():
+		return
 	var problem: String = await FarmCommands.request(&"accept_job", [index])
 	if is_inside_tree() and problem != "":
 		_hud.push_log("JOB NOT ACCEPTED: " + problem)
@@ -614,6 +636,8 @@ func _refresh_bram() -> void:
 
 
 func _try_buy_standard(standard_id: String) -> void:
+	if _refuse_on_foot():
+		return
 	if not _bram_bay.rover_inside:
 		return
 	var problem: String = GameState.standard_purchase_problem(standard_id)
@@ -639,6 +663,8 @@ func _try_buy_standard(standard_id: String) -> void:
 
 
 func _try_trade() -> void:
+	if _refuse_on_foot():
+		return
 	if not _bram_bay.rover_inside or GameState.has_wide_treads:
 		return
 	_armed_standard = ""
@@ -654,7 +680,50 @@ func _try_trade() -> void:
 
 
 func _go_to_dome() -> void:
+	if _refuse_on_foot():
+		return
 	SceneSwitcher.swap_to(SceneSwitcher.DOME_SCENE)
+
+
+## F: out of the stopped rover, or back in from nearby.
+func _get_out_or_in() -> void:
+	if CoopWalkers.asking:
+		return
+	if CoopWalkers.on_foot():
+		CoopWalkers.asking = true
+		var refused: String = await FarmCommands.request(&"get_into_rover")
+		CoopWalkers.asking = false
+		if refused == "":
+			CoopWalkers.went_in()
+		elif is_inside_tree():
+			_hud.push_log("ON FOOT: " + refused)
+		return
+	if _rover.away_text() != "":
+		_say_if_away()
+		return
+	if not _rover.is_stopped():
+		_hud.push_log("ROVER: Stop the rover first.")
+		return
+	var at: Vector3 = _walkers.clear_spot()
+	if not at.is_finite():
+		_hud.push_log("ROVER: There is no room to get out here.")
+		return
+	CoopWalkers.asking = true
+	var problem: String = await FarmCommands.request(&"get_out_of_rover", [at.x, at.z])
+	CoopWalkers.asking = false
+	if problem == "" and is_inside_tree():
+		CoopWalkers.went_out(at.x, at.z)
+		_robots_ui.hide()
+		_hud.push_log("On foot. F gets back in the rover.")
+	elif is_inside_tree():
+		_hud.push_log("ROVER: " + problem)
+
+
+## Farm work is done from the rover. True, and says so, if the player is out.
+func _refuse_on_foot() -> bool:
+	if CoopWalkers.on_foot():
+		_hud.push_log(CoopWalkers.REFUSAL)
+	return CoopWalkers.on_foot()
 
 
 ## Says where the rover is if it is not here.
