@@ -24,7 +24,7 @@ const MAP: PackedStringArray = [
 	"##########AAA###########",
 	"##########...###########",
 	"#######......*##########",
-	"#######.......##########",
+	"######........##########",
 	"#######.......##########",
 	"##########...###########",
 	"##########...###########",
@@ -42,8 +42,8 @@ const ROCK_M: float = 6.0  # [PLACEHOLDER]
 const FADE_NEAR_M: float = 6.0  # [PLACEHOLDER]
 const FADE_ALPHA: float = 0.2  # [PLACEHOLDER]
 
-const BASALT := Color(0.17, 0.135, 0.12)
-const BASALT_FLOOR := Color(0.4, 0.33, 0.29)
+const BASALT := Color("#232832")
+const BASALT_FLOOR := Color("#495261")
 const TEAL := Color("#38e1c6")
 const AMBER := Color("#f5a623")
 
