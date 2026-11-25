@@ -1129,4 +1129,4 @@ Agent's notes (flagged for Ryan, not his words):
 - Distance driven, line of sight and parking are not actions: the host counts its own rovers, and a guest's count for nothing [ASSUMPTION]. Open: how a guest drives a rover the host runs, and whose skill its driving uses.
 - The seed and starting set point stay saved with the farm and are sent with each planting. Changing them is not a command yet: a guest changes only its own copy, until Ryan decides whether each player has their own. A guest's spool and set point lines say only what the host's answer holds, and its Bram greetings are not drawn from the farm's generator.
 - Open: GameState doesn't check that a guest's rover is at the soil, fissure, stall or pad.
-- To settle with syncing: REMOVE CARD and accepting a job name a card or job by its place, so another player's change in the same moment could move it.
+- To settle with syncing: the farm must reach a guest before the answer that changed it, or a bracket pressed at once after PLANTED sets the next crop's starting set point; REMOVE CARD and accepting a job name a card or job by its place, so another player's change in the same moment could move it.
