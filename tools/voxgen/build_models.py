@@ -839,6 +839,27 @@ DOCK = {
                               "B1": "#D9A13B", "S": SHADOW},
 }
 
+# Ryan's Shrub, Basalt & Poppy pack (2026-11-24): two plants at 0.1 m voxels and a rock at 0.2 m.
+# Colors are his own; P1 is the boulders' first PLATEAU color. Nothing is lit.
+HILL_DRESS = {
+    "bitterberry_shrub": ({"B2": "#3D2919", "B1": "#6B4D30", "F3": "#4E5936", "F1": "#6D7A4C",
+                           "F2": "#8A9663", "A1": "#D9A13B", "A2": "#E5B53B", "S": SHADOW}, "prop", 0.1),
+    "basalt_column_cluster": ({"K1": "#343A46", "K2": "#495261", "K3": "#232832", "P1": PLATEAU[0],
+                               "S": SHADOW}, "rock", 0.2),
+    "plateau_poppy": ({"G3": "#2E4F22", "G1": "#587D3A", "G2": "#7EA856", "Y1": "#E5B53B",
+                       "Y2": "#F2C96B", "Y3": "#C98A4B", "M3": "#2E3844", "S": SHADOW}, "prop", 0.1),
+}
+
+# Ryan's Environment Variants pack (2026-11-24): a butte, a gulch bend and three underground
+# pieces, all 0.2 m voxels. Colors are his own; P1..P4 match the boulders' PLATEAU colors, D1 and
+# K1 to K3 the gulch and the basalt. The crystals glow (emit_crystal, his name); nothing else is lit.
+BUTTE = {"P1": PLATEAU[0], "P2": PLATEAU[1], "P3": PLATEAU[2], "P4": PLATEAU[3], "D1": "#C26B4A",
+         "K1": "#343A46", "S": SHADOW}
+CAVERN = {"K1": "#343A46", "K2": "#495261", "K3": "#232832", "EC": TEAL, "Q1": "#2A8F85", "S": SHADOW}
+ENV_VARIANTS = {"mesa_butte_stack": BUTTE, "gulch_bend_corner": BUTTE, "cavern_crystal_grotto": CAVERN,
+                "sub_shale_tunnel": CAVERN, "sub_sump_cistern": CAVERN, "mesa_arch_span": BUTTE,
+                "rim_inner_corner": BUTTE, "sub_crystal_seam_wall": CAVERN, "sub_pillar_vault": CAVERN}
+
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
                      colors: dict[str, str], part: str = "prop",
@@ -894,6 +915,9 @@ MODELS = [
     *[((lambda n=n: prop_sheet(n, *OUTDOOR[n][:3])), OUTDOOR[n][3]) for n in OUTDOOR],
     *[((lambda n=n: prop_sheet(n, SILK[n][0])), SILK[n][1]) for n in SILK],
     *[((lambda n=n: prop_sheet(n, DOCK[n])), 0.1) for n in DOCK],
+    *[((lambda n=n: prop_sheet(n, *HILL_DRESS[n][:2])), HILL_DRESS[n][2]) for n in HILL_DRESS],
+    *[((lambda n=n: prop_sheet(n, ENV_VARIANTS[n], "rock", {"EC": "emit_crystal"})), 0.2)
+      for n in ENV_VARIANTS],
 ]
 
 
