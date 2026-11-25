@@ -25,6 +25,8 @@ signal credibility_changed(points: int)
 signal crops_changed
 ## A soil cell was tilled.
 signal soil_tilled(cell: Vector3i)
+## Ground was dug or filled.
+signal terrain_changed
 ## The job board or the accepted jobs changed (paid calibration jobs).
 signal jobs_changed
 ## The lab grew, a build started or finished, or an area changed.
@@ -182,6 +184,8 @@ var rng := RandomNumberGenerator.new()
 var rover_transforms: Dictionary = {}
 ## Vector3i -> true for every tilled soil cell.
 var tilled_cells: Dictionary = {}
+## How deep each dug cell of Terrain is, in steps.
+var dug: Dictionary[Vector2i, int] = {}
 
 ## Lab credibility (Ryan, 2026-11-22): audits and overdue instruments move it;
 ## the phone shows its band. See data/economy.json "credibility".
@@ -403,7 +407,7 @@ const MAX_KNOWN_GUESTS: int = 64
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
-	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids"]
+	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -465,6 +469,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 	for cell: Variant in data["tilled_cells"]:
 		if not cell is Vector3i:
 			return "'tilled_cells' has an entry that is not a cell."
+	var dug_problem: String = Terrain.dug_problem(data.get("dug", {}))
+	if dug_problem != "":
+		return "'dug' %s" % dug_problem
 	if not _optional_fields(data["lab_build"], ["kind", "discipline"], ["size", "done_day"]):
 		return "'lab_build' has a field of the wrong type."
 	for list: String in ["job_board", "active_jobs"]:
@@ -603,6 +610,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	jobs_changed.emit()
 	lab_changed.emit()
 	robots_changed.emit()
+	terrain_changed.emit()
 	return ""
 
 
@@ -632,6 +640,8 @@ func put_farm(data: Dictionary) -> void:
 		var value: Variant = data.get(field, fresh.get(field))
 		if value is Array:
 			(get(field) as Array).assign((value as Array).duplicate(true))
+		elif value is Dictionary and (get(field) as Dictionary).is_typed():
+			(get(field) as Dictionary).assign(value)
 		elif value is Dictionary:
 			set(field, (value as Dictionary).duplicate(true))
 		else:
@@ -3968,6 +3978,31 @@ func till(cell: Vector3i, player_id: String = "") -> bool:
 	_award_xp("till", player_id)
 	soil_tilled.emit(cell)
 	return true
+
+
+## Digs a cell of Terrain (y = 0) one step deeper. Returns "" or why not. It costs
+## and gives nothing [ASSUMPTION].
+@warning_ignore("unused_parameter")
+func dig(cell: Vector3i, player_id: String = "") -> String:
+	var at := Vector2i(cell.x, cell.z)
+	var problem: String = Terrain.dig_problem(at, dug) if cell.y == 0 else "This ground can't be dug."
+	if problem == "":
+		dug[at] = dug.get(at, 0) + 1
+		terrain_changed.emit()
+	return problem
+
+
+## Fills a dug cell one step. Returns "" or why not.
+@warning_ignore("unused_parameter")
+func fill(cell: Vector3i, player_id: String = "") -> String:
+	var at := Vector2i(cell.x, cell.z)
+	var problem: String = Terrain.fill_problem(at, dug) if cell.y == 0 else "There is nothing to fill here."
+	if problem == "":
+		dug[at] -= 1
+		if dug[at] == 0:
+			dug.erase(at)
+		terrain_changed.emit()
+	return problem
 
 
 ## Plants `crop_id` (default: the current seed) on a tilled, empty cell.

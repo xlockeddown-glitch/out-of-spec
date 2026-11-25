@@ -8,7 +8,7 @@ extends Node
 const ACTIONS: Array[StringName] = [
 	&"accept_job", &"add_robot_calibrate_card", &"add_robot_card", &"add_robot_collect_card",
 	&"adjust_setpoint", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
-	&"calibrate_at_bench", &"clear_lab_area", &"collect_spool", &"complete_job", &"fit_lab_area", &"get_up", &"go_to_bed",
+	&"calibrate_at_bench", &"clear_lab_area", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_up", &"go_to_bed",
 	&"harvest_crop", &"mine_fissure", &"plant_crop", &"release_robot", &"remove_robot_card",
 	&"sell_harvest_to_lin", &"send_to_oirm", &"set_interlock_override", &"slot_spool_into_relay",
 	&"start_lab_grow", &"till", &"zero_steering",

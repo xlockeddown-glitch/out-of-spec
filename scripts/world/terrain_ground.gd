@@ -68,6 +68,15 @@ func height_at(at: Vector3) -> float:
 	return Terrain.height(Vector2(at.x, at.z), _dug)
 
 
+## The highest ground under a body at `at`.
+func highest_under(at: Transform3D, half_length_m: float, half_width_m: float) -> float:
+	var highest_m: float = -INF
+	for x: int in range(-2, 3):
+		for z: int in range(-2, 3):
+			highest_m = maxf(highest_m, height_at(at * Vector3(half_width_m * x * 0.5, 0.0, half_length_m * z * 0.5)))
+	return highest_m
+
+
 ## How a body at `at` facing `forward` lies on the ground under its wheels.
 func lie_at(at: Vector3, forward: Vector3, half_length_m: float, half_width_m: float) -> Basis:
 	var ahead := Vector3(forward.x, 0.0, forward.z).normalized()

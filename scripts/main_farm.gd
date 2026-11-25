@@ -40,6 +40,9 @@ func _ready() -> void:
 	_rover.steering_zeroed.connect(_on_steering_zeroed)
 	_rover.soil_tilled.connect(_on_soil_tilled)
 	_rover.till_rejected.connect(_on_till_rejected)
+	_rover.dig_rejected.connect(_on_dig_rejected)
+	_rover.fill_rejected.connect(_on_fill_rejected)
+	GameState.terrain_changed.connect(_show_dug)
 	_rover.tilled_cell_used.connect(_on_tilled_cell_used)
 	_hud.zero_steering_pressed.connect(_on_zero_pressed)
 	_hud.slot_spool_pressed.connect(_on_slot_spool_pressed)
@@ -82,6 +85,7 @@ func _ready() -> void:
 		_hud.push_log(line)
 	var relay_name: String = _rover.satellite_relay.relay_name if _rover.satellite_relay else "NO RELAY"
 	_hud.configure(relay_name, _rover.steering.mpe, _rover.steering.acceptance_ratio)
+	_show_dug()
 	_last_band = _rover.get_drift_band()
 	_rover.broadcast_state()
 	_refresh_relay_hud()
@@ -203,6 +207,19 @@ func _on_till_rejected(reason: String) -> void:
 	_hud.push_log("TILL FAILED: %s" % reason)
 
 
+func _on_dig_rejected(reason: String) -> void:
+	_hud.push_log("DIG FAILED: %s" % reason)
+
+
+func _on_fill_rejected(reason: String) -> void:
+	_hud.push_log("FILL FAILED: %s" % reason)
+
+
+func _show_dug() -> void:
+	_rover.ground.show_dug(GameState.dug)
+	_rover.keep_above_ground()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"interact") and _cal_pad.rover_inside:
 		get_viewport().set_input_as_handled()
@@ -216,6 +233,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _is_key(event, KEY_T) and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_robots_ui.open()
+	elif event.is_action_pressed(&"rover_dig"):
+		get_viewport().set_input_as_handled()
+		_rover.queue_command(RoverController.Command.DIG)
+	elif event.is_action_pressed(&"rover_fill"):
+		get_viewport().set_input_as_handled()
+		_rover.queue_command(RoverController.Command.FILL)
 	elif _is_key(event, KEY_C):
 		get_viewport().set_input_as_handled()
 		var seed: String = GameState.cycle_seed()

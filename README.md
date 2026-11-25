@@ -68,6 +68,7 @@ Open `project.godot` in Godot 4.7 and press F5. The farm saves each morning and 
 |---|---|
 | WASD / arrows | Drive rover (through the uplink lag) |
 | Space | Drill a crystal ore fissure under the rover, or till the soil tile |
+| G / H | Dig / fill the ground in front of the stopped rover, off the level farm |
 | E (in Bram's bay) | Trade 6 crystal ore for wide treads |
 | F9 (debug builds) | Skip to the next morning |
 | R or ZERO STEERING button | Re-zero steering drift remotely |

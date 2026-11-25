@@ -48,6 +48,7 @@ func _worn() -> GameStateScript:
 	gs.buy_standard("reference_gauge")
 	gs.park_rover("rover_1", Transform3D(Basis(Vector3.UP, 0.1 + 0.2), Vector3(1.1, 2.2, 3.3)))
 	gs.mined_fissures[&"FissureA"] = 2
+	gs.dig(Vector3i(20, 0, 20))
 	gs._spool_species.append(&"curlyhair")
 	gs._spool_damaged.append(true)
 	gs.slotted_spool_damaged = true
@@ -248,7 +249,8 @@ func test_bad_bytes_change_nothing() -> String:
 				["at_oirm", { "x": [] }], ["suspect_units", { "x": [] }], ["mined_fissures", { "x": [] }], ["lab_areas", { "x": [] }],
 				["offence_counts", { "x": [] }], ["rover_uplinks", { "x": [] }], ["rover_transforms", { "x": [] }], ["tilled_cells", { "here": true }],
 				["lab_build", { "kind": [] }], ["lab_build", { "kind": "grow", "size": [] }], ["lab_build", { "kind": "grow", "done_day": [] }],
-				["lab_build", { "kind": "refit", "discipline": [] }], ["owned_standards", { 3: true }], ["_untraceable_since_cal", { 3: true }]]:
+				["lab_build", { "kind": "refit", "discipline": [] }], ["owned_standards", { 3: true }], ["_untraceable_since_cal", { 3: true }],
+				["dug", { Vector2i(20, 20): 2 }], ["dug", { Vector2i(0, 0): 1 }], ["dug", { Vector2i(20, 20): "1" }], ["dug", { 3: 1 }], ["dug", []]]:
 			var data: Dictionary = whole.duplicate(true)
 			data["farm"][values[0]] = values[1]
 			bad[str(values)] = SaveGame.to_bytes(data)
@@ -404,3 +406,29 @@ func test_guests_rover_changes_nothing() -> String:
 		guest.set_rover_uplink("rover_1", true)
 		guest.park_rover("rover_1", Transform3D.IDENTITY)
 		return problem + _differs(before, guest.farm_to_dict(), "after the guest's rover drove"))
+
+
+func test_a_guest_sees_digging_and_old_farms_load_without_it() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		if FarmSync.join(bytes, guest) != "" or guest.dug != host.dug or guest.dug.size() != 1:
+			return "A guest must have the host's digging."
+		var counts: Dictionary = _count(guest)
+		host.dig(Vector3i(21, 0, 20))
+		host.dig(Vector3i(-30, 0, 5))
+		host.fill(Vector3i(20, 0, 20))
+		if FarmSync.update(FarmSync.capture(host), guest) != "" or guest.dug != host.dug or guest.dug.size() != 2:
+			return "A guest must get what was dug since."
+		if counts.get("terrain_changed", 0) != 1:
+			return "A guest must be told once that the ground changed."
+		guest.dug[Vector2i(25, 25)] = 1
+		if host.dug.has(Vector2i(25, 25)):
+			return "The copies must not be shared."
+		var old: Dictionary = host.farm_to_dict()
+		old.erase("dug")
+		if guest.farm_from_dict(old) != "" or not guest.dug.is_empty() or counts["terrain_changed"] != 2:
+			return "A farm from before digging must load with none, and be shown."
+		# A dictionary of no type, as another build may have saved it.
+		old["dug"] = { Vector2i(20, 20): 1 }
+		if guest.farm_from_dict(old) != "" or guest.dug.get(Vector2i(20, 20), 0) != 1:
+			return "Digging must load whatever its dictionary's type."
+		return "")

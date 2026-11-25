@@ -134,6 +134,31 @@ func test_a_guest_cannot_make_soil_or_ore() -> String:
 	return "\n".join(problems)
 
 
+func test_a_guest_digs_and_fills_only_by_the_rules() -> String:
+	var commands: Node = _make()
+	var problems: PackedStringArray = []
+	for cell: Vector3i in [Vector3i(0, 0, 0), Vector3i(20, 1, 20), Vector3i(2147483647, 0, -2147483648), Vector3i(-39, 0, 39)]:
+		if commands.execute("player_2", &"dig", [cell]) == "" or commands.execute("player_2", &"fill", [cell]) == "":
+			problems.append("Changed the ground at %s" % cell)
+	for arguments: Array in [[], [Vector2i(20, 20)], [Vector3(20, 0, 20)], ["x"], [Vector3i(20, 0, 20), "player_1"]]:
+		for action: StringName in [&"dig", &"fill"]:
+			if commands.execute("player_2", action, arguments) == "":
+				problems.append("Did %s with %s" % [action, arguments])
+	if not commands.state.dug.is_empty():
+		problems.append("A refused dig must change nothing")
+	var told: Array = [0]
+	commands.state.terrain_changed.connect(func() -> void: told[0] += 1)
+	var cell := Vector3i(20, 0, 20)
+	if commands.execute("player_2", &"dig", [cell]) != "" or commands.state.dug.get(Vector2i(20, 20), 0) != 1:
+		problems.append("A guest must dig")
+	if commands.execute("player_2", &"dig", [cell]) == "" or commands.state.dug[Vector2i(20, 20)] != 1:
+		problems.append("Dug too steep")
+	if commands.execute("player_2", &"fill", [cell]) != "" or not commands.state.dug.is_empty() or told[0] != 2:
+		problems.append("A guest must fill, and each change be told")
+	_free(commands)
+	return "\n".join(problems)
+
+
 func test_zero_steering_is_no_calibration() -> String:
 	var saved: float = GameClock.elapsed_days
 	var commands: Node = _make()

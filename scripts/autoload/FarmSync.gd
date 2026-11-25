@@ -28,6 +28,7 @@ const SHOWN_BY: Dictionary = {
 	&"jobs_changed": ["job_board", "active_jobs", "job_log", "_board_day"],
 	&"lab_changed": ["lab_size", "lab_areas", "lab_build", "lab_layout"],
 	&"robots_changed": ["robots"],
+	&"terrain_changed": ["dug"],
 }
 ## These also show the day.
 const SHOW_THE_DAY: Array[StringName] = [&"molt_changed", &"fissures_changed", &"jobs_changed"]
