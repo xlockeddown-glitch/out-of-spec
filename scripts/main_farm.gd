@@ -5,6 +5,9 @@ extends Node
 
 ## Phone-log lines replayed into the HUD when the farm loads.
 const LOG_REPLAY_LINES: int = 6
+## With the rover in the other scene, these only say where it is.
+const ROVER_KEYS: Array[StringName] = [
+	&"rover_forward", &"rover_reverse", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill"]
 ## A clicked prop's text stays in the hover label this long, like the dome's toast.
 const INSPECT_SECONDS: float = 3.0
 ## Long descriptions stay up longer.
@@ -40,6 +43,9 @@ var _inspect_left: float = 0.0
 ## (key or button) arms the offer and shows the price; a second press on the
 ## same offer buys it. Leaving the bay or pressing another offer re-arms.
 var _armed_standard: String = ""
+## This player asked to move the rover; the host said yes.
+var _moving: bool = false
+var _move_granted: bool = false
 
 
 func _ready() -> void:
@@ -73,6 +79,7 @@ func _ready() -> void:
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.skill_leveled.connect(_on_skill_leveled)
 	SaveGame.save_failed.connect(_hud.push_log)
+	GameState.rover_place_changed.connect(_on_rover_place_changed)
 	GameState.credits_changed.connect(_on_credits_changed)
 	GameState.ore_changed.connect(_on_ore_changed)
 	GameState.credibility_changed.connect(_on_credibility_changed)
@@ -107,6 +114,7 @@ func _ready() -> void:
 	_refresh_jobs_hud()
 	_hud.get_parent().add_child(SkillsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())
+	_say_if_away()
 	_robots_ui = RobotsUI.new()
 	_hud.get_parent().add_child(_robots_ui)
 
@@ -118,7 +126,7 @@ func _process(delta: float) -> void:
 		_inspect_left -= delta
 		return
 	var hovered: Clickable = Clickable.hovered
-	_hover_hint.text = hovered.hint if hovered else ""
+	_hover_hint.text = hovered.hint if hovered else _rover.away_text()
 
 
 func _show_inspect(text: String) -> void:
@@ -127,6 +135,9 @@ func _show_inspect(text: String) -> void:
 
 
 func _on_uplink_changed(has_los: bool, quality: float, lag_s: float) -> void:
+	if _rover.away_text() != "":
+		_hud.set_rover_away()
+		return
 	_hud.set_uplink(has_los, quality, lag_s)
 	if _had_los != has_los:
 		_hud.push_log("SYS: LOS %s" % ("restored" if has_los else "lost; uplink lag rising"))
@@ -141,6 +152,9 @@ func _on_drift_changed(drift_deg: float, band: int) -> void:
 
 
 func _on_zero_pressed() -> void:
+	if _rover.away_text() != "":
+		_say_if_away()
+		return
 	_rover.queue_command(RoverController.Command.ZERO_STEERING)
 	_hud.push_log("> ZERO STEERING sent (%d ms lag)" % roundi(_rover.get_current_lag() * 1000.0))
 
@@ -165,7 +179,7 @@ func _on_slot_spool_pressed() -> void:
 			return
 		_hud.push_log("%s installed%s. Uplink lag × %s." % [
 			"Damaged silk spool" if GameState.slotted_spool_damaged else "Optical silk spool",
-			", the damaged one thrown away" if replaced else "", SP811.number(GameState.get_relay_lag_multiplier(), 2)])
+			", the old one taken out" if replaced else "", SP811.number(GameState.get_relay_lag_multiplier(), 2)])
 
 
 func _on_silk_changed(_spools: int) -> void:
@@ -239,6 +253,9 @@ func _on_blocks_changed() -> void:
 
 ## Q: puts the dish (at the relay) or the rover's steering encoder against a block.
 func _check_with_block() -> void:
+	if _rover.away_text() != "":
+		_say_if_away()
+		return
 	if not _rover.is_stopped():
 		_hud.push_log("BLOCK CHECK: stop the rover first.")
 		return
@@ -268,7 +285,14 @@ func _show_dug() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"interact") and _cal_pad.rover_inside:
+	var away: bool = _rover.away_text() != ""
+	if away and event.is_action_pressed(&"interact"):
+		get_viewport().set_input_as_handled()
+		SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+	elif away and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
+		get_viewport().set_input_as_handled()
+		_say_if_away()
+	elif event.is_action_pressed(&"interact") and _cal_pad.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_field_cal()
 	elif event.is_action_pressed(&"interact") and _tunnel_pad.rover_inside:
@@ -299,7 +323,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			GameState.crop_name(seed), SP811.integer(GameState.seed_cost(seed)),
 			SP811.integer(int(GameState.crop(seed).get("growth_days", 0))),
 			SP811.number(float(GameState.crop(seed).get("soil_moisture_target", 0.0)) * 100.0, 0)])
-	elif _is_key(event, KEY_BRACKETLEFT) or _is_key(event, KEY_BRACKETRIGHT):
+	elif not away and (_is_key(event, KEY_BRACKETLEFT) or _is_key(event, KEY_BRACKETRIGHT)):
 		var cell: Vector3i = _rover.cell_under()
 		var step: int = -1 if _is_key(event, KEY_BRACKETLEFT) else 1
 		get_viewport().set_input_as_handled()
@@ -540,9 +564,32 @@ func _go_to_dome() -> void:
 	SceneSwitcher.swap_to(SceneSwitcher.DOME_SCENE)
 
 
+## Says where the rover is if it is not here.
+func _say_if_away() -> void:
+	if _rover.away_text() != "":
+		_hud.push_log(_rover.away_text())
+
+
+## Takes the rover in and goes with it.
 func _enter_tunnels() -> void:
-	# Alone it always comes in at the mouth. With friends in, someone may be
-	# driving it in there.
-	if not CoopRovers.together():
-		FarmCommands.rover_parked(GameState.TUNNEL_ROVER, GameState.TUNNEL_START)
-	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+	if _moving:
+		return
+	_moving = true
+	var problem: String = await FarmCommands.request(&"move_rover", [true])
+	if not is_inside_tree():
+		return
+	if problem != "":
+		_moving = false
+		_hud.push_log("TUNNEL MOUTH: " + problem)
+		return
+	_move_granted = true
+	_on_rover_place_changed()
+
+
+## A guest's copy of the farm may come after the host's yes.
+func _on_rover_place_changed() -> void:
+	if _move_granted and _rover.away_text() != "":
+		_move_granted = false
+		SceneSwitcher.go_to(SceneSwitcher.TUNNELS_SCENE)
+	elif not _moving:
+		_say_if_away()

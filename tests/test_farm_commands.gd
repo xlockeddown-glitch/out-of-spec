@@ -66,7 +66,8 @@ func test_bad_requests_are_refused() -> String:
 			[&"calibrate", ["steering"]], [&"add_rover_usage", [1.0]], [&"park_rover", ["tractor", Transform3D.IDENTITY]],
 			[&"rover_drove", [1.0]], [&"till", [Vector3(0.0, 0.0, 0.0)]], [&"mine_fissure", ["FissureA"]],
 			[&"calibrate_at_bench", [null]],
-			[&"calibrate_at_bench", ["air_hygrometer", "player_9"]], [&"collect_spool", ["player_9", true, true]]]:
+			[&"calibrate_at_bench", ["air_hygrometer", "player_9"]], [&"collect_spool", ["player_9", true, true]],
+			[&"catch_species", ["cobalt_sentinel"]], [&"collect_enclosure_spool", []], [&"collect_enclosure_spool", [3]]]:
 		if commands.problem(bad[0], bad[1]) == "":
 			problems.append(str(bad))
 	var kinds: Array = [commands.refusal(&"start_lab_grow", "no"), commands.refusal(&"collect_spool", "no"),

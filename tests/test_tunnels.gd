@@ -4,6 +4,7 @@ extends "res://tests/coop_net.gd"
 
 const RoversScript: GDScript = preload("res://scripts/autoload/CoopRovers.gd")
 const SwitcherScript: GDScript = preload("res://scripts/autoload/SceneSwitcher.gd")
+const FarmScene: PackedScene = preload("res://scenes/main_farm.tscn")
 const TunnelsScene: PackedScene = preload("res://scenes/basalt_tunnels.tscn")
 const ANTENNA: Vector3 = Vector3(0.22, 1.88, 0.38)
 
@@ -167,7 +168,147 @@ func test_the_airlock_leads_back_to_where_the_dome_was_entered() -> String:
 	return problem
 
 
-func test_a_guest_may_drive_in_the_tunnels_first() -> String:
+func test_the_pads_are_where_the_farm_thinks() -> String:
+	var tunnels: Node = TunnelsScene.instantiate()
+	var farm: Node = FarmScene.instantiate()
+	var problem: String = ""
+	if _place(tunnels, "ExitPad") != GameState.TUNNEL_EXIT or _place(farm, "TunnelPad") != GameState.TUNNEL_PAD:
+		problem = "The pads must be where GameState says"
+	if not TunnelRock.holds(GameState.TUNNEL_EXIT) or not TunnelRock.holds(GameState.TUNNEL_START.origin):
+		problem = "The rover must be able to be at the mouth"
+	tunnels.free()
+	farm.free()
+	return problem
+
+
+func test_the_rover_goes_in_and_comes_out_where_it_went_in() -> String:
+	var farm: Node = GameStateScript.new()
+	var off_pad := Transform3D(Basis.IDENTITY, farm.TUNNEL_PAD + Vector3(farm.TUNNEL_PAD_REACH_M + 0.1, 0.0, 0.0))
+	var mouth := Transform3D(Basis.IDENTITY, farm.TUNNEL_PAD + Vector3(1.0, 0.0, 0.0))
+	var shown: Array[int] = [0]
+	farm.rover_place_changed.connect(func() -> void: shown[0] += 1)
+	var problem: String = ""
+	if farm.move_rover(true) == "" or farm.move_rover(false) == "":
+		problem = "Only a rover whose place is known goes in, and only one inside comes out"
+	farm.park_rover(farm.ROVER, off_pad)
+	if farm.move_rover(true) == "" or farm.rover_in_tunnels:
+		problem = "It must be on the pad"
+	farm.park_rover(farm.ROVER, mouth)
+	CoopRovers._drivers[farm.ROVER] = ["player_2", 0]
+	var other: String = farm.move_rover(true, "player_1")
+	var own: String = farm.move_rover(true, "player_2")
+	CoopRovers._drivers.erase(farm.ROVER)
+	if other == "" or own != "" or not farm.rover_in_tunnels or shown[0] != 1:
+		problem = "Whoever drives takes it in, and nobody else (%s, %s)" % [other, own]
+	if farm.parked_rover_transform(farm.TUNNEL_ROVER) != farm.TUNNEL_START or not farm.rover_is_away(farm.ROVER) or farm.rover_here() != farm.TUNNEL_ROVER:
+		problem = "It comes in at the mouth and is gone from the farm"
+	if farm.move_rover(true) == "":
+		problem = "It can't go in twice"
+	farm.park_rover(farm.TUNNEL_ROVER, Transform3D(Basis.IDENTITY, Vector3(-19.5, 0.0, -7.5)))
+	if farm.move_rover(false) == "":
+		problem = "It comes out only from the pad there"
+	farm.park_rover(farm.TUNNEL_ROVER, Transform3D(Basis.IDENTITY, farm.TUNNEL_EXIT))
+	if farm.move_rover(false) != "" or farm.rover_in_tunnels or farm.parked_rover_transform(farm.ROVER) != mouth or not farm.rover_is_away(farm.TUNNEL_ROVER):
+		problem = "It comes out where it went in"
+	farm.free()
+	return problem
+
+
+func test_the_rover_is_gone_from_the_scene_it_is_not_in() -> String:
+	var held: Array = [GameState.rover_in_tunnels, GameState.rover_transforms.duplicate()]
+	GameState.rover_in_tunnels = false
+	GameState.rover_transforms.clear()
+	var rover := RoverController.new()
+	rover.rover_id = GameState.ROVER
+	(Engine.get_main_loop() as SceneTree).root.add_child(rover)
+	var problem: String = ""
+	if rover.away_text() != "" or not rover.visible or not rover.can_process():
+		problem = "On the farm it is there"
+	var entry := Transform3D(Basis.IDENTITY, GameState.TUNNEL_PAD)
+	GameState.park_rover(GameState.ROVER, entry)
+	GameState.rover_in_tunnels = true
+	GameState.rover_place_changed.emit()
+	rover.queue_command(RoverController.Command.DIG)
+	rover._park()
+	if rover.away_text() != "The rover is in the tunnels. Press E to go there." or rover.visible or rover.can_process() or not rover._commands.is_empty():
+		problem = "In the tunnels it is gone from the farm and takes no command"
+	if GameState.parked_rover_transform(GameState.ROVER) != entry:
+		problem = "One that is gone must not say where it is"
+	GameState.rover_in_tunnels = false
+	GameState.rover_place_changed.emit()
+	if not rover.visible or not rover.can_process() or rover.position.distance_to(entry.origin) > 0.1:
+		problem = "It must be back where it went in (%s)" % rover.position
+	rover.free()
+	GameState.rover_in_tunnels = held[0]
+	GameState.rover_transforms = held[1]
+	return problem
+
+
+func test_a_rover_in_the_rock_comes_back_at_the_mouth() -> String:
+	var held: Array = [GameState.rover_in_tunnels, GameState.rover_transforms.duplicate()]
+	GameState.rover_in_tunnels = true
+	GameState.rover_transforms = { GameState.TUNNEL_ROVER: Transform3D(Basis.IDENTITY, Vector3(400.0, 0.0, 0.0)) }
+	var rover := RoverController.new()
+	rover.rover_id = GameState.TUNNEL_ROVER
+	(Engine.get_main_loop() as SceneTree).root.add_child(rover)
+	var at: Vector3 = rover.position
+	rover.free()
+	GameState.rover_in_tunnels = held[0]
+	GameState.rover_transforms = held[1]
+	return "" if at == GameState.TUNNEL_START.origin else "It is at %s" % at
+
+
+func test_older_saves_have_the_rover_on_the_farm() -> String:
+	var farm: Node = GameStateScript.new()
+	farm.build_registry()
+	farm.rover_in_tunnels = true
+	var saved: Dictionary = farm.farm_to_dict()
+	var problem: String = ""
+	var later: Node = GameStateScript.new()
+	later.build_registry()
+	if later.farm_from_dict(saved) != "" or not later.rover_in_tunnels:
+		problem = "The place must be saved"
+	saved.erase("rover_in_tunnels")
+	if later.farm_from_dict(saved) != "" or later.rover_in_tunnels:
+		problem = "A save without one has it on the farm"
+	for wrong: Variant in ["tunnels", 1, null]:
+		saved["rover_in_tunnels"] = wrong
+		if later.farm_dict_problem(saved) == "":
+			problem = "%s is no place" % wrong
+	farm.free()
+	later.free()
+	return problem
+
+
+func test_continue_opens_the_tunnels_only_if_left_there_with_the_rover() -> String:
+	var held: Dictionary = SaveGame.snapshot()
+	var held_open: bool = SaveGame.farm_open
+	var path: String = "user://test_tunnels.save"
+	var inside := Transform3D(Basis.IDENTITY, Vector3(-19.5, 0.0, -7.5))
+	var farm: String = SceneSwitcher.FARM_SCENE
+	var tunnels: String = SceneSwitcher.TUNNELS_SCENE
+	var problem: String = ""
+	# The saved scene, whether the rover is inside, and the scene that opens.
+	for case: Array in [[tunnels, true, tunnels], [farm, true, farm], [SceneSwitcher.DOME_SCENE, true, farm], ["res://no.tscn", true, farm],
+			[3, true, farm], [null, true, farm], [tunnels, false, farm], [farm, false, farm]]:
+		GameState.rover_in_tunnels = case[1]
+		GameState.park_rover(GameState.TUNNEL_ROVER, inside)
+		var data: Dictionary = SaveGame.snapshot()
+		data["scene"] = case[0]
+		if case[0] == null:
+			data.erase("scene")  # an older save
+		SaveGame._write_data(data, path)
+		if SaveGame.continue_farm(path) != "" or SaveGame.open_scene != case[2]:
+			problem = "%s opened %s" % [case, SaveGame.open_scene]
+		if GameState.rover_in_tunnels != (case[2] == tunnels) or GameState.parked_rover_transform(GameState.TUNNEL_ROVER) != inside:
+			problem = "%s: the rover must be in the scene that opens, where it was parked" % [case]
+	DirAccess.remove_absolute(path)
+	SaveGame.restore(held)
+	SaveGame.farm_open = held_open
+	return problem
+
+
+func test_a_guest_drives_the_rover_only_where_it_is() -> String:
 	var host: Node = _host()
 	var mine: Node = RoversScript.new()
 	mine.start(host, host.commands.state)
@@ -175,16 +316,30 @@ func test_a_guest_may_drive_in_the_tunnels_first() -> String:
 	var theirs: Node = RoversScript.new()
 	theirs.start(guest, guest.commands.state)
 	var id: String = GameState.TUNNEL_ROVER
-	mine.tick(Time.get_ticks_msec())
-	var known: bool = host.commands.state.parked_rover_transform(id) == GameState.TUNNEL_START
-	# In the game the farm's own sync brings the guest what the host parked.
-	guest.commands.state.park_rover(id, GameState.TUNNEL_START)
+	for farm: Node in [host.commands.state, guest.commands.state]:
+		farm.park_rover(GameState.ROVER, Transform3D(Basis.IDENTITY, GameState.TUNNEL_PAD))
+		farm.park_rover(id, GameState.TUNNEL_START)
+	theirs._told_driver[id] = ""
+	var early: bool = theirs.moves_here(id, true)
+	var asked: Array = _request(guest, &"move_rover", [true])
+	_until(func() -> bool: return not asked.is_empty())
+	var went: bool = asked == [""] and host.commands.state.rover_in_tunnels
+	# In the game the farm's own sync brings the guest the host's farm.
+	guest.commands.state.rover_in_tunnels = true
+	guest.commands.state.rover_place_changed.emit()
 	mine.tick(Time.get_ticks_msec() + 100000)
 	var told: bool = _until(func() -> bool: return theirs._told_driver.has(id))
-	var drives: bool = theirs.moves_here(id, true)
+	var drives: bool = theirs.moves_here(id, true) and not theirs._told_driver.has(GameState.ROVER)
 	var to := Transform3D(Basis.IDENTITY, GameState.TUNNEL_START.origin + Vector3(0.0, 0.0, -2.0))
 	theirs.moved(id, to, 3.0, true)
 	var followed: bool = _until(func() -> bool: return mine.place(id).is_equal_approx(to) and mine.driver(id) == "player_2")
+	# A guest's word is not enough for the rover on the farm, or for one in the rock.
+	mine._on_driven("player_2", GameState.ROVER, [GameState.TUNNEL_PAD.x - 2.0, 0.0, GameState.TUNNEL_PAD.z, 0.0, 1.0, true])
+	var forged: bool = mine.driver(GameState.ROVER) != "" or mine.place(GameState.ROVER).origin != GameState.TUNNEL_PAD
+	var rock: Vector3 = to.origin + Vector3(0.0, 0.0, 13.0)
+	mine._on_driven("player_2", id, [rock.x, rock.y, rock.z, 0.0, 1.0, true])
+	forged = forged or TunnelRock.holds(rock) or not mine.place(id).is_equal_approx(to)
 	mine.free()
 	theirs.free()
-	return _finish("" if known and told and drives and followed else "known %s, told %s, drives %s, followed %s" % [known, told, drives, followed])
+	return _finish("" if not early and went and told and drives and followed and not forged
+		else "early %s, went %s %s, told %s, drives %s, followed %s, forged %s" % [early, went, asked, told, drives, followed, forged])

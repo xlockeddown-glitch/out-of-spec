@@ -57,6 +57,7 @@ func start(with_session: Node, with_farm: Node) -> void:
 	session.player_left.connect(_on_left)
 	session.joined.connect(_forget.unbind(1))
 	farm.farm_loaded.connect(_forget)
+	farm.rover_place_changed.connect(_forget)
 
 
 func _process(_delta: float) -> void:
@@ -137,10 +138,9 @@ func tick(now: int) -> void:
 			known.clear()
 	if not session.is_hosting() or session.players.size() < 2:
 		return
-	if not farm.rover_transforms.has(farm.TUNNEL_ROVER):
-		# A guest can only drive a rover the farm knows, and may go in first.
-		farm.park_rover(farm.TUNNEL_ROVER, farm.TUNNEL_START)
 	for rover_id: String in farm.rover_transforms:
+		if farm.rover_is_away(rover_id):
+			continue
 		if not _poses.has(rover_id):
 			# A rover in the scene here says where it is itself; the farm may lag it.
 			if now - _here_at.get(rover_id, -STILL_MS) < STILL_MS:
@@ -158,14 +158,17 @@ func tick(now: int) -> void:
 ## Host: a guest says where the rover it drives is.
 func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Time.get_ticks_msec()) -> void:
 	_expire(now)
-	if not farm.rover_transforms.has(rover_id) or not driver(rover_id) in ["", player_id] or not together():
+	if not farm.rover_transforms.has(rover_id) or farm.rover_is_away(rover_id):
+		return
+	if not driver(rover_id) in ["", player_id] or not together():
 		return
 	var to: Transform3D = _transform(pose)
 	var from: Transform3D = place(rover_id)
 	var reach: Array = _reach.get(rover_id, [REACH_M, now])
 	var left: float = minf(REACH_M, reach[0] + (now - reach[1]) * REACH_MPS / 1000.0)
 	var distance: float = from.origin.distance_to(to.origin)
-	if distance > left:
+	# In the rock nobody could get it out again.
+	if distance > left or (rover_id == farm.TUNNEL_ROVER and not TunnelRock.holds(to.origin)):
 		# It is told where the rover is, and drives on from there.
 		_drivers.erase(rover_id)
 		_sent_at.erase(rover_id)
@@ -182,7 +185,7 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 
 ## Guest: the host says who drives and where the rover is.
 func _on_told(rover_id: String, driver_id: String, pose: Array, now: int = Time.get_ticks_msec()) -> void:
-	if not farm.rover_transforms.has(rover_id):
+	if not farm.rover_transforms.has(rover_id) or farm.rover_is_away(rover_id):
 		return
 	_told_driver[rover_id] = driver_id
 	var own: String = farm.local_player_id
@@ -210,6 +213,8 @@ func _forget() -> void:
 
 
 func _may_drive(rover_id: String) -> bool:
+	if farm.rover_is_away(rover_id):
+		return false
 	return session.is_hosting() or (session.is_guest() and _told_driver.has(rover_id))
 
 

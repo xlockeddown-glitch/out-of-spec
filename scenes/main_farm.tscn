@@ -21,6 +21,7 @@
 [ext_resource type="Script" path="res://scripts/world/dig_outline.gd" id="32_outline"]
 [ext_resource type="Script" path="res://scripts/world/boulder.gd" id="33_boulder"]
 [ext_resource type="Script" path="res://scripts/world/hill_dressing.gd" id="34_dress"]
+[ext_resource type="Shader" path="res://assets/shaders/ground.gdshader" id="35_groundshader"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 
@@ -36,9 +37,8 @@ glow_enabled = true
 glow_intensity = 0.9
 glow_bloom = 0.05
 
-[sub_resource type="StandardMaterial3D" id="MatGround"]
-vertex_color_use_as_albedo = true
-albedo_color = Color(0.42, 0.5, 0.3, 1)
+[sub_resource type="ShaderMaterial" id="MatGround"]
+shader = ExtResource("35_groundshader")
 
 [sub_resource type="StandardMaterial3D" id="MatRock"]
 albedo_color = Color(0.5, 0.48, 0.45, 1)

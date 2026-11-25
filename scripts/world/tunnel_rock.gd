@@ -64,6 +64,11 @@ static func is_floor(cell: Vector2i) -> bool:
 	return tile(cell) in ".AB"
 
 
+## True if the rover can be at this place.
+static func holds(place: Vector3) -> bool:
+	return is_floor(cell_of(place)) and absf(place.y) < ROCK_M
+
+
 ## The middle of a cell.
 static func at(cell: Vector2i) -> Vector3:
 	return Vector3((cell.x - (MAP[0].length() - 1) * 0.5) * CELL_M, 0.0, (cell.y - (MAP.size() - 1) * 0.5) * CELL_M)
@@ -186,10 +191,8 @@ func _build_blocks() -> void:
 	stone.vertex_color_is_srgb = true
 	stone.roughness = 1.0
 	_add_blocks("Blocks", rock, rock_colors, stone)
-	var molten := StandardMaterial3D.new()
-	molten.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	molten.vertex_color_use_as_albedo = true
-	molten.vertex_color_is_srgb = true
+	var molten := ShaderMaterial.new()
+	molten.shader = load("res://assets/shaders/magma.gdshader")
 	_add_blocks("Magma", magma, magma_colors, molten)
 
 
