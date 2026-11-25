@@ -4,6 +4,12 @@ extends StaticBody3D
 ## land, so a dig rebuilds only what it touched.
 
 const CHUNK_M: int = 16
+## What the ground's color is times on the highest land and in the lowest, so
+## hills read from above. Level ground keeps its color [PLACEHOLDER].
+const HIGH_TINT := Color(1.0, 0.82, 0.6)
+const LOW_TINT := Color(0.7, 0.8, 0.8)
+const HIGH_M: float = 6.0
+const LOW_M: float = -1.0
 
 @export var material: Material
 
@@ -12,13 +18,17 @@ var _chunks: Dictionary[Vector2i, MeshInstance3D] = {}
 var _shape := HeightMapShape3D.new()
 ## The ground at every point, row by row along z.
 var _heights := PackedFloat32Array()
+## The natural land's tint at every point, in the same order.
+var _tints := PackedColorArray()
 
 
 func _ready() -> void:
 	_heights.resize((Terrain.SIZE_M + 1) * (Terrain.SIZE_M + 1))
+	_tints.resize(_heights.size())
 	for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
 		for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
 			_heights[_index(x, z)] = Terrain.point_height(Vector2i(x, z), _dug)
+			_tints[_index(x, z)] = _tint(Terrain.natural(Vector2i(x, z)))
 	_shape.map_width = Terrain.SIZE_M + 1
 	_shape.map_depth = Terrain.SIZE_M + 1
 	_shape.map_data = _heights
@@ -84,14 +94,18 @@ func lie_at(at: Vector3, forward: Vector3, half_length_m: float, half_width_m: f
 func _build(chunk: Vector2i) -> void:
 	var points := PackedVector3Array()
 	var normals := PackedVector3Array()
+	var tints := PackedColorArray()
 	for x: int in range(chunk.x, chunk.x + CHUNK_M):
 		for z: int in range(chunk.y, chunk.y + CHUNK_M):
 			_add_face(points, normals, _point(x, z), _point(x + 1, z), _point(x, z + 1))
 			_add_face(points, normals, _point(x + 1, z), _point(x + 1, z + 1), _point(x, z + 1))
+			for corner: int in [_index(x, z), _index(x + 1, z), _index(x, z + 1), _index(x + 1, z), _index(x + 1, z + 1), _index(x, z + 1)]:
+				tints.append(_tints[corner])
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = points
 	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_COLOR] = tints
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_chunks[chunk].mesh = mesh
@@ -103,6 +117,12 @@ func _add_face(points: PackedVector3Array, normals: PackedVector3Array, a: Vecto
 	for corner: Vector3 in [a, b, c]:
 		points.append(corner)
 		normals.append(normal)
+
+
+func _tint(natural_m: float) -> Color:
+	if natural_m >= 0.0:
+		return Color.WHITE.lerp(HIGH_TINT, minf(natural_m / HIGH_M, 1.0))
+	return Color.WHITE.lerp(LOW_TINT, minf(natural_m / LOW_M, 1.0))
 
 
 func _point(x: int, z: int) -> Vector3:
