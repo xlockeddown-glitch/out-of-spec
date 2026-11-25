@@ -84,7 +84,7 @@ func test_the_beacon_is_seen_at_the_mouth_and_not_past_the_arch() -> String:
 		if not found.is_empty():
 			problem = "%s hides the beacon at %s" % [found, at]
 	# No rock is in the way here, only the arch.
-	var past: Vector3 = Vector3(-2.5, 0.0, 9.5)
+	var past: Vector3 = Vector3(-2.5, 0.0, 7.5)
 	var hit: PackedStringArray = _between(rock, past + ANTENNA, dish, TunnelRock.LAYER_OCCLUDER)
 	if hit != PackedStringArray(["Arch"]):
 		problem = "Only the arch must hide the beacon at %s, not %s" % [past, hit]
@@ -138,6 +138,7 @@ func test_a_rover_in_the_tunnels_says_nothing_of_the_relay() -> String:
 
 func test_rock_is_not_tilled_dug_or_filled() -> String:
 	var rover := RoverController.new()
+	rover.rover_id = "test_rover"
 	var said: Array[String] = []
 	for refused: Signal in [rover.till_rejected, rover.dig_rejected, rover.fill_rejected]:
 		refused.connect(func(why: String) -> void: said.append(why))

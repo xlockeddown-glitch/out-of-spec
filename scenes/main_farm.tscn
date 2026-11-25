@@ -159,7 +159,7 @@ size = Vector3(1.8, 3, 2.4)
 size = Vector3(4, 3, 0.8)
 
 [sub_resource type="StandardMaterial3D" id="MatBasalt"]
-albedo_color = Color(0.2, 0.17, 0.16, 1)
+albedo_color = Color(0.137255, 0.156863, 0.196078, 1)
 roughness = 1.0
 
 [sub_resource type="StandardMaterial3D" id="MatMouthGlow"]

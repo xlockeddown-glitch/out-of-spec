@@ -230,7 +230,9 @@ func _build_arch(cell: Vector2i, along: Vector2i) -> void:
 	stone.roughness = 1.0
 	for side: float in [-1.0, 1.0]:
 		var size: Vector3 = step * 0.8 + across * 2.0 + Vector3.UP * ARCH_LOW_M
-		_add_mesh(middle + step * side * width_m * 0.5 + Vector3.UP * ARCH_LOW_M * 0.5, size, stone)
+		var foot: Vector3 = middle + step * side * width_m * 0.5 + Vector3.UP * ARCH_LOW_M * 0.5
+		_add_mesh(foot, size, stone)
+		_add_body("Pillar", LAYER_WORLD, foot, size)
 	var lintel: StandardMaterial3D = stone.duplicate()
 	lintel.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	lintel.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
