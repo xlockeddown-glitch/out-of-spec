@@ -329,3 +329,10 @@ Where the generated models differ from the footprints above:
   - **Sump cistern** (`sub_sump_cistern`): 10 × 10 × 8 voxels (2.0 m × 2.0 m × 1.6 m tall), 472 voxels. The water is Q1, unlit; EC isn't used. Not placed.
 
   The three underground ones are for the tunnels.
+- **More Environment Variants** (Ryan's zip and four grids, 2026-11-24). Built as the Environment Variants, with their palettes and part names; the grids, the script and the .vox files in his zip match voxel for voxel (the seam wall then gets its border, below), and every model is face-connected.
+  - **Mesa arch span** (`mesa_arch_span`): 14 × 10 × 12 voxels (2.8 m × 2.0 m × 2.4 m tall), 996 voxels. Its opening runs front to back over a floor 0.4 m up, 0.8 m wide at its narrowest and 1.2 m at its widest. The rover is 1.6 m wide and doesn't fit.
+  - **Rim inner corner** (`rim_inner_corner`): 10 × 10 × 10 voxels (2.0 m × 2.0 m × 2.0 m tall), 564 voxels. Despite its name it is a convex outer corner: full height at one corner, stepping down with talus to the two sides away from it. It has no inside corner, so it doesn't turn the plateau rim inward. Neither K1 nor S is used.
+  - **Crystal seam wall** (`sub_crystal_seam_wall`): 10 × 10 × 10 voxels (2.0 m × 2.0 m × 2.0 m tall), 616 voxels, 6 of them EC, lit. As 6 is under the 9-voxel cutoff, the generator gives them their `#1D222B` border (answer A): 15 of the voxels around them are S instead of Ryan's colors, the only change. Not placed.
+  - **Pillar vault** (`sub_pillar_vault`): 12 × 12 × 10 voxels (2.4 m × 2.4 m × 2.0 m tall), 912 voxels. EC and Q1 aren't used. Not placed.
+
+  The two underground ones are for the tunnels.

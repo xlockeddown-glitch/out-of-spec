@@ -66,6 +66,10 @@ First-pass models are generated: run `python tools/voxgen/build_models.py`, whic
 | `cavern_crystal_grotto.glb` | Underground grotto with lit crystals, 2.4 m × 2.4 m × 2.0 m tall; not placed | 0.2 m voxels, origin at ground level. Built from Ryan's Environment Variants grid (`tools/voxgen/sheets/cavern_crystal_grotto.txt`). |
 | `sub_shale_tunnel.glb` | Straight underground drift along X, 2.0 m × 2.0 m × 1.6 m tall; not placed | 0.2 m voxels, origin at ground level. Built from Ryan's Environment Variants grid (`tools/voxgen/sheets/sub_shale_tunnel.txt`). |
 | `sub_sump_cistern.glb` | Underground seepage sump, 2.0 m × 2.0 m × 1.6 m tall; not placed | 0.2 m voxels, origin at ground level. Built from Ryan's Environment Variants grid (`tools/voxgen/sheets/sub_sump_cistern.txt`). |
+| `mesa_arch_span.glb` | Sandstone arch on a ledge, 2.8 m × 2.0 m × 2.4 m tall; not placed yet | 0.2 m voxels, origin at ground level. Built from Ryan's More Environment Variants grid (`tools/voxgen/sheets/mesa_arch_span.txt`). |
+| `rim_inner_corner.glb` | Banded outcrop, a convex outer corner despite its name, 2.0 m × 2.0 m × 2.0 m tall; not placed yet | 0.2 m voxels, origin at ground level. Built from Ryan's More Environment Variants grid (`tools/voxgen/sheets/rim_inner_corner.txt`). |
+| `sub_crystal_seam_wall.glb` | Underground wall with a lit crystal seam, 2.0 m × 2.0 m × 2.0 m tall; not placed | 0.2 m voxels, origin at ground level. Built from Ryan's More Environment Variants grid (`tools/voxgen/sheets/sub_crystal_seam_wall.txt`). |
+| `sub_pillar_vault.glb` | Underground vault on two pillars, 2.4 m × 2.4 m × 2.0 m tall; not placed | 0.2 m voxels, origin at ground level. Built from Ryan's More Environment Variants grid (`tools/voxgen/sheets/sub_pillar_vault.txt`). |
 
 Each slot's `model_scale` sets the voxel size (0.025 m, 0.1 m, 0.2 m or 0.5 m by class), assuming 1 export unit = 1 voxel. Full spec, palettes and the `emit_*` naming rule for glowing parts: `docs/art/voxel_models.md`.
 

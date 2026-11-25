@@ -857,7 +857,8 @@ BUTTE = {"P1": PLATEAU[0], "P2": PLATEAU[1], "P3": PLATEAU[2], "P4": PLATEAU[3],
          "K1": "#343A46", "S": SHADOW}
 CAVERN = {"K1": "#343A46", "K2": "#495261", "K3": "#232832", "EC": TEAL, "Q1": "#2A8F85", "S": SHADOW}
 ENV_VARIANTS = {"mesa_butte_stack": BUTTE, "gulch_bend_corner": BUTTE, "cavern_crystal_grotto": CAVERN,
-                "sub_shale_tunnel": CAVERN, "sub_sump_cistern": CAVERN}
+                "sub_shale_tunnel": CAVERN, "sub_sump_cistern": CAVERN, "mesa_arch_span": BUTTE,
+                "rim_inner_corner": BUTTE, "sub_crystal_seam_wall": CAVERN, "sub_pillar_vault": CAVERN}
 
 
 def front_to_minus_z(name: str, cells: dict[tuple[int, int, int], str], w: int, d: int,
