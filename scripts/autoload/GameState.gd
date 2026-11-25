@@ -32,6 +32,8 @@ signal crops_changed
 signal soil_tilled(cell: Vector3i)
 ## Ground was dug or filled.
 signal terrain_changed
+## A reference block was dug up.
+signal blocks_changed
 ## A boulder was hit or broken.
 signal boulders_changed
 ## The rover went into the tunnels or came out.
@@ -231,6 +233,10 @@ var tilled_cells: Dictionary = {}
 var dug: Dictionary[Vector2i, int] = {}
 ## How often each boulder was hit; BOULDER_HITS is broken. None is 0.
 var boulder_hits: Dictionary[StringName, int] = {}
+## The cells whose reference block was dug up, for good: filling and digging
+## again gives nothing. Which cells hold one is ReferenceBlock.at(). The count
+## is the farm's blocks, and they are kept, not used up [ASSUMPTION].
+var found_blocks: Dictionary[Vector2i, bool] = {}
 
 ## Lab credibility (Ryan, 2026-11-22): audits and overdue instruments move it;
 ## the phone shows its band. See data/economy.json "credibility".
@@ -453,7 +459,7 @@ const MAX_KNOWN_GUESTS: int = 64
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
-	"boulder_hits", "rover_in_tunnels", "enclosures",
+	"boulder_hits", "found_blocks", "rover_in_tunnels", "enclosures",
 	"sentinel_out", "sentinel_days_unseen", "rover_lights"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
@@ -519,6 +525,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var dug_problem: String = Terrain.dug_problem(data.get("dug", {}))
 	if dug_problem != "":
 		return "'dug' %s" % dug_problem
+	for cell: Variant in data.get("found_blocks", {}):
+		if not cell is Vector2i or not data["found_blocks"][cell] is bool or not data["found_blocks"][cell] \
+				or ReferenceBlock.at(data["world_seed"], cell).is_empty():
+			return "'found_blocks' has a cell that holds no block."
 	var hits: Dictionary = data.get("boulder_hits", {})
 	for boulder: Variant in hits:
 		if not (boulder is String or boulder is StringName) or not StringName(boulder) in BOULDERS \
@@ -681,6 +691,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	robots_changed.emit()
 	terrain_changed.emit()
 	boulders_changed.emit()
+	blocks_changed.emit()
 	rover_place_changed.emit()
 	sentinel_changed.emit()
 	rover_lights_changed.emit()
@@ -4319,7 +4330,26 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 	if problem == "":
 		dug[at] = dug.get(at, 0) + 1
 		terrain_changed.emit()
+		if not found_blocks.has(at) and not ReferenceBlock.at(world_seed, at).is_empty():
+			found_blocks[at] = true
+			blocks_changed.emit()
 	return problem
+
+
+## The block a check uses: the last one found. {} with none.
+func block_in_hand() -> Dictionary:
+	var cells: Array[Vector2i] = found_blocks.keys()
+	return ReferenceBlock.at(world_seed, cells.back()) if not cells.is_empty() else {}
+
+
+## Puts an instrument against a block the farm has dug up, as ReferenceBlock.check()
+## says, or { refused, reason }. A check, not a calibration: the instrument, its
+## drift and the log stay as they were, and the block is kept.
+func check_with_block(instrument_id: String) -> Dictionary:
+	var block: Dictionary = block_in_hand()
+	if block.is_empty():
+		return { "refused": true, "reason": "No reference block yet. Dig for one." }
+	return ReferenceBlock.check(get_sensor(instrument_id), block)
 
 
 ## Fills a dug cell one step. Returns "" or why not.

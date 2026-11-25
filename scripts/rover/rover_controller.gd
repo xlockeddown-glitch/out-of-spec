@@ -172,7 +172,7 @@ func _unpark() -> void:
 ## A farm saved before the hills may have it parked inside one, or off the land.
 ## In the tunnels, one in the rock is back at the mouth.
 func _put_back_on_land() -> void:
-	if rover_id == GameState.TUNNEL_ROVER and not TunnelRock.holds(global_position):
+	if rover_id == GameState.TUNNEL_ROVER and (not TunnelRock.holds(global_position) or TunnelRock.in_deep(global_position)):
 		global_transform = GameState.TUNNEL_START
 	if ground == null:
 		return
