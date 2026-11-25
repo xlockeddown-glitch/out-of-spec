@@ -272,10 +272,8 @@ func _build_blocks() -> void:
 	stone.vertex_color_is_srgb = true
 	stone.roughness = 1.0
 	_add_blocks("Blocks", rock, rock_colors, stone)
-	var molten := StandardMaterial3D.new()
-	molten.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	molten.vertex_color_use_as_albedo = true
-	molten.vertex_color_is_srgb = true
+	var molten := ShaderMaterial.new()
+	molten.shader = load("res://assets/shaders/magma.gdshader")
 	_add_blocks("Magma", magma, magma_colors, molten)
 
 
