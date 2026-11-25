@@ -22,7 +22,7 @@ const SHOWN_BY: Dictionary = {
 	&"ore_changed": ["crystal_ore"],
 	&"fissures_changed": ["mined_fissures"],
 	&"upgrades_changed": ["has_wide_treads", "owned_standards", "tier1_unlocked", "traceable_lab"],
-	&"oirm_changed": ["at_oirm", "oirm_trips", "certificate_log", "suspect_units"],
+	&"oirm_changed": ["at_oirm", "oirm_trips", "certificate_log", "suspect_units", "_untraceable_since_cal"],
 	&"credibility_changed": ["credibility", "_best_band", "contract_state", "contract_run"],
 	&"crops_changed": ["plantings", "harvest_bin"],
 	&"jobs_changed": ["job_board", "active_jobs", "job_log", "_board_day"],

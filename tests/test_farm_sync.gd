@@ -5,7 +5,7 @@ const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 const PATH: String = "user://test_farm_sync.save"
 ## Saved variables no signal shows: bookkeeping, or shown only when asked.
 const NO_SIGNAL: Array[String] = [
-	"_untraceable_since_cal", "clean_audit_streak", "_next_certificate_number",
+	"clean_audit_streak", "_next_certificate_number",
 	"offence_counts", "_drop_pod_departure_at", "audit_grace_used", "_cal_index_at_last_audit",
 	"_dispatch_deck", "rover_transforms", "_next_job_number", "_board_band", "_board_taken",
 	"seed_crop_id", "planting_offset_steps", "rover_uplinks", "next_player_number",
@@ -170,6 +170,18 @@ func test_update_shows_only_what_changed_and_news_once() -> String:
 		return problem)
 
 
+## An open bench redraws the selected job's standard on oirm_changed.
+func test_lost_traceability_is_shown() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		FarmSync.join(bytes, guest)
+		host._untraceable_since_cal["working_standard"] = true
+		var counts: Dictionary = _count(guest)
+		var problem: String = FarmSync.update(FarmSync.capture(host), guest)
+		if problem != "" or counts != { "oirm_changed": 1 }:
+			return "Expected one oirm_changed, got %s %s" % [problem, counts]
+		return "")
+
+
 func test_news_keeps_the_hosts_order_and_repeats() -> String:
 	return _as_guest(func(host: GameStateScript, guest: GameStateScript, _bytes: PackedByteArray) -> String:
 		for i: int in host.PHONE_LOG_MAX:
@@ -231,6 +243,38 @@ func test_bad_bytes_change_nothing() -> String:
 			var data: Dictionary = whole.duplicate(true)
 			data["farm"]["plantings"] = plants
 			bad[str(plants)] = SaveGame.to_bytes(data)
+		for values: Array in [["player_skill_xp", { 2: { "farming": 1 } }], ["player_skill_xp", { "player_2": { 3: 1 } }], ["farm_skill_xp", { 3: 1 }],
+				["at_oirm", { "x": [] }], ["suspect_units", { "x": [] }], ["mined_fissures", { "x": [] }], ["lab_areas", { "x": [] }],
+				["offence_counts", { "x": [] }], ["rover_uplinks", { "x": [] }], ["rover_transforms", { "x": [] }], ["tilled_cells", { "here": true }],
+				["lab_build", { "kind": [] }], ["lab_build", { "kind": "grow", "size": [] }], ["lab_build", { "kind": "grow", "done_day": [] }],
+				["lab_build", { "kind": "refit", "discipline": [] }], ["owned_standards", { 3: true }], ["_untraceable_since_cal", { 3: true }]]:
+			var data: Dictionary = whole.duplicate(true)
+			data["farm"][values[0]] = values[1]
+			bad[str(values)] = SaveGame.to_bytes(data)
+		var odd_sensor: Dictionary = whole.duplicate(true)
+		odd_sensor["farm"]["sensors"][[]] = 1
+		bad["sensor key"] = SaveGame.to_bytes(odd_sensor)
+		for target: Array in [[GameStateScript.JOB_WATER, []], [GameStateScript.JOB_COLLECT, []], [GameStateScript.JOB_CALIBRATE, []]]:
+			var card: Dictionary = { "trigger": GameStateScript.CARD_TRIGGERS[target[0]][0], "job": target[0], "hour": 6, "every_days": 1,
+				"last_day": 0, "added_by": "x", "target": "x" }
+			if not GameStateScript._is_card(card):
+				return "A whole card must load: %s" % card
+			card["target"] = target[1]
+			if GameStateScript._is_card(card):
+				return "A card with a bad target must be refused: %s" % card
+		for wrong: Array in [["job_board", {}, ["pay", "min_tier", "due_in_days", "discipline"]],
+				["active_jobs", { "job_id": "JOB-0001", "due_day": 1 }, ["pay", "min_tier", "bench_minutes", "item"]],
+				["harvest_bin", { "crop_id": "x" }, ["advance"]],
+				["certificate_log", { "id": "x", "standard_id": "x", "day": 1, "due_day": 1, "expanded_uncertainty": 1.0, "k": 2.0,
+					"as_found": null, "as_found_in_tolerance": true }, ["issuer"]]]:
+			var good: Dictionary = whole.duplicate(true)
+			good["farm"][wrong[0]].append(wrong[1])
+			if host.farm_dict_problem(good["farm"]) != "":
+				return "%s without its optional fields must load: %s" % [wrong[0], host.farm_dict_problem(good["farm"])]
+			for field: String in wrong[2]:
+				var data: Dictionary = good.duplicate(true)
+				data["farm"][wrong[0]][-1][field] = []
+				bad["%s %s" % [wrong[0], field]] = SaveGame.to_bytes(data)
 		for list: String in ["active_jobs", "oirm_trips", "harvest_bin", "cal_log", "certificate_log"]:
 			var data: Dictionary = whole.duplicate(true)
 			data["farm"][list].append({ "instrument_id": "x", "standard_id": "x" })
