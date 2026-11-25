@@ -28,7 +28,7 @@ func test_every_exact_minute_shows() -> String:
 			if GameClock.format_now() != want:
 				problem = "Want %s, got %s" % [want, GameClock.format_now()]
 	GameClock.elapsed_days = 1.0 - 1.0e-10
-	if not GameClock.format_now() in ["DAY 1  05:59", "DAY 2  06:00"]:
-		problem = "The day and time must turn over together, got " + GameClock.format_now()
+	if GameClock.format_now() != "DAY 1  05:59":
+		problem = "Day 2 must not show before it starts, got " + GameClock.format_now()
 	GameClock.elapsed_days = saved
 	return problem
