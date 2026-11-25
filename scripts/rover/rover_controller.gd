@@ -137,7 +137,7 @@ func _unpark() -> void:
 
 
 func _park() -> void:
-	GameState.park_rover(rover_id, global_transform)
+	FarmCommands.rover_parked(rover_id, global_transform)
 
 
 func _input(event: InputEvent) -> void:
@@ -192,7 +192,7 @@ func broadcast_state() -> void:
 func _update_line_of_sight(delta: float) -> void:
 	var los: bool = _raycast_to_relay()
 	if satellite_relay != null:
-		GameState.set_rover_uplink(rover_id, los)
+		FarmCommands.rover_uplink(rover_id, los)
 	var target_quality: float = 1.0 if los else occluded_link_quality
 	var new_quality: float = move_toward(link_quality, target_quality, link_slew_per_s * delta)
 	if los == has_line_of_sight and is_equal_approx(new_quality, link_quality):
@@ -268,13 +268,13 @@ func _drive(delta: float) -> void:
 	move_and_slide()
 	# Horizontal displacement actually achieved; pushing into a rock adds no drift.
 	var driven: float = Vector2(global_position.x - before.x, global_position.z - before.z).length()
-	GameState.add_rover_usage(driven, GameState.local_player_id)
+	FarmCommands.rover_drove(driven)
 
 
 func _zero_steering() -> void:
-	# Same calibration path as the bench, so the record lands in GameState.
-	# A remote zero has no standard: untraceable, judged against the MPE only.
-	steering_zeroed.emit(GameState.calibrate(GameState.STEERING_ID, GameState.local_player_id, false))
+	var record: Dictionary = await FarmCommands.request(&"zero_steering")
+	if is_inside_tree():
+		steering_zeroed.emit(record)
 
 
 func _on_steering_error_changed(_error: float, _band: int) -> void:
@@ -285,19 +285,24 @@ func _on_steering_error_changed(_error: float, _band: int) -> void:
 # --- Tilling ----------------------------------------------------------------
 
 func _till_under_rover(seed_id: String, offset_steps: int) -> void:
-	if _try_mine():
+	if await _try_mine() or not is_inside_tree():
 		return
 	if soil_grid == null:
 		till_rejected.emit("No soil grid linked.")
 		return
 	var cell: Vector3i = soil_grid.world_to_cell(global_position)
-	match soil_grid.till_cell(cell):
+	var result: FarmGrid.TillResult = await soil_grid.till_cell(cell)
+	if not is_inside_tree():
+		return
+	match result:
 		FarmGrid.TillResult.TILLED:
 			soil_tilled.emit(cell)
 		FarmGrid.TillResult.ALREADY_TILLED:
 			tilled_cell_used.emit(cell, seed_id, offset_steps)
 		FarmGrid.TillResult.NOT_SOIL:
 			till_rejected.emit("No soil under tractor.")
+		FarmGrid.TillResult.REFUSED:
+			till_rejected.emit("The host did not till it.")
 
 
 ## The soil cell under the rover (y = 0), or (0, -1, 0) without a grid.
@@ -307,6 +312,7 @@ func cell_under() -> Vector3i:
 	return soil_grid.world_to_cell(global_position)
 
 
+## True if a fissure in reach was tried, so the ground is not tilled.
 func _try_mine() -> bool:
 	if ore_fissures_root == null:
 		return false
@@ -319,10 +325,17 @@ func _try_mine() -> bool:
 			if d < best:
 				best = d
 				nearest = fissure
-	if nearest and GameState.mine_fissure(nearest.fissure_id, GameState.local_player_id):
-		ore_mined.emit(nearest.fissure_id)
+	if nearest == null:
+		return false
+	var id: StringName = nearest.fissure_id
+	var mined: bool = await FarmCommands.request(&"mine_fissure", [id])
+	if not is_inside_tree():
 		return true
-	return false
+	if mined:
+		ore_mined.emit(id)
+	else:
+		till_rejected.emit("The fissure was not drilled.")
+	return true
 
 
 func _apply_upgrades() -> void:

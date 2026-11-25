@@ -6,18 +6,16 @@ extends GridMap
 ## tiles to a MeshLibrary with the SAME item IDs as `Tile` and assign it to
 ## `mesh_library_override` (or straight to `mesh_library`); no code changes.
 ##
-## Tilled cells live in GameState.tilled_cells, changed only with
-## GameState.till(), so they survive farm <-> dome scene swaps. The grid shows
+## Tilled cells live in GameState.tilled_cells, changed only by
+## the till command, so they survive farm <-> dome scene swaps. The grid shows
 ## them, whoever tilled them.
 
 signal tile_changed(cell: Vector3i, tile: int)
 
 ## CROP_* are tilled cells with a crop (GameState.plantings) growing or ready.
 enum Tile { SOIL_UNTILLED = 0, SOIL_TILLED = 1 }
-enum TillResult { TILLED, ALREADY_TILLED, NOT_SOIL }
+enum TillResult { TILLED, ALREADY_TILLED, NOT_SOIL, REFUSED }
 
-@export var plot_origin_cell: Vector2i = Vector2i(-6, -6)
-@export var plot_size_cells: Vector2i = Vector2i(12, 12)
 @export var mesh_library_override: MeshLibrary
 
 ## Filled in with the crop's model set, then 0 to 3 or "wilted".
@@ -49,8 +47,9 @@ func world_to_cell(world_pos: Vector3) -> Vector3i:
 func till_cell(cell: Vector3i) -> TillResult:
 	match get_cell_item(cell):
 		Tile.SOIL_UNTILLED:
-			if not GameState.till(cell, GameState.local_player_id):
-				_on_soil_tilled(cell)  # already recorded, not shown yet
+			if not await FarmCommands.request(&"till", [cell]) and not GameState.tilled_cells.has(cell):
+				return TillResult.REFUSED
+			_on_soil_tilled(cell)  # a guest's own record comes later
 			return TillResult.TILLED
 		Tile.SOIL_TILLED:
 			return TillResult.ALREADY_TILLED
@@ -65,9 +64,9 @@ func _on_soil_tilled(cell: Vector3i) -> void:
 
 
 func _fill_plot() -> void:
-	for x: int in plot_size_cells.x:
-		for z: int in plot_size_cells.y:
-			var cell := Vector3i(plot_origin_cell.x + x, 0, plot_origin_cell.y + z)
+	for x: int in range(GameState.PLOT.position.x, GameState.PLOT.end.x):
+		for z: int in range(GameState.PLOT.position.y, GameState.PLOT.end.y):
+			var cell := Vector3i(x, 0, z)
 			if get_cell_item(cell) == INVALID_CELL_ITEM:
 				set_cell_item(cell, Tile.SOIL_UNTILLED)
 	for tilled: Variant in GameState.tilled_cells:
