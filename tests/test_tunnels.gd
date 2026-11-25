@@ -365,8 +365,9 @@ func test_pieces_cover_no_path_and_hide_no_floor() -> String:
 				problem = "%s must fill its cell and no more" % kind
 			if _between(rock, at + Vector3(-3.0, 0.5, 0.0), at + Vector3(3.0, 0.5, 0.0), TunnelRock.LAYER_WORLD).has("Piece") == false:
 				problem = "%s must stop the rover" % kind
-			if not _between(rock, at + Vector3(-3.0, 1.0, 0.0), at + Vector3(3.0, 1.0, 0.0), TunnelRock.LAYER_OCCLUDER).has("Piece"):
-				problem = "%s must stop the signal" % kind
+			# At the antenna's height. The sump is lower.
+			if _between(rock, at + Vector3(-3.0, 1.88, 0.0), at + Vector3(3.0, 1.88, 0.0), TunnelRock.LAYER_OCCLUDER).has("Piece") == (kind == "S"):
+				problem = "%s must stop the signal, or be the low sump" % kind
 			# The camera looks toward -x and -z, so this is what it hides.
 			for behind: Vector2i in [Vector2i(-1, -1), Vector2i(-1, 0), Vector2i(0, -1)]:
 				if TunnelRock.is_floor(cell + behind):
@@ -416,6 +417,13 @@ func test_shallow_water_is_driven_and_deep_water_is_not() -> String:
 	var hollow: HeightMapShape3D = (rock.get_node("Hollow").get_child(0) as CollisionShape3D).shape
 	if not is_equal_approx(hollow.get_min_height(), TunnelRock.DEEP_GROUND_M) or hollow.get_max_height() != 0.0:
 		problem = "The ground must go from level to deep"
+	for z: int in hollow.map_depth:
+		for x: int in hollow.map_width:
+			var at := Vector2(rock.get_node("Hollow").position.x, rock.get_node("Hollow").position.z) + Vector2(x - (hollow.map_width - 1) * 0.5, z - (hollow.map_depth - 1) * 0.5)
+			if not is_equal_approx(hollow.map_data[z * hollow.map_width + x], TunnelRock.ground_m(at)):
+				problem = "The ground to stand on is not the ground at %s" % at
+	if not TunnelRock.in_deep(TunnelRock.SUMP + Vector3(2.0, 0.0, 0.0)) or TunnelRock.in_deep(TunnelRock.SUMP + Vector3(0.0, 0.0, 2.5)):
+		problem = "Only a rover over the deep's edge is in it"
 	rock.free()
 	return problem
 
