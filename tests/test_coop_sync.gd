@@ -91,7 +91,7 @@ func test_the_host_s_changes_and_clock_come_in_time() -> String:
 
 
 func test_a_bad_farm_ends_the_connection() -> String:
-	for bad: Dictionary in [{}, { "clock": 1 }, { "clock": {} }, { "farm": PackedByteArray([1]), "size": 0 },
+	for bad: Dictionary in [{}, { "clock": 1 }, { "too_big": true }, { "farm": PackedByteArray(), "size": 3 }, { "clock": {} }, { "farm": PackedByteArray([1]), "size": 0 },
 			{ "farm": PackedByteArray([1]), "size": FarmSync.MAX_BYTES + 1 }, { "farm": PackedByteArray([1]), "size": 1.0 },
 			{ "farm": PackedByteArray([1, 2, 3]).compress(FileAccess.COMPRESSION_ZSTD), "size": 3 },
 			{ "farm": PackedByteArray([1, 2, 3]), "size": 3, "more": 1 }]:
