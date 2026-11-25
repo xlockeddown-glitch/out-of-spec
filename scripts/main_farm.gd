@@ -129,6 +129,9 @@ func _on_zero_pressed() -> void:
 
 
 func _on_steering_zeroed(record: Dictionary) -> void:
+	if record.get("refused", false):
+		_hud.push_log("ZERO STEERING FAILED: %s" % record["reason"])
+		return
 	var schedule: String = ("No standard: not a calibration, still due day %d" % record.get("due_day", 0)
 		if not record.get("traceable", true)
 		else "Next due day %d (%d d)" % [record.get("due_day", 0), record.get("interval_days", 0)])
@@ -138,7 +141,7 @@ func _on_steering_zeroed(record: Dictionary) -> void:
 
 func _on_slot_spool_pressed() -> void:
 	var replaced: bool = GameState.relay_slotted
-	if GameState.slot_spool_into_relay(GameState.local_player_id):
+	if await FarmCommands.request(&"slot_spool_into_relay") and is_inside_tree():
 		_hud.push_log("%s installed%s. Uplink lag × %s." % [
 			"Damaged silk spool" if GameState.slotted_spool_damaged else "Optical silk spool",
 			", the damaged one thrown away" if replaced else "", SP811.number(GameState.get_relay_lag_multiplier(), 2)])
@@ -166,7 +169,12 @@ func _on_soil_tilled(cell: Vector3i) -> void:
 ## Space on tilled soil: harvest a ready crop, report a growing one, or plant.
 func _on_tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int) -> void:
 	if GameState.is_crop_ready(cell):
-		var entry: Dictionary = GameState.harvest_crop(cell)
+		var entry: Dictionary = await FarmCommands.request(&"harvest_crop", [cell])
+		if not is_inside_tree():
+			return
+		if not entry.has("crop_id"):
+			_hud.push_log("HARVEST FAILED: %s" % entry.get("reason", "Nothing is ready here."))
+			return
 		var grade: String = ("in spec" if entry["in_spec"]
 			else "OFF SPEC: the soil left its moisture band on %s days" % SP811.integer(entry["out_of_band_days"]))
 		_hud.push_log("HARVESTED %s, %s. Bin: %s crops for Lin at Bram's bay." % [
@@ -174,9 +182,13 @@ func _on_tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int) ->
 	elif GameState.plantings.has(cell):
 		_hud.push_log(GameState.crop_status_text(cell) + ". [ and ] move the set point.")
 	else:
-		var problem: String = GameState.plant_crop(cell, seed_id, offset_steps)
+		var problem: String = await FarmCommands.request(&"plant_crop", [cell, seed_id, offset_steps])
+		if not is_inside_tree():
+			return
 		if problem.is_empty():
-			_hud.push_log("PLANTED " + GameState.crop_status_text(cell))
+			# A guest may hear back before the planting reaches it.
+			_hud.push_log("PLANTED " + (GameState.crop_status_text(cell) if GameState.plantings.has(cell)
+				else GameState.crop_name(seed_id)))
 		else:
 			_hud.push_log("PLANT FAILED: " + problem)
 
@@ -210,8 +222,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		var step: int = -1 if _is_key(event, KEY_BRACKETLEFT) else 1
 		get_viewport().set_input_as_handled()
 		if GameState.plantings.has(cell):
-			GameState.adjust_setpoint(cell, step)
-			_hud.push_log(GameState.crop_status_text(cell))
+			_adjust_setpoint(cell, step)
 		else:
 			GameState.adjust_planting_offset(step)
 			_hud.push_log(GameState.planting_offset_text())
@@ -222,6 +233,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		if GameState.tier1_unlocked and index >= 0 and index < catalog.size():
 			get_viewport().set_input_as_handled()
 			_try_buy_standard(catalog[index])
+
+
+func _adjust_setpoint(cell: Vector3i, step: int) -> void:
+	await FarmCommands.request(&"adjust_setpoint", [cell, step])
+	if is_inside_tree() and GameState.plantings.has(cell):
+		_hud.push_log(GameState.crop_status_text(cell))
 
 
 func _is_key(event: InputEvent, keycode: Key) -> bool:
@@ -238,7 +255,7 @@ func _sell_to_lin() -> void:
 	if GameState.harvest_bin.is_empty():
 		_hud.push_log("LIN: Nothing in your bin. Bring me crops, and keep that spider away from my stall.")
 		return
-	GameState.sell_harvest_to_lin()
+	await FarmCommands.request(&"sell_harvest_to_lin")
 
 
 func _refresh_jobs_hud() -> void:
@@ -254,8 +271,8 @@ func _refresh_jobs_hud() -> void:
 
 
 func _try_accept_job(index: int) -> void:
-	var problem: String = GameState.accept_job(index)
-	if problem != "":
+	var problem: String = await FarmCommands.request(&"accept_job", [index])
+	if is_inside_tree() and problem != "":
 		_hud.push_log("JOB NOT ACCEPTED: " + problem)
 
 
@@ -312,13 +329,15 @@ func _try_field_cal() -> void:
 		_hud.push_log(NO_FIELD_STANDARD)
 		return
 	for id: String in offered:
-		_field_cal_one(id)
+		await _field_cal_one(id)
+		if not is_inside_tree():
+			return
 
 
 func _field_cal_one(id: String) -> void:
 	var sensor: DriftingSensor = GameState.get_sensor(id)
-	var record: Dictionary = GameState.calibrate_at_bench(id, GameState.local_player_id)
-	if record.is_empty():
+	var record: Dictionary = await FarmCommands.request(&"calibrate_at_bench", [id])
+	if record.is_empty() or not is_inside_tree():
 		return
 	var label: String = GameState.instrument_name(id).to_upper()
 	if record.get("refused", false):
@@ -386,7 +405,9 @@ func _try_buy_standard(standard_id: String) -> void:
 		return
 	_armed_standard = ""
 	if problem.is_empty():
-		problem = GameState.buy_standard(standard_id, GameState.local_player_id)
+		problem = await FarmCommands.request(&"buy_standard", [standard_id])
+		if not is_inside_tree() or not _bram_bay.rover_inside:
+			return
 	if problem.is_empty():
 		_bram_line = "Handle it like it's worth more than your tractor. It nearly is."
 	else:
@@ -400,7 +421,9 @@ func _try_trade() -> void:
 	if not _bram_bay.rover_inside or GameState.has_wide_treads:
 		return
 	_armed_standard = ""
-	var problem: String = GameState.buy_wide_treads()
+	var problem: String = await FarmCommands.request(&"buy_wide_treads")
+	if not is_inside_tree() or not _bram_bay.rover_inside:
+		return
 	if problem.is_empty():
 		_bram_line = "Fresh treads, wide stance. Try not to till a boulder with them."
 	else:

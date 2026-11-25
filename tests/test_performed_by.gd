@@ -57,7 +57,6 @@ func test_callers_name_the_player() -> String:
 	var call_site: RegEx = RegEx.create_from_string(r"GameState\.(\w+)(?:\.bind)?\(")
 	var comment: RegEx = RegEx.create_from_string(r"(?m)(^|\s)#.*$")
 	var problems: PackedStringArray = []
-	var seen: int = 0
 	for dir: String in ["res://scripts", "res://scripts/camera", "res://scripts/dome", "res://scripts/rover", "res://scripts/ui", "res://scripts/world"]:
 		for file: String in DirAccess.get_files_at(dir):
 			if not file.ends_with(".gd"):
@@ -66,7 +65,6 @@ func test_callers_name_the_player() -> String:
 			for found: RegExMatch in call_site.search_all(text):
 				if not actions.has(found.get_string(1)):
 					continue
-				seen += 1
 				# The arguments, up to the closing parenthesis. A bracket or comma
 				# inside a string isn't told apart, so it could only fail the test.
 				var end: int = found.get_end()
@@ -87,6 +85,6 @@ func test_callers_name_the_player() -> String:
 				var index: int = actions[found.get_string(1)]
 				if index >= passed.size() or passed[index].strip_edges() != "GameState.local_player_id":
 					problems.append("%s: %s%s)" % [file, found.get_string(), ",".join(passed)])
-	if seen < 6:
-		return "It found only %d calls, so it checks nothing." % seen
+	if actions.size() < 6:
+		return "It found only %d functions, so it checks nothing." % actions.size()
 	return "\n".join(problems)

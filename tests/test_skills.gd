@@ -107,8 +107,8 @@ func test_mining_and_buying() -> String:
 
 
 func _check_mining(gs: GameStateScript) -> String:
-	gs.mine_fissure(&"a_fissure")
-	gs.mine_fissure(&"a_fissure")
+	gs.mine_fissure(&"FissureA")
+	gs.mine_fissure(&"FissureA")
 	if gs.skill_xp("field_ops") != _xp("mine_fissure"):
 		return "A fissure gives XP once while it is mined out."
 	gs.buy_standard(FM3)

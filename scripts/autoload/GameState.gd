@@ -691,6 +691,12 @@ func standard_problem(standard_id: String) -> String:
 	return ""
 
 
+## Zeroes the rover's steering from afar. No standard, so it is untraceable and
+## judged against the MPE only. A player may ask for this, but not for calibrate().
+func zero_steering(player_id: String = "") -> Dictionary:
+	return calibrate(STEERING_ID, player_id, false)
+
+
 ## Zeroes an instrument and stores the record. Same path for the bench, the
 ## manager's grace calibration and the phone's remote ZERO STEERING, so every
 ## calibration lands in the log.
@@ -2399,6 +2405,11 @@ func _last_traceable_record(instrument_id: String) -> Dictionary:
 
 # --- Ore and Bram ----------------------------------------------------------------
 
+## The fissures in scenes/main_farm.tscn. Any other name would be ore for nothing.
+const FISSURES: Array[StringName] = [&"FissureA", &"FissureB", &"FissureC", &"FissureD",
+	&"FissureE", &"FissureF", &"FissureG", &"FissureH"]
+
+
 ## A mined fissure regrows `fissure_regrow_days` mornings later.
 func is_fissure_available(fissure_id: StringName) -> bool:
 	if not mined_fissures.has(fissure_id):
@@ -2408,7 +2419,7 @@ func is_fissure_available(fissure_id: StringName) -> bool:
 
 
 func mine_fissure(fissure_id: StringName, player_id: String = "") -> bool:
-	if not is_fissure_available(fissure_id):
+	if not fissure_id in FISSURES or not is_fissure_available(fissure_id):
 		return false
 	mined_fissures[fissure_id] = GameClock.get_day_index()
 	crystal_ore += 1
@@ -2449,6 +2460,8 @@ func add_tire_usage(meters: float) -> void:
 ## gauge. There is one of each, whichever rover drove. The driver's Field Ops
 ## skill spares the encoder.
 func add_rover_usage(meters: float, player_id: String = "") -> void:
+	if not is_finite(meters) or meters < 0.0:
+		return
 	steering.add_usage(meters * skill_factor("steering_usage", player_id))
 	add_tire_usage(meters)
 
@@ -2456,7 +2469,8 @@ func add_rover_usage(meters: float, player_id: String = "") -> void:
 ## Remembers where a rover is parked, so it is still there when the farm scene
 ## loads again.
 func park_rover(rover_id: String, at: Transform3D) -> void:
-	rover_transforms[rover_id] = at
+	if at.is_finite():
+		rover_transforms[rover_id] = at
 
 
 ## Where `rover_id` was parked; `fallback` if it has not been parked yet.
@@ -3761,10 +3775,14 @@ func crop_name(crop_id: String) -> String:
 	return str(crop(crop_id).get("name", crop_id))
 
 
+## The soil plot, in cells. FarmGrid's defaults match it.
+const PLOT: Rect2i = Rect2i(-6, -6, 12, 12)
+
+
 ## Records a cell as tilled, so it stays tilled across scene swaps. Returns
-## false if it already was. The grid decides whether the cell is soil.
+## false if it already was, or is off the plot.
 func till(cell: Vector3i, player_id: String = "") -> bool:
-	if tilled_cells.has(cell):
+	if tilled_cells.has(cell) or cell.y != 0 or not PLOT.has_point(Vector2i(cell.x, cell.z)):
 		return false
 	tilled_cells[cell] = true
 	_award_xp("till", player_id)

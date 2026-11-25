@@ -6,10 +6,12 @@ extends Node
 ## What a screen may ask for. Each is a GameState function; its own types are
 ## the argument types, and its player argument is filled in here.
 const ACTIONS: Array[StringName] = [
-	&"add_robot_calibrate_card", &"add_robot_card", &"add_robot_collect_card", &"build_robot",
-	&"buy_from_kestrel", &"calibrate_at_bench", &"clear_lab_area", &"collect_spool", &"complete_job",
-	&"fit_lab_area", &"release_robot", &"remove_robot_card", &"send_to_oirm", &"set_interlock_override",
-	&"start_lab_grow",
+	&"accept_job", &"add_robot_calibrate_card", &"add_robot_card", &"add_robot_collect_card",
+	&"adjust_setpoint", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
+	&"calibrate_at_bench", &"clear_lab_area", &"collect_spool", &"complete_job", &"fit_lab_area",
+	&"harvest_crop", &"mine_fissure", &"plant_crop", &"release_robot", &"remove_robot_card",
+	&"sell_harvest_to_lin", &"send_to_oirm", &"set_interlock_override", &"slot_spool_into_relay",
+	&"start_lab_grow", &"till", &"zero_steering",
 ]
 const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
 
@@ -77,9 +79,30 @@ func refusal(action: StringName, reason: String) -> Variant:
 	match (_method(action)["return"]["type"] as int) if action in ACTIONS else TYPE_STRING:
 		TYPE_BOOL:
 			return false
+		TYPE_INT:
+			return 0
+		TYPE_FLOAT:
+			return -1.0
 		TYPE_DICTIONARY:
 			return { "ok": false, "refused": true, "no_answer": true, "reason": reason }
 	return reason
+
+
+## What a rover reports every tick. The host measures the rovers it simulates, so
+## these are not actions: a guest can't send them, and its own rover changes nothing.
+func rover_drove(meters: float) -> void:
+	if not guest:
+		_farm().add_rover_usage(meters, _farm().local_player_id)
+
+
+func rover_uplink(rover_id: String, has_los: bool) -> void:
+	if not guest:
+		_farm().set_rover_uplink(rover_id, has_los)
+
+
+func rover_parked(rover_id: String, at: Transform3D) -> void:
+	if not guest:
+		_farm().park_rover(rover_id, at)
 
 
 ## Where the player goes among the action's arguments, or -1. Anything after it
