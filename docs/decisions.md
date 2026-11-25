@@ -1173,6 +1173,14 @@ Agent's notes (flagged for Ryan, not his words):
   - The model is original voxels in code: orange suit, dark boots and pack,
     teal visor. Protocol 13.
 
+- Ready for Steam, with no Steam in it (steps 1 to 3 of
+  [steam-plan.md](steam-plan.md)) [ASSUMPTION]:
+  - A session runs over any Godot `MultiplayerPeer`. Two functions make the
+    ENet one. A fake in-memory peer in the tests stands in for others.
+  - host() and join() take a transport: "enet" unless told otherwise. "steam"
+    gets "Steam unavailable." and any other is refused; nothing opens. The
+    screens don't offer a choice. Protocol unchanged.
+
 ## 2026-11-24: Hills, digging, tunnels
 
 Ryan: "Hills then tunnels for growth if we can do digging and destruction in parallel that would be amazing."
