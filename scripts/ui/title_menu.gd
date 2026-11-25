@@ -195,4 +195,4 @@ func _open(problem: String) -> void:
 		return
 	_starting = true
 	GameClock.paused = false
-	SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE)
+	SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE)

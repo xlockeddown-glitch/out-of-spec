@@ -5,6 +5,8 @@ extends Node
 const ENDED: String = "The host closed the farm or the connection was lost."
 
 var _note: String = ""
+## On the way to the title menu.
+var _leaving: bool = false
 
 
 func _ready() -> void:
@@ -15,7 +17,7 @@ func _ready() -> void:
 
 
 func _on_lost() -> void:
-	if _note == "":
+	if _note == "" and not _leaving:
 		_note = ENDED
 	leave_farm()
 
@@ -23,6 +25,9 @@ func _on_lost() -> void:
 ## Guest: out of the host's farm. The title menu ends the session, so the copy
 ## stays locked until its scene is gone.
 func leave_farm() -> void:
+	if _leaving:
+		return
+	_leaving = true
 	SceneSwitcher.go_to(SceneSwitcher.TITLE_SCENE)
 
 
@@ -30,4 +35,5 @@ func leave_farm() -> void:
 func take_note() -> String:
 	var note: String = _note
 	_note = ""
+	_leaving = false
 	return note

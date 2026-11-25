@@ -13,6 +13,7 @@ var _panel: Control
 var _about: Label
 var _action: Button
 var _close_button: Button
+var _addresses: PackedStringArray = []
 var _problem: String = ""
 
 
@@ -79,6 +80,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func open() -> void:
 	_problem = ""
+	_addresses = local_addresses()
 	_refresh()
 	_panel.show()
 	_close_button.grab_focus()
@@ -91,7 +93,7 @@ func _refresh() -> void:
 		_about.text = "You are on a friend's farm. It is saved on the host's PC, not on this one.\n\n" + who
 	elif CoopSession.is_hosting():
 		_action.text = "STOP HOSTING"
-		_about.text = host_text(CoopSession.port(), local_addresses()) + "\n\n" + who
+		_about.text = host_text(CoopSession.port(), _addresses) + "\n\n" + who
 	else:
 		_action.text = "HOST THIS FARM"
 		_about.text = _problem if _problem != "" else "Hosting lets friends join this farm while you play. Anyone who knows your address can join, so share it only with friends."
