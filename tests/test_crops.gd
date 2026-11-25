@@ -401,7 +401,7 @@ func test_soil_probe_text_caps_cells_and_flags_overdue() -> String:
 		problem = "The readout must start 'Reads ', got '%s'." % text
 	if problem == "" and (listed != gs.SOIL_PROBE_TEXT_CELLS or ", 2 more." not in text):
 		problem = "The readout must list %d cells then '2 more', got '%s'." % [gs.SOIL_PROBE_TEXT_CELLS, text]
-	if problem == "" and not text.ends_with("CAL OVERDUE (due day %d)." % probe.cal_due_day):
+	if problem == "" and not text.ends_with("CAL " + DriftingSensor.overdue_text(probe.cal_due_day) + "."):
 		problem = "An overdue probe must say so, got '%s'." % text
 	_done(gs)
 	return problem

@@ -92,6 +92,6 @@ func _refresh() -> void:
 	_reading.text = "Hygrometer reads %s %%" % SP811.number(reading_pct, 0)
 	var band: int = sensor.get_observed_band()
 	_band.text = "%s  ·  %s" % [DriftingSensor.band_label(band),
-		"CAL OVERDUE (due day %d)" % sensor.cal_due_day if sensor.is_overdue(GameClock.get_day_index())
+		"CAL " + DriftingSensor.overdue_text(sensor.cal_due_day) if sensor.is_overdue(GameClock.get_day_index())
 		else "cal due day %d" % sensor.cal_due_day]
 	_band.add_theme_color_override(&"font_color", DriftingSensor.band_color(band))

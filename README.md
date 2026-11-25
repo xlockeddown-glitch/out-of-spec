@@ -67,11 +67,23 @@ Open `project.godot` in Godot 4.7 and press F5. The farm saves each morning and 
 | Input | Action |
 |---|---|
 | WASD / arrows | Drive rover (through the uplink lag) |
-| Space | Drill a crystal ore fissure under the rover or a boulder close in front, or till the soil tile |
-| G / H | Dig / fill the ground in front of the stopped rover, off the level farm |
-| E (in Bram's bay) | Trade 6 crystal ore for wide treads |
-| F9 (debug builds) | Skip to the next morning |
+| Space | Drill a crystal ore fissure under the rover or a boulder close in front, or till the soil tile; again on tilled soil harvests or plants |
+| C | Next seed (cost, growth days, soil moisture target in the log) |
+| [ / ] | Lower / raise the irrigation set point of the planting under the rover; with nothing planted, the starting offset of new plantings |
+| G / H | Dig / fill the ground in front of the stopped rover, off the level farm (also in the tunnels) |
+| B / N | Build or take up a stone piece in front of the stopped rover / next piece kind |
+| V | Ore survey from the stopped rover: bearing to the nearest ore pocket |
+| Q | Check the stopped rover's steering encoder (or the dish, at the relay) against a block |
 | R or ZERO STEERING button | Re-zero steering drift remotely |
+| E | At a pad, bay, tunnel mouth or the catch cup: use it (field cal pad, enter or leave the tunnels, trade 6 crystal ore for wide treads, open the catch cup by the Sentinel) |
+| 1, 2, ... (in Bram's bay) | Buy Bram's Tier 1 standards in catalog order, once unlocked (press twice to confirm) |
+| L (in Bram's bay) | Sell the harvest bin to Lin |
+| L (in the tunnels) | Rover lights on or low (the Sentinel bolts from lights on) |
+| T (in Bram's bay) | Robots panel |
+| K | Skills panel |
+| F7 | Co-op panel (host or see who is here) |
+| Esc | Close a panel |
+| F9 (debug builds) | Skip to the next morning |
 | Tab, airlock, or ENTER DOME | Swap farm <-> dome |
 | Click (dome) | Bench calibration, terrarium info, collect silk spool |
 | INSTALL SILK SPOOL (phone) | Slot a spool into the relay (cuts uplink lag); a whole one may replace a damaged one |
