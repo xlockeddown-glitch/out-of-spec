@@ -1,6 +1,6 @@
 # Steam plan for co-op
 
-Plan only; nothing here is built. Written 2026-11-24 for Godot 4.7.2. Ryan chose "Direct IP first, Steam later" (decisions.md, "Co-op, first slice"). This is the later.
+Plan only; nothing here is built. Written 2026-11-24 for Godot 4.7.2. Ryan chose "Direct IP first" (friends join by IP, Steam later) (decisions.md, "Co-op, first slice"). This is the later.
 
 ## Where the transport is made today
 
@@ -9,8 +9,8 @@ All in `scripts/autoload/CoopSession.gd`; no other file creates a peer (tests ma
 - Host: `ENetMultiplayerPeer.new()` and `create_server()` at lines 113-115, `peer_connected` / `peer_disconnected` hooked at 117-118, then `_open(peer)`.
 - Guest: `create_client(address, port)` at 138-139, then `_open(peer)`.
 - `_peer` is typed `ENetMultiplayerPeer` (line 67) and `_open` takes one (line 469). `port()` (174) reads `_peer.host`, which is ENet only.
-- Everything else already uses the `MultiplayerPeer` interface: `poll`, `get_packet`, `get_packet_peer`, `get_packet_mode`, `put_packet`, `set_target_peer`, `transfer_mode`, `get_connection_status`, `disconnect_peer`, `close` (lines 237-267, 367-372, 496-500).
-- UI: `title_menu.gd:158` calls `join(text)`; `coop_ui.gd:132` calls `host()`. `join` accepts only an IP (line 133).
+- Everything else already uses the `MultiplayerPeer` interface: `poll`, `get_packet`, `get_available_packet_count`, `get_packet_peer`, `get_packet_mode`, `put_packet`, `set_target_peer`, `transfer_mode`, `get_connection_status`, `disconnect_peer`, `close` (lines 237-267, 347, 367-372, 478, 496-500).
+- UI: `title_menu.gd:158` calls `join(text)`; `coop_ui.gd:132` calls `host()`. `join` accepts only an IP (lines 134-135).
 
 ## Smallest seam
 
@@ -19,13 +19,13 @@ All in `scripts/autoload/CoopSession.gd`; no other file creates a peer (tests ma
 3. `port()` and the host text get what they need from the transport, not from `_peer.host`.
 4. A `transport` argument ("enet" default; "steam" only if the extension is present) on host/join. No new autoload.
 
-No high-level RPC: `tests/test_coop_session.gd:318` forbids it on purpose.
+No high-level RPC: `tests/test_coop_session.gd:310` forbids it on purpose.
 
 ## What stays the same
 
 - Host authority: the host runs the farm; guests send commands through `FarmCommands`.
 - HELLO / `PROTOCOL` check (`PROTOCOL = 11`, line 28) and the REFUSED reasons.
-- `is_plain` and `_end_of` checks on every packet (lines 209, 506-520). They work on bytes, so transport does not matter.
+- `is_plain` and `_end_of` checks on every packet (lines 209, 503-508, 514 on). They work on bytes, so transport does not matter.
 - Rate limits, `MAX_GUEST_BYTES` (2048), `MAX_HOST_BYTES` (4 MiB), join timeout, `SPARE_CONNECTIONS`.
 - Guests talk to peer id 1 (line 379). A Steam peer must keep host = 1.
 
@@ -61,7 +61,7 @@ Accessed 2026-11-24. Pages were read through a summarizing fetch tool, so exact 
 - Version pin: Godot, GodotSteam build and Steamworks SDK must match; an update can break compatibility. Pin all three.
 - The overlay may fail from the editor; test exports. Steam must be running. A missing extension must leave ENet working.
 - Binaries in the repo (the extension and Steam DLL) change today's habits; needs Ryan's yes.
-- A Steam host and an ENet guest cannot meet; the menu shows one transport per game.
+- A Steam host and an ENet guest cannot meet; if both stay, each game uses one transport.
 - `PROTOCOL` stays the same unless messages change.
 
 ## Testing without a store page
@@ -78,7 +78,7 @@ Accessed 2026-11-24. Pages were read through a summarizing fetch tool, so exact 
 3. Transport argument and a "Steam unavailable" refusal; ENet stays default. No Steam code.
 4. Spike (after Ryan approves the add-on): vendor the pinned GodotSteam GDExtension, init with App ID 480, a scene where two PCs exchange a packet. Not wired to co-op.
 5. Steam peer in `CoopSession`: host makes a lobby, guest joins by lobby id; same session code.
-6. Lobby UI in `title_menu.gd` and `coop_ui.gd`: "Host on Steam" / "Join friend"; the IP box stays.
+6. Lobby UI in `title_menu.gd` and `coop_ui.gd`: "Host on Steam" / "Join friend"; the IP box stays if Ryan wants Steam beside direct IP.
 7. Hardening from the manual run: disconnects, sizes, reliable-only poses.
 8. Packaging: export presets, `steam_appid.txt` handling, tester notes.
 9. Real App ID and store page (after Ryan has the account).
