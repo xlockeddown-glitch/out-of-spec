@@ -40,8 +40,8 @@ func test_performer_names() -> String:
 	return ""
 
 
-## Screens and scenes must say whose action it is: in co-op the state may be
-## another machine's.
+## Scenes that call GameState must say whose action it is: in co-op the state may
+## be another machine's. FarmCommands does so for the screens.
 func test_callers_name_the_player() -> String:
 	var actions: Dictionary = {}
 	for method: Dictionary in GameStateScript.get_script_method_list():
@@ -87,6 +87,6 @@ func test_callers_name_the_player() -> String:
 				var index: int = actions[found.get_string(1)]
 				if index >= passed.size() or passed[index].strip_edges() != "GameState.local_player_id":
 					problems.append("%s: %s%s)" % [file, found.get_string(), ",".join(passed)])
-	if seen < 15:
+	if seen < 6:
 		return "It found only %d calls, so it checks nothing." % seen
 	return "\n".join(problems)

@@ -123,7 +123,7 @@ func _on_terrarium_clicked() -> void:
 
 
 func _on_spool_clicked() -> void:
-	if GameState.collect_spool(GameState.local_player_id):
+	if await FarmCommands.request(&"collect_spool"):
 		_toast("Collected 1 optical silk spool. Install it at the farm relay.")
 
 

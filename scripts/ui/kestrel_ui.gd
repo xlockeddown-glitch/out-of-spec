@@ -43,6 +43,9 @@ func _ready() -> void:
 	_close_button.pressed.connect(hide)
 	column.add_child(_close_button)
 	hide()
+	GameState.credits_changed.connect(_on_farm_changed.unbind(1))
+	GameState.ore_changed.connect(_on_farm_changed.unbind(1))
+	GameState.upgrades_changed.connect(_on_farm_changed)
 
 
 func _process(_delta: float) -> void:
@@ -68,6 +71,20 @@ func open() -> void:
 	_refresh()
 	show()
 	_focus_row("")
+
+
+## The other player may spend or buy while this is open.
+func _on_farm_changed() -> void:
+	if not visible:
+		return
+	var focused: Control = get_viewport().gui_get_focus_owner()
+	var row: String = str(focused.get_meta(&"standard", "")) if focused != null else ""
+	var on_close: bool = focused == _close_button
+	_refresh()
+	if on_close:
+		_close_button.grab_focus()
+	else:
+		_focus_row(row)
 
 
 func _refresh() -> void:
@@ -103,7 +120,7 @@ func _on_buy_pressed(id: String) -> void:
 	else:
 		_armed_id = ""
 		if problem == "":
-			problem = GameState.buy_from_kestrel(id, GameState.local_player_id)
+			problem = await FarmCommands.request(&"buy_from_kestrel", [id])
 		_result.text = problem if problem != "" else "Bought. Send it to OIRM at the bench for its first certificate."
 		_result.add_theme_color_override(&"font_color", AMBER if problem != "" else TEAL)
 	_refresh()

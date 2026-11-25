@@ -145,7 +145,7 @@ func _on_interlock_pressed(id: String, row: String, on: bool) -> void:
 		_result.text = ""
 	else:
 		_armed_id = ""
-		_show_result(GameState.set_interlock_override(id, on, GameState.local_player_id), "Interlock overridden." if on else "Interlock armed.")
+		_show_result(await FarmCommands.request(&"set_interlock_override", [id, on]), "Interlock overridden." if on else "Interlock armed.")
 	_refresh()
 	_focus_row(row, id + " ")
 
@@ -155,20 +155,20 @@ func _add_card_rows(id: String) -> void:
 	var cards: Array = GameState.robot_cards(id)
 	for i: int in cards.size():
 		_add_card_button("REMOVE CARD %s: %s" % [SP811.integer(i + 1), GameState.robot_card_text(cards[i])],
-			"%s remove %d" % [id, i], GameState.remove_robot_card.bind(id, i), "Card removed.")
+			"%s remove %d" % [id, i], FarmCommands.request.bind(&"remove_robot_card", [id, i]), "Card removed.")
 	if cards.size() >= GameState.robot_card_slots():
 		return
 	_add_card_button("ADD CARD: WATER all plots at 06:00 every day", id + " clock",
-		GameState.add_robot_card.bind(id, "clock", 6, 1, GameState.local_player_id), "Card added.")
+		FarmCommands.request.bind(&"add_robot_card", [id, "clock", 6, 1]), "Card added.")
 	_add_card_button("ADD CARD: WATER all plots when the soil reads off target", id + " soil",
-		GameState.add_robot_card.bind(id, "soil", 6, 1, GameState.local_player_id), "Card added.")
+		FarmCommands.request.bind(&"add_robot_card", [id, "soil", 6, 1]), "Card added.")
 	if not cards.any(func(card: Dictionary) -> bool: return card["job"] == GameState.JOB_COLLECT):
 		var problem: String = GameState.robot_job_gate(GameState.JOB_COLLECT)
 		if problem == "":
 			problem = GameState.robot_collect_problem(id)
 		if problem == "":
 			_add_card_button("ADD CARD: COLLECT SPOOL when it is ready", id + " spool",
-				GameState.add_robot_collect_card.bind(id, GameState.local_player_id), "Card added.")
+				FarmCommands.request.bind(&"add_robot_collect_card", [id]), "Card added.")
 		else:
 			_rows.add_child(PlanBoardUI._label("    " + problem, DIM, 18))
 	var gate: String = GameState.robot_job_gate(GameState.JOB_CALIBRATE)
@@ -179,7 +179,7 @@ func _add_card_rows(id: String) -> void:
 		if cards.any(func(card: Dictionary) -> bool: return card.get("target", "") == target):
 			continue
 		_add_card_button("ADD CARD: CALIBRATE %s as it comes due" % GameState.instrument_name(target, true),
-			"%s calibrate %s" % [id, target], GameState.add_robot_calibrate_card.bind(id, target, "due", 6, 1, GameState.local_player_id), "Card added.")
+			"%s calibrate %s" % [id, target], FarmCommands.request.bind(&"add_robot_calibrate_card", [id, target, "due", 6, 1]), "Card added.")
 	var gaps: Dictionary = GameState.robot_calibrate_gaps(id)
 	for reason: String in gaps:
 		var names: Array = gaps[reason].map(func(unit: String) -> String: return GameState.instrument_name(unit, true))
@@ -195,7 +195,7 @@ func _add_card_button(text: String, row: String, action: Callable, done: String)
 
 func _on_card_pressed(row: String, action: Callable, done: String) -> void:
 	_armed_id = ""
-	_show_result(action.call(), done)
+	_show_result(await action.call(), done)
 	_refresh()
 	_focus_row(row, row.get_slice(" ", 0) + " ")
 
@@ -208,7 +208,7 @@ func _on_order_pressed(id: String) -> void:
 	else:
 		_armed_id = ""
 		if problem == "":
-			problem = GameState.build_robot(id, GameState.local_player_id)
+			problem = await FarmCommands.request(&"build_robot", [id])
 		_show_result(problem, "Ordered.")
 	_refresh()
 	_focus_row(id)
@@ -216,7 +216,7 @@ func _on_order_pressed(id: String) -> void:
 
 func _on_release_pressed(id: String) -> void:
 	_armed_id = ""
-	_show_result(GameState.release_robot(id, GameState.local_player_id), "Released.")
+	_show_result(await FarmCommands.request(&"release_robot", [id]), "Released.")
 	_refresh()
 	_focus_row(id)
 
