@@ -447,8 +447,27 @@ func farm_dict_problem(data: Dictionary) -> String:
 					return "'%s' has an entry of the wrong type." % field
 	if data.has("_spool_damaged") and data["_spool_damaged"].size() > data["_spool_species"].size():
 		return "'_spool_damaged' has more entries than there are spools."
+	for needs: Array in [["at_oirm", TYPE_INT], ["suspect_units", TYPE_INT], ["mined_fissures", TYPE_INT], ["lab_areas", TYPE_INT],
+			["offence_counts", TYPE_INT], ["rover_uplinks", TYPE_BOOL], ["rover_transforms", TYPE_TRANSFORM3D]]:
+		var values: Dictionary = data.get(needs[0], {})
+		for key: Variant in values:
+			if not (key is String or key is StringName) or not _fits(values[key], needs[1]):
+				return "'%s' has an entry of the wrong type." % needs[0]
+	for cell: Variant in data["tilled_cells"]:
+		if not cell is Vector3i:
+			return "'tilled_cells' has an entry that is not a cell."
+	if not _optional_fields(data["lab_build"], ["kind", "discipline"], ["size", "done_day"]):
+		return "'lab_build' has a field of the wrong type."
+	for list: String in ["job_board", "active_jobs"]:
+		for job: Dictionary in data[list]:
+			if not _optional_fields(job, ["id", "customer", "item", "discipline", "area", "min_band"],
+					["pay", "min_tier", "bench_minutes", "due_in_days", "accepted_day"]):
+				return "'%s' has a field of the wrong type." % list
+	for entry: Dictionary in data["harvest_bin"]:
+		if not _optional_fields(entry, [], ["advance"]):
+			return "'harvest_bin' has a field of the wrong type."
 	for cell: Variant in data["plantings"]:
-		if not cell is Vector3i or not _has_fields(data["plantings"][cell], ["crop_id"], ["days_grown", "out_of_band_days", "setpoint"]):
+		if not cell is Vector3i or not _has_fields(data["plantings"][cell], ["crop_id"], ["days_grown", "out_of_band_days", "setpoint"]) or not _optional_fields(data["plantings"][cell], [], ["advance", "planted_day", "planted_at"]):
 			return "'plantings' has an entry that is not a planted cell."
 	for needs: Array in [["active_jobs", ["job_id"], ["due_day"]], ["oirm_trips", ["standard_id"], ["sent_day", "return_day"]],
 			["harvest_bin", ["crop_id"], []],
@@ -458,18 +477,21 @@ func farm_dict_problem(data: Dictionary) -> String:
 			if not _has_fields(entry, needs[1], needs[2]):
 				return "'%s' has an entry with a field missing." % needs[0]
 	for record: Dictionary in data["cal_log"]:
-		if not record.get("as_found_in_tolerance") is bool or not record.get("traceable", true) is bool 				or not record.get("performed_by", "") is String or not record.get("standard_problem", "") is String:
+		if not record.get("as_found_in_tolerance") is bool or not record.get("traceable", true) is bool or not record.get("performed_by", "") is String or not record.get("standard_problem", "") is String:
 			return "'cal_log' has an entry with a field missing."
 	for cert: Dictionary in data["certificate_log"]:
+		if not _optional_fields(cert, ["issuer"], []):
+			return "'certificate_log' has a field of the wrong type."
 		# A maker's certificate has no as-found; an in-house one names its reference.
-		if not cert.has("as_found") or not (cert["as_found"] == null or cert["as_found"] is float or cert["as_found"] is int) 				or not cert.get("as_found_in_tolerance") is bool 				or (cert.has("reference_id") and not _has_fields(cert, ["reference_id", "reference_certificate"], [])):
+		if not cert.has("as_found") or not (cert["as_found"] == null or cert["as_found"] is float or cert["as_found"] is int) or not cert.get("as_found_in_tolerance") is bool or (cert.has("reference_id") and not _has_fields(cert, ["reference_id", "reference_certificate"], [])):
 			return "'certificate_log' has an entry with a field missing."
 	for report: Dictionary in data["audit_log"]:
 		var report_problem: String = _audit_problem(report)
 		if report_problem != "":
 			return "'audit_log' has an entry with a bad %s." % report_problem
-	for own: Variant in data.get("player_skill_xp", {}).values():
-		if typeof(own) != TYPE_DICTIONARY or not _holds_only_ints(own):
+	for player: Variant in data.get("player_skill_xp", {}):
+		var own: Variant = data["player_skill_xp"][player]
+		if not player is String or typeof(own) != TYPE_DICTIONARY or not _holds_only_ints(own):
 			return "'player_skill_xp' has a player whose XP is not whole numbers."
 	if data.get("next_player_number", 2) < 2:
 		return "'next_player_number' is below 2."
@@ -514,7 +536,19 @@ static func _audit_problem(report: Dictionary) -> String:
 
 
 static func _holds_only_ints(values: Dictionary) -> bool:
-	return values.values().all(func(value: Variant) -> bool: return value is int)
+	return values.keys().all(func(key: Variant) -> bool: return key is String or key is StringName) and values.values().all(
+		func(value: Variant) -> bool: return value is int)
+
+
+## Whether a value has this type. A number may be whole or not.
+static func _fits(value: Variant, type: int) -> bool:
+	return typeof(value) == type or (type == TYPE_INT and value is float)
+
+
+## Whether those of these texts and numbers a record has are such. Missing ones are read as their defaults.
+static func _optional_fields(record: Dictionary, texts: Array, numbers: Array) -> bool:
+	return texts.all(func(key: String) -> bool: return _fits(record.get(key, ""), TYPE_STRING)) and numbers.all(
+		func(key: String) -> bool: return _fits(record.get(key, 0), TYPE_INT))
 
 
 static func _has_nan(value: Variant) -> bool:
