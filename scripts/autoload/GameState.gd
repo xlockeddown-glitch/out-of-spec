@@ -448,6 +448,14 @@ func farm_dict_problem(data: Dictionary) -> String:
 		for entry: Dictionary in data[pair[0]]:
 			if typeof(entry.get(pair[1])) != TYPE_STRING:
 				return "'%s' has an entry with no %s." % pair
+	for cell: Variant in data["plantings"]:
+		if not cell is Vector3i or not _has_fields(data["plantings"][cell], "crop_id", ["days_grown", "out_of_band_days", "setpoint"]):
+			return "'plantings' has an entry that is not a planted cell."
+	for needs: Array in [["active_jobs", "job_id", ["due_day"]], ["oirm_trips", "standard_id", ["sent_day", "return_day"]],
+			["harvest_bin", "crop_id", []]]:
+		for entry: Dictionary in data[needs[0]]:
+			if not _has_fields(entry, needs[1], needs[2]):
+				return "'%s' has an entry with a field missing." % needs[0]
 	for report: Dictionary in data["audit_log"]:
 		var report_problem: String = _audit_problem(report)
 		if report_problem != "":
@@ -472,6 +480,12 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if (sensors.has(str(id)) or str(id) in robot_sensors) and not DriftingSensor.from_config(str(id)).apply_dict(state):
 			return "Sensor '%s' can't load." % id
 	return ""
+
+
+## Whether a saved record names its `text` and has these numbers.
+static func _has_fields(record: Variant, text: String, numbers: Array) -> bool:
+	return record is Dictionary and record.get(text) is String and numbers.all(
+		func(key: String) -> bool: return record.get(key) is int or record.get(key) is float)
 
 
 ## What a screen would read from this audit and couldn't, or "".

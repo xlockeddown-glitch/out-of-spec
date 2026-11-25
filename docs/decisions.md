@@ -1117,17 +1117,18 @@ Agent's notes (flagged for Ryan, not his words):
 - "Agree" to a first slice with the shared rover and screens only, and no walking characters.
 - "Direct IP first": friends join by IP address, Steam later.
 - "yeah lets do wait for now": at 06:00 with someone still up, the day waits for them.
+- Seeds and starting set points (2026-11-24): "Pick there own!" Each player picks their own.
 
 ### Agent's notes (flagged for Ryan, not his words)
 
 - Order, one PR each: player ids, host commands, host clock, joining, syncing, beds, guest skills.
 - Every screen and scene now says which player acts, and a test keeps it so. One player notices no change.
 - A robot's log keeps who overrode its interlock last, until the audit that clears it [ASSUMPTION]. No screen shows the name: whether one should is open, with no effect on the fine.
-- Open: bench calibration time in co-op, who can pause, who may drive a shared rover, where a guest's skills are kept, rejoining mid-day, whether each player picks a seed of their own, and how names show.
+- Open: bench calibration time in co-op, who can pause, who may drive a shared rover, where a guest's skills are kept, rejoining mid-day, and how names show.
 - Host commands: the dome, bench, lab, Kestrel and robot screens change the farm only through FarmCommands, by action name with plain arguments, and a test keeps the listed actions so. The host says who acts. FIT OUT now says only "one more space", as a guest's count may lag. A bench refusal is amber, as nothing was found out of tolerance, and its button stays. Looking at the lab no longer writes its layout. One player notices no change.
 - The farm scene, rover and grid go through FarmCommands too, so every screen does. GameState refuses soil off the plot, unknown fissures, and rover distances or places that are not real numbers. ZERO STEERING is its own action, so a guest can't ask for any calibration without a standard. One player notices no change.
 - Distance driven, line of sight and parking are not actions: the host counts its own rovers, and a guest's count for nothing [ASSUMPTION]. Open: how a guest drives a rover the host runs, and whose skill its driving uses.
-- The seed and starting set point stay saved with the farm and are sent with each planting. Changing them is not a command yet: a guest changes only its own copy, until Ryan decides whether each player has their own. A guest's spool and set point lines say only what the host's answer holds, and its Bram greetings are not drawn from the farm's generator.
+- The seed and starting set point stay saved with the farm and are sent with each planting. Changing them is not a command yet: a guest changes only its own copy, and each player has their own. A guest's spool and set point lines say only what the host's answer holds, and its Bram greetings are not drawn from the farm's generator.
 - Open: GameState doesn't check that a guest's rover is at the soil, fissure, stall or pad.
 - To settle with syncing: the farm must reach a guest before the answer that changed it, or a bracket pressed at once after PLANTED sets the next crop's starting set point; REMOVE CARD and accepting a job name a card or job by its place, so another player's change in the same moment could move it.
 - From Fable's math check: the manager's one-time favor no longer costs credibility for an overdue standard, its records count at the audit it happens in, and the clock no longer shows some exact minutes one early.

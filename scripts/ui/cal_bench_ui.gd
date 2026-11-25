@@ -65,6 +65,7 @@ func _ready() -> void:
 	GameState.drop_pod_changed.connect(_on_pod_or_oirm_changed.unbind(1))
 	GameState.oirm_changed.connect(_on_pod_or_oirm_changed)
 	GameState.jobs_changed.connect(_on_jobs_changed)
+	GameState.upgrades_changed.connect(_on_upgrades_changed)
 	GameClock.time_advanced.connect(_on_time_advanced.unbind(1))
 	GameClock.guest_time_shown.connect(_on_time_advanced)
 
@@ -145,6 +146,15 @@ func _on_jobs_changed() -> void:
 			_on_instrument_selected(index)
 		else:
 			_show_job({})
+
+
+## A bought standard, and the units it puts in service, join the list. The
+## selection and what it shows stay as they were.
+func _on_upgrades_changed() -> void:
+	if not visible:
+		return
+	_rebuild_list()
+	_instrument_option.select(_ids.find(_current_id))
 
 
 ## A shown job can become impossible as the clock runs (the cancel cutoff

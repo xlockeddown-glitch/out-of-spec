@@ -224,6 +224,15 @@ func test_bad_bytes_change_nothing() -> String:
 			var data: Dictionary = whole.duplicate(true)
 			data["farm"]["audit_log"].append(report)
 			bad[str(report)] = SaveGame.to_bytes(data)
+		for plants: Dictionary in [{ Vector3i.ZERO: {} }, { Vector3i.ZERO: 1 }, { "here": { "crop_id": "x", "days_grown": 0, "out_of_band_days": 0, "setpoint": 0.2 } },
+				{ Vector3i.ZERO: { "crop_id": "x", "days_grown": "no", "out_of_band_days": 0, "setpoint": 0.2 } }]:
+			var data: Dictionary = whole.duplicate(true)
+			data["farm"]["plantings"] = plants
+			bad[str(plants)] = SaveGame.to_bytes(data)
+		for list: String in ["active_jobs", "oirm_trips", "harvest_bin"]:
+			var data: Dictionary = whole.duplicate(true)
+			data["farm"][list].append({})
+			bad[list] = SaveGame.to_bytes(data)
 		for clock: Array in [["elapsed_days", NAN], ["elapsed_days", -1.0], ["seconds_per_day", INF], ["paused", 1]]:
 			var data: Dictionary = whole.duplicate(true)
 			data["clock"][clock[0]] = clock[1]
