@@ -154,7 +154,8 @@ func _ready() -> void:
 	_unpark()
 	if satellite_relay == null:
 		push_warning("%s: no SatelliteRelay linked; uplink will read as occluded." % name)
-	if soil_grid == null:
+	# The tunnels have no soil and no ground to dig.
+	if soil_grid == null and ground != null:
 		push_warning("%s: no FarmGrid linked; tilling disabled." % name)
 
 
@@ -403,7 +404,7 @@ func _till_under_rover(seed_id: String, offset_steps: int) -> void:
 	if await _try_boulder() or not is_inside_tree():
 		return
 	if soil_grid == null:
-		till_rejected.emit("No soil grid linked.")
+		till_rejected.emit("This is rock, not soil.")
 		return
 	var cell: Vector3i = soil_grid.world_to_cell(global_position)
 	var result: FarmGrid.TillResult = await soil_grid.till_cell(cell)
@@ -430,6 +431,9 @@ func dig_cell() -> Vector2i:
 ## cell dug [ASSUMPTION].
 func _change_ground(deeper: bool) -> void:
 	var rejected: Signal = dig_rejected if deeper else fill_rejected
+	if ground == null:
+		rejected.emit("This rock can't be dug." if deeper else "There is nothing to fill here.")
+		return
 	if not is_stopped():
 		rejected.emit("Stop the rover first.")
 		return

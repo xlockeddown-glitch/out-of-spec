@@ -23,6 +23,7 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 ## Ryan, 2026-11-22: "Pad by the airlock". Park here and press E to calibrate
 ## the tire gauge against the WD-1 without going into the dome.
 @onready var _cal_pad: ParkingPad = %FieldCalPad
+@onready var _tunnel_pad: ParkingPad = %TunnelPad
 
 var _robots_ui: RobotsUI
 var _bram_line: String = ""
@@ -71,6 +72,7 @@ func _ready() -> void:
 	_bram_bay.rover_entered.connect(_on_rover_entered_bay)
 	_bram_bay.rover_exited.connect(_on_rover_exited_bay)
 	_cal_pad.rover_entered.connect(_on_rover_entered_cal_pad)
+	_tunnel_pad.rover_entered.connect(func() -> void: _hud.push_log("TUNNEL MOUTH: press E to enter."))
 	_hud.trade_pressed.connect(_try_trade)
 	_hud.buy_standard_pressed.connect(_try_buy_standard)
 	_hud.accept_job_pressed.connect(_try_accept_job)
@@ -225,6 +227,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"interact") and _cal_pad.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_field_cal()
+	elif event.is_action_pressed(&"interact") and _tunnel_pad.rover_inside:
+		get_viewport().set_input_as_handled()
+		_enter_tunnels()
 	elif event.is_action_pressed(&"interact") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_trade()
@@ -487,3 +492,10 @@ func _try_trade() -> void:
 func _go_to_dome() -> void:
 	SceneSwitcher.swap_to(SceneSwitcher.DOME_SCENE)
 
+
+func _enter_tunnels() -> void:
+	# Alone it always comes in at the mouth. With friends in, someone may be
+	# driving it in there.
+	if not CoopRovers.together():
+		FarmCommands.rover_parked(GameState.TUNNEL_ROVER, GameState.TUNNEL_START)
+	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)

@@ -1,13 +1,17 @@
 extends CanvasLayer
-## Farm <-> dome scene swaps with a short fade. Autoloaded as `SceneSwitcher`.
-## Tab (action "swap_scene") toggles from anywhere.
+## Farm, tunnels and dome scene swaps with a short fade. Autoloaded as
+## `SceneSwitcher`. Tab (action "swap_scene") goes to the dome and back.
 
 signal scene_swapped(path: String)
 
 const FARM_SCENE: String = "res://scenes/main_farm.tscn"
 const TITLE_SCENE: String = "res://scenes/title_menu.tscn"
 const DOME_SCENE: String = "res://scenes/dome_interior.tscn"
+const TUNNELS_SCENE: String = "res://scenes/basalt_tunnels.tscn"
 const FADE_SECONDS: float = 0.1  # each way; ~0.2 s total per the Week 2 board
+
+## Where the dome's airlock leads: the farm or the tunnels, whichever was left.
+var outside: String = FARM_SCENE
 
 var _fade: ColorRect
 var _busy: bool = false
@@ -33,7 +37,7 @@ func toggle_farm_dome() -> void:
 	if current != null and current.scene_file_path == TITLE_SCENE:
 		return  # no farm is open yet
 	var on_dome: bool = current != null and current.scene_file_path == DOME_SCENE
-	swap_to(FARM_SCENE if on_dome else DOME_SCENE)
+	swap_to(outside if on_dome else DOME_SCENE)
 
 
 ## Like swap_to, but after a swap in progress instead of not at all.
@@ -47,6 +51,7 @@ func swap_to(path: String) -> void:
 	if _busy:
 		return
 	_busy = true
+	_note_outside(path)
 	var tween: Tween = create_tween()
 	tween.tween_property(_fade, "color:a", 1.0, FADE_SECONDS)
 	await tween.finished
@@ -61,3 +66,10 @@ func swap_to(path: String) -> void:
 	await tween.finished
 	_busy = false
 	scene_swapped.emit(path)
+
+
+func _note_outside(path: String) -> void:
+	if path == TUNNELS_SCENE:
+		outside = TUNNELS_SCENE
+	elif path != DOME_SCENE:
+		outside = FARM_SCENE
