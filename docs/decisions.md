@@ -1182,5 +1182,5 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - It molts as fast as the Curlyhair, one spool a molt, each on its own [ASSUMPTION]. Collecting gives the same XP [ASSUMPTION].
 - Installing takes the whole spool with the biggest cut. A better whole spool may replace a whole one, which goes back into stock. Building a robot uses damaged spools first, then the plainest [ASSUMPTION, all]. With only Curlyhair silk nothing changes but the log's words, "the old one taken out".
 - COLLECT SPOOL cards stay with the Curlyhair's spool [ASSUMPTION].
-- The tank stands at the dome's left front [PLACEHOLDER], and the live tarantula tinted cobalt stands in for its model [PLACEHOLDER]. Protocol 6.
+- The tank stands at the dome's left front [PLACEHOLDER], and the live tarantula tinted cobalt stands in for its model [PLACEHOLDER]. Protocol 7; the shared-rover work takes 6.
 - Open with Ryan: the Sentinel's ideals, molt length and silk grade, whether its tank should have a hygrometer and mister of its own, and whether robots may collect its silk.
