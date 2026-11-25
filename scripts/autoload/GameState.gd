@@ -7,6 +7,8 @@ extends Node
 
 signal molt_changed(progress: float, stage: int)
 signal silk_changed(spools: int)
+## A tarantula was caught, or one in a tank of its own molted or gave its spool.
+signal enclosures_changed
 signal relay_changed(slotted: bool)
 signal calibration_recorded(record: Dictionary)
 signal phone_message(text: String)
@@ -82,6 +84,8 @@ const PRE_MOLT_AT: float = 0.8
 ## taken (Ryan's call: 1, gone the next morning). The spider stays in its
 ## burrow (hidden) until then, since the two can't share the tank floor.
 const EXUVIA_LINGER_DAYS: int = 1
+## Tarantulas that can be caught. Each has a tank waiting in the dome.
+const CATCHABLE: Array[StringName] = [&"cobalt_sentinel"]
 ## The dome hygrometer starts out of tolerance ("gold sticker expired at 03:00")
 ## so the first dome visit has something to calibrate. |error| = MPE * this.
 const HYGROMETER_START_ERROR_RATIO: float = 1.12
@@ -105,6 +109,9 @@ var molt_stage: MoltStage = MoltStage.ACTIVE
 ## Day index on whose morning the exuvia from the last spool pickup is gone
 ## (0 = no exuvia lingering).
 var exuvia_until_day: int = 0
+## The caught tarantulas, each in a tank of its own beside the main terrarium.
+## Species id (String) -> { molt_progress, molt_stage, exuvia_until_day }.
+var enclosures: Dictionary = {}
 var optical_silk_spools: int = 0
 var relay_slotted: bool = false
 ## Species that spun the spool now in the relay (its lag_reduction_pct stacks).
@@ -426,7 +433,7 @@ const MAX_KNOWN_GUESTS: int = 64
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
-	"boulder_hits", "rover_in_tunnels"]
+	"boulder_hits", "rover_in_tunnels", "enclosures"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -496,6 +503,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if not (boulder is String or boulder is StringName) or not StringName(boulder) in BOULDERS \
 				or not hits[boulder] is int or hits[boulder] < 1 or hits[boulder] > BOULDER_HITS:
 			return "'boulder_hits' has a boulder that can't be hit like that."
+	var tanks: Dictionary = data.get("enclosures", {})
+	for id: Variant in tanks:
+		if not id is String or not StringName(id) in CATCHABLE or not _is_tank(tanks[id]):
+			return "'enclosures' has an entry that is not a caught tarantula."
 	if not _optional_fields(data["lab_build"], ["kind", "discipline"], ["size", "done_day"]):
 		return "'lab_build' has a field of the wrong type."
 	for list: String in ["job_board", "active_jobs"]:
@@ -610,6 +621,16 @@ static func _has_nan(value: Variant) -> bool:
 	return false
 
 
+## An entry of `enclosures`: a molt, at the stage its progress gives.
+static func _is_tank(tank: Variant) -> bool:
+	if not tank is Dictionary or tank.size() != 3 or not tank.has_all(["molt_progress", "molt_stage", "exuvia_until_day"]):
+		return false
+	var progress: Variant = tank["molt_progress"]
+	return progress is float and progress >= 0.0 and progress <= 1.0 \
+		and tank["molt_stage"] is int and tank["molt_stage"] == _molt_stage_at(progress) \
+		and tank["exuvia_until_day"] is int and tank["exuvia_until_day"] >= 0
+
+
 ## Replaces the farm with one farm_to_dict() made. Checks all of it first: bad
 ## data is refused whole and the reason returned ("" on success). An instrument
 ## the save doesn't know starts new. Set GameClock first, and reload the scenes
@@ -621,6 +642,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	put_farm(data)
 	farm_loaded.emit()
 	molt_changed.emit(molt_progress, molt_stage)
+	enclosures_changed.emit()
 	silk_changed.emit(optical_silk_spools)
 	relay_changed.emit(relay_slotted)
 	credits_changed.emit(credits)
@@ -2981,23 +3003,29 @@ func molt_days() -> float:
 
 ## "MOLT  40 %", what pauses it, or that the spool is ready.
 func molt_text() -> String:
-	if molt_stage == MoltStage.MOLTED:
+	return _molt_line(molt_progress, molt_stage, molt_pause_reason())
+
+
+static func _molt_line(progress: float, at: MoltStage, pause_reason: String) -> String:
+	if at == MoltStage.MOLTED:
 		return "MOLTED: optical silk spool ready"
-	var stage: String = "PRE-MOLT" if molt_stage == MoltStage.PRE_MOLT else "MOLT"
-	return (stage + " PAUSED: " + molt_pause_reason() if is_molt_paused()
-		else "%s  %s %%" % [stage, SP811.number(molt_progress * 100.0, 0)])
+	var stage: String = "PRE-MOLT" if at == MoltStage.PRE_MOLT else "MOLT"
+	return (stage + " PAUSED: " + pause_reason if pause_reason != ""
+		else "%s  %s %%" % [stage, SP811.number(progress * 100.0, 0)])
+
+
+static func _molt_stage_at(progress: float) -> MoltStage:
+	if progress >= 1.0:
+		return MoltStage.MOLTED
+	return MoltStage.PRE_MOLT if progress >= PRE_MOLT_AT else MoltStage.ACTIVE
 
 
 func _tick_molt(delta_days: float) -> void:
+	_tick_enclosures(delta_days)
 	if molt_stage == MoltStage.MOLTED or is_molt_paused():
 		return
 	molt_progress = minf(1.0, molt_progress + delta_days / molt_days())
-	if molt_progress >= 1.0:
-		molt_stage = MoltStage.MOLTED
-	elif molt_progress >= PRE_MOLT_AT:
-		molt_stage = MoltStage.PRE_MOLT
-	else:
-		molt_stage = MoltStage.ACTIVE
+	molt_stage = _molt_stage_at(molt_progress)
 	molt_changed.emit(molt_progress, molt_stage)
 
 
@@ -3007,10 +3035,7 @@ func _tick_molt(delta_days: float) -> void:
 func collect_spool(player_id: String = "", by_robot: bool = false, damaged: bool = false) -> bool:
 	if not is_spool_ready():
 		return false
-	optical_silk_spools += 1
-	_spool_species.append(dome_species_id)
-	_spool_damaged.resize(_spool_species.size())
-	_spool_damaged[-1] = damaged
+	_add_spool(dome_species_id, damaged)
 	exuvia_until_day = GameClock.get_day_index() + EXUVIA_LINGER_DAYS
 	molt_progress = 0.0
 	molt_stage = MoltStage.ACTIVE
@@ -3018,6 +3043,13 @@ func collect_spool(player_id: String = "", by_robot: bool = false, damaged: bool
 	silk_changed.emit(optical_silk_spools)
 	molt_changed.emit(molt_progress, molt_stage)
 	return true
+
+
+func _add_spool(species_id: StringName, damaged: bool = false) -> void:
+	optical_silk_spools += 1
+	_spool_species.append(species_id)
+	_spool_damaged.resize(_spool_species.size())
+	_spool_damaged[-1] = damaged
 
 
 func _is_spool_damaged(index: int) -> bool:
@@ -3035,7 +3067,8 @@ func spool_count_text() -> String:
 	return "%s (%s DAMAGED)" % [SP811.integer(optical_silk_spools), SP811.integer(damaged_spools())]
 
 
-## Takes the oldest spool out of stock, a damaged one first or last [ASSUMPTION].
+## Takes a spool out of stock [ASSUMPTION]: a damaged one before a whole one and the
+## least lag cut first, or whole and the most. Of those alike, the oldest.
 ## Returns its species and whether it is damaged.
 func _take_spool(damaged_first: bool) -> Array:
 	optical_silk_spools -= 1
@@ -3043,14 +3076,16 @@ func _take_spool(damaged_first: bool) -> Array:
 		return [dome_species_id, false]
 	var index: int = -1
 	for i: int in _spool_species.size():
-		if _is_spool_damaged(i) == damaged_first:
+		if _is_spool_damaged(i) == damaged_first and (index < 0 or _is_taken_before(i, index, damaged_first)):
 			index = i
-			break
 	if index < 0:
 		# Spools with no species listed are whole.
 		if not damaged_first and _spool_species.size() <= optical_silk_spools:
 			return [dome_species_id, false]
 		index = 0
+		for i: int in _spool_species.size():
+			if _is_taken_before(i, index, damaged_first):
+				index = i
 	var taken: Array = [_spool_species[index], _is_spool_damaged(index)]
 	_spool_species.remove_at(index)
 	if index < _spool_damaged.size():
@@ -3058,19 +3093,128 @@ func _take_spool(damaged_first: bool) -> Array:
 	return taken
 
 
+func _is_taken_before(index: int, other: int, least_first: bool) -> bool:
+	var cut: float = _species_lag_pct(_spool_species[index])
+	var other_cut: float = _species_lag_pct(_spool_species[other])
+	return cut < other_cut if least_first else cut > other_cut
+
+
+# --- Caught tarantulas ----------------------------------------------------------
+
+## The one way a tarantula joins the dome: caught once, and kept for good. Not a
+## farm command: only the host's own game decides a catch. False if it can't be caught.
+func catch_species(species_id: String) -> bool:
+	if FarmCommands.guest or not StringName(species_id) in CATCHABLE or is_caught(species_id):
+		return false
+	enclosures[species_id] = { "molt_progress": 0.0, "molt_stage": int(MoltStage.ACTIVE), "exuvia_until_day": 0 }
+	enclosures_changed.emit()
+	return true
+
+
+func is_caught(species_id: String) -> bool:
+	return enclosures.has(species_id)
+
+
+## The tank's true relative humidity in percent: the species' ideal, off by the
+## dome's one hygrometer's error [ASSUMPTION]. NAN while the ideal isn't set.
+func enclosure_humidity(species_id: String) -> float:
+	return _species_number(species_id, "ideal_humidity_pct") + hygrometer.error
+
+
+## enclosure_humidity() as the hygrometer shows it.
+func enclosure_humidity_reading(species_id: String) -> float:
+	return _species_number(species_id, "ideal_humidity_pct") + hygrometer.observed_error
+
+
+## What holds this tank's molt back, or "". The true values must be within the species'
+## own tolerance, temperature too once the thermometer is in service [ASSUMPTION]. A
+## value the data leaves unset holds it. Held back it only gives no silk: it never dies.
+func enclosure_pause_reason(species_id: String) -> String:
+	var causes: PackedStringArray = []
+	if is_in_service(THERMOMETER_ID):
+		if is_nan(_species_number(species_id, "ideal_temp_c")):
+			return "temperature not set"
+		if not _tolerates(species_id, "temp_tolerance_c", get_sensor(THERMOMETER_ID).error):
+			causes.append("temperature")
+	if is_nan(enclosure_humidity(species_id)):
+		return "humidity not set"
+	if not _tolerates(species_id, "humidity_tolerance_pct", hygrometer.error):
+		causes.append("humidity")
+	return "" if causes.is_empty() else " and ".join(causes) + " out of range"
+
+
+## False too if the tolerance isn't set.
+func _tolerates(species_id: String, field: String, error: float) -> bool:
+	return absf(error) <= _species_number(species_id, field)
+
+
+## A number in the species' record, or NAN if it isn't set there.
+func _species_number(species_id: String, field: String) -> float:
+	var raw: Variant = DataManager.get_record(SPECIES_TABLE, StringName(species_id)).get(field)
+	return float(raw) if raw is float or raw is int else NAN
+
+
+func is_enclosure_spool_ready(species_id: String) -> bool:
+	return is_caught(species_id) and enclosures[species_id]["molt_stage"] == MoltStage.MOLTED
+
+
+func is_enclosure_exuvia_visible(species_id: String) -> bool:
+	return is_enclosure_spool_ready(species_id) or (is_caught(species_id)
+		and GameClock.get_day_index() < enclosures[species_id]["exuvia_until_day"])
+
+
+## As molt_text(), or "" before the catch.
+func enclosure_text(species_id: String) -> String:
+	if not is_caught(species_id):
+		return ""
+	return _molt_line(enclosures[species_id]["molt_progress"], enclosures[species_id]["molt_stage"],
+		enclosure_pause_reason(species_id))
+
+
+func _tick_enclosures(delta_days: float) -> void:
+	for id: String in enclosures:
+		var tank: Dictionary = enclosures[id]
+		if tank["molt_stage"] == MoltStage.MOLTED or enclosure_pause_reason(id) != "":
+			continue
+		tank["molt_progress"] = minf(1.0, tank["molt_progress"] + delta_days / molt_days())
+		tank["molt_stage"] = int(_molt_stage_at(tank["molt_progress"]))
+		enclosures_changed.emit()
+
+
+## collect_spool() for a caught tarantula's tank.
+func collect_enclosure_spool(species_id: String, player_id: String = "") -> bool:
+	if not is_enclosure_spool_ready(species_id):
+		return false
+	_add_spool(StringName(species_id))
+	enclosures[species_id] = { "molt_progress": 0.0, "molt_stage": int(MoltStage.ACTIVE),
+		"exuvia_until_day": GameClock.get_day_index() + EXUVIA_LINGER_DAYS }
+	_award_xp("collect_spool", player_id)
+	silk_changed.emit(optical_silk_spools)
+	enclosures_changed.emit()
+	return true
+
+
 # --- Relay ----------------------------------------------------------------------
 
-## A whole spool may take the place of a damaged one, which is thrown away.
+## A whole spool may take the place of a damaged one, which is thrown away, or of a
+## whole one that cuts the lag less, which goes back into stock [ASSUMPTION].
 func can_slot_spool() -> bool:
-	if relay_slotted:
-		return slotted_spool_damaged and optical_silk_spools > damaged_spools()
-	return optical_silk_spools > 0
+	if not relay_slotted:
+		return optical_silk_spools > 0
+	if slotted_spool_damaged:
+		return optical_silk_spools > damaged_spools()
+	for i: int in _spool_species.size():
+		if not _is_spool_damaged(i) and _species_lag_pct(_spool_species[i]) > _species_lag_pct(slotted_spool_species):
+			return true
+	return false
 
 
 func slot_spool_into_relay(player_id: String = "") -> bool:
 	if not can_slot_spool():
 		return false
 	var taken: Array = _take_spool(false)
+	if relay_slotted and not slotted_spool_damaged:
+		_add_spool(slotted_spool_species)
 	slotted_spool_species = taken[0]
 	slotted_spool_damaged = taken[1]
 	relay_slotted = true
@@ -3090,11 +3234,14 @@ func get_relay_lag_multiplier() -> float:
 	var spool_pct: float = DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/relay_lag_reduction_pct", 0.0)
 	if slotted_spool_damaged:
 		spool_pct *= DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/damaged_reduction_share", 1.0)
-	var species_pct: float = 0.0
-	var raw: Variant = DataManager.get_record(SPECIES_TABLE, slotted_spool_species).get("lag_reduction_pct")
-	if typeof(raw) == TYPE_FLOAT or typeof(raw) == TYPE_INT:  # null for undesigned morphs
-		species_pct = float(raw)
+	var species_pct: float = _species_lag_pct(slotted_spool_species)
 	return clampf((1.0 - spool_pct / 100.0) * (1.0 - species_pct / 100.0), 0.0, 1.0)
+
+
+## The species' own cut. One not set (an undesigned morph) cuts nothing.
+func _species_lag_pct(species_id: StringName) -> float:
+	var pct: float = _species_number(species_id, "lag_reduction_pct")
+	return 0.0 if is_nan(pct) else pct
 
 
 func get_dome_species() -> Dictionary:

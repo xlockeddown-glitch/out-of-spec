@@ -51,16 +51,17 @@
     "tier": "alien",
     "source": "worldbuilding_art_bible",
     "substrate": "Damp frontier moss & slate",
-    "ideal_temp_c": null,
+    "ideal_temp_c": 22,
     "temp_tolerance_c": 3.0,
-    "ideal_humidity_pct": null,
+    "ideal_humidity_pct": 80,
     "humidity_tolerance_pct": 8,
     "molt_days": null,
     "silk_grade": null,
     "optical_silk_yield": null,
     "lag_reduction_pct": 25,
     "output": "Standard optical silk",
-    "unlock": "Cuts Day 1 tractor input lag when slotted into the dish (bible: 25 %)."
+    "unlock": "Cuts Day 1 tractor input lag when slotted into the dish (bible: 25 %).",
+    "_note": "ideal_temp_c and ideal_humidity_pct: invented [PLACEHOLDER]. null is not set yet."
   },
   {
     "id": "terracotta_knee",
