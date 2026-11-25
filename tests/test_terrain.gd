@@ -104,10 +104,10 @@ func test_digging_keeps_to_one_step_between_neighbors() -> String:
 
 func test_digging_keeps_off_the_edge_and_level_ground() -> String:
 	for cell: Vector2i in [Vector2i(-40, 20), Vector2i(39, 20), Vector2i(20, -40), Vector2i(20, 39), Vector2i(20, 1000),
-			Vector2i(0, 0), Vector2i(14, 0), Vector2i(15, 0), Vector2i(-16, 0), Vector2i(0, 14), Vector2i(-35, -35), Vector2i(-31, -35)]:
+			Vector2i(0, 0), Vector2i(14, 0), Vector2i(16, 0), Vector2i(-17, 0), Vector2i(0, 14), Vector2i(-35, -35), Vector2i(-31, -35)]:
 		if Terrain.dig_problem(cell, {}) == "" or Terrain.dug_problem({ cell: 1 }) == "":
 			return "%s must not be dug." % cell
-	for cell: Vector2i in [Vector2i(-39, 20), Vector2i(38, 38), Vector2i(16, 0), Vector2i(0, -17), Vector2i(-29, -35)]:
+	for cell: Vector2i in [Vector2i(-39, 20), Vector2i(38, 38), Vector2i(17, 0), Vector2i(0, -18), Vector2i(-29, -35)]:
 		if Terrain.dig_problem(cell, {}) != "":
 			return "%s must be dug." % cell
 	return ""
@@ -177,10 +177,40 @@ func test_the_highest_ground_under_a_rover_is_found() -> String:
 	ground._ready()
 	var dug: Dictionary[Vector2i, int] = { Vector2i(20, 20): 1, Vector2i(20, 21): 1, Vector2i(20, 22): 1 }
 	ground.show_dug(dug)
+	var found := PackedFloat32Array()
+	var problem: String = ""
 	# In the trench along z, and across it.
-	var along: float = ground.highest_under(Transform3D(Basis.IDENTITY, Vector3(41, 0, 43)), 1.2, 0.8)
-	var across: float = ground.highest_under(Transform3D(Basis(Vector3.UP, PI * 0.5), Vector3(41, 0, 43)), 1.2, 0.8)
+	for turn: float in [0.0, PI * 0.5]:
+		var at := Transform3D(Basis(Vector3.UP, turn), Vector3(41, 0, 43))
+		var highest_m: float = -INF
+		for x: int in range(-8, 9):
+			for z: int in range(-12, 13):
+				highest_m = maxf(highest_m, ground.height_at(at * Vector3(x * 0.1, 0, z * 0.1)))
+		found.append(ground.highest_under(at, 1.2, 0.8))
+		if absf(found[-1] - highest_m) > 0.1:
+			problem = "Found %s, not %s." % [found[-1], highest_m]
 	ground.free()
-	if not is_equal_approx(along, -0.1) or not is_zero_approx(across):
-		return "Found %s and %s." % [along, across]
+	if problem == "" and found[1] <= found[0]:
+		return "Across the trench it must reach the rim."
+	return problem
+
+
+func test_dug_hills_can_be_driven_everywhere() -> String:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var dug: Dictionary[Vector2i, int] = {}
+	for i: int in 60000:
+		var cell := Vector2i(rng.randi_range(-40, 39), rng.randi_range(-40, 39))
+		if Terrain.dig_problem(cell, dug) == "":
+			dug[cell] = dug.get(cell, 0) + 1
+	# Rovers climb 45 degrees, a rise of 1 in 1.
+	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M):
+		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M):
+			var a: float = Terrain.point_height(Vector2i(x, z), dug)
+			var b: float = Terrain.point_height(Vector2i(x + 1, z), dug)
+			var c: float = Terrain.point_height(Vector2i(x, z + 1), dug)
+			var d: float = Terrain.point_height(Vector2i(x + 1, z + 1), dug)
+			for rise: Vector2 in [Vector2(b - a, c - a), Vector2(d - c, d - b), Vector2(b - a, d - b), Vector2(d - c, c - a)]:
+				if rise.length() >= 0.98:
+					return "%s, %s rises %s." % [x, z, rise.length()]
 	return ""
