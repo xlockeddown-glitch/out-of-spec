@@ -1165,3 +1165,10 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - High ground is a little warmer and valleys a little cooler in color; level ground is unchanged [PLACEHOLDER].
 - The land rises 1.5 m toward its edge [PLACEHOLDER], but the rover can still drive off, as before. A rover parked inside a hill by an older save, or off the land, comes back on the ground [ASSUMPTION].
 - Open with Ryan: what should stop the rover at the land's edge.
+- Basalt tunnels, first slice: the mouth is at the farm's northeast, its pad at (20.5, -15.5) m [PLACEHOLDER]. Park on the pad and press E, as at the other pads. Entry is open from the start, and nothing in there is unlocked, earned or spent [ASSUMPTION].
+- The rover has one parked place on the farm and one in the tunnels, so neither scene's place is taken for the other's. Alone it always comes in at the mouth, and comes out where it went in [ASSUMPTION]. Continue opens the farm, with the rover at the mouth if it was left inside [ASSUMPTION]. The dome's airlock leads back to the tunnels if they were left for it.
+- TUNNEL BEACON 01 inside the mouth stands in for the relay, with the same lag, and a silk spool in the relay shortens it as outdoors [ASSUMPTION]. Arches and walls block it, walls drawn low too. A rover in there says nothing of the relay: the farm rover's last word holds, as from the dome [ASSUMPTION]. The mouth's rock on the farm doesn't block the relay [ASSUMPTION].
+- Walls on the camera's side are drawn low and an arch near the rover is see-through, so the rover is always seen. Map, sizes, colors and light are [PLACEHOLDER].
+- The rock there is not tilled, dug or filled [ASSUMPTION].
+- In co-op each player goes in and out alone, as with the dome. The one rover is in both scenes: someone on the farm and someone in the tunnels may each drive it there [ASSUMPTION]. Protocol stays 5.
+- Open with Ryan: vents that heat sensors, Old Orin, beacons the player places, what is unlocked, earned or spent in the tunnels, when they open, whether a rover in the tunnels should be gone from the farm for friends, and whether Continue should open the tunnels.

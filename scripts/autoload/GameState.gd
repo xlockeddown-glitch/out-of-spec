@@ -184,6 +184,11 @@ var rng := RandomNumberGenerator.new()
 ## rover id -> Transform3D where it was parked. Rovers belong to the farm, not
 ## to a player. Change it with park_rover().
 var rover_transforms: Dictionary = {}
+## The rover while in the tunnels has a place of its own, so neither scene's
+## place is taken for the other's.
+const TUNNEL_ROVER: String = "rover_1_tunnels"
+## Just inside the tunnels' mouth [PLACEHOLDER].
+const TUNNEL_START := Transform3D(Basis.IDENTITY, Vector3(-1.5, 0.05, 22.5))
 ## Vector3i -> true for every tilled soil cell.
 var tilled_cells: Dictionary = {}
 ## How deep each dug cell of Terrain is, in steps.
@@ -1988,6 +1993,8 @@ func _interlock_findings() -> Array[Dictionary]:
 func set_rover_uplink(rover_id: String, has_los: bool) -> void:
 	if FarmCommands.guest:
 		return  # the host's rover says
+	if rover_id == TUNNEL_ROVER:
+		return  # it sees a beacon, not the relay
 	if rover_uplinks.has(rover_id) and (rover_uplinks[rover_id] == true) == has_los:
 		return
 	rover_uplinks[rover_id] = has_los
