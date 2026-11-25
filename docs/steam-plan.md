@@ -1,6 +1,6 @@
 # Steam plan for co-op
 
-Plan only; nothing here is built. Written 2026-11-24 for Godot 4.7.2. Ryan chose "Direct IP first" (friends join by IP, Steam later) (decisions.md, "Co-op, first slice"). This is the later.
+Steps 1 to 3 are done (2026-11-24): `CoopSession` runs over any `MultiplayerPeer`, tests prove it with a fake one, and "steam" is refused as "Steam unavailable." There is no Steam code; step 4 on waits for Ryan. "Where the transport is made today", "Smallest seam" and all line numbers describe the code before step 1. Written 2026-11-24 for Godot 4.7.2. Ryan chose "Direct IP first" (friends join by IP, Steam later) (decisions.md, "Co-op, first slice"). This is the later.
 
 ## Where the transport is made today
 
@@ -24,7 +24,7 @@ No high-level RPC: `tests/test_coop_session.gd:310` forbids it on purpose.
 ## What stays the same
 
 - Host authority: the host runs the farm; guests send commands through `FarmCommands`.
-- HELLO / `PROTOCOL` check (`PROTOCOL = 11`, line 28) and the REFUSED reasons.
+- HELLO / `PROTOCOL` check (`PROTOCOL = 13`) and the REFUSED reasons.
 - `is_plain` and `_end_of` checks on every packet (lines 209, 503-508, 514 on). They work on bytes, so transport does not matter.
 - Rate limits, `MAX_GUEST_BYTES` (2048), `MAX_HOST_BYTES` (4 MiB), join timeout, `SPARE_CONNECTIONS`.
 - Guests talk to peer id 1 (line 379). A Steam peer must keep host = 1.
@@ -73,9 +73,9 @@ Accessed 2026-11-24. Pages were read through a summarizing fetch tool, so exact 
 
 ## Ordered PRs, one job each
 
-1. Seam: retype `_peer`/`_open` to `MultiplayerPeer`, move creation into two functions, `port()` off `_peer.host`. No behavior change.
-2. Fake-peer test: run session tests through an in-memory peer.
-3. Transport argument and a "Steam unavailable" refusal; ENet stays default. No Steam code.
+1. (Done) Seam: retype `_peer`/`_open` to `MultiplayerPeer`, move creation into two functions, `port()` off `_peer.host`. No behavior change.
+2. (Done) Fake-peer test: run session tests through an in-memory peer.
+3. (Done) Transport argument and a "Steam unavailable" refusal; ENet stays default. No Steam code.
 4. Spike (after Ryan approves the add-on): vendor the pinned GodotSteam GDExtension, init with App ID 480, a scene where two PCs exchange a packet. Not wired to co-op.
 5. Steam peer in `CoopSession`: host makes a lobby, guest joins by lobby id; same session code.
 6. Lobby UI in `title_menu.gd` and `coop_ui.gd`: "Host on Steam" / "Join friend"; the IP box stays if Ryan wants Steam beside direct IP.

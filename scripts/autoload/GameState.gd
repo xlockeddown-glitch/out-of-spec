@@ -103,6 +103,8 @@ const SENTINEL_SEES_M: float = 8.0
 const SENTINEL_CALM_MPS: float = 3.5
 const SENTINEL_CROWDED_M: float = 1.8
 const SENTINEL_REACH_M: float = 4.0
+## Told once when it is first in sight; the numbers are the ones above.
+const SENTINEL_HINT: String = "SENTINEL: Lights low (L), creep, stop short."
 ## The chance on its first morning, and again for each morning it isn't met. [PLACEHOLDER]
 const SENTINEL_CHANCE: float = 0.10
 ## How far the cup's relative humidity may really be from its ideal. [PLACEHOLDER]
@@ -137,6 +139,8 @@ var enclosures: Dictionary = {}
 ## last scared off.
 var sentinel_out: bool = false
 var sentinel_days_unseen: int = 0
+## The rules were told for this sighting (host only, not saved).
+var sentinel_sighted: bool = false
 ## Past this the chance is certain anyway.
 const SENTINEL_DAYS_MAX: int = 10
 var rover_lights: bool = true
@@ -477,7 +481,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
 	"world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
-	"certificates", "local_player_id", "_morning", "_morning_notes",
+	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
 ]
 
 
@@ -696,6 +700,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	if problem != "":
 		return problem
 	put_farm(data)
+	sentinel_sighted = false
 	farm_loaded.emit()
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
@@ -2274,7 +2279,7 @@ func _run_audit(day: int) -> void:
 				instrument_name(line["instrument_id"]),
 				sensor.format_value(line["as_found"]), SP811.number(line["ratio"], 3), DriftingSensor.band_label(line["band"])])
 		if line["overdue"]:
-			label += ", OVERDUE (due day %d)" % line["due_day"]
+			label += ", " + DriftingSensor.overdue_text(int(line["due_day"]))
 		if line.get("excused", false):
 			label += ", EXCUSED (its standard was at OIRM when it fell due; calibrate before the day %d audit)" % excused[line["instrument_id"]]
 		if line.get("suspect", false):
@@ -2678,7 +2683,7 @@ func traceability_chain(instrument_id: String) -> Dictionary:
 			return { "traceable": true, "text": "%s ← %s ← OIRM time" % [name, "relay lock" if is_relay_locked(instrument_id)
 				else "holdover (good to day %d)" % sensor.cal_due_day] }
 		if sensor.is_overdue(today):
-			return { "traceable": false, "text": "%s ← %s lapsed (due day %d)" % [name, cert["id"], cert["due_day"]] }
+			return { "traceable": false, "text": "%s ← %s %s" % [name, cert["id"], DriftingSensor.overdue_text(sensor.cal_due_day)] }
 		if suspect_units.has(instrument_id):
 			return { "traceable": false, "text": "%s ← %s: SUSPECT, recalled day %d" % [name, cert["id"], suspect_units[instrument_id]] }
 		if _untraceable_since_cal.has(instrument_id):
@@ -2699,7 +2704,7 @@ func traceability_chain(instrument_id: String) -> Dictionary:
 	if _untraceable_since_cal.has(instrument_id):
 		return { "traceable": false, "text": "%s: adjusted since without a traceable standard" % link }
 	if sensor.is_overdue(today):
-		return { "traceable": false, "text": "%s: calibration lapsed (due day %d)" % [link, sensor.cal_due_day] }
+		return { "traceable": false, "text": "%s: %s" % [link, DriftingSensor.overdue_text(sensor.cal_due_day)] }
 	return { "traceable": true, "text": link + " ← OIRM" }
 
 
@@ -3208,6 +3213,7 @@ func _roll_sentinel() -> void:
 	if FarmCommands.guest or is_caught(SENTINEL):
 		return
 	sentinel_out = rng.randf() < sentinel_chance()
+	sentinel_sighted = false
 	sentinel_days_unseen = mini(sentinel_days_unseen + 1, SENTINEL_DAYS_MAX)
 	sentinel_changed.emit()
 
@@ -3238,6 +3244,10 @@ func watch_sentinel(rover_id: String, at: Vector3, speed_mps: float) -> void:
 	var away: float = at.distance_to(SENTINEL_AT)
 	if away > SENTINEL_SEES_M:
 		return
+	if not sentinel_sighted:
+		# Once per sighting, before it can bolt, so the rules come first.
+		sentinel_sighted = true
+		post_phone(SENTINEL_HINT)
 	if rover_lights:
 		_scare_sentinel("The rover's lights were on.")
 	elif absf(speed_mps) > SENTINEL_CALM_MPS:
@@ -3246,11 +3256,12 @@ func watch_sentinel(rover_id: String, at: Vector3, speed_mps: float) -> void:
 		_scare_sentinel("The rover came too close.")
 
 
-func _scare_sentinel(why: String) -> void:
+func _scare_sentinel(why: String, extra: String = "") -> void:
 	sentinel_out = false
+	sentinel_sighted = false
 	sentinel_days_unseen = 0
 	sentinel_changed.emit()
-	post_phone("SENTINEL: %s It bolted, and hides until another day." % why)
+	post_phone("SENTINEL: %s It bolted, and hides until another day.%s" % [why, " " + extra if extra != "" else ""])
 
 
 ## True if the cup reaches it from the rover's place.
@@ -3274,11 +3285,16 @@ func catch_sentinel(reading_pct: float, player_id: String = "") -> String:
 	var off: float = reading_pct - hygrometer.error - _species_number(SENTINEL, "ideal_humidity_pct")
 	if absf(off) <= CUP_TOLERANCE_PCT:
 		sentinel_out = false
+		sentinel_sighted = false
 		catch_species(SENTINEL)
 		sentinel_changed.emit()
 		post_phone("SENTINEL: caught. It goes to its tank in the dome.")
 	else:
-		_scare_sentinel("The cup was too %s." % ("damp" if off > 0.0 else "dry"))
+		# The display was in the band: say where the fault is.
+		var hint: String = ""
+		if absf(reading_pct - _species_number(SENTINEL, "ideal_humidity_pct")) <= CUP_TOLERANCE_PCT:
+			hint = "The hygrometer read %s %%. Was it right?" % SP811.number(reading_pct, 0)
+		_scare_sentinel("The cup was too %s." % ("damp" if off > 0.0 else "dry"), hint)
 	return ""
 
 
@@ -4564,8 +4580,8 @@ func soil_probe_text() -> String:
 		# Like the dome's displays: the drift as the last reference saw it.
 		text += " Drift %s, %s." % [probe.format_value(probe.observed_error),
 			DriftingSensor.band_label(probe.get_observed_band())]
-		text += (" CAL OVERDUE (due day %d)." if probe.is_overdue(GameClock.get_day_index())
-			else " Cal due day %d.") % probe.cal_due_day
+		text += (" CAL %s." % DriftingSensor.overdue_text(probe.cal_due_day) if probe.is_overdue(GameClock.get_day_index())
+			else " Cal due day %d." % probe.cal_due_day)
 	return text
 
 

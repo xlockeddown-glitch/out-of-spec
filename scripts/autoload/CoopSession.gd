@@ -41,6 +41,7 @@ const REASONS: Dictionary = {
 	"version": "The host has another version of the game.",
 }
 const NO_HOST: String = "The host did not answer."
+const NO_STEAM: String = "Steam unavailable."
 
 ## Connections beyond the players, so a full farm can still say so.
 const SPARE_CONNECTIONS: int = 4
@@ -68,7 +69,9 @@ var answer_timeout_ms: int = 10000
 var commands: Node
 var profile: Node
 
-var _peer: ENetMultiplayerPeer
+var _peer: MultiplayerPeer
+## Host: the port, set when the peer is made.
+var _port: int = 0
 var _hosting: bool = false
 ## Guest: let in, and not cut off since.
 var _accepted: bool = false
@@ -105,19 +108,14 @@ func _exit_tree() -> void:
 
 
 ## Opens the farm to guests. Returns "" or why not.
-func host(listen_port: int = DEFAULT_PORT, bind_ip: String = "*") -> String:
-	var problem: String = _start_problem()
+func host(listen_port: int = DEFAULT_PORT, bind_ip: String = "*", transport: String = "enet") -> String:
+	var problem: String = _start_problem(transport)
 	if problem != "":
 		return problem
-	# Godot would report a bad address, then listen on all of them.
-	if bind_ip != "*" and not bind_ip.is_valid_ip_address():
-		return "'%s' is not an address." % bind_ip
-	if listen_port < 0 or listen_port > 65535:
-		return "%d is not a port." % listen_port
-	var peer := ENetMultiplayerPeer.new()
-	peer.set_bind_ip(bind_ip)
-	if peer.create_server(listen_port, MAX_PLAYERS - 1 + SPARE_CONNECTIONS) != OK:
-		return "Could not open port %d." % listen_port
+	var made: Variant = _make_host_peer(listen_port, bind_ip)
+	if made is String:
+		return made
+	var peer: MultiplayerPeer = made
 	peer.peer_connected.connect(func(id: int) -> void: _events.append([id, true]))
 	peer.peer_disconnected.connect(_peer_gone)
 	_open(peer)
@@ -129,20 +127,16 @@ func host(listen_port: int = DEFAULT_PORT, bind_ip: String = "*") -> String:
 ## Asks to join the host at `address`. Returns "" or why not; then joined or
 ## refused follows. From the title menu: a guest has no farm of its own open,
 ## so nothing autosaves the host's farm over it.
-func join(address: String, host_port: int = DEFAULT_PORT) -> String:
-	var problem: String = _start_problem()
+func join(address: String, host_port: int = DEFAULT_PORT, transport: String = "enet") -> String:
+	var problem: String = _start_problem(transport)
 	if problem != "":
 		return problem
 	if SaveGame.farm_open:
 		return "Close your own farm first."
-	if not address.is_valid_ip_address():
-		return "That is not an IP address."
-	if host_port < 1 or host_port > 65535:
-		return "That is not a port."
-	var peer := ENetMultiplayerPeer.new()
-	if peer.create_client(address, host_port) != OK:
-		return "Could not connect."
-	_open(peer)
+	var made: Variant = _make_guest_peer(address, host_port)
+	if made is String:
+		return made
+	_open(made)
 	_hello_sent = false
 	_join_by = Time.get_ticks_msec() + join_timeout_ms
 	return ""
@@ -175,7 +169,7 @@ func is_guest() -> bool:
 
 ## The port hosted on, or 0.
 func port() -> int:
-	return _peer.host.get_local_port() if _hosting else 0
+	return _port
 
 
 ## Host: sends `data`, for CoopSync, to one guest or ("") to all.
@@ -492,11 +486,45 @@ func _end(reason: String) -> void:
 		refused.emit(reason)
 
 
-func _start_problem() -> String:
-	return "Leave the co-op farm first." if _peer != null or _own_id != "" else ""
+func _start_problem(transport: String) -> String:
+	if _peer != null or _own_id != "":
+		return "Leave the co-op farm first."
+	match transport:
+		"enet":
+			return ""
+		"steam":
+			return NO_STEAM
+	return "'%s' is not a way to connect." % transport
 
 
-func _open(peer: ENetMultiplayerPeer) -> void:
+## A peer listening for guests, or why not. Its own id must be 1.
+func _make_host_peer(listen_port: int, bind_ip: String) -> Variant:
+	# Godot would report a bad address, then listen on all of them.
+	if bind_ip != "*" and not bind_ip.is_valid_ip_address():
+		return "'%s' is not an address." % bind_ip
+	if listen_port < 0 or listen_port > 65535:
+		return "%d is not a port." % listen_port
+	var peer := ENetMultiplayerPeer.new()
+	peer.set_bind_ip(bind_ip)
+	if peer.create_server(listen_port, MAX_PLAYERS - 1 + SPARE_CONNECTIONS) != OK:
+		return "Could not open port %d." % listen_port
+	_port = peer.host.get_local_port()
+	return peer
+
+
+## A peer on its way to the host, or why not.
+func _make_guest_peer(address: String, host_port: int) -> Variant:
+	if not address.is_valid_ip_address():
+		return "That is not an IP address."
+	if host_port < 1 or host_port > 65535:
+		return "That is not a port."
+	var peer := ENetMultiplayerPeer.new()
+	if peer.create_client(address, host_port) != OK:
+		return "Could not connect."
+	return peer
+
+
+func _open(peer: MultiplayerPeer) -> void:
 	_peer = peer
 	set_process(true)
 
@@ -508,6 +536,7 @@ func _close() -> void:
 		_peer.close()
 		_peer = null
 	_hosting = false
+	_port = 0
 	_accepted = false
 	_links.clear()
 	_events.clear()

@@ -1173,6 +1173,14 @@ Agent's notes (flagged for Ryan, not his words):
   - The model is original voxels in code: orange suit, dark boots and pack,
     teal visor. Protocol 13.
 
+- Ready for Steam, with no Steam in it (steps 1 to 3 of
+  [steam-plan.md](steam-plan.md)) [ASSUMPTION]:
+  - A session runs over any Godot `MultiplayerPeer`. Two functions make the
+    ENet one. A fake in-memory peer in the tests stands in for others.
+  - host() and join() take a transport: "enet" unless told otherwise. "steam"
+    gets "Steam unavailable." and any other is refused; nothing opens. The
+    screens don't offer a choice. Protocol unchanged.
+
 ## 2026-11-24: Hills, digging, tunnels
 
 Ryan: "Hills then tunnels for growth if we can do digging and destruction in parallel that would be amazing."
@@ -1256,3 +1264,7 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - Channels [ASSUMPTION]: a channel in or touching a wet pool carries a film 0.08 m over its floor along its whole run (FILM_M [PLACEHOLDER]), whatever the rims; it rides the ground, so it is not level, and is too shallow to slow a rover. One step dimples touching a fed channel, lower than it, fill to their own rim. An unfed channel carries nothing, and taking a stone away stops its film at once.
 - Digging and filling stay possible in wet pits, so nobody is trapped: filling a pit down to 1 step dries it. No new saved state, so no protocol change. Sensor, sinkhole, plots, reference blocks, ore, stone rules and relay line of sight are untouched.
 - Open with Ryan: whether a wet pit should seep slowly after a dig, whether channels should need a downhill run to carry water, and whether deep water should ever be swum.
+- Playtest text fixes. Humidity differences (sensor error, MPE, U) print as "percentage points", since SP 811 does not allow "% RH" and a difference of two relative humidities is not a share of the reading [ASSUMPTION]. Soil moisture keeps "%", and the phone HUD is unchanged. tools/check_sp811.py is not taught a rule: it cannot tell an RH difference from an absolute RH by text alone.
+- One overdue wording everywhere: "OVERDUE since day N", N being the day after the due day, so never "day 0" [ASSUMPTION]. `DriftingSensor.overdue_text` makes it.
+- The Sentinel's rules ("Lights low (L), creep, stop short.") go to the phone log once per sighting, the first time the rover is within its 8 m, before any scare line; no speed readout. A bolt or a catch starts a new sighting. The told flag is not saved [ASSUMPTION]. A failed catch with a reading inside the 5 % cup band adds "The hygrometer read N %. Was it right?" to the host's phone line, so guests get it with the phone log and the protocol is unchanged [ASSUMPTION].
+- Terrace models (models only, not placed; Ryan's terrace pack as layer grids in `tools/voxgen/sheets/`): ramp, mid deck, upper bluff, endcap and switchback are built voxel for voxel from his scripts; letters map to the repo's colors (P1..P4 the boulders', D1, K1, F1/F2, EC the teal, S shadow) and O1 is his `#C97A3B`. [ASSUMPTION] The rim overhang shelf had only a summary: its Z=2 cells under the S recess (X=3..6, Y=2..3) are P1, so the recess does not float, and X=0 and X=9 are empty at Y=2..3 as written. Its other layers, Z=0's two rows and the empty cell at Z=1, Y=1, X=9 included, are the summary's. [ASSUMPTION] The upper bluff was built too, as it belongs to the pack. [ASSUMPTION] The switchback follows `build_terrace_switchback_vox.py`, the later of his two scripts by file time (4 s) and the one with EC in it as his summary has (8 voxels; the other has 2). It does not match his summary on every row (Z=0, 1, 3, 6, 7 and 11 differ); the other script matches those rows but not the EC, so neither fits. Open with Ryan: which is final? Ramp: his summary and his grid disagree (the summary's steps rise toward +Y at Y=9-z; the grid's shadow is at Y=z-1 with the mass toward -Y); the grid was built. Open with Ryan. [ASSUMPTION] Part `rock`, EC as `emit_crystal`; the border pass puts S around EC (8 voxels each, under the 9-voxel cutoff). Doubtful: the ramp does not read as a ramp, and the S cracks and recess read near black.
