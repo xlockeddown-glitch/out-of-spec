@@ -11,7 +11,7 @@ const ACTIONS: Array[StringName] = [
 	&"calibrate_at_bench", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_up", &"go_to_bed",
 	&"harvest_crop", &"hit_boulder", &"mine_fissure", &"move_rover", &"plant_crop", &"release_robot", &"remove_robot_card",
 	&"sell_harvest_to_lin", &"send_to_oirm", &"set_interlock_override", &"slot_spool_into_relay",
-	&"start_lab_grow", &"till", &"zero_steering",
+	&"start_lab_grow", &"survey_ore", &"till", &"zero_steering",
 ]
 const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
 

@@ -23,9 +23,11 @@ const DISH_ID: String = "relay_dish_azimuth"
 var _had_los: bool = true
 ## The blocks this screen has told about.
 var _blocks_told: Array[Vector2i] = []
+var _pockets_told: Array[Vector2i] = []
 var _last_band: int = DriftingSensor.Band.IN_BAND
 
 @onready var _rover: RoverController = %Rover
+@onready var _survey_line: SurveyLine = $WorldView/WorldViewport/World/SurveyLine
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
 @onready var _airlock: Clickable = %Airlock
 @onready var _hover_hint: Label = %HoverHint
@@ -59,6 +61,8 @@ func _ready() -> void:
 	GameState.terrain_changed.connect(_show_dug)
 	_blocks_told.assign(GameState.found_blocks.keys())
 	GameState.blocks_changed.connect(_on_blocks_changed)
+	_pockets_told.assign(GameState.found_pockets.keys())
+	GameState.pockets_changed.connect(_on_pockets_changed)
 	_rover.tilled_cell_used.connect(_on_tilled_cell_used)
 	_hud.zero_steering_pressed.connect(_on_zero_pressed)
 	_hud.slot_spool_pressed.connect(_on_slot_spool_pressed)
@@ -251,6 +255,35 @@ func _on_blocks_changed() -> void:
 					SP811.number(block["certified"], 0), SP811.number(block["u"], 2), SP811.number(block["k"], 0)])
 
 
+func _on_pockets_changed() -> void:
+	for cell: Vector2i in GameState.found_pockets:
+		if not cell in _pockets_told:
+			_pockets_told.append(cell)
+			_hud.push_log("FOUND AN ORE POCKET: +%s crystal ore" % SP811.integer(OrePocket.ORE))
+
+
+## V: a survey from the standing rover reads a bearing to the nearest ore pocket.
+func _survey() -> void:
+	if _rover.away_text() != "":
+		_say_if_away()
+		return
+	if not _rover.is_stopped():
+		_hud.push_log("ORE SURVEY: stop the rover first.")
+		return
+	var record: Dictionary = await FarmCommands.request(&"survey_ore")
+	if record.is_empty() or not is_inside_tree():
+		return
+	_survey_line.forget()
+	if record.get("refused", false):
+		_hud.push_log("ORE SURVEY REFUSED: %s" % str(record["reason"]))
+	elif not record["found"]:
+		_hud.push_log("ORE SURVEY: no ore pocket within %s m" % SP811.number(OrePocket.RANGE_M, 0))
+	else:
+		_survey_line.show_bearing(record["from"], record["bearing"])
+		_hud.push_log("ORE SURVEY: %s° from north (±%s° if steering is in MPE)" % [
+			SP811.number(record["bearing"], 1), SP811.number(record["mpe"], 1)])
+
+
 ## Q: puts the dish (at the relay) or the rover's steering encoder against a block.
 func _check_with_block() -> void:
 	if _rover.away_text() != "":
@@ -316,6 +349,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _is_key(event, KEY_Q):
 		get_viewport().set_input_as_handled()
 		_check_with_block()
+	elif _is_key(event, KEY_V):
+		get_viewport().set_input_as_handled()
+		_survey()
 	elif _is_key(event, KEY_C):
 		get_viewport().set_input_as_handled()
 		var seed: String = GameState.cycle_seed()
