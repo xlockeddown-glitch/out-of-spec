@@ -200,6 +200,9 @@ func test_a_rover_cannot_drive_off_the_land() -> String:
 	tree.root.add_child(rover)
 	var edge_m: float = Terrain.HALF_M - rover.wheelbase_m
 	var problem: String = ""
+	# A guest's driving wears nothing here.
+	var guest: bool = FarmCommands.guest
+	FarmCommands.guest = true
 	for way: Vector3 in [Vector3.RIGHT, Vector3.LEFT, Vector3.BACK, Vector3.FORWARD]:
 		rover.global_position = way * (edge_m + 0.5)
 		rover._drive(0.0)
@@ -218,5 +221,6 @@ func test_a_rover_cannot_drive_off_the_land() -> String:
 	tree.root.remove_child(rover)
 	rover.free()
 	ground.free()
+	FarmCommands.guest = guest
 	GameState.rover_transforms.assign(parked)
 	return problem
