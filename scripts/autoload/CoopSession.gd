@@ -373,7 +373,10 @@ func _guest_read(packet: PackedByteArray) -> bool:
 ## FarmCommands' way to the host. Null when no answer comes.
 func _ask(action: StringName, arguments: Array) -> Variant:
 	_last_number += 1
-	if not _send(1, [COMMAND, _last_number, String(action), arguments]):
+	# The host takes only a list that names no type.
+	var plain: Array = []
+	plain.append_array(arguments)
+	if not _send(1, [COMMAND, _last_number, String(action), plain]):
 		return null
 	var ask := Ask.new()
 	ask.answer_by = Time.get_ticks_msec() + answer_timeout_ms

@@ -221,7 +221,8 @@ func test_a_command_runs_as_the_sender() -> String:
 	var host: Node = _host()
 	_guest(host)
 	var guest: Node = _guest(host)
-	var got: Array = _request(guest, &"calibrate_at_bench", [GameStateScript.HYGROMETER_ID])
+	var typed: Array[String] = [GameStateScript.HYGROMETER_ID]
+	var got: Array = _request(guest, &"calibrate_at_bench", typed)
 	_until(func() -> bool: return not got.is_empty())
 	GameClock.elapsed_days = saved
 	if got.is_empty() or got[0].get("performed_by", "") != "player_3":
