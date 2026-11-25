@@ -490,6 +490,28 @@ func farm_from_dict(data: Dictionary) -> String:
 	var problem: String = farm_dict_problem(data)
 	if problem != "":
 		return problem
+	put_farm(data)
+	farm_loaded.emit()
+	molt_changed.emit(molt_progress, molt_stage)
+	silk_changed.emit(optical_silk_spools)
+	relay_changed.emit(relay_slotted)
+	credits_changed.emit(credits)
+	drop_pod_changed.emit(drop_pod_present)
+	ore_changed.emit(crystal_ore)
+	fissures_changed.emit()
+	upgrades_changed.emit()
+	oirm_changed.emit()
+	credibility_changed.emit(credibility)
+	crops_changed.emit()
+	jobs_changed.emit()
+	lab_changed.emit()
+	robots_changed.emit()
+	return ""
+
+
+## farm_from_dict() without its check, and with no signal but the sensors' own:
+## `data` must have passed farm_dict_problem(). FarmSync says what changed.
+func put_farm(data: Dictionary) -> void:
 	var fresh: Node = (get_script() as GDScript).new()
 	fresh.build_registry()
 	fresh._sync_robot_sensors(data.get("robots", {}))
@@ -527,22 +549,6 @@ func farm_from_dict(data: Dictionary) -> String:
 	certificates.clear()
 	for cert: Dictionary in certificate_log:
 		certificates[cert["standard_id"]] = cert
-	farm_loaded.emit()
-	molt_changed.emit(molt_progress, molt_stage)
-	silk_changed.emit(optical_silk_spools)
-	relay_changed.emit(relay_slotted)
-	credits_changed.emit(credits)
-	drop_pod_changed.emit(drop_pod_present)
-	ore_changed.emit(crystal_ore)
-	fissures_changed.emit()
-	upgrades_changed.emit()
-	oirm_changed.emit()
-	credibility_changed.emit(credibility)
-	crops_changed.emit()
-	jobs_changed.emit()
-	lab_changed.emit()
-	robots_changed.emit()
-	return ""
 
 
 func get_sensor(instrument_id: String) -> DriftingSensor:
@@ -1800,6 +1806,8 @@ func _interlock_findings() -> Array[Dictionary]:
 
 ## A rover reports its line of sight to the relay here.
 func set_rover_uplink(rover_id: String, has_los: bool) -> void:
+	if FarmCommands.guest:
+		return  # the host's rover says
 	if rover_uplinks.has(rover_id) and (rover_uplinks[rover_id] == true) == has_los:
 		return
 	rover_uplinks[rover_id] = has_los
@@ -2449,6 +2457,8 @@ func add_tire_usage(meters: float) -> void:
 ## gauge. There is one of each, whichever rover drove. The driver's Field Ops
 ## skill spares the encoder.
 func add_rover_usage(meters: float, player_id: String = "") -> void:
+	if FarmCommands.guest:
+		return  # the host's rover wears the sensors
 	steering.add_usage(meters * skill_factor("steering_usage", player_id))
 	add_tire_usage(meters)
 
@@ -2456,6 +2466,8 @@ func add_rover_usage(meters: float, player_id: String = "") -> void:
 ## Remembers where a rover is parked, so it is still there when the farm scene
 ## loads again.
 func park_rover(rover_id: String, at: Transform3D) -> void:
+	if FarmCommands.guest:
+		return  # it is where the host parked it
 	rover_transforms[rover_id] = at
 
 

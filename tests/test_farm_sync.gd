@@ -1,0 +1,302 @@
+extends RefCounted
+## The host's farm reaches a guest whole, and the guest only shows it.
+
+const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
+const PATH: String = "user://test_farm_sync.save"
+## Saved variables no signal shows: bookkeeping, or shown only when asked.
+const NO_SIGNAL: Array[String] = [
+	"_untraceable_since_cal", "clean_audit_streak", "_next_certificate_number",
+	"offence_counts", "_drop_pod_departure_at", "audit_grace_used", "_cal_index_at_last_audit",
+	"_dispatch_deck", "rover_transforms", "_next_job_number", "_board_band", "_board_taken",
+	"seed_crop_id", "planting_offset_steps", "rover_uplinks",
+]
+## Saved variables _show_changes() or _show_news() shows.
+const NEWS: Array[String] = ["cal_log", "phone_log", "audit_log", "tilled_cells", "player_skill_xp", "farm_skill_xp"]
+
+
+func _make_state(seed_value: int = 424242) -> GameStateScript:
+	var gs: GameStateScript = GameStateScript.new()
+	gs.build_registry()
+	gs.set_world_seed(seed_value)
+	gs.credits = 100000
+	gs.crystal_ore = 50
+	gs.tier1_unlocked = true
+	gs.reset_credibility()
+	gs.credibility = 60
+	return gs
+
+
+## Plays mornings so every kind of state has something in it.
+func _play(gs: GameStateScript, from_day: int, days: int) -> void:
+	for day: int in range(from_day, from_day + days):
+		GameClock.elapsed_days = float(day)
+		gs._on_time_advanced(1.0)
+		gs._on_day_started(GameClock.get_day_index())
+		gs._on_day_started_regrow()
+		gs._tick_molt(0.001)
+		gs.calibrate(gs.unit_ids()[day % gs.unit_ids().size()])
+		gs.add_tire_usage(1000.0 / 3.0)
+		var cell := Vector3i(day, 0, -day)
+		if gs.till(cell):
+			gs.plant_crop(cell)
+		if not gs.job_board.is_empty():
+			gs.accept_job(0)
+
+
+func _worn() -> GameStateScript:
+	var gs: GameStateScript = _make_state()
+	gs.buy_standard("reference_gauge")
+	gs.park_rover("rover_1", Transform3D(Basis(Vector3.UP, 0.1 + 0.2), Vector3(1.1, 2.2, 3.3)))
+	gs.mined_fissures[&"FissureA"] = 2
+	gs._spool_species.append(&"curlyhair")
+	gs._spool_damaged.append(true)
+	gs.slotted_spool_damaged = true
+	gs.optical_silk_spools = 1
+	_play(gs, 1, 6)
+	return gs
+
+
+func _differs(a: Dictionary, b: Dictionary, when: String) -> String:
+	for key: Variant in a:
+		if var_to_bytes(a[key]) != var_to_bytes(b.get(key)):
+			return "'%s' differs %s: %s vs %s" % [key, when, a[key], b.get(key)]
+	return ""
+
+
+## Runs `body` as a guest and puts the clock, the guest flag and the save back.
+func _as_guest(body: Callable) -> String:
+	var elapsed: float = GameClock.elapsed_days
+	var speed: float = GameClock.seconds_per_day
+	var paused: bool = GameClock.paused
+	var open: bool = SaveGame.farm_open
+	var host: GameStateScript = _worn()
+	var guest: GameStateScript = _make_state(7)
+	var bytes: PackedByteArray = FarmSync.capture(host)
+	FarmCommands.guest = true
+	var problem: String = body.call(host, guest, bytes)
+	FarmCommands.guest = false
+	GameClock.elapsed_days = elapsed
+	GameClock.seconds_per_day = speed
+	GameClock.paused = paused
+	SaveGame.farm_open = open
+	host.free()
+	guest.free()
+	return problem
+
+
+## Counts what `gs` emits, by signal name. Its sensors' are not counted.
+func _count(gs: GameStateScript) -> Dictionary:
+	var counts: Dictionary = {}
+	for sig: Dictionary in GameStateScript.get_script_signal_list():
+		var name: String = sig["name"]
+		var add: Callable = func() -> void: counts[name] = counts.get(name, 0) + 1
+		gs.connect(name, add.unbind(sig["args"].size()) if sig["args"].size() > 0 else add)
+	return counts
+
+
+func test_every_saved_variable_has_a_signal_or_is_named_as_without() -> String:
+	var shown: Array = NO_SIGNAL + NEWS
+	for fields: Array in FarmSync.SHOWN_BY.values():
+		shown += fields
+	var gs: GameStateScript = GameStateScript.new()
+	var saved: Array[String] = gs.SAVED_FIELDS + gs.SAVED_LATER
+	gs.free()
+	for field: String in saved:
+		if shown.count(field) != 1:
+			return "'%s' must be in exactly one of SHOWN_BY, NEWS and NO_SIGNAL." % field
+	return "" if shown.size() == saved.size() else "A listed variable is not saved."
+
+
+func test_guest_has_the_hosts_farm_after_join_and_update() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		var id: String = guest.local_player_id
+		guest.local_player_id = "guest_2"
+		var problem: String = FarmSync.join(bytes, guest)
+		problem += _differs(host.farm_to_dict(), guest.farm_to_dict(), "after joining")
+		FarmCommands.guest = false
+		_play(host, 7, 5)
+		bytes = FarmSync.capture(host)
+		FarmCommands.guest = true
+		problem += FarmSync.update(bytes, guest)
+		problem += _differs(host.farm_to_dict(), guest.farm_to_dict(), "after an update")
+		if problem == "" and (host.certificates != guest.certificates or host.last_cal_records != guest.last_cal_records):
+			problem = "Certificates and last records must match the host's."
+		if problem == "" and not is_equal_approx(GameClock.elapsed_days, 11.0):
+			problem = "The guest must be on the host's day."
+		if problem == "" and (guest.local_player_id != "guest_2" or id == "guest_2"):
+			problem = "The guest's own player id must stay."
+		return problem)
+
+
+func test_relay_renewed_certificate_matches_the_hosts() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, _bytes: PackedByteArray) -> String:
+		for id: String in host.all_standard_ids():
+			if not host.sensors[id].relay_disciplined:
+				continue
+			host.owned_standards[id] = 1
+			host.certificate_log.append({ "standard_id": id, "due_day": 1 })
+			host.sensors[id].cal_due_day = 9
+			host.certificates[id] = { "standard_id": id, "due_day": 9 }
+			var renewed: PackedByteArray = FarmSync.capture(host)
+			var problem: String = FarmSync.join(renewed, guest)
+			if problem == "" and guest.certificates != host.certificates:
+				problem = "A renewed certificate must reach a guest who joins."
+			problem += FarmSync.update(renewed, guest)
+			if problem == "" and guest.certificates != host.certificates:
+				problem = "A renewed certificate must reach a guest who plays."
+			return problem
+		return "The data must have a relay-locked standard.")
+
+
+func test_update_shows_only_what_changed_and_news_once() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		FarmSync.join(bytes, guest)
+		var counts: Dictionary = _count(guest)
+		var problem: String = FarmSync.update(bytes, guest)
+		if not counts.is_empty():
+			return "The same farm must show nothing, not %s." % counts
+		host.credits += 5
+		host.post_phone("HELLO")
+		host.tilled_cells[Vector3i(99, 0, 99)] = true
+		host.audit_log.append({ "passed": true })
+		bytes = FarmSync.capture(host)
+		problem += FarmSync.update(bytes, guest)
+		problem += FarmSync.update(bytes, guest)
+		var want: Dictionary = { "credits_changed": 1, "phone_message": 1, "soil_tilled": 1, "audit_completed": 1 }
+		if problem == "" and counts != want:
+			problem = "Expected %s, got %s." % [want, counts]
+		return problem)
+
+
+func test_new_phone_lines_are_found_in_a_full_log() -> String:
+	for case: Array in [
+		[["a", "b"], ["a", "b", "c"], ["c"]], [["a", "b"], ["b", "c"], ["c"]],
+		[["a"], ["x", "y"], ["x", "y"]], [["a", "b"], ["a", "b"], []], [[], ["a"], ["a"]],
+	]:
+		if FarmSync._new_lines(case[0], case[1]) != case[2]:
+			return "%s then %s must show %s." % case
+	return ""
+
+
+func test_bad_bytes_change_nothing() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		var whole: Dictionary = { "clock": FarmSync.clock(), "farm": host.farm_to_dict() }
+		var bad: Dictionary = { "nothing": PackedByteArray(), "cut off": bytes.slice(0, bytes.size() - 1) }
+		var flipped: PackedByteArray = bytes.duplicate()
+		flipped[500] ^= 1
+		bad["damaged"] = flipped
+		var big := PackedByteArray()
+		big.resize(FarmSync.MAX_BYTES + 1)
+		bad["too big"] = big
+		for field: String in ["credits", "robots", "sensors", "world_seed"]:
+			var data: Dictionary = whole.duplicate(true)
+			data["farm"][field] = "no"
+			bad[field] = SaveGame.to_bytes(data)
+		for clock: Array in [["elapsed_days", NAN], ["elapsed_days", -1.0], ["seconds_per_day", INF], ["paused", 1]]:
+			var data: Dictionary = whole.duplicate(true)
+			data["clock"][clock[0]] = clock[1]
+			bad[str(clock)] = SaveGame.to_bytes(data)
+		var before: Dictionary = guest.farm_to_dict()
+		var day: float = GameClock.elapsed_days
+		SaveGame.farm_open = true
+		var counts: Dictionary = _count(guest)
+		for what: String in bad:
+			for take: Callable in [FarmSync.join, FarmSync.update]:
+				if take.call(bad[what], guest) == "":
+					return "%s must be refused." % what
+		if not counts.is_empty() or GameClock.elapsed_days != day or not SaveGame.farm_open:
+			return "A refused farm must change nothing."
+		return _differs(before, guest.farm_to_dict(), "after refusals"))
+
+
+func test_host_and_solo_take_no_farm() -> String:
+	return _as_guest(func(_host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		FarmCommands.guest = false
+		var before: Dictionary = guest.farm_to_dict()
+		for take: Callable in [FarmSync.join, FarmSync.update]:
+			if take.call(bytes, guest) == "":
+				return "Only a guest may take a farm."
+		if FarmSync.follow_clock(FarmSync.clock()) == "":
+			return "Only a guest may follow a clock."
+		return _differs(before, guest.farm_to_dict(), "on a host"))
+
+
+func test_guest_never_writes_a_save() -> String:
+	var write_first: String = SaveGame._write_data({ "mine": 1 }, PATH)
+	var file_before: PackedByteArray = FileAccess.get_file_as_bytes(PATH)
+	var default_before: PackedByteArray = FileAccess.get_file_as_bytes(SaveGame.DEFAULT_PATH) if FileAccess.file_exists(SaveGame.DEFAULT_PATH) else PackedByteArray()
+	var problem: String = _as_guest(func(_host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		SaveGame.farm_open = true
+		var got: String = FarmSync.join(bytes, guest) + FarmSync.update(bytes, guest)
+		if SaveGame.farm_open:
+			return "Joining must close the guest's own farm."
+		SaveGame.farm_open = true
+		SaveGame._autosave()
+		return got if SaveGame.write(PATH) != "" else "A guest must not save.")
+	if problem == "" and (write_first != "" or FileAccess.get_file_as_bytes(PATH) != file_before):
+		problem = "The save file must not change."
+	var default_after: PackedByteArray = FileAccess.get_file_as_bytes(SaveGame.DEFAULT_PATH) if FileAccess.file_exists(SaveGame.DEFAULT_PATH) else PackedByteArray()
+	if problem == "" and default_after != default_before:
+		problem = "The player's save must not change."
+	DirAccess.remove_absolute(PATH)
+	return problem
+
+
+func test_guest_clock_shows_time_and_runs_nothing() -> String:
+	return _as_guest(func(_host: GameStateScript, _guest: GameStateScript, _bytes: PackedByteArray) -> String:
+		var ran: Array = []
+		var note: Callable = func(_value: float) -> void: ran.append("time")
+		var note_day: Callable = func(_day: int) -> void: ran.append("day")
+		GameClock.time_advanced.connect(note)
+		GameClock.clock_ran.connect(note)
+		GameClock.day_started.connect(note_day)
+		var problem: String = _clock_story()
+		GameClock.time_advanced.disconnect(note)
+		GameClock.clock_ran.disconnect(note)
+		GameClock.day_started.disconnect(note_day)
+		return problem if problem != "" or ran.is_empty() else "A guest's clock must emit nothing.")
+
+
+func _clock_story() -> String:
+	GameClock.elapsed_days = 3.5
+	GameClock.follow(3.5, 720.0, false)
+	GameClock.paused = true  # the guest's own pause does not stop the host
+	GameClock._process(1.0)
+	if not is_equal_approx(GameClock.elapsed_days, 3.5 + 1.0 / 720.0):
+		return "Time must run between updates."
+	var shown: float = GameClock.elapsed_days
+	GameClock.follow(3.5005, 720.0, false)
+	GameClock._process(0.1)
+	if GameClock.elapsed_days != shown:
+		return "A guest a little ahead must wait, not go back."
+	GameClock._process(2.0)
+	if GameClock.elapsed_days <= shown:
+		return "It must go on once the host has caught up."
+	GameClock._process(600.0)
+	if GameClock.elapsed_days > 3.5005 + GameClock.MAX_AHEAD_DAYS + 0.000001:
+		return "It must stop when the host goes quiet."
+	GameClock.follow(3.999, 720.0, false)
+	GameClock._process(600.0)
+	if GameClock.get_day_index() != 4:
+		return "Only the host starts a day."
+	GameClock.follow(4.0, 720.0, true)
+	GameClock._process(60.0)
+	if GameClock.elapsed_days != 4.0:
+		return "A paused host's clock must stand still."
+	GameClock.advance(1.0)
+	GameClock.skip_to_next_morning()
+	if GameClock.elapsed_days != 4.0:
+		return "A guest can't move time."
+	GameClock.follow(1.25, 720.0, false)
+	return "" if GameClock.elapsed_days == 1.25 else "A host far behind must be followed back."
+
+
+func test_guests_rover_changes_nothing() -> String:
+	return _as_guest(func(_host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		var problem: String = FarmSync.join(bytes, guest)
+		var before: Dictionary = guest.farm_to_dict()
+		guest.add_rover_usage(500.0)
+		guest.set_rover_uplink("rover_1", false)
+		guest.set_rover_uplink("rover_1", true)
+		guest.park_rover("rover_1", Transform3D.IDENTITY)
+		return problem + _differs(before, guest.farm_to_dict(), "after the guest's rover drove"))
