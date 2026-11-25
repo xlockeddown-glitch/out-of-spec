@@ -453,6 +453,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 		for key: Variant in values:
 			if not (key is String or key is StringName) or not _fits(values[key], needs[1]):
 				return "'%s' has an entry of the wrong type." % needs[0]
+	for field: String in ["owned_standards", "_untraceable_since_cal"]:
+		for key: Variant in data[field]:
+			if not (key is String or key is StringName):
+				return "'%s' has a key that is not text." % field
 	for cell: Variant in data["tilled_cells"]:
 		if not cell is Vector3i:
 			return "'tilled_cells' has an entry that is not a cell."
@@ -502,6 +506,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return robot_problem
 	var robot_sensors: Array[String] = _robot_sensor_ids(data.get("robots", {}))
 	for id: Variant in data["sensors"]:
+		if not (id is String or id is StringName):
+			return "'sensors' has a key that is not text."
 		var state: Variant = data["sensors"][id]
 		if typeof(state) != TYPE_DICTIONARY:
 			return "Sensor '%s' is not a dictionary." % id
@@ -1627,7 +1633,7 @@ static func _is_card(card: Variant) -> bool:
 	for key: String in ["trigger", "job", "added_by"]:
 		if typeof(card.get(key)) != TYPE_STRING:
 			return false
-	if card["job"] == JOB_CALIBRATE and typeof(card.get("target")) != TYPE_STRING:
+	if typeof(card.get("target", "")) != TYPE_STRING or (card["job"] == JOB_CALIBRATE and not card.has("target")):
 		return false
 	return card["trigger"] in CARD_TRIGGERS.get(card["job"], []) \
 			and card["hour"] >= 0 and card["hour"] < 24 and card["every_days"] >= 1

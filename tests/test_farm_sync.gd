@@ -247,10 +247,21 @@ func test_bad_bytes_change_nothing() -> String:
 				["at_oirm", { "x": [] }], ["suspect_units", { "x": [] }], ["mined_fissures", { "x": [] }], ["lab_areas", { "x": [] }],
 				["offence_counts", { "x": [] }], ["rover_uplinks", { "x": [] }], ["rover_transforms", { "x": [] }], ["tilled_cells", { "here": true }],
 				["lab_build", { "kind": [] }], ["lab_build", { "kind": "grow", "size": [] }], ["lab_build", { "kind": "grow", "done_day": [] }],
-				["lab_build", { "kind": "refit", "discipline": [] }]]:
+				["lab_build", { "kind": "refit", "discipline": [] }], ["owned_standards", { 3: true }], ["_untraceable_since_cal", { 3: true }]]:
 			var data: Dictionary = whole.duplicate(true)
 			data["farm"][values[0]] = values[1]
 			bad[str(values)] = SaveGame.to_bytes(data)
+		var odd_sensor: Dictionary = whole.duplicate(true)
+		odd_sensor["farm"]["sensors"][[]] = 1
+		bad["sensor key"] = SaveGame.to_bytes(odd_sensor)
+		for target: Array in [[GameStateScript.JOB_WATER, []], [GameStateScript.JOB_COLLECT, []], [GameStateScript.JOB_CALIBRATE, []]]:
+			var card: Dictionary = { "trigger": GameStateScript.CARD_TRIGGERS[target[0]][0], "job": target[0], "hour": 6, "every_days": 1,
+				"last_day": 0, "added_by": "x", "target": "x" }
+			if not GameStateScript._is_card(card):
+				return "A whole card must load: %s" % card
+			card["target"] = target[1]
+			if GameStateScript._is_card(card):
+				return "A card with a bad target must be refused: %s" % card
 		for wrong: Array in [["job_board", {}, ["pay", "min_tier", "due_in_days", "discipline"]],
 				["active_jobs", { "job_id": "JOB-0001", "due_day": 1 }, ["pay", "min_tier", "bench_minutes", "item"]],
 				["harvest_bin", { "crop_id": "x" }, ["advance"]],
