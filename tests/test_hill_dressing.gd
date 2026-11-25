@@ -206,6 +206,10 @@ func test_a_rover_saved_where_a_rock_stands_comes_back_beside_it() -> String:
 				return "At %s a rover comes back inside the rock at %s." % [at, rock]
 			if HillDressing.clear_of_rocks(away) != away:
 				return "Beside a rock a rover must stay where it was."
+		# Its long side against a corner.
+		var corner: Vector2 = Vector2(rock) + half + Vector2.ONE.normalized() * ROVER_M / 2.0
+		if HillDressing.clear_of_rocks(corner) != corner:
+			return "A rover resting diagonally at a corner must stay where it was."
 	var parked: Dictionary = GameState.rover_transforms.duplicate()
 	var tree: SceneTree = Engine.get_main_loop()
 	var ground := TerrainGround.new()
