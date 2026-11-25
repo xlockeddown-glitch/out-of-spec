@@ -23,13 +23,17 @@ signal state_received(data: Dictionary)
 ## Host: a guest drives a rover. Guest: the host says who does, or "". See CoopRovers.
 signal rover_driven(player_id: String, rover_id: String, pose: Array)
 signal rover_told(rover_id: String, driver_id: String, pose: Array)
+## Host: a guest walks. Guest: the host says who is out of the rover, and where
+## (player -> pose). See CoopWalkers.
+signal walked(player_id: String, pose: Array)
+signal walkers_told(poses: Dictionary)
 
 ## Raise it whenever two versions could disagree about the farm or the messages.
-const PROTOCOL: int = 12
+const PROTOCOL: int = 13
 const DEFAULT_PORT: int = 24711
 const MAX_PLAYERS: int = 4
 
-enum { HELLO, COMMAND, WELCOME, REFUSED, JOINED, LEFT, ANSWER, STATE, DRIVE, ROVER }
+enum { HELLO, COMMAND, WELCOME, REFUSED, JOINED, LEFT, ANSWER, STATE, DRIVE, ROVER, WALK, WALKERS }
 
 const REASONS: Dictionary = {
 	"full": "The farm is full.",
@@ -205,6 +209,20 @@ func tell_rover(rover_id: String, driver_id: String, pose: Array) -> void:
 			_put(id, message, false)
 
 
+## Guest: tells the host where this player walks, as drive() does.
+func walk(pose: Array) -> void:
+	if _accepted:
+		_put(1, var_to_bytes([WALK, pose]), false)
+
+
+## Host: tells every guest who is out of the rover, and where.
+func tell_walkers(poses: Dictionary) -> void:
+	var message: PackedByteArray = var_to_bytes([WALKERS, poses])
+	for id: int in _links:
+		if _links[id]["player"] != "" and not _links[id].get("gone", false):
+			_put(id, message, false)
+
+
 ## Only these kinds of data: nothing that is, holds or calls an object.
 static func is_plain(value: Variant, depth: int = 0) -> bool:
 	match typeof(value):
@@ -291,6 +309,11 @@ func _host_read(from: int, packet: PackedByteArray, now: int, reliable: bool) ->
 		if not CoopProfile.is_key(message[2]) or not CoopProfile.are_skills(message[3]):
 			return false
 		_let_in(from, message[2], message[3])
+		return true
+	if not reliable and _is_shape(message, [WALK, TYPE_ARRAY]):
+		if not CoopWalkers.is_pose(message[1]):
+			return false
+		walked.emit(link["player"], message[1])
 		return true
 	if not reliable:
 		if not _is_shape(message, [DRIVE, TYPE_STRING, TYPE_ARRAY]) or message[1].length() > MAX_TEXT or not CoopRovers.is_pose(message[2]):
@@ -396,6 +419,13 @@ func _guest_read(packet: PackedByteArray) -> bool:
 		# It may overtake the welcome.
 		if _accepted:
 			rover_told.emit(message[1], message[2], message[3])
+		return true
+	if _is_shape(message, [WALKERS, TYPE_DICTIONARY]):
+		var poses: Dictionary = message[1]
+		if poses.size() > MAX_PLAYERS or not poses.keys().all(_is_player_id) or not poses.values().all(CoopWalkers.is_pose):
+			return false
+		if _accepted:
+			walkers_told.emit(poses)
 		return true
 	if not _accepted:
 		if _is_shape(message, [REFUSED, TYPE_STRING]):

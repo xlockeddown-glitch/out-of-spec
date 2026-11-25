@@ -160,7 +160,7 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 	_expire(now)
 	if not farm.rover_transforms.has(rover_id) or farm.rover_is_away(rover_id):
 		return
-	if not driver(rover_id) in ["", player_id] or not together():
+	if not driver(rover_id) in ["", player_id] or not together() or CoopWalkers.is_out(player_id):
 		return
 	var to: Transform3D = _transform(pose)
 	var from: Transform3D = place(rover_id)

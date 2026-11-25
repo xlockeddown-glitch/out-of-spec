@@ -8,7 +8,7 @@ extends Node
 const ACTIONS: Array[StringName] = [
 	&"accept_job", &"add_robot_calibrate_card", &"add_robot_card", &"add_robot_collect_card",
 	&"adjust_setpoint", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
-	&"calibrate_at_bench", &"catch_sentinel", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_up", &"go_to_bed",
+	&"calibrate_at_bench", &"catch_sentinel", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
 	&"harvest_crop", &"hit_boulder", &"mine_fissure", &"move_rover", &"place_stone", &"plant_crop", &"release_robot", &"remove_robot_card",
 	&"sell_harvest_to_lin", &"send_to_oirm", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay",
 	&"start_lab_grow", &"survey_ore", &"till", &"zero_steering",
@@ -50,6 +50,8 @@ func request(action: StringName, arguments: Array = []) -> Variant:
 func execute(player_id: String, action: StringName, arguments: Array) -> Variant:
 	# GameState would take no name as the host's own.
 	var reason: String = "No player is named." if player_id == "" else problem(action, arguments)
+	if reason == "" and CoopWalkers.is_out(player_id) and not action in CoopWalkers.ON_FOOT:
+		reason = CoopWalkers.REFUSAL
 	if reason != "":
 		return refusal(action, reason)
 	# Whoever does something is up.
