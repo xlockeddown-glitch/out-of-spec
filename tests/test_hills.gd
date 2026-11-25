@@ -53,19 +53,19 @@ func test_the_same_land_on_every_pc() -> String:
 
 
 func test_the_road_to_the_relay_is_level() -> String:
+	var dish: Vector3 = _dish()
 	for i: int in 71:
 		for aside: int in range(-3, 4):
 			var at := Vector2i(-i + aside, -i - aside)
 			if not Terrain.is_level(Vector2(at)) or Terrain.natural(at) != 0.0:
 				return "The road is not level at %s." % at
+			if _hidden(Vector3(at.x, ANTENNA_M, at.y), dish):
+				return "The land hides the relay from the road at %s." % at
 	return "" if not Terrain.is_level(Vector2(-60, -40)) else "The road must not be all the land."
 
 
 func test_the_farm_sees_the_relay() -> String:
-	var scene: Node = (load("res://scenes/main_farm.tscn") as PackedScene).instantiate()
-	var relay: SatelliteRelay = scene.find_child("SatelliteRelay")
-	var dish: Vector3 = relay.position + relay.uplink_point.position
-	scene.free()
+	var dish: Vector3 = _dish()
 	for x: int in range(-33, 34):
 		for z: int in range(-33, 34):
 			if Vector2(x, z).length() <= Terrain.FARM_LEVEL_M and _hidden(Vector3(x, ANTENNA_M, z), dish):
@@ -76,6 +76,14 @@ func test_the_farm_sees_the_relay() -> String:
 		if _hidden(Vector3(x, ground_m + ANTENNA_M, x), dish):
 			return ""
 	return "No hill hides the relay."
+
+
+func _dish() -> Vector3:
+	var scene: Node = (load("res://scenes/main_farm.tscn") as PackedScene).instantiate()
+	var relay: SatelliteRelay = scene.find_child("SatelliteRelay")
+	var dish: Vector3 = relay.position + relay.uplink_point.position
+	scene.free()
+	return dish
 
 
 func _hidden(from: Vector3, to: Vector3) -> bool:
@@ -123,6 +131,8 @@ func test_level_ground_keeps_its_color() -> String:
 
 func test_a_rover_saved_inside_a_hill_comes_back_on_it() -> String:
 	var tree: SceneTree = Engine.get_main_loop()
+	# Leaving the tree parks it.
+	var parked: Dictionary = GameState.rover_transforms.duplicate()
 	var ground := TerrainGround.new()
 	tree.root.add_child(ground)
 	var rover := RoverController.new()
@@ -147,4 +157,5 @@ func test_a_rover_saved_inside_a_hill_comes_back_on_it() -> String:
 		problem = "On the hill it must stay where it was."
 	rover.free()
 	ground.free()
+	GameState.rover_transforms.assign(parked)
 	return problem

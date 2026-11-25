@@ -342,6 +342,8 @@ func _set_following(following: bool) -> void:
 	# The host goes on from the very place, a guest from where it shows it.
 	if not following and not FarmCommands.guest:
 		global_transform = CoopRovers.place(rover_id)
+	if not following:
+		_put_back_on_land()
 
 
 func _follow(delta: float) -> void:
