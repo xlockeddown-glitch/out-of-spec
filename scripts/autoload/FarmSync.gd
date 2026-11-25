@@ -6,8 +6,10 @@ extends RefCounted
 ## shows its copy: FarmCommands.guest must be true, so its clock and rover leave
 ## the copy alone and it is never written to a save file.
 
-## A bigger farm is neither sent nor read.
+## A bigger farm is neither sent nor read [ASSUMPTION].
 const MAX_BYTES: int = 4 * 1024 * 1024
+## A guest's choices: the host's start them, and later ones don't replace them.
+const OWN: Array[String] = ["seed_crop_id", "planting_offset_steps"]
 const SENDER: String = "The host's farm"
 
 ## Each signal is emitted when one of these variables changed.
@@ -38,13 +40,13 @@ const CARRIES: Dictionary = {
 }
 
 
-## On the host: the farm for a guest, or nothing if it is too big. Not from
+## On the host: the farm for a guest. Empty means only that it is over MAX_BYTES,
+## which the caller must say: the farm still saves, but can't be shared. Not from
 ## inside a GameState or GameClock signal, where a change may be half made.
 static func capture(farm: Node = GameState) -> PackedByteArray:
 	SaveGame.saving.emit()  # rovers say where they are
 	var bytes: PackedByteArray = SaveGame.to_bytes({ "clock": clock(), "farm": farm.farm_to_dict() })
 	if bytes.size() > MAX_BYTES:
-		push_error("FarmSync: the farm is %d bytes; a guest takes %d." % [bytes.size(), MAX_BYTES])
 		return PackedByteArray()
 	return bytes
 
@@ -101,6 +103,9 @@ static func update(bytes: PackedByteArray, farm: Node = GameState) -> String:
 		return got["problem"]
 	var before: Dictionary = farm.farm_to_dict()
 	var levels: Dictionary = _levels(farm)
+	# What this player will plant next is their own.
+	for field: String in OWN:
+		got["data"]["farm"][field] = farm.get(field)
 	# The clock first, so listeners see the host's day.
 	var new_day: bool = _follow(got["data"]["clock"])
 	farm.put_farm(got["data"]["farm"])
@@ -162,11 +167,18 @@ static func _emit(farm: Node, shown: StringName) -> void:
 static func _show_news(farm: Node, before: Dictionary, levels: Dictionary) -> void:
 	for record: Dictionary in farm.cal_log.slice(before["cal_log"].size()):
 		farm.calibration_recorded.emit(record)
-	for line: String in _new_lines(before["phone_log"], farm.phone_log):
-		farm.phone_message.emit(line)
-	# After the phone's lines, as on the host.
-	for report: Dictionary in farm.audit_log.slice(before["audit_log"].size()):
-		farm.audit_completed.emit(report)
+	# In the host's order: a line posted after an audit is shown after it. The
+	# phone keeps only its last lines.
+	var number: int = farm.phone_count - mini(farm.phone_log.size(), maxi(farm.phone_count - before["phone_count"], 0))
+	var reports: Array = farm.audit_log.slice(before["audit_log"].size())
+	while number < farm.phone_count or not reports.is_empty():
+		if not reports.is_empty() and reports[0].get("phone_count", 0) <= number:
+			farm.audit_completed.emit(reports.pop_front())
+		elif number < farm.phone_count:
+			farm.phone_message.emit(farm.phone_log[number - farm.phone_count])
+			number += 1
+		else:
+			farm.audit_completed.emit(reports.pop_front())
 	var now: Dictionary = _levels(farm)
 	for owned: Array in now:
 		var was: Array = levels.get(owned, [0, 1])
@@ -184,12 +196,3 @@ static func _levels(farm: Node) -> Dictionary:
 		for player: String in owners:
 			out[[player, skill]] = [farm.skill_xp(skill, player), farm.skill_level(skill, player)]
 	return out
-
-
-## The phone keeps only its last lines, so the old ones are the longest start of
-## `now` that `before` ends with.
-static func _new_lines(before: Array, now: Array) -> Array:
-	for kept: int in range(mini(before.size(), now.size()), -1, -1):
-		if before.slice(before.size() - kept) == now.slice(0, kept):
-			return now.slice(kept)
-	return now

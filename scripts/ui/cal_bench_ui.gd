@@ -66,6 +66,7 @@ func _ready() -> void:
 	GameState.oirm_changed.connect(_on_pod_or_oirm_changed)
 	GameState.jobs_changed.connect(_on_jobs_changed)
 	GameClock.time_advanced.connect(_on_time_advanced.unbind(1))
+	GameClock.guest_time_shown.connect(_on_time_advanced)
 
 
 func _unhandled_input(event: InputEvent) -> void:

@@ -149,6 +149,8 @@ var owned_standards: Dictionary = {}
 var credits: int = 0
 ## Phone messages that should survive scene swaps (dispatches, audits).
 var phone_log: Array[String] = []
+## Lines ever posted, so a guest knows which of the kept ones are new.
+var phone_count: int = 0
 ## One report per audit (see AuditEngine.evaluate).
 var audit_log: Array[Dictionary] = []
 ## instrument_id -> number of audits that fined it (repeat surcharge).
@@ -393,7 +395,7 @@ const SAVED_FIELDS: Array[String] = [
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
-	"_spool_damaged", "slotted_spool_damaged"]
+	"_spool_damaged", "slotted_spool_damaged", "phone_count"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -446,6 +448,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 		for entry: Dictionary in data[pair[0]]:
 			if typeof(entry.get(pair[1])) != TYPE_STRING:
 				return "'%s' has an entry with no %s." % pair
+	for report: Dictionary in data["audit_log"]:
+		var report_problem: String = _audit_problem(report)
+		if report_problem != "":
+			return "'audit_log' has an entry with a bad %s." % report_problem
 	for own: Variant in data.get("player_skill_xp", {}).values():
 		if typeof(own) != TYPE_DICTIONARY or not _holds_only_ints(own):
 			return "'player_skill_xp' has a player whose XP is not whole numbers."
@@ -466,6 +472,21 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if (sensors.has(str(id)) or str(id) in robot_sensors) and not DriftingSensor.from_config(str(id)).apply_dict(state):
 			return "Sensor '%s' can't load." % id
 	return ""
+
+
+## What a screen would read from this audit and couldn't, or "".
+static func _audit_problem(report: Dictionary) -> String:
+	for key: String in ["day", "total_fine", "phone_count"]:
+		if not (report.get(key, 0) is int or report.get(key, 0) is float):
+			return key
+	for pair: Array in [["lines", "instrument_id"], ["interlocks", "robot_id"]]:
+		var entries: Variant = report.get(pair[0], [])
+		if not entries is Array:
+			return pair[0]
+		for entry: Variant in entries:
+			if not entry is Dictionary or typeof(entry.get(pair[1])) != TYPE_STRING:
+				return pair[0]
+	return "" if report.get("tire_check", {}) is Dictionary else "tire_check"
 
 
 static func _holds_only_ints(values: Dictionary) -> bool:
@@ -1871,6 +1892,7 @@ func _note_holdover_lapses(day: int) -> void:
 
 func post_phone(text: String) -> void:
 	phone_log.append(text)
+	phone_count += 1
 	while phone_log.size() > PHONE_LOG_MAX:
 		phone_log.remove_at(0)
 	phone_message.emit(text)
@@ -2018,6 +2040,8 @@ func _run_audit(day: int) -> void:
 		post_phone("TOTAL FINE %s CR. Balance %s CR. %s" % [SP811.integer(report["total_fine"]), SP811.integer(credits), footer])
 	_update_clean_audit_gate(report)
 	_credibility_after_audit(report)
+	# Where it came among the phone's lines, so a guest sees the same order.
+	report["phone_count"] = phone_count
 	audit_log.append(report)
 	audit_completed.emit(report)
 

@@ -11,7 +11,7 @@ const NO_SIGNAL: Array[String] = [
 	"seed_crop_id", "planting_offset_steps", "rover_uplinks",
 ]
 ## Saved variables _show_changes() or _show_news() shows.
-const NEWS: Array[String] = ["cal_log", "phone_log", "audit_log", "tilled_cells", "player_skill_xp", "farm_skill_xp"]
+const NEWS: Array[String] = ["cal_log", "phone_log", "phone_count", "audit_log", "tilled_cells", "player_skill_xp", "farm_skill_xp"]
 
 
 func _make_state(seed_value: int = 424242) -> GameStateScript:
@@ -168,14 +168,41 @@ func test_update_shows_only_what_changed_and_news_once() -> String:
 		return problem)
 
 
-func test_new_phone_lines_are_found_in_a_full_log() -> String:
-	for case: Array in [
-		[["a", "b"], ["a", "b", "c"], ["c"]], [["a", "b"], ["b", "c"], ["c"]],
-		[["a"], ["x", "y"], ["x", "y"]], [["a", "b"], ["a", "b"], []], [[], ["a"], ["a"]],
-	]:
-		if FarmSync._new_lines(case[0], case[1]) != case[2]:
-			return "%s then %s must show %s." % case
-	return ""
+func test_news_keeps_the_hosts_order_and_repeats() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, _bytes: PackedByteArray) -> String:
+		for i: int in host.PHONE_LOG_MAX:
+			host.post_phone("SAME")
+		var problem: String = FarmSync.join(FarmSync.capture(host), guest)
+		var shown: Array = []
+		guest.phone_message.connect(func(line: String) -> void: shown.append(line))
+		guest.audit_completed.connect(func(_report: Dictionary) -> void: shown.append("AUDIT"))
+		host.post_phone("SAME")
+		host.audit_log.append({ "phone_count": host.phone_count })
+		host.post_phone("CANCELLED")
+		problem += FarmSync.update(FarmSync.capture(host), guest)
+		if problem == "" and shown != ["SAME", "AUDIT", "CANCELLED"]:
+			return "Got %s." % [shown]
+		for i: int in host.PHONE_LOG_MAX + 5:
+			host.post_phone("MANY")
+		shown.clear()
+		problem += FarmSync.update(FarmSync.capture(host), guest)
+		return problem if problem != "" or shown.size() == host.PHONE_LOG_MAX else "Only the kept lines can be shown, got %d." % shown.size())
+
+
+func test_a_guest_keeps_its_own_planting_choices() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		host.seed_crop_id = "hosts"
+		host.planting_offset_steps = 2
+		bytes = FarmSync.capture(host)
+		var problem: String = FarmSync.join(bytes, guest)
+		if problem == "" and (guest.seed_crop_id != "hosts" or guest.planting_offset_steps != 2):
+			return "The host's choices must start the guest's."
+		guest.seed_crop_id = "mine"
+		guest.planting_offset_steps = -3
+		problem += FarmSync.update(bytes, guest)
+		if problem == "" and (guest.seed_crop_id != "mine" or guest.planting_offset_steps != -3):
+			return "A guest's own choices must stay."
+		return problem)
 
 
 func test_bad_bytes_change_nothing() -> String:
@@ -192,6 +219,11 @@ func test_bad_bytes_change_nothing() -> String:
 			var data: Dictionary = whole.duplicate(true)
 			data["farm"][field] = "no"
 			bad[field] = SaveGame.to_bytes(data)
+		for report: Dictionary in [{ "lines": [{ "violation": true }] }, { "lines": 3 }, { "interlocks": [{}] },
+				{ "total_fine": "no" }, { "tire_check": 1 }]:
+			var data: Dictionary = whole.duplicate(true)
+			data["farm"]["audit_log"].append(report)
+			bad[str(report)] = SaveGame.to_bytes(data)
 		for clock: Array in [["elapsed_days", NAN], ["elapsed_days", -1.0], ["seconds_per_day", INF], ["paused", 1]]:
 			var data: Dictionary = whole.duplicate(true)
 			data["clock"][clock[0]] = clock[1]
@@ -283,6 +315,13 @@ func _clock_story() -> String:
 	GameClock._process(60.0)
 	if GameClock.elapsed_days != 4.0:
 		return "A paused host's clock must stand still."
+	GameClock.follow(4.25, 720.0, false)
+	GameClock._process(2.0)
+	GameClock.follow(4.25, 720.0, true)
+	if GameClock.elapsed_days != 4.25:
+		return "A paused host's time is exact."
+	GameClock.follow(1.0, 720.0, true)
+	GameClock.follow(4.0, 720.0, true)
 	GameClock.advance(1.0)
 	GameClock.skip_to_next_morning()
 	if GameClock.elapsed_days != 4.0:
