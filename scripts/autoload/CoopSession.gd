@@ -59,13 +59,10 @@ var _hello_sent: bool = false
 var _join_by: int = 0
 ## Guest: who this player was before joining, until leave().
 var _own_id: String = ""
-## Host: peer -> { player ("" until let in), join_by, tokens, at }.
+## Host: peer -> { player ("" until let in), join_by, tokens, at, gone (hung up) }.
 var _links: Dictionary = {}
 ## Host: [peer, came or went], in order, noted while polling.
 var _events: Array = []
-## Host: ids aren't reused while hosting, so a newcomer is never taken for
-## someone who left.
-var _next_number: int = 2
 ## Guest: request number -> Ask.
 var _asks: Dictionary = {}
 var _last_number: int = 0
@@ -100,10 +97,9 @@ func host(listen_port: int = DEFAULT_PORT, bind_ip: String = "*") -> String:
 	if peer.create_server(listen_port, MAX_PLAYERS - 1 + SPARE_CONNECTIONS) != OK:
 		return "Could not open port %d." % listen_port
 	peer.peer_connected.connect(func(id: int) -> void: _events.append([id, true]))
-	peer.peer_disconnected.connect(func(id: int) -> void: _events.append([id, false]))
+	peer.peer_disconnected.connect(_peer_gone)
 	_open(peer)
 	_hosting = true
-	_next_number = 2
 	players = [_local_id()]
 	return ""
 
@@ -152,7 +148,7 @@ func port() -> int:
 ## Host: sends `data`, for a later syncing layer, to one guest or ("") to all.
 ## It arrives in order with answers. False if it can't be sent.
 func send_state(data: Dictionary, player_id: String = "") -> bool:
-	if not _hosting or not is_plain(data):
+	if not _hosting or not is_plain([STATE, data]):
 		return false
 	var message: PackedByteArray = var_to_bytes([STATE, data])
 	if message.size() > MAX_HOST_BYTES:
@@ -160,16 +156,16 @@ func send_state(data: Dictionary, player_id: String = "") -> bool:
 	var sent: bool = false
 	for id: int in _links:
 		var to: String = _links[id]["player"]
-		if to != "" and player_id in ["", to]:
+		if to != "" and not _links[id].get("gone", false) and player_id in ["", to]:
 			sent = _put(id, message) or sent
 	return sent
 
 
-## Only data: nothing that is, holds or calls an object.
+## Only these kinds of data: nothing that is, holds or calls an object.
 static func is_plain(value: Variant, depth: int = 0) -> bool:
 	match typeof(value):
-		TYPE_OBJECT, TYPE_CALLABLE, TYPE_SIGNAL, TYPE_RID:
-			return false
+		TYPE_NIL, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR3I, TYPE_PACKED_BYTE_ARRAY:
+			return true
 		TYPE_ARRAY:
 			if depth >= MAX_DEPTH or value.get_typed_builtin() == TYPE_OBJECT:
 				return false
@@ -182,6 +178,8 @@ static func is_plain(value: Variant, depth: int = 0) -> bool:
 			for key: Variant in value:
 				if not is_plain(key, depth + 1) or not is_plain(value[key], depth + 1):
 					return false
+		_:
+			return false
 	return true
 
 
@@ -194,6 +192,12 @@ func poll() -> void:
 		_poll_host()
 	else:
 		_poll_guest()
+
+
+func _peer_gone(id: int) -> void:
+	_events.append([id, false])
+	if _links.has(id):
+		_links[id]["gone"] = true
 
 
 func _poll_host() -> void:
@@ -244,7 +248,7 @@ func _host_read(from: int, packet: PackedByteArray, now: int) -> bool:
 	var answer: Variant = _farm_commands().execute(link["player"], StringName(action), arguments)
 	# What the command set off may have ended the session.
 	if _links.has(from):
-		_send(from, [ANSWER, message[1], answer if is_plain(answer) else null])
+		_send(from, [ANSWER, message[1], answer if is_plain([answer]) else null])
 	return true
 
 
@@ -259,9 +263,10 @@ func _let_in(id: int, version: int) -> void:
 		_send(id, [REFUSED, reason])
 		return
 	var player_id: String = ""
+	var farm: Node = _farm_commands()._farm()
 	while player_id == "" or player_id in players:
-		player_id = "player_%d" % _next_number
-		_next_number += 1
+		player_id = "player_%d" % farm.next_player_number
+		farm.next_player_number += 1
 	_send(id, [WELCOME, player_id, players])
 	_tell_guests([JOINED, player_id])
 	_links[id]["player"] = player_id
@@ -285,24 +290,32 @@ func _drop(id: int, gone: bool = false) -> void:
 
 func _tell_guests(message: Array) -> void:
 	for id: int in _links:
-		if _links[id]["player"] != "":
+		if _links[id]["player"] != "" and not _links[id].get("gone", false):
 			_send(id, message)
 
 
 func _poll_guest() -> void:
 	var now: int = Time.get_ticks_msec()
+	# Anything read now came after we stopped waiting.
+	if not _accepted and now > _join_by:
+		_end(NO_HOST)
+		return
+	_expire(now)
 	while _peer != null and _peer.get_available_packet_count() > 0:
 		if not _guest_read(_peer.get_packet()):
 			_end(NO_HOST)
 	if _peer == null:
 		return
 	var status: MultiplayerPeer.ConnectionStatus = _peer.get_connection_status()
-	if status == MultiplayerPeer.CONNECTION_DISCONNECTED or (not _accepted and now > _join_by):
+	if status == MultiplayerPeer.CONNECTION_DISCONNECTED:
 		_end(NO_HOST)
 		return
 	if not _hello_sent and status == MultiplayerPeer.CONNECTION_CONNECTED:
 		_hello_sent = true
 		_send(1, [HELLO, protocol])
+
+
+func _expire(now: int) -> void:
 	for number: int in _asks.keys():
 		if _asks.has(number) and now > _asks[number].answer_by:
 			_answer(number, null)
@@ -414,8 +427,96 @@ func _put(to: int, bytes: PackedByteArray) -> bool:
 
 
 func _unpack(packet: PackedByteArray) -> Array:
+	# Godot reports an error for bytes it can't read, so it gets only good ones.
+	if _end_of(packet, 0) != packet.size():
+		return []
 	var message: Variant = bytes_to_var(packet)
 	return message if message is Array and is_plain(message) else []
+
+
+## Where the value at `at` ends, or -1 if it isn't a whole value is_plain() allows,
+## as var_to_bytes() writes it. A header is a type and its flags; text and bytes
+## have a length and fill whole words; a list has a count.
+static func _end_of(bytes: PackedByteArray, at: int, depth: int = 0) -> int:
+	if at < 0 or at + 4 > bytes.size():
+		return -1
+	var header: int = bytes.decode_u32(at)
+	var type: int = header & 0xff
+	var flags: int = header >> 16
+	at += 4
+	if header & 0xff00 != 0 or (flags != 0 and not type in [TYPE_INT, TYPE_FLOAT, TYPE_ARRAY, TYPE_DICTIONARY]):
+		return -1
+	match type:
+		TYPE_NIL:
+			return at
+		TYPE_BOOL:
+			return at + 4 if at + 4 <= bytes.size() and bytes.decode_u32(at) <= 1 else -1
+		TYPE_INT, TYPE_FLOAT:
+			at += 8 if flags == 1 else 4
+			return at if flags <= 1 and at <= bytes.size() else -1
+		TYPE_VECTOR3I:
+			return at + 12 if at + 12 <= bytes.size() else -1
+		TYPE_STRING, TYPE_STRING_NAME, TYPE_PACKED_BYTE_ARRAY:
+			if at + 4 > bytes.size():
+				return -1
+			var length: int = bytes.decode_u32(at)
+			at += 4
+			var end: int = at + length + (4 - length % 4) % 4
+			if end > bytes.size() or (type != TYPE_PACKED_BYTE_ARRAY and not _is_text(bytes, at, at + length)):
+				return -1
+			return end
+		TYPE_ARRAY, TYPE_DICTIONARY:
+			return _end_of_list(bytes, at, type, flags, depth)
+	return -1
+
+
+## Two bits of `flags` for a list's items, or for a dictionary's keys and then its
+## values: 1 is a built-in type, named next and kept to; a script or class isn't
+## allowed.
+static func _end_of_list(bytes: PackedByteArray, at: int, type: int, flags: int, depth: int) -> int:
+	var kinds: Array = [flags & 3] if type == TYPE_ARRAY else [flags & 3, flags >> 2 & 3]
+	if depth >= MAX_DEPTH or flags >> (2 * kinds.size()) != 0:
+		return -1
+	var types: PackedInt32Array = []
+	for kind: int in kinds:
+		if kind > 1 or (kind == 1 and at + 4 > bytes.size()):
+			return -1
+		types.append(bytes.decode_u32(at) if kind == 1 else TYPE_NIL)
+		at += 4 * kind
+		if kind == 1 and not types[-1] in [TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR3I,
+				TYPE_DICTIONARY, TYPE_ARRAY, TYPE_PACKED_BYTE_ARRAY]:
+			return -1
+	if at + 4 > bytes.size() or bytes.decode_u32(at) > bytes.size():
+		return -1
+	var count: int = bytes.decode_u32(at) * types.size()
+	at += 4
+	for i: int in count:
+		var want: int = types[i % types.size()]
+		if at + 4 > bytes.size() or (want != TYPE_NIL and bytes.decode_u32(at) & 0xff != want):
+			return -1
+		at = _end_of(bytes, at, depth + 1)
+		if at < 0:
+			return -1
+	return at
+
+
+## UTF-8, with no NUL.
+static func _is_text(bytes: PackedByteArray, at: int, end: int) -> bool:
+	while at < end:
+		var lead: int = bytes[at]
+		var more: int = 0 if lead < 0x80 else 1 if lead >= 0xc2 and lead < 0xe0 else 2 if lead >= 0xe0 and lead < 0xf0 else 3 if lead >= 0xf0 and lead < 0xf5 else -1
+		if lead == 0 or more < 0 or at + more >= end:
+			return false
+		var code: int = lead if more == 0 else lead & (0x3f >> more)
+		for i: int in range(1, more + 1):
+			if bytes[at + i] & 0xc0 != 0x80:
+				return false
+			code = code << 6 | bytes[at + i] & 0x3f
+		# Too long a spelling, a half of a pair, or past the last character.
+		if code < [0, 0x80, 0x800, 0x10000][more] or (code >= 0xd800 and code < 0xe000) or code > 0x10ffff:
+			return false
+		at += more + 1
+	return true
 
 
 ## `shape` is the kind, then the type of each part (TYPE_MAX: any).

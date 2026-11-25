@@ -120,7 +120,55 @@ func test_joining_and_leaving() -> String:
 	if not _until(func() -> bool: return _got(host, "player_left", "player_2") and _got(second, "player_left", "player_2")):
 		return _finish("Everyone must hear who left")
 	var third: Node = _guest(host)
-	return _finish("" if _got(third, "joined", "player_4") else "A newcomer must not take a leaver's id")
+	if not _got(third, "joined", "player_4"):
+		return _finish("A newcomer must not take a leaver's id")
+	host.leave()
+	var again: GameStateScript = GameStateScript.new()
+	again.build_registry()
+	again.farm_from_dict(host.commands.state.farm_to_dict())
+	host.commands.state.free()
+	host.commands.state = again
+	host.host(0, LOCAL)
+	return _finish("" if _got(_guest(host), "joined", "player_5") else "Nor after the farm is loaded and hosted again")
+
+
+func test_two_leaving_at_once() -> String:
+	var host: Node = _host()
+	var guests: Array[Node] = [_guest(host), _guest(host), _guest(host)]
+	guests[0].leave()
+	guests[1].leave()
+	OS.delay_msec(50)
+	var heard: bool = _until(func() -> bool: return _got(guests[2], "player_left", "player_2") and _got(guests[2], "player_left", "player_3"))
+	return _finish("" if heard and host.players.size() == 2 else "Both must be known gone")
+
+
+func test_only_whole_good_messages_are_read() -> String:
+	var typed: Array[String] = ["a"]
+	var typed_map: Dictionary[String, int] = { "a": 1 }
+	var deep: Variant = []
+	for i: int in SessionScript.MAX_DEPTH - 1:
+		deep = [deep]
+	for good: Variant in [[null, true, 1, -1099511627776, 2.5, 0.1, "héllo 🕷", &"n", Vector3i(-1, 2, 3)], [{ "k": [{}] }, {}],
+			[typed, typed_map], [PackedByteArray([1, 2, 3])], deep, [""]]:
+		var bytes: PackedByteArray = var_to_bytes(good)
+		if SessionScript._end_of(bytes, 0) != bytes.size() or not SessionScript.is_plain(good):
+			return "Must be read: %s" % [good]
+		for cut: int in bytes.size():
+			if SessionScript._end_of(bytes.slice(0, cut), 0) == cut:
+				return "Cut to %d must not: %s" % [cut, good]
+	for bad: Variant in [[deep], [Vector3.ZERO], [NodePath("a")], [RefCounted.new()], [[PackedStringArray(["a"])]]]:
+		var bytes: PackedByteArray = var_to_bytes(bad)
+		if SessionScript._end_of(bytes, 0) == bytes.size():
+			return "Must not be read: %s" % [bad]
+	var text: PackedByteArray = var_to_bytes(["abcd"])
+	for spelling: Array in [[0xff, 1, 1, 1], [0xc0, 0x80, 1, 1], [0xed, 0xa0, 0x80, 1], [0xe2, 0x82, 1, 1], [1, 1, 1, 0xe2], [1, 0, 1, 1], [0xf4, 0x90, 0x80, 0x80]]:
+		for i: int in 4:
+			text[text.size() - 4 + i] = spelling[i]
+		if SessionScript._end_of(text, 0) != -1:
+			return "Not text: %s" % [spelling]
+	var extra: PackedByteArray = var_to_bytes([1])
+	extra.append_array([0, 0, 0, 0])
+	return "" if SessionScript._end_of(extra, 0) != extra.size() else "Bytes after the message must not be read"
 
 
 func test_a_full_farm_refuses() -> String:
@@ -312,6 +360,11 @@ func test_state_reaches_guests_only() -> String:
 		return _finish("The state must arrive whole")
 	if guest.send_state({}) or host.send_state({}, "player_9") or host.send_state({ "node": guest }):
 		return _finish("Only the host sends, only plain data, only to guests")
+	var deep: Dictionary = {}
+	for i: int in SessionScript.MAX_DEPTH - 1:
+		deep = { "in": deep }
+	if host.send_state(deep) or not host.send_state(deep["in"]):
+		return _finish("What is sent must be what can be read")
 	if host.send_state({ "huge": "x".repeat(SessionScript.MAX_HOST_BYTES) }):
 		return _finish("A state has a size limit")
 	return _finish("")
