@@ -12,7 +12,14 @@ const INSPECT_SECONDS_PER_CHAR: float = 0.04
 ## The prop whose inspect text also carries the plot's soil readings.
 const SOIL_PROBE_PROP: String = "soil_moisture_probe"
 
+## Within this far of the relay mast the Q check reads the dish; elsewhere, the
+## rover's own steering encoder [PLACEHOLDER].
+const DISH_REACH_M: float = 8.0
+const DISH_ID: String = "relay_dish_azimuth"
+
 var _had_los: bool = true
+## The blocks this screen has told about.
+var _blocks_told: Array[Vector2i] = []
 var _last_band: int = DriftingSensor.Band.IN_BAND
 
 @onready var _rover: RoverController = %Rover
@@ -44,6 +51,8 @@ func _ready() -> void:
 	_rover.dig_rejected.connect(_on_dig_rejected)
 	_rover.fill_rejected.connect(_on_fill_rejected)
 	GameState.terrain_changed.connect(_show_dug)
+	_blocks_told.assign(GameState.found_blocks.keys())
+	GameState.blocks_changed.connect(_on_blocks_changed)
 	_rover.tilled_cell_used.connect(_on_tilled_cell_used)
 	_hud.zero_steering_pressed.connect(_on_zero_pressed)
 	_hud.slot_spool_pressed.connect(_on_slot_spool_pressed)
@@ -218,6 +227,41 @@ func _on_fill_rejected(reason: String) -> void:
 	_hud.push_log("FILL FAILED: %s" % reason)
 
 
+func _on_blocks_changed() -> void:
+	for cell: Vector2i in GameState.found_blocks:
+		if not cell in _blocks_told:
+			_blocks_told.append(cell)
+			var block: Dictionary = ReferenceBlock.at(GameState.world_seed, cell)
+			if not block.is_empty():
+				_hud.push_log("FOUND A REFERENCE BLOCK: %s° angle, ±%s° (k = %s). Q checks a sensor with it." % [
+					SP811.number(block["certified"], 0), SP811.number(block["u"], 2), SP811.number(block["k"], 0)])
+
+
+## Q: puts the dish (at the relay) or the rover's steering encoder against a block.
+func _check_with_block() -> void:
+	if not _rover.is_stopped():
+		_hud.push_log("BLOCK CHECK: stop the rover first.")
+		return
+	var at := Vector2(_rover.global_position.x, _rover.global_position.z)
+	var id: String = DISH_ID if at.distance_to(Terrain.RELAY) <= DISH_REACH_M else GameState.STEERING_ID
+	var record: Dictionary = await FarmCommands.request(&"check_with_block", [id])
+	if record.is_empty() or not is_inside_tree():
+		return
+	if record.get("refused", false):
+		_hud.push_log("BLOCK CHECK REFUSED: %s" % str(record["reason"]))
+		return
+	var sensor: DriftingSensor = GameState.get_sensor(id)
+	var places: int = roundi(-log(maxf(sensor.resolution, 0.01)) / log(10.0))
+	var verdict: String = {
+		ReferenceBlock.VERDICT_WITHIN: "WITHIN MPE",
+		ReferenceBlock.VERDICT_OUTSIDE: "OUTSIDE MPE",
+	}.get(record["verdict"], "CAN'T TELL IF WITHIN MPE")
+	_hud.push_log("BLOCK CHECK %s  Block %s°  Reads %s°  Error %s ±%s°  %s (MPE ±%s°)" % [
+		GameState.instrument_name(id).to_upper(), SP811.number(record["certified"], 0),
+		SP811.number(record["reading"], places), sensor.format_value(record["error"], places),
+		SP811.number(record["error_u"], 2), verdict, SP811.number(record["mpe"], 2)])
+
+
 func _show_dug() -> void:
 	_rover.ground.show_dug(GameState.dug)
 	_rover.keep_above_ground()
@@ -245,6 +289,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"rover_fill"):
 		get_viewport().set_input_as_handled()
 		_rover.queue_command(RoverController.Command.FILL)
+	elif _is_key(event, KEY_Q):
+		get_viewport().set_input_as_handled()
+		_check_with_block()
 	elif _is_key(event, KEY_C):
 		get_viewport().set_input_as_handled()
 		var seed: String = GameState.cycle_seed()
