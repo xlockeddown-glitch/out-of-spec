@@ -76,7 +76,9 @@ func elapsed_at_hour(day_index: int, hour: float) -> float:
 
 ## "DAY 3  14:20"
 func format_now() -> String:
-	# The margin keeps an exact 12:20, stored as 12:19.99999…, from showing a minute early.
-	var minutes: int = floori(get_hour() * 60.0 + 1.0e-6) % (24 * 60)
+	# The margin (0.06 ms) only absorbs float rounding: an exact 12:20 is stored
+	# as 12:19.99999…. The day comes from the same count, so they always agree.
+	var total: int = floori(elapsed_days * 24.0 * 60.0 + 1.0e-6)
+	var minutes: int = (total + floori(DAY_START_HOUR * 60.0)) % (24 * 60)
 	@warning_ignore("integer_division")
-	return "DAY %d  %02d:%02d" % [get_day_index(), minutes / 60, minutes % 60]
+	return "DAY %d  %02d:%02d" % [total / (24 * 60) + 1, minutes / 60, minutes % 60]
