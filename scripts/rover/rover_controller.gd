@@ -172,7 +172,7 @@ func _unpark() -> void:
 ## A farm saved before the hills may have it parked inside one, or off the land.
 ## In the tunnels, one in the rock is back at the mouth.
 func _put_back_on_land() -> void:
-	if rover_id == GameState.TUNNEL_ROVER and not TunnelRock.holds(global_position):
+	if rover_id == GameState.TUNNEL_ROVER and (not TunnelRock.holds(global_position) or TunnelRock.in_deep(global_position)):
 		global_transform = GameState.TUNNEL_START
 	if ground == null:
 		return
@@ -216,6 +216,7 @@ func _physics_process(delta: float) -> void:
 	if moves:
 		_drive(delta)
 		CoopRovers.moved(rover_id, global_transform, _speed_mps, has_line_of_sight)
+		FarmCommands.rover_at(rover_id, global_position, _speed_mps)
 	else:
 		_follow(delta)
 	_lie_on_ground(delta)

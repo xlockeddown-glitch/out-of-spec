@@ -31,8 +31,8 @@ static func tint(depth_m: float) -> Color:
 func fill(area: Rect2, level_m: float, ground_m: Callable) -> void:
 	places.clear()
 	colors.clear()
-	for x: int in roundi(area.size.x / COLUMN_M):
-		for z: int in roundi(area.size.y / COLUMN_M):
+	for x: int in ceili(area.size.x / COLUMN_M):
+		for z: int in ceili(area.size.y / COLUMN_M):
 			var at: Vector2 = area.position + (Vector2(x, z) + Vector2.ONE * 0.5) * COLUMN_M
 			var depth_m: float = level_m - ground_m.call(at)
 			if depth_m <= 0.0:

@@ -12,8 +12,6 @@ const LAMP_WARM := Color(1.0, 0.72, 0.42)
 const LAMP_HARSH := Color(1.0, 0.45, 0.08)
 const BODY_ACTIVE := Color(0.32, 0.22, 0.15)
 const BODY_PRE_MOLT := Color(0.16, 0.12, 0.1)
-## [PLACEHOLDER] until the Cobalt Sentinel has its own model.
-const BODY_COBALT := Color("2f6bff")
 const BLINK_HZ: float = 2.5
 
 ## The caught tarantula whose own tank this is, empty until the catch. "" is the
@@ -54,13 +52,6 @@ func _ready() -> void:
 	if species_id == "":
 		GameState.molt_changed.connect(_on_molt_changed)
 	else:
-		var cobalt := StandardMaterial3D.new()
-		cobalt.albedo_color = BODY_COBALT
-		cobalt.emission_enabled = true
-		cobalt.emission = BODY_COBALT
-		cobalt.emission_energy_multiplier = 0.4
-		for node: Node in tarantula.find_children("*", "MeshInstance3D", true, false):
-			(node as MeshInstance3D).material_override = cobalt
 		GameState.enclosures_changed.connect(_apply_molt_visuals)
 	_apply_molt_visuals()
 	GameClock.day_started.connect(_on_day_started)

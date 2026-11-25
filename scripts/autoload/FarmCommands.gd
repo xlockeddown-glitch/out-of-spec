@@ -8,10 +8,10 @@ extends Node
 const ACTIONS: Array[StringName] = [
 	&"accept_job", &"add_robot_calibrate_card", &"add_robot_card", &"add_robot_collect_card",
 	&"adjust_setpoint", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
-	&"calibrate_at_bench", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_up", &"go_to_bed",
+	&"calibrate_at_bench", &"catch_sentinel", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_up", &"go_to_bed",
 	&"harvest_crop", &"hit_boulder", &"mine_fissure", &"move_rover", &"plant_crop", &"release_robot", &"remove_robot_card",
-	&"sell_harvest_to_lin", &"send_to_oirm", &"set_interlock_override", &"slot_spool_into_relay",
-	&"start_lab_grow", &"till", &"zero_steering",
+	&"sell_harvest_to_lin", &"send_to_oirm", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay",
+	&"start_lab_grow", &"survey_ore", &"till", &"zero_steering",
 ]
 const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
 
@@ -106,6 +106,11 @@ func rover_uplink(rover_id: String, has_los: bool) -> void:
 func rover_parked(rover_id: String, at: Transform3D) -> void:
 	if not guest:
 		_farm().park_rover(rover_id, at)
+
+
+func rover_at(rover_id: String, at: Vector3, speed_mps: float) -> void:
+	if not guest:
+		_farm().watch_sentinel(rover_id, at, speed_mps)
 
 
 ## Where the player goes among the action's arguments, or -1. Anything after it

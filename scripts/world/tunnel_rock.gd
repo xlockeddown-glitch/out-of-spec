@@ -39,7 +39,7 @@ const SUMP := Vector3(-25.5, 0.0, -25.5)
 const POOL := Rect2(-30.0, -30.0, 10.0, 10.0)
 const SHELF_M: float = 2.4
 const SHORE_M: float = 3.6
-const DEEP_GROUND_M: float = -0.9
+const DEEP_GROUND_M: float = -0.96
 const SHELF_GROUND_M: float = -0.48
 ## The hollow's blocks are this wide and tall [PLACEHOLDER].
 const POOL_BLOCK_M: float = 0.5
@@ -95,6 +95,12 @@ static func is_floor(cell: Vector2i) -> bool:
 ## True if the rover can be at this place.
 static func holds(place: Vector3) -> bool:
 	return is_floor(cell_of(place)) and absf(place.y) < ROCK_M
+
+
+## True if a rover here would stand in the deep water's edge, as one parked on the
+## old floor could.
+static func in_deep(place: Vector3) -> bool:
+	return Rect2(SUMP.x - CELL_M * 0.5, SUMP.z - CELL_M * 0.5, CELL_M, CELL_M).grow(0.7).has_point(Vector2(place.x, place.z))
 
 
 ## The middle of a cell.
@@ -181,6 +187,8 @@ func _build_colliders() -> void:
 	_add_floor(Vector2(-end.x, POOL.position.y), Vector2(POOL.position.x, POOL.end.y))
 	_add_floor(Vector2(POOL.end.x, POOL.position.y), Vector2(end.x, POOL.end.y))
 	_add_hollow()
+	# Nothing falls out of the world, should it get through the hollow.
+	_add_body("Net", LAYER_WORLD, Vector3(POOL.get_center().x, -2.5, POOL.get_center().y), Vector3(POOL.size.x, 1.0, POOL.size.y))
 	for y: int in MAP.size():
 		var x: int = 0
 		while x < MAP[y].length():
@@ -339,7 +347,8 @@ func _build_arch(cell: Vector2i, along: Vector2i) -> void:
 	_lintels[middle] = lintel
 
 
-## A model that stops the rover and the signal as rock does. Its crystals are unlit.
+## A model that stops the rover and, but for the low sump, the signal as rock does.
+## Not a ModelSlot, which would light its crystals.
 func _build_piece(cell: Vector2i, kind: String) -> void:
 	var size: Vector3 = PIECES[kind][1]
 	var model: Node3D = (load("res://assets/voxels/%s.glb" % PIECES[kind][0]) as PackedScene).instantiate()
@@ -354,7 +363,7 @@ func _build_piece(cell: Vector2i, kind: String) -> void:
 			unlit.emission_enabled = false
 			mesh.set_surface_override_material(i, unlit)
 	add_child(model)
-	_add_body("Piece", LAYER_WORLD | LAYER_OCCLUDER, model.position + Vector3.UP * size.y * 0.5, size)
+	_add_body("Piece", LAYER_WORLD if kind == "S" else LAYER_WORLD | LAYER_OCCLUDER, model.position + Vector3.UP * size.y * 0.5, size)
 
 
 func _build_crystals(cell: Vector2i) -> void:

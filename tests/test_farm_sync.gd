@@ -55,6 +55,8 @@ func _worn() -> GameStateScript:
 	gs.dig(Vector3i(20, 0, 20))
 	gs.hit_boulder(&"RockA")
 	gs.catch_species("cobalt_sentinel")
+	gs.sentinel_days_unseen = 3
+	gs.rover_lights = false
 	gs._spool_species.append(&"curlyhair")
 	gs._spool_damaged.append(true)
 	gs.slotted_spool_damaged = true
@@ -262,7 +264,8 @@ func test_bad_bytes_change_nothing() -> String:
 				["enclosures", []], ["enclosures", { "mexican_curlyhair": _tank(0.0, 0) }], ["enclosures", { 3: _tank(0.0, 0) }], ["enclosures", { "cobalt_sentinel": 1 }],
 				["enclosures", { "cobalt_sentinel": {} }], ["enclosures", { "cobalt_sentinel": _tank(1.5, 2) }], ["enclosures", { "cobalt_sentinel": _tank(-0.1, 0) }],
 				["enclosures", { "cobalt_sentinel": _tank(0.1, 2) }], ["enclosures", { "cobalt_sentinel": _tank(0.1, "no") }], ["enclosures", { "cobalt_sentinel": _tank(1, 2) }],
-				["enclosures", { "cobalt_sentinel": _tank(0.0, 0, -1) }], ["enclosures", { "cobalt_sentinel": _tank(0.0, 0, 1.0) }]]:
+				["enclosures", { "cobalt_sentinel": _tank(0.0, 0, -1) }], ["enclosures", { "cobalt_sentinel": _tank(0.0, 0, 1.0) }],
+				["sentinel_out", 1], ["sentinel_days_unseen", -1], ["rover_lights", "no"]]:
 			var data: Dictionary = whole.duplicate(true)
 			data["farm"][values[0]] = values[1]
 			bad[str(values)] = SaveGame.to_bytes(data)

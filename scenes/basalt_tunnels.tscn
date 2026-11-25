@@ -10,6 +10,8 @@
 [ext_resource type="Script" path="res://scripts/world/uplink_beam.gd" id="13_beam"]
 [ext_resource type="Script" path="res://scripts/rover/cab_readout.gd" id="15_readout"]
 [ext_resource type="Script" path="res://scripts/world/parking_pad.gd" id="16_pad"]
+[ext_resource type="Script" path="res://scripts/world/wild_sentinel.gd" id="17_wild"]
+[ext_resource type="Script" path="res://scripts/rover/rover_lights.gd" id="18_lights"]
 
 [sub_resource type="Environment" id="Env"]
 background_mode = 1
@@ -240,6 +242,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22, 1.88, 0.38)
 [node name="UplinkBeam" type="MeshInstance3D" parent="WorldView/WorldViewport/World/Rover/Antenna" node_paths=PackedStringArray("rover")]
 script = ExtResource("13_beam")
 rover = NodePath("../..")
+
+[node name="Headlights" type="Node3D" parent="WorldView/WorldViewport/World/Rover" node_paths=PackedStringArray("model_slot")]
+position = Vector3(0, 0.85, -1.3)
+script = ExtResource("18_lights")
+model_slot = NodePath("../VisualRoot")
+
+[node name="WildSentinel" type="Node3D" parent="WorldView/WorldViewport/World"]
+script = ExtResource("17_wild")
 
 [node name="HUDLayer" type="CanvasLayer" parent="."]
 
