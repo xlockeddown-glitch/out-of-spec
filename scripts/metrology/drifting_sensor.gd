@@ -280,6 +280,12 @@ func is_overdue(day: int) -> bool:
 	return day > cal_due_day
 
 
+## The one overdue wording: the first day it is late (the day after the due day),
+## never "day 0".
+static func overdue_text(due_day: int) -> String:
+	return "OVERDUE since day %d" % (due_day + 1)
+
+
 func get_error_ratio() -> float:
 	return absf(error) / mpe if mpe > 0.0 else INF
 
@@ -306,6 +312,8 @@ func band_for(value: float) -> Band:
 ## Human-readable signed value in this instrument's unit, per NIST SP 811:
 ## U+2212 minus, no space before the plane-angle degree, a space before %, and
 ## no "RH" qualifier on the % symbol (use quantity_name() in the label instead).
+## A humidity error is a difference of two readings, so it is in "percentage
+## points" rather than "%".
 ## `decimals` < 0 uses the unit's default (2, or 3 for other units);
 ## `display_decimals` from the data sets the default; a caller asking for
 ## more precision (uncertainties) still gets at least that many.
@@ -322,7 +330,10 @@ func format_value(value: float, decimals: int = -1) -> String:
 	match error_unit:
 		"degrees":
 			return number + "°"
-		"percentage_points_rh", "percentage_points_vwc":
+		"percentage_points_rh":
+			# A difference of two relative humidities, not a share of the reading.
+			return number + " percentage points"
+		"percentage_points_vwc":
 			return number + " %"
 		"degC":
 			return number + " °C"

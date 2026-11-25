@@ -16,6 +16,11 @@ signal closed
 const CALIBRATE_TEXT: String = "ZERO / CALIBRATE"
 const JOB_PREFIX: String = "job:"
 
+const BIG_VALUE_SIZE: int = 52
+## [PLACEHOLDER] over 14 characters the number drops to 38.
+const LONG_VALUE_CHARS: int = 14
+const LONG_VALUE_SIZE: int = 38
+
 var _ids: Array[String] = []
 var _current_id: String = ""
 ## The shown result is from this session's calibration.
@@ -217,6 +222,7 @@ func _on_instrument_selected(index: int) -> void:
 	var standard: DriftingSensor = GameState.get_sensor(_budget.get("standard_id", ""))
 	_show_as_found(sensor, sensor.error - (standard.error if standard else 0.0))
 	_left_value.text = "--"
+	_fit(_left_value)
 	_left_band.text = ""
 	_left_meter.show_needle = false
 	_calibrate_button.disabled = false
@@ -224,6 +230,7 @@ func _on_instrument_selected(index: int) -> void:
 	var standard_id: String = _budget.get("standard_id", "")
 	if GameState.at_oirm.has(standard_id):
 		_found_value.text = "--"
+		_fit(_found_value)
 		_found_band.text = "STANDARD AT OIRM"
 		_found_band.remove_theme_color_override("font_color")
 		_found_meter.show_needle = false
@@ -255,6 +262,7 @@ func _show_standard(sensor: DriftingSensor) -> void:
 	_standard_label.text = _certificate_text(_current_id) + "\n" + _chain_text(_current_id)
 	for label: Label in [_found_value, _left_value]:
 		label.text = "--"
+		_fit(label)
 	_found_band.text = "AT OIRM" if GameState.at_oirm.has(_current_id) else "NO REFERENCE ON SITE"
 	_found_band.remove_theme_color_override("font_color")
 	_left_band.text = ""
@@ -283,6 +291,7 @@ func _show_job(job: Dictionary) -> void:
 		meter.show_needle = false
 	for label: Label in [_found_value, _left_value]:
 		label.text = "--"
+		_fit(label)
 	_found_band.text = "CUSTOMER JOB"
 	_found_band.remove_theme_color_override("font_color")
 	_left_band.text = ""
@@ -311,7 +320,7 @@ func _show_job(job: Dictionary) -> void:
 func _due_text(sensor: DriftingSensor, today: int) -> String:
 	if sensor.role == "standard" and not GameState.certificates.has(_current_id):
 		return "Work done with it is not traceable until OIRM has certified it."
-	return ("OVERDUE since day %d." % (sensor.cal_due_day + 1) if sensor.is_overdue(today)
+	return (DriftingSensor.overdue_text(sensor.cal_due_day) + "." if sensor.is_overdue(today)
 		else "Due day %d." % sensor.cal_due_day)
 
 
@@ -378,6 +387,7 @@ func _on_calibrate_pressed() -> void:
 	var as_left: float = record["as_left"]
 	var left_band: int = _bench_band(sensor, as_left)
 	_left_value.text = sensor.format_value(as_left)
+	_fit(_left_value)
 	_left_band.text = DriftingSensor.band_label(left_band)
 	_left_band.add_theme_color_override("font_color", DriftingSensor.band_color(left_band))
 	_left_meter.value = as_left
@@ -473,6 +483,7 @@ func _show_refusal(prefix: String, answer: Dictionary) -> void:
 func _show_as_found(sensor: DriftingSensor, value: float) -> void:
 	var band: int = _bench_band(sensor, value)
 	_found_value.text = sensor.format_value(value)
+	_fit(_found_value)
 	_found_band.text = DriftingSensor.band_label(band)
 	_found_band.add_theme_color_override("font_color", DriftingSensor.band_color(band))
 	_found_meter.value = value
@@ -493,7 +504,7 @@ func _last_record_text(instrument_id: String) -> String:
 	_result_label.remove_theme_color_override("font_color")
 	var sensor: DriftingSensor = GameState.get_sensor(instrument_id)
 	var today: int = GameClock.get_day_index()
-	var due: String = ("OVERDUE since day %d" % (sensor.cal_due_day + 1) if sensor.is_overdue(today)
+	var due: String = (DriftingSensor.overdue_text(sensor.cal_due_day) if sensor.is_overdue(today)
 		else "Due day %d (interval %d d)" % [sensor.cal_due_day, sensor.cal_interval_days])
 	var record: Dictionary = GameState.last_cal_records.get(instrument_id, {})
 	if record.is_empty():
@@ -552,3 +563,8 @@ func _unsigned_precise(sensor: DriftingSensor, value: float) -> String:
 
 func _unsigned(sensor: DriftingSensor, value: float) -> String:
 	return sensor.format_value(value).trim_prefix("+")
+
+
+## A long unit, like percentage points, gets a smaller size so the number fits its panel.
+func _fit(label: Label) -> void:
+	label.add_theme_font_size_override(&"font_size", LONG_VALUE_SIZE if label.text.length() > LONG_VALUE_CHARS else BIG_VALUE_SIZE)
