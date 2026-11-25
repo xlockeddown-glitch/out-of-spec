@@ -36,7 +36,7 @@ const ROCK_SIZE_M: Dictionary[Rock, Vector3] = {
 ## can stand any way.
 const ROCK_QUARTER_TURNS: Dictionary[Rock, int] = {Rock.ARCH: 0, Rock.OUTCROP: 1}
 ## Where the rocks stand, in meters, each at the middle of a cell: on high ground,
-## far enough apart to drive between, and off every line from the farm or the road
+## far enough apart to drive between (a row of terrace pieces counts as one), and off every line from the farm or the road
 ## to the relay [PLACEHOLDER].
 const ROCKS: Dictionary[Vector2i, Rock] = {
 	Vector2i(49, 45): Rock.BUTTE, Vector2i(45, -47): Rock.BUTTE, Vector2i(-47, 49): Rock.BUTTE,
@@ -170,18 +170,19 @@ static func is_at_rock(cell: Vector2i) -> bool:
 
 ## `at`, or just clear of a rock if a rover there would be inside it.
 static func clear_of_rocks(at: Vector2) -> Vector2:
-	# Out of one rock may be into the next of its row.
+	# Out of one rock may be into the next of its row, and one that is moved must
+	# end clear of them all.
 	for i: int in ROCKS.size():
-		var clear: Vector2 = _out_of_rock(at)
+		var clear: Vector2 = _out_of_rock(at, ROVER_INSIDE_M if i == 0 else ROVER_CLEAR_M - 0.01)
 		if clear == at:
 			break
 		at = clear
 	return at
 
 
-static func _out_of_rock(at: Vector2) -> Vector2:
+static func _out_of_rock(at: Vector2, within_m: float) -> Vector2:
 	for rock: Vector2i in ROCKS:
-		if _rover_gap(at, rock) < ROVER_INSIDE_M:
+		if _rover_gap(at, rock) < within_m:
 			var away: Vector2 = at - Vector2(rock)
 			var way: Vector2 = Vector2.RIGHT if away.is_zero_approx() else away.normalized()
 			return Vector2(rock) + way * (rock_half_m(rock).length() + ROVER_CLEAR_M)

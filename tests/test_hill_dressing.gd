@@ -210,15 +210,20 @@ func test_rocks_block_rovers_and_the_uplink_as_boulders_do() -> String:
 func test_a_rover_saved_where_a_rock_stands_comes_back_beside_it() -> String:
 	for rock: Vector2i in HillDressing.ROCKS:
 		var half: Vector2 = HillDressing.rock_half_m(rock)
-		for at: Vector2 in _footprint(Vector2(rock), half):
+		var starts: Array[Vector2] = []
+		starts.assign(_footprint(Vector2(rock), half))
+		for x: int in range(-9, 10):
+			for z: int in range(-9, 10):
+				starts.append(Vector2(rock) + Vector2(x, z) / 9.0 * half)
+		for at: Vector2 in starts:
 			var away: Vector2 = HillDressing.clear_of_rocks(at)
 			var gap: Vector2 = (away - Vector2(rock)).abs() - half
 			if maxf(gap.x, gap.y) < ROVER_M / 2.0:
 				return "At %s a rover comes back inside the rock at %s." % [at, rock]
 			for other: Vector2i in HillDressing.ROCKS:
 				gap = (away - Vector2(other)).abs() - HillDressing.rock_half_m(other)
-				if maxf(gap.x, gap.y) < ROVER_M / 2.0 - 0.1:
-					return "At %s a rover comes back inside the rock at %s." % [at, other]
+				if away != at and gap.max(Vector2.ZERO).length() < HillDressing.ROVER_CLEAR_M - 0.02:
+					return "At %s a rover comes back against the rock at %s." % [at, other]
 			if HillDressing.clear_of_rocks(away) != away:
 				return "Beside a rock a rover must stay where it was."
 		# Its long side against a corner.
