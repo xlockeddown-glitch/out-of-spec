@@ -34,6 +34,8 @@ signal soil_tilled(cell: Vector3i)
 signal terrain_changed
 ## A reference block was dug up.
 signal blocks_changed
+## The ore pockets dug up changed.
+signal pockets_changed
 ## A boulder was hit or broken.
 signal boulders_changed
 ## The rover went into the tunnels or came out.
@@ -133,6 +135,8 @@ var enclosures: Dictionary = {}
 ## last scared off.
 var sentinel_out: bool = false
 var sentinel_days_unseen: int = 0
+## Past this the chance is certain anyway.
+const SENTINEL_DAYS_MAX: int = 10
 var rover_lights: bool = true
 var optical_silk_spools: int = 0
 var relay_slotted: bool = false
@@ -237,6 +241,8 @@ var boulder_hits: Dictionary[StringName, int] = {}
 ## again gives nothing. Which cells hold one is ReferenceBlock.at(). The count
 ## is the farm's blocks, and they are kept, not used up [ASSUMPTION].
 var found_blocks: Dictionary[Vector2i, bool] = {}
+## The cells whose ore pocket was dug up.
+var found_pockets: Dictionary[Vector2i, bool] = {}
 
 ## Lab credibility (Ryan, 2026-11-22): audits and overdue instruments move it;
 ## the phone shows its band. See data/economy.json "credibility".
@@ -459,7 +465,7 @@ const MAX_KNOWN_GUESTS: int = 64
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
-	"boulder_hits", "found_blocks", "rover_in_tunnels", "enclosures",
+	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures",
 	"sentinel_out", "sentinel_days_unseen", "rover_lights"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
@@ -529,13 +535,19 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if not cell is Vector2i or not data["found_blocks"][cell] is bool or not data["found_blocks"][cell] \
 				or ReferenceBlock.at(data["world_seed"], cell).is_empty():
 			return "'found_blocks' has a cell that holds no block."
+	for cell: Variant in data.get("found_pockets", {}):
+		if not cell is Vector2i or not data["found_pockets"][cell] is bool or not data["found_pockets"][cell] \
+				or not Terrain.can_dig(cell):
+			return "'found_pockets' has a cell that can't be dug."
 	var hits: Dictionary = data.get("boulder_hits", {})
 	for boulder: Variant in hits:
 		if not (boulder is String or boulder is StringName) or not StringName(boulder) in BOULDERS \
 				or not hits[boulder] is int or hits[boulder] < 1 or hits[boulder] > BOULDER_HITS:
 			return "'boulder_hits' has a boulder that can't be hit like that."
-	if data.get("sentinel_days_unseen", 0) < 0:
-		return "'sentinel_days_unseen' is below zero."
+	if data.get("sentinel_days_unseen", 0) < 0 or data.get("sentinel_days_unseen", 0) > SENTINEL_DAYS_MAX:
+		return "'sentinel_days_unseen' is out of range."
+	if data.get("sentinel_out", false) and data.get("enclosures", {}).has(String(SENTINEL)):
+		return "'sentinel_out' is set for a caught Sentinel."
 	var tanks: Dictionary = data.get("enclosures", {})
 	for id: Variant in tanks:
 		if not id is String or not StringName(id) in CATCHABLE or not _is_tank(tanks[id]):
@@ -692,6 +704,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	terrain_changed.emit()
 	boulders_changed.emit()
 	blocks_changed.emit()
+	pockets_changed.emit()
 	rover_place_changed.emit()
 	sentinel_changed.emit()
 	rover_lights_changed.emit()
@@ -3164,7 +3177,7 @@ func _roll_sentinel() -> void:
 	if FarmCommands.guest or is_caught(SENTINEL):
 		return
 	sentinel_out = rng.randf() < sentinel_chance()
-	sentinel_days_unseen += 1
+	sentinel_days_unseen = mini(sentinel_days_unseen + 1, SENTINEL_DAYS_MAX)
 	sentinel_changed.emit()
 
 
@@ -4322,7 +4335,7 @@ func till(cell: Vector3i, player_id: String = "") -> bool:
 
 
 ## Digs a cell of Terrain (y = 0) one step deeper. Returns "" or why not. It costs
-## and gives nothing [ASSUMPTION].
+## nothing [ASSUMPTION]. A block or an ore pocket there comes up once.
 @warning_ignore("unused_parameter")
 func dig(cell: Vector3i, player_id: String = "") -> String:
 	var at := Vector2i(cell.x, cell.z)
@@ -4333,6 +4346,11 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 		if not found_blocks.has(at) and not ReferenceBlock.at(world_seed, at).is_empty():
 			found_blocks[at] = true
 			blocks_changed.emit()
+		if not found_pockets.has(at) and at in OrePocket.cells(world_seed):
+			found_pockets[at] = true
+			crystal_ore += OrePocket.ORE
+			pockets_changed.emit()
+			ore_changed.emit(crystal_ore)
 	return problem
 
 
@@ -4350,6 +4368,19 @@ func check_with_block(instrument_id: String) -> Dictionary:
 	if block.is_empty():
 		return { "refused": true, "reason": "No reference block yet. Dig for one." }
 	return ReferenceBlock.check(get_sensor(instrument_id), block)
+
+
+## Surveys for ore from where the rover is, as OrePocket.survey() says, or
+## { refused, reason }. It changes nothing, and takes no word from a guest on where
+## the rover is.
+func survey_ore() -> Dictionary:
+	if rover_is_away(ROVER):
+		return { "refused": true, "reason": "The rover is in the tunnels." }
+	SaveGame.saving.emit()  # it says where it is
+	if not rover_transforms.has(ROVER):
+		return { "refused": true, "reason": "The rover's place is not known." }
+	var at: Vector3 = parked_rover_transform(ROVER).origin
+	return OrePocket.survey(get_sensor(STEERING_ID), world_seed, found_pockets, Vector2(at.x, at.z))
 
 
 ## Fills a dug cell one step. Returns "" or why not.

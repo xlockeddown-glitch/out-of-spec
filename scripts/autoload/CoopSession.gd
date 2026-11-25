@@ -25,7 +25,7 @@ signal rover_driven(player_id: String, rover_id: String, pose: Array)
 signal rover_told(rover_id: String, driver_id: String, pose: Array)
 
 ## Raise it whenever two versions could disagree about the farm or the messages.
-const PROTOCOL: int = 9
+const PROTOCOL: int = 11
 const DEFAULT_PORT: int = 24711
 const MAX_PLAYERS: int = 4
 

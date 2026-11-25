@@ -43,7 +43,7 @@ func test_the_chance_rises_each_morning_until_it_is_met() -> String:
 			if not is_equal_approx(farm.sentinel_chance(), minf(1.0, 0.1 * (morning + 1))):
 				return "Morning %d has a chance of %f" % [morning, farm.sentinel_chance()]
 			farm._roll_sentinel()
-		if not farm.sentinel_out or farm.sentinel_days_unseen != 12:
+		if not farm.sentinel_out or farm.sentinel_days_unseen != farm.SENTINEL_DAYS_MAX:
 			return "A certain morning must bring it out, and count."
 		farm.watch_sentinel(farm.TUNNEL_ROVER, farm.SENTINEL_AT, 0.0)
 		if farm.sentinel_days_unseen != 0 or farm.sentinel_chance() != farm.SENTINEL_CHANCE:
@@ -94,11 +94,16 @@ func test_a_loaded_farm_gets_the_same_mornings() -> String:
 func test_an_old_save_loads_and_bad_ones_do_not() -> String:
 	return _run(func(farm: GameStateScript) -> String:
 		var saved: Dictionary = farm.farm_to_dict()
-		for wrong: Array in [["sentinel_out", 1], ["sentinel_days_unseen", -1], ["sentinel_days_unseen", "4"], ["rover_lights", "on"]]:
+		for wrong: Array in [["sentinel_out", 1], ["sentinel_days_unseen", -1], ["sentinel_days_unseen", 99999], ["sentinel_days_unseen", "4"], ["rover_lights", "on"]]:
 			var bad: Dictionary = saved.duplicate(true)
 			bad[wrong[0]] = wrong[1]
 			if farm.farm_dict_problem(bad) == "":
 				return "Must be refused: %s" % [wrong]
+		var caught: Dictionary = saved.duplicate(true)
+		caught["sentinel_out"] = true
+		caught["enclosures"] = {String(SENTINEL): {}}
+		if not "caught" in farm.farm_dict_problem(caught):
+			return "A caught Sentinel can't be out too: %s" % farm.farm_dict_problem(caught)
 		for key: String in ["sentinel_out", "sentinel_days_unseen", "rover_lights"]:
 			saved.erase(key)
 		var problem: String = farm.farm_from_dict(saved)

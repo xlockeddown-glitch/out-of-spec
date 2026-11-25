@@ -77,6 +77,8 @@ func _process(_delta: float) -> void:
 	if not reach and _cup.visible:
 		_cup.hide()
 	_in_reach = reach
+	if not reach:
+		_told_reach = false
 
 
 func _unhandled_input(event: InputEvent) -> void:

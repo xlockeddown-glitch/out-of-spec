@@ -6,7 +6,7 @@ extends Node3D
 const ENERGY: float = 3.0
 const RANGE_M: float = 11.0
 const ANGLE_DEG: float = 28.0
-const COLOR := Color("#ffe2b0")
+const COLOR := Color("#f5a623")
 
 @export var model_slot: ModelSlot
 
@@ -22,7 +22,9 @@ func _ready() -> void:
 		beam.spot_angle = ANGLE_DEG
 		add_child(beam)
 	GameState.rover_lights_changed.connect(_refresh)
-	_refresh()
+	# The rover swaps its model after this, for wide treads.
+	GameState.upgrades_changed.connect(_refresh, CONNECT_DEFERRED)
+	_refresh.call_deferred()
 
 
 func _refresh() -> void:
