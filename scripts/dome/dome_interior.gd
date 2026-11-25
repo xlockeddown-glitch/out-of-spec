@@ -110,7 +110,7 @@ func _show_reading(sensor: DriftingSensor, ideal: Variant, unit: String, title: 
 		reading = SP811.number(float(ideal) + sensor.observed_error, 1) + unit
 	value_label.text = "%s  %s" % [title, reading]
 	var band: int = sensor.get_observed_band()
-	var due_text: String = ("CAL OVERDUE (due day %d)" % sensor.cal_due_day if sensor.is_overdue(GameClock.get_day_index())
+	var due_text: String = ("CAL " + DriftingSensor.overdue_text(sensor.cal_due_day) if sensor.is_overdue(GameClock.get_day_index())
 		else "cal due day %d" % sensor.cal_due_day)
 	band_label.text = "%s  ·  %s" % [DriftingSensor.band_label(band), due_text]
 	band_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
