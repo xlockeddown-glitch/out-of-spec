@@ -206,7 +206,11 @@
         "daily_ore_done": "Two ore. So you were out that way.",
         "to_the_click_offer": "Your wheel nuts are due, Doc. Bring her into the bay and do them yourself this time. Five nuts, star order. Pull until the wrench clicks, then stop.",
         "to_the_click_done": "Five nuts, and the wheel is still on. I have seen worse from people with certificates.",
-        "to_the_click_reference": "Every one of them right on the click. I checked. I always check. You can keep the wrench."
+        "to_the_click_reference": "Every one of them right on the click. I checked. I always check. You can keep the wrench.",
+        "greenhouse_four_offer": "[PLACEHOLDER] You have outgrown that closet you call a lab, Doc. Six hundred credits and four ore buys you a bigger one. I will not do the paperwork, but I will say I told you so.",
+        "greenhouse_four_done": "[PLACEHOLDER] Bigger walls, same bad coffee. Go on, put a bench in the new space. The next refit is on me.",
+        "brams_ore_run_offer": "[PLACEHOLDER] Ore does not walk to the rover. Mine five fissures yourself, with your own hands, and I will take ten percent off the next standard I sell you.",
+        "brams_ore_run_done": "[PLACEHOLDER] Five fissures, and you only complained twice. Ten percent off your next standard. The ore goes in the farm's pile, so we both won."
       }
     },
     "lin": {
@@ -222,7 +226,9 @@
     "vance": {
       "name": "Inspector Vance",
       "quests": {
-        "every_sticker_counts_done": "One audit with nothing to write down. The stickers on your bench mean something now. Keep them that way."
+        "every_sticker_counts_done": "One audit with nothing to write down. The stickers on your bench mean something now. Keep them that way.",
+        "on_the_dot_offer": "[PLACEHOLDER] Anyone can calibrate. I want to see five instruments calibrated on the day they are due, by your own hand, and none of them a day late.",
+        "on_the_dot_done": "[PLACEHOLDER] Five on the day. Here is something to keep time by. Do not be late for the next one."
       }
     },
     "oirm": {

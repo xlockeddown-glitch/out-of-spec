@@ -943,7 +943,9 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 		"owns_standard":
 			return int((farm.owned_standards as Dictionary).has(str(step.get("standard_id", ""))))
 		"lab_size":
-			return int(farm.lab_size)
+			# `with_grow`: a grow under way counts as one size up (L4's first step).
+			var growing: bool = bool(step.get("with_grow", false)) and str((farm.lab_build as Dictionary).get("kind", "")) == "grow"
+			return int(farm.lab_size) + (1 if growing else 0)
 		"count":
 			return _count_rows(farm, str(step.get("log", "")), step.get("where", {}))
 		"state_is":

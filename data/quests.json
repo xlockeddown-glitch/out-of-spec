@@ -178,6 +178,44 @@
       "rewards": { "xp_earthworks": 150, "quest_points": 1, "keepsake": "felt_lined_case", "phone": "npcs/orin/quests/missing_blocks_done" }
     },
     {
+      "id": "greenhouse_four", "kind": "lab", "giver": "bram", "title": "Greenhouse Four", "scope": "farm",
+      "gates": { "lab_level": 20 },
+      "offer": { "when": "always" },
+      "offer_line": "npcs/bram/quests/greenhouse_four_offer",
+      "any_order": true,
+      "steps": [
+        { "id": "grow", "text": "Start the medium lab's grow (600 CR and 4 crystal ore).",
+          "check": "lab_size", "with_grow": true, "at_least": 1 },
+        { "id": "move_in", "text": "Move into the medium lab (it is ready two days after the grow starts).",
+          "check": "lab_size", "at_least": 1 },
+        { "id": "fit", "text": "Fit out one space an area never had before (a lab with every space fitted must clear one, and fit another area).",
+          "check": "counter", "counter": "lab_area" }
+      ],
+      "rewards": { "lab_xp": 500, "one_use": "free_lab_refit", "phone": "npcs/bram/quests/greenhouse_four_done" }
+    },
+    {
+      "id": "brams_ore_run", "kind": "personal", "giver": "bram", "title": "Bram's Ore Run", "scope": "player",
+      "gates": { "lab_level": 5 },
+      "offer": { "when": "always" },
+      "offer_line": "npcs/bram/quests/brams_ore_run_offer",
+      "steps": [
+        { "id": "mine", "text": "Mine five fissures yourself.",
+          "check": "counter", "counter": "mine_fissure", "at_least": 5 }
+      ],
+      "rewards": { "xp_field_ops": 100, "quest_points": 1, "one_use": "bram_discount_10", "phone": "npcs/bram/quests/brams_ore_run_done" }
+    },
+    {
+      "id": "on_the_dot", "kind": "personal", "giver": "vance", "title": "On the Dot", "scope": "player",
+      "gates": { "skill": { "id": "uncertainty", "level": 5 } },
+      "offer": { "when": "always" },
+      "offer_line": "npcs/vance/quests/on_the_dot_offer",
+      "steps": [
+        { "id": "on_time", "text": "Calibrate five instruments on time, yourself.",
+          "check": "counter", "counter": "calibrate_on_time", "at_least": 5 }
+      ],
+      "rewards": { "xp_certificate": 100, "keepsake": "pocket_watch", "phone": "npcs/vance/quests/on_the_dot_done" }
+    },
+    {
       "id": "a_clean_line", "kind": "lab", "giver": "odalys", "title": "A Clean Line", "scope": "farm",
       "gates": {},
       "offer": { "when": "stat_at_least", "stat": "optical_silk_spools", "at_least": 1 },
