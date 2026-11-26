@@ -713,7 +713,7 @@ A guest who finishes a story quest on a friend's farm keeps the quest point. The
 14. **Daily asks.** D2.
 15. **Mini-game 2: Wring the Blocks,** then P3, which needs it.
 16. **Mini-games 3 to 5,** one PR each. Torque to Spec needs a rover repair action first.
-17. **Dispatch names.** The text fix from §0.2: every OmniSpec string in `data/dialogue_dispatches.json` becomes BNH, with the sender names settled there. It depends on nothing else here and can go first.
+17. **Dispatch names.** The text fix from §0.2: every OmniSpec string in `data/dialogue_dispatches.json` becomes BNH, with the sender names settled there. It depends on nothing else here and can go first. **Built (2026-11-26):** `megacorp_name` is "Brightwell-Nonesuch Habitats", "Orbital Compliance" is "BNH Compliance", `disp_04` and Bram's greeting say BNH, and every morning dispatch closes with "Warmly, Dispatch." Text only; no id, key or script changed. The bench's title in `ui/cal_bench_ui.tscn` still says "OMNISPEC FORM 88-C": it is outside the dispatch file, so it waits for Ryan (`docs/decisions.md`).
 
 Each PR logs its decisions in `docs/decisions.md` and names its placeholders.
 
