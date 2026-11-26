@@ -901,7 +901,7 @@ func _try_wheel_service() -> void:
 	var arguments: Array = []
 	var torque: String = ""
 	var due: bool = QuestEngine.has_minigame_step(GameState, MinigameScore.TORQUE_TO_SPEC, "", GameState.local_player_id)
-	if due and GameState.wheels_due() and not GameState.rover_in_tunnels and MinigameSettings.mode() != MinigameSettings.Mode.OFF:
+	if due and GameState.wheels_due() and not GameState.rover_lent and MinigameSettings.mode() != MinigameSettings.Mode.OFF:
 		# The game takes the rover's controls: a rover that is rolling through
 		# the bay is stopped first, as for Thread the Spool.
 		if _rover.away_text() == "" and not _rover.is_stopped():

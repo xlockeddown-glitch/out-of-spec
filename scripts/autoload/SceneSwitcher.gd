@@ -39,7 +39,15 @@ func toggle_farm_dome() -> void:
 	if CoopWalkers.on_foot():
 		return  # only the rover goes anywhere
 	var on_dome: bool = current != null and current.scene_file_path == DOME_SCENE
-	swap_to(outside if on_dome else DOME_SCENE)
+	swap_to(exit_path() if on_dome else DOME_SCENE)
+
+
+## Where the dome's airlock leads. The tunnels only while a rover is there for
+## the player: one that was sent home, or let go, leaves the farm out the door.
+func exit_path() -> String:
+	if outside == TUNNELS_SCENE and GameState.rover_zone == "":
+		outside = FARM_SCENE
+	return outside
 
 
 ## Like swap_to, but after a swap in progress instead of not at all.

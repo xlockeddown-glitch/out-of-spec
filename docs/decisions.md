@@ -2029,3 +2029,13 @@ Ryan's idea: stage areas almost level specific. Underground for lab levels about
 - **Known limits (round two).** Presence is self-reported: a guest in the dome can report depth 1 and be credited a find while another player has the rover below (only the log line is affected, since rewards go to the shared stock). Guest rescue at 02:00 is not done here and is the next PR.
 - **Known gaps (untested in play).** The scene swap, fade and rover re-park, the day-change rebuild below, a guest driving the rover below, and the new props have not been seen in a running game. A guest below is not rescued by the 02:00 recall yet.
 - **[PLACEHOLDER].** Grid size, the four pieces, the room slots, the landing, passage heights, finds per room (2) and on the landing (1), the kind weights, the three rewards, reach 4 m with 1.5 m slack, the hatch cell (8,16), the start cell (11,18), every name and word, and the look of the hatch and markers.
+
+## Zones step 7: the fast-travel terminal (2026-11-26)
+
+- **Terminal.** The dome console opens `FastTravelUI`, one row per playable zone, with the soft-gate warning shown first and a second press to go. The host runs `fast_travel(zone_id)`; a guest asks through `FarmCommands`.
+- **Field rover.** Fast travel starts a field rover (`TUNNEL_ROVER`, `rover_zone` set, `rover_lent` false) and the farm rover stays home. A new saved field `rover_lent` (SAVED_LATER) separates this from the real entrance, which still lends the farm rover. Old saves read `rover_lent` as `rover_zone != ""`. Open question for Ryan: the lent farm rover still leaves the home player without it.
+- **Way home.** `leave_zone` goes to the dome; the last one out releases the field rover and bumps `rover_epoch`. Exit pad E calls `move_rover(false)` when the farm rover is lent, else `leave_zone`.
+- **Arrival.** None live: start at the hub. Live: join. Live below with nobody below: re-park at the hub (epoch bump). [PLACEHOLDER]
+- **Recall.** Host and solo fast-travellers are rescued to bed at 02:00. Guests are not yet (next change; a test pins it).
+- **Quit in a zone.** Continue loads in the zone as before.
+- **Protocol 20 to 21.** `rover_lent` is sent and two commands are new.

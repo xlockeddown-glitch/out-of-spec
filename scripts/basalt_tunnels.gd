@@ -178,7 +178,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_rover_entered_exit() -> void:
-	_hud.push_log("WAY UP: press E to go up." if _below else "TUNNEL MOUTH: press E to leave.")
+	_hud.push_log("WAY UP: press E to go up." if _below else ("WAY HOME: press E to go back to the dome." if not GameState.rover_lent else "TUNNEL MOUTH: press E to leave."))
 
 
 ## Says what E does when the rover first comes by the rack, the board or a spot.
@@ -486,6 +486,19 @@ func _leave_tunnels() -> void:
 	if _moving:
 		return
 	_moving = true
+	if not GameState.rover_lent:
+		# A field rover, from the dome's console: the way home is the dome, where
+		# the console is. The farm's rover never left home.
+		var left: String = await FarmCommands.request(&"leave_zone")
+		if not is_inside_tree():
+			return
+		if left != "":
+			_moving = false
+			_hud.push_log("TUNNEL MOUTH: " + left)
+			return
+		SceneSwitcher.outside = SceneSwitcher.FARM_SCENE
+		SceneSwitcher.go_to(SceneSwitcher.DOME_SCENE)
+		return
 	var problem: String = await FarmCommands.request(&"move_rover", [false])
 	if not is_inside_tree():
 		return
