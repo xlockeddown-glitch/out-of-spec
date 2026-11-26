@@ -3562,6 +3562,15 @@ func is_fissure_available(fissure_id: StringName) -> bool:
 	return GameClock.get_day_index() >= int(mined_fissures[fissure_id]) + regrow
 
 
+## How many fissures can be mined now.
+func open_fissures() -> int:
+	var open: int = 0
+	for fissure: StringName in FISSURES:
+		if is_fissure_available(fissure):
+			open += 1
+	return open
+
+
 func mine_fissure(fissure_id: StringName, player_id: String = "") -> bool:
 	if not fissure_id in FISSURES or not is_fissure_available(fissure_id):
 		return false

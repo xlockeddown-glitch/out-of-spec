@@ -193,19 +193,12 @@ func test_the_four_asks_are_shipped() -> String:
 	pointed["rewards"]["quest_points"] = 1
 	if QuestEngine.data_problem(on_farm) == "" or QuestEngine.data_problem(pointed) == "":
 		problems.append("A daily ask of the whole farm, or one that pays quest points, must be refused.")
-	if not QuestEngine.player_quests().is_empty() == _only_non_daily_player_quests_are_absent():
-		problems.append("A daily ask is not among the quests that travel.")
+	for id: Variant in QuestEngine.player_quests():
+		if QuestEngine.is_daily_id(str(id)) or str(id) in ASKS:
+			problems.append("%s is a daily ask among the quests that travel." % id)
 	if SessionScript.PROTOCOL != 16:
 		problems.append("Daily asks change nothing in what is sent: the protocol stays 16.")
 	return "\n".join(problems)
-
-
-## Whether the shipped file has no other quest of a player's own (true today).
-func _only_non_daily_player_quests_are_absent() -> bool:
-	for quest: Dictionary in QuestEngine.quests():
-		if str(quest.get("scope", "")) == QuestEngine.SCOPE_PLAYER and not QuestEngine.is_daily(quest):
-			return false
-	return true
 
 
 # --- Given ------------------------------------------------------------------------
@@ -323,7 +316,7 @@ func _check_paid_once(gs: GameStateScript, ask: String) -> String:
 	if _held(gs) != [ask]:
 		return "The ask was not given: %s" % [gs.player_quest_state]
 	var quest: Dictionary = _shipped(ask)
-	var points: int = gs.quest_points_of(HOST) if gs.has_method("quest_points_of") else QuestEngine.points_of(gs, HOST)
+	var points: int = QuestEngine.points_of(gs, HOST)
 	_do(gs, ask)
 	var credits: int = gs.credits
 	_after(gs)
@@ -532,20 +525,23 @@ func test_two_players_have_their_own_asks() -> String:
 		host.update_quests(_both(id))
 		if _lines(host, ASK) != 2:
 			return "Nobody is asked twice."
-		# What the guest tills is the guest's.
-		_till(host, id, 6)
+		# The plot is the farm's: a row tilled by either is a row for Orin, and each
+		# player's own ask is paid once, into the shared wallet.
+		_till(host, id, 3)
+		_after(host, _both(id))
+		if QuestEngine.daily_done(host, id) or QuestEngine.daily_done(host, HOST):
+			return "Three cells is not a row."
+		_till(host, HOST, 3)
 		var credits: int = host.credits
 		_after(host, _both(id))
-		if not QuestEngine.daily_done(host, id) or QuestEngine.daily_done(host, HOST) or host.credits != credits + 30:
-			return "The guest's row does the guest's ask alone, into the shared wallet: %s" % [host.player_quest_state]
-		if host.held_xp_certificates(id).size() != 1 or not host.held_xp_certificates(HOST).is_empty():
-			return "The certificate is the guest's."
-		if not (_entry(host, ORIN, HOST)["steps_done"] as Array).is_empty() or int((_entry(host, ORIN, HOST)["shown"] as Dictionary).get("till", 0)) != 0:
-			return "The host's ask did not move: %s" % [_entry(host, ORIN, HOST)]
-		_till(host, HOST, 6)
+		if not QuestEngine.daily_done(host, id) or not QuestEngine.daily_done(host, HOST) or host.credits != credits + 60 or _lines(host, DONE) != 2:
+			return "Six cells between them does both asks, each paid once: %s" % [host.player_quest_state]
+		if host.held_xp_certificates(id).size() != 1 or host.held_xp_certificates(HOST).size() != 1:
+			return "Each has their own certificate."
+		_till(host, id, 6)
 		_after(host, _both(id))
-		if not QuestEngine.daily_done(host, HOST) or host.credits != credits + 60 or _lines(host, DONE) != 2:
-			return "The host's own row does the host's ask."
+		if host.credits != credits + 60 or host.held_xp_certificates(id).size() != 1:
+			return "More tilling pays nothing more."
 		# The guest's view: the farm as it reaches them says the same.
 		var guest: GameStateScript = _farm(1)
 		guest.local_player_id = id
@@ -655,3 +651,154 @@ func test_a_guest_s_block_check_is_theirs() -> String:
 			return "A check gives no XP."
 		return "",
 		_only([ODALYS] as Array[String]))
+
+
+# --- After review -----------------------------------------------------------------
+
+## The plot and the fissures are shared: what another player does to them moves
+## an ask on, and never puts it out of reach.
+func test_a_shared_ask_is_never_put_out_of_reach() -> String:
+	var problems: PackedStringArray = []
+	# Exactly a row left: the other player tills all of it. The asker's ask is done.
+	problems.append(_run(func(host: GameStateScript) -> String:
+		_till(host, HOST, host.PLOT.get_area() - 6)
+		var id: String = host.let_in_guest(KEY, {}, [HOST] as Array[String], ProfileScript.no_record())
+		# Left the day before, so each is there to be asked this morning.
+		_morning(host, 2, _both(id))
+		if host.untilled_cells() != 6 or _held(host) != [ORIN] or _held(host, id) != [ORIN]:
+			return "With six cells left both are asked for the row: %s" % [host.player_quest_state]
+		_till(host, id, 6)
+		_after(host, _both(id))
+		if host.untilled_cells() != 0 or not QuestEngine.daily_done(host, HOST) or not QuestEngine.daily_done(host, id):
+			return "The guest tilling the last row does the host's ask too: %s" % [host.player_quest_state]
+		# With no row left, the next morning Orin does not ask.
+		_morning(host, 3, _both(id))
+		return "" if _held(host).is_empty() and _held(host, id).is_empty() else "A fully tilled plot is not asked for a row.",
+		_only([ORIN] as Array[String])))
+	# Bram: the other player mines; and with under two fissures open he does not ask.
+	problems.append(_run(func(host: GameStateScript) -> String:
+		var id: String = host.let_in_guest(KEY, {}, [HOST] as Array[String], ProfileScript.no_record())
+		_morning(host, 1, _both(id))
+		if _held(host) != [BRAM] or _held(host, id) != [BRAM]:
+			return "Both are asked for ore: %s" % [host.player_quest_state]
+		for fissure: StringName in host.FISSURES:
+			host.mine_fissure(fissure, id)
+		var credits: int = host.credits
+		_after(host, _both(id))
+		if host.open_fissures() != 0 or not QuestEngine.daily_done(host, HOST) or not QuestEngine.daily_done(host, id) or host.credits != credits + 80:
+			return "The guest mining every fissure does the host's ask too, each paid once: %s" % [host.player_quest_state]
+		# A farm whose fissures are mined out when the ask would be given: no ask.
+		var late: GameStateScript = _farm()
+		for i: int in host.FISSURES.size() - 1:
+			late.mine_fissure(late.FISSURES[i], HOST)
+		late.update_quests()
+		if late.open_fissures() != 1 or not _held(late).is_empty():
+			return "With one fissure open Bram does not ask for two: %s" % [late.player_quest_state]
+		late.mine_fissure(late.FISSURES[0], HOST)
+		GameClock.elapsed_days = 1.0
+		late.update_quests()
+		return "" if late.open_fissures() == 8 and _held(late) == [BRAM] else "Regrown, he asks.",
+		_only([BRAM] as Array[String])))
+	# Odalys's is the player's own: a check is not a thing that runs out.
+	if str(_shipped(ODALYS)["steps"][0].get("whose", "")) != "" or str(_shipped(ORIN)["steps"][0].get("whose", "")) != QuestEngine.WHOSE_FARM or str(_shipped(BRAM)["steps"][0].get("whose", "")) != QuestEngine.WHOSE_FARM:
+		problems.append("The row and the ore count the farm's doing; the block check the player's own.")
+	return "\n".join(problems).strip_edges()
+
+
+## The day turns at 06:00 and nowhere else: an ask worked on at 05:50 and done
+## before 06:00 pays; work across 06:00 does not carry.
+func test_the_day_of_an_ask_turns_at_six() -> String:
+	return _run(func(gs: GameStateScript) -> String:
+		_morning(gs, 1)
+		# 05:50 the next calendar morning is still day 1.
+		GameClock.elapsed_days = (23.0 + 50.0 / 60.0) / 24.0
+		if GameClock.get_day_index() != 1 or absf(GameClock.get_hour() - (5.0 + 50.0 / 60.0)) > 0.01:
+			return "The test's clock is not 05:50 of day 1: %f" % GameClock.get_hour()
+		_till(gs, HOST, 3)
+		_after(gs)
+		GameClock.elapsed_days = (23.0 + 59.0 / 60.0) / 24.0
+		_till(gs, HOST, 3)
+		var credits: int = gs.credits
+		_after(gs)
+		if not QuestEngine.daily_done(gs, HOST) or gs.credits != credits + 30 or int(_entry(gs, ORIN)["accepted"]) != 1:
+			return "An ask done at 05:59 is day 1's and pays: %s" % [gs.player_quest_state]
+		# Day 2: three cells at 05:50, three after 06:00. The three do not carry.
+		_morning(gs, 2)
+		GameClock.elapsed_days = 1.0 + (23.0 + 50.0 / 60.0) / 24.0
+		_till(gs, HOST, 3)
+		_after(gs)
+		if QuestEngine.daily_done(gs, HOST) or int((_entry(gs, ORIN)["shown"] as Dictionary).get("till", 0)) != 3:
+			return "Three of six at 05:50: %s" % [_entry(gs, ORIN)]
+		credits = gs.credits
+		var certificates: int = gs.held_xp_certificates(HOST).size()
+		_morning(gs, 3)
+		var entry: Dictionary = _entry(gs, ORIN)
+		if int(entry["accepted"]) != 3 or not (entry["steps_done"] as Array).is_empty() or int((entry["shown"] as Dictionary).get("till", 0)) != 0:
+			return "At 06:00 the old ask is taken out and a new one given from nothing: %s" % [entry]
+		_till(gs, HOST, 3)
+		_after(gs)
+		if QuestEngine.daily_done(gs, HOST) or gs.credits != credits or gs.held_xp_certificates(HOST).size() != certificates:
+			return "Three before 06:00 and three after is not a row for either day."
+		_till(gs, HOST, 3)
+		_after(gs)
+		return "" if QuestEngine.daily_done(gs, HOST) and gs.credits == credits + 30 else "Six since 06:00 does day 3's.",
+		_only([ORIN] as Array[String]))
+
+
+## A guest's record that names a daily ask (a forged file) is not taken.
+func test_a_record_naming_a_daily_ask_is_ignored() -> String:
+	return _run(func(gs: GameStateScript) -> String:
+		var forged: Dictionary = {}
+		for ask: String in ASKS:
+			var quest: Dictionary = _shipped(ask)
+			forged[ask] = { "done": true, "steps": [str(quest["steps"][0]["id"])], "counts": { str(quest["steps"][0]["counter"]): 99 } }
+		# Before any ask is held, and while one is.
+		var credits: int = gs.credits
+		if QuestEngine.take_brought(gs, HOST, forged) or not gs.player_quest_state.is_empty():
+			return "take_brought must not take a daily ask: %s" % [gs.player_quest_state]
+		_morning(gs, 1)
+		var before: PackedByteArray = var_to_bytes(gs.player_quest_state)
+		var partly: Dictionary = forged.duplicate(true)
+		for ask: String in ASKS:
+			partly[ask]["done"] = false
+		if QuestEngine.take_brought(gs, HOST, forged) or QuestEngine.take_brought(gs, HOST, partly) or var_to_bytes(gs.player_quest_state) != before:
+			return "A held ask is not moved by a record either."
+		_after(gs)
+		if QuestEngine.daily_done(gs, HOST) or gs.credits != credits or not gs.held_xp_certificates(HOST).is_empty():
+			return "A forged record pays nothing."
+		return "")
+
+
+## An ask once given is the day's, though what is open changes after.
+func test_a_held_ask_is_not_picked_again_when_the_pool_changes() -> String:
+	return _run(func(gs: GameStateScript) -> String:
+		var dailies: Array[Dictionary] = QuestEngine.daily_quests()
+		var with_block: GameStateScript = _farm()
+		if not _find_block(with_block):
+			return "The test needs a block."
+		# A day on which a block in the pool would change the pick.
+		var day: int = 0
+		for d: int in range(1, 60):
+			if QuestEngine.pick_daily(gs, dailies, HOST, d) != QuestEngine.pick_daily(with_block, dailies, HOST, d):
+				day = d
+				break
+		if day == 0:
+			return "The test needs a day on which the block changes the pick."
+		_morning(gs, day)
+		var held: Array[String] = _held(gs)
+		var given: Dictionary = _entry(gs, held[0]).duplicate(true)
+		if held != [str(QuestEngine.pick_daily(with_block, dailies, HOST, day)["id"])] and not _find_block(gs):
+			return "The test needs a block."
+		if str(QuestEngine.pick_daily(gs, dailies, HOST, day)["id"]) == held[0]:
+			return "The pool did not change the pick; the test shows nothing."
+		# Looks of every kind, and a save and a load: the ask held is the one given.
+		gs.update_quests()
+		_after(gs)
+		var back: GameStateScript = _farm(1)
+		if back.farm_from_dict(str_to_var(var_to_str(gs.farm_to_dict()))) != "":
+			return "The farm must load."
+		back.update_quests()
+		for farm: GameStateScript in [gs, back]:
+			if _held(farm) != held or _entry(farm, held[0]) != given or str(QuestEngine.daily_ask(farm, HOST)["id"]) != held[0]:
+				return "The ask given in the morning stays: %s, was %s" % [farm.player_quest_state, held]
+		return "" if _lines(gs, ASK) == 1 else "And nothing new is asked.")

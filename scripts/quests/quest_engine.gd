@@ -77,6 +77,10 @@ const SCOPE_FARM: String = "farm"
 const SCOPE_PLAYER: String = "player"
 ## A daily ask's `kind`. See _update_dailies().
 const KIND_DAILY: String = "daily"
+## A counter step's `whose` when every player's doing counts, in a player's own
+## quest too. For what is done to things the farm shares (the plot, the
+## fissures): another player using them up moves the ask on, never out of reach.
+const WHOSE_FARM: String = "farm"
 ## What `stat_at_least` may read.
 const STATS: Array[String] = ["credits", "credibility", "crystal_ore", "stone", "optical_silk_spools", "clean_audit_streak"]
 ## What `flag` may read; `oirm_account` is has_oirm_account().
@@ -89,7 +93,7 @@ const LOGS: Dictionary = { "cal_log": "cal_log", "job_log": "job_log", "audit_lo
 const COUNTING: Array[String] = ["count", "counter"]
 ## The checks check_value() knows: what a step's `check` may be, and with
 ## `always` and `day_at_least` (WHENS) what a `when` may be.
-const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled"]
+const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open"]
 ## A `when` that is not a step check (offer_holds).
 const WHENS: Array[String] = ["always", "day_at_least"]
 ## A reward of skill XP is "xp_<skill id>".
@@ -236,7 +240,11 @@ static func update_daily_of(farm: Node, player_id: String) -> bool:
 
 
 ## The ask `player_id` is given on `day`: one of `dailies` whose gates and offer
-## hold for them now, by daily_roll(). {} when none holds.
+## hold for them now, by daily_roll(). {} when none holds. The pick depends on
+## which asks are open when it is made: a player who comes in later in the day
+## (after a block is dug up, say) may roll among other asks than one who was
+## there in the morning. An ask once given is held for its day and is not picked
+## again, whatever opens or closes after.
 static func pick_daily(farm: Node, dailies: Array[Dictionary], player_id: String, day: int) -> Dictionary:
 	var alone: Array[String] = [player_id]
 	var open: Array[Dictionary] = []
@@ -774,7 +782,8 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 		"counter":
 			if str(step.get("counter", "")) == SOLD_IN_SPEC:
 				return _sold_in_spec(farm, step.get("where", {}))
-			if owner != "":
+			# `whose` farm: every player's doing counts, in a player's own quest too.
+			if owner != "" and str(step.get("whose", "")) != WHOSE_FARM:
 				return farm.action_count(str(step.get("counter", "")), owner)
 			var total: int = 0
 			for player: String in farm._known_players():
@@ -786,6 +795,8 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 			return (farm.found_blocks as Dictionary).size()
 		"plot_untilled":
 			return farm.untilled_cells()
+		"fissures_open":
+			return farm.open_fissures()
 	return 0
 
 

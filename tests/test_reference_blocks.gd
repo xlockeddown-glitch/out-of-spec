@@ -190,10 +190,18 @@ func test_the_check_reads_the_error() -> String:
 	return "\n".join(problems)
 
 
-## The farm as it is saved, without the counts of what players did.
+## The farm as it is saved, without the counts of checks with a block: every
+## other count of what players did stays in the comparison.
 func _but_the_counts(gs: Node) -> Dictionary:
-	var farm: Dictionary = gs.farm_to_dict()
-	farm.erase("action_counts")
+	var farm: Dictionary = gs.farm_to_dict().duplicate(true)
+	var counts: Dictionary = farm.get("action_counts", {})
+	for player: Variant in counts.keys():
+		var own: Dictionary = counts[player]
+		for source: Variant in own.keys():
+			if str(source).begins_with(gs.BLOCK_CHECK_COUNT):
+				own.erase(source)
+		if own.is_empty():
+			counts.erase(player)
 	return farm
 
 
