@@ -10,6 +10,9 @@ const MOST_XP: int = 1000000000
 ## So that they fit in a guest's message.
 const MOST_SKILLS: int = 16
 const MAX_FILE_BYTES: int = 8192
+## Written to the file as "curve": the XP in it is counted on the 99-level curve
+## (GameState.SKILL_CURVE). A file without it is from the 10-level curve.
+const CURVE: int = 2
 
 ## Only tests set others. "" keeps no file.
 var path: String = PATH
@@ -113,11 +116,13 @@ static func _parse(bytes: PackedByteArray) -> Dictionary:
 	var skills: Variant = json.data.get("skills")
 	if not is_key(json.data.get("key")) or not skills is Dictionary:
 		return {}
+	# XP from the 10-level curve converts as a farm's does (GameState._convert_old_xp).
+	var factor: float = 1.0 if json.data.has("curve") else DataManager.get_number(&"skills", "old_curve/xp_factor", 5.0)
 	var whole: Dictionary = {}
 	for skill: Variant in skills:
 		if not skills[skill] is float or skills[skill] < 0.0 or skills[skill] > MOST_XP:
 			return {}
-		whole[skill] = int(skills[skill])
+		whole[skill] = mini(roundi(skills[skill] * factor), MOST_XP)
 	return { "key": json.data["key"], "skills": whole } if are_skills(whole) else {}
 
 
@@ -128,7 +133,7 @@ func _write(data: Dictionary) -> void:
 	var file: FileAccess = FileAccess.open(temp, FileAccess.WRITE)
 	var done: bool = file != null
 	if done:
-		file.store_string(JSON.stringify(data, "\t"))
+		file.store_string(JSON.stringify({ "key": data["key"], "skills": data["skills"], "curve": CURVE }, "\t"))
 		done = file.get_error() == OK
 		file.close()
 	# The new file is complete before it replaces the old one.

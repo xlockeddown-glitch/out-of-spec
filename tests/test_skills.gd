@@ -26,8 +26,8 @@ func _run(body: Callable) -> String:
 	return problem
 
 
-func _xp(source: String) -> int:
-	return int(DataManager.get_record(&"skills", source, "xp_sources").get("xp", 0))
+func _xp(source: String, scale: float = 1.0) -> int:
+	return roundi(DataManager.get_record(&"skills", source, "xp_sources").get("xp", 0) * scale)
 
 
 func test_data_is_whole() -> String:
@@ -65,7 +65,7 @@ func _check_curve(gs: GameStateScript) -> String:
 		gs.farm_skill_xp["husbandry"] = needed
 		if gs.skill_level("husbandry") != level + 1:
 			return "%d XP must be level %d." % [needed, level + 1]
-	gs.farm_skill_xp["husbandry"] = 1000000
+	gs.farm_skill_xp["husbandry"] = gs.xp_for_level(gs.max_skill_level()) * 9
 	return "" if gs.skill_level("husbandry") == gs.max_skill_level() else "The top level must hold."
 
 
@@ -131,8 +131,12 @@ func _check_calibration(gs: GameStateScript) -> String:
 	var record: Dictionary = gs.calibrate(gs.TIRE_ID)
 	if not record.get("traceable", false):
 		return "Setup: the WD-1 must calibrate the tire gauge traceably: %s" % record
-	var clean: int = _xp("calibrate_clean_tur") if record["tur"] >= CalUncertainty.tur_clean() else 0
-	var found: int = _xp("calibrate_player") + _xp("calibrate_found_oot")
+	# The WD-1 is Tier 1, so every source here is worth its tier scale more.
+	var tier: float = gs.calibration_xp_scale(WD1)
+	if tier <= 1.0:
+		return "Setup: a Tier 1 standard must scale the XP up."
+	var clean: int = _xp("calibrate_clean_tur", tier) if record["tur"] >= CalUncertainty.tur_clean() else 0
+	var found: int = _xp("calibrate_player", tier) + _xp("calibrate_found_oot", tier)
 	if gs.skill_xp("calibration") != found or gs.skill_xp("uncertainty") != clean:
 		return "A late find: %s" % gs.player_skill_xp
 	gs.calibrate(gs.TIRE_ID)
@@ -141,8 +145,8 @@ func _check_calibration(gs: GameStateScript) -> String:
 	GameClock.elapsed_days += tire.cal_interval_days
 	tire.error = 0.0
 	gs.calibrate(gs.TIRE_ID, "player_2")
-	if gs.skill_xp("calibration", "player_2") != _xp("calibrate_player") \
-			or gs.skill_xp("uncertainty", "player_2") != _xp("calibrate_on_time") + clean:
+	if gs.skill_xp("calibration", "player_2") != _xp("calibrate_player", tier) \
+			or gs.skill_xp("uncertainty", "player_2") != _xp("calibrate_on_time", tier) + clean:
 		return "An on-time pass: %s" % gs.player_skill_xp
 	GameClock.elapsed_days += tire.cal_interval_days
 	gs.calibrate(gs.TIRE_ID, gs.MANAGER_ID)
@@ -168,7 +172,8 @@ func _check_standard(gs: GameStateScript) -> String:
 		return "Too soon after it was bought."
 	GameClock.elapsed_days += ceili(gs.get_sensor(WD1).cal_interval_days / 2.0)
 	gs.calibrate(WD1)
-	return "" if gs.skill_xp("instrumentation") == _xp("buy_standard") + _xp("calibrate_standard") else "A standard on the bench: %s" % gs.farm_skill_xp
+	# The HB-700 it is checked against sets the scale.
+	return "" if gs.skill_xp("instrumentation") == _xp("buy_standard") + _xp("calibrate_standard", gs.calibration_xp_scale(HB700)) else "A standard on the bench: %s" % gs.farm_skill_xp
 
 
 func test_clean_audit() -> String:
@@ -232,7 +237,8 @@ func _check_late(gs: GameStateScript) -> String:
 	tire.cal_due_day = 0
 	tire.error = 0.0
 	var record: Dictionary = gs.calibrate(gs.TIRE_ID)
-	var clean: int = _xp("calibrate_clean_tur") if record["tur"] >= CalUncertainty.tur_clean() else 0
-	if gs.skill_xp("calibration") != _xp("calibrate_player") or gs.skill_xp("uncertainty") != clean:
+	var tier: float = gs.calibration_xp_scale(WD1)
+	var clean: int = _xp("calibrate_clean_tur", tier) if record["tur"] >= CalUncertainty.tur_clean() else 0
+	if gs.skill_xp("calibration") != _xp("calibrate_player", tier) or gs.skill_xp("uncertainty") != clean:
 		return "Late, and in tolerance: no find, not on time: %s" % gs.player_skill_xp
 	return ""
