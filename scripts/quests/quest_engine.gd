@@ -106,7 +106,7 @@ const LOGS: Dictionary = { "cal_log": "cal_log", "job_log": "job_log", "audit_lo
 const COUNTING: Array[String] = ["count", "counter"]
 ## The checks check_value() knows: what a step's `check` may be, and with
 ## `always` and `day_at_least` (WHENS) what a `when` may be.
-const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due"]
+const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due", "beacons_placed"]
 ## A `when` that is not a step check (offer_holds).
 const WHENS: Array[String] = ["always", "day_at_least"]
 ## A reward of skill XP is "xp_<skill id>".
@@ -688,6 +688,11 @@ static func data_problem(quest: Dictionary) -> String:
 					return "step '%s' names %s and its instrument plays %s." % [id, step["minigame"], " or ".join(plays)]
 			if step.has(MINIGAME_LINE) and (not step[MINIGAME_LINE] is String or step[MINIGAME_LINE] == ""):
 				return "step '%s' has a mini-game line that is not text." % id
+	for step: Variant in steps:
+		if str(step.get("check", "")) == "beacons_placed" and step_need(step) > LavaHub.SPOTS.size():
+			return "step '%s' wants more beacons than there are spots." % str(step.get("id", ""))
+	if quest.has("zone") and (not quest["zone"] is String or not ZoneData.has_zone(StringName(quest["zone"]))):
+		return "its zone is not one data/zones.json has."
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:
 		if quest.has(key) and not quest[key] is Dictionary:
 			return "'%s' is not a dictionary." % key
@@ -979,6 +984,10 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 			return farm.open_fissures()
 		"wheels_due":
 			return int(farm.wheels_due())
+		"beacons_placed":
+			# The farm's, whoever set them down. Not a counting check: with only
+			# three spots, one set down before the quest was offered must count.
+			return (farm.beacons_placed as Array).size()
 	return 0
 
 
