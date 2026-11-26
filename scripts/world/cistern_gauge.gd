@@ -5,8 +5,8 @@ extends Node3D
 ## the host's. Water colors from VoxelWater, no glow.
 
 ## Slot size in meters [PLACEHOLDER]: up the tank's body, in a steel frame.
-const SLOT_SIZE: Vector3 = Vector3(0.3, 1.0, 0.04)
-const FRAME_SIZE: Vector3 = Vector3(0.4, 1.1, 0.03)
+const SLOT_SIZE: Vector3 = Vector3(0.5, 1.2, 0.04)
+const FRAME_SIZE: Vector3 = Vector3(0.62, 1.32, 0.03)
 const FRAME_COLOR := Color("#6c7a89")
 ## The water rises in these steps [PLACEHOLDER].
 const STEPS: int = 20

@@ -1292,3 +1292,9 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - Tolerances (±3 °C, ±8 %) and lag_reduction_pct (25) are still the art bible's and are [PLACEHOLDER]; no source gives them.
 - Molt: only one source gives an interval, 1 to 7 months, stored as `molt_interval_real_days_range` [30, 210] (real-world days), and it is not used by the game yet. No source gives days by life stage or a premolt length, so `molt_days` and `premolt_days` stay unset [PLACEHOLDER]. The tank still molts on the playtest pace (`GameState.PLAYTEST_MOLT_DAYS`).
 - Left for GameState.gd (another PR touches it): the comment on `PLAYTEST_MOLT_DAYS` says to use the species' molt_days; it stays correct until a sourced value exists.
+
+## 2026-11-25: Four looks fixes (Ryan)
+- **Suits:** unchanged. Each player already has a distinct suit by roster place (host orange, guests blue, lilac, green, off-white), the same on every screen through `WalkerModel.suit_for`. A test now pins the host and first guest apart. **Boots** are `BOOT` #6b7686 (were the dark gear #1d222b) [PLACEHOLDER]; gloves and pack stay dark.
+- **Basalt:** `TunnelRock.BASALT` and the copy in `stone_pieces_view.gd` go from #232832 to #353c49 [PLACEHOLDER], still darker than the floor (#495261). No basalt color is in `terrain.gd` or `hill_dressing.gd` (the farm's basalt columns are Ryan's models).
+- **Tunnel arch:** the flat 2-slab lintel is now two stepped courses (0.7 m in per course, `ARCH_STEP_M`) under a capstone, so the opening reads as an arch. Pillars and the signal box are unchanged, so the rover and walkers pass where they did; nothing is drawn or solid below `ARCH_LOW_M` (2.3 m) between the pillars. The whole lintel still fades when the rover is near [PLACEHOLDER].
+- **Cistern glass:** slot 0.5 x 1.2 m (was 0.3 x 1.0) in a 0.62 x 1.32 m frame, and the gauge sits 0.1 m lower on the tank (y 0.2) so it stays under the lid [PLACEHOLDER].
