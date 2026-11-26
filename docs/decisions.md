@@ -1945,4 +1945,4 @@ Ryan's idea: stage areas almost level specific. Underground for lab levels about
 
 ### Agent's notes (flagged for Ryan, not his words)
 
-- The design PR changes no code and no data. Every band, fee, time and name in it is a [PLACEHOLDER] or [ASSUMPTION]; the ten open questions are at the end of the design.
+- The design PR changes no code and no data. Every band, fee, time and name in it is a [PLACEHOLDER] or [ASSUMPTION]; the eleven open questions are at the end of the design.

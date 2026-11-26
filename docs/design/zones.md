@@ -27,7 +27,8 @@ Written against main at `c094966`, from the code.
 - **You need the rover.** On foot a player only walks, looks, clicks props, opens panels and goes to bed. The farm, the dome and the tunnels need the rover (`docs/decisions.md`, co-op). **The rover is in one place:** in the tunnels it is gone from the farm, and the host keeps and saves where it is.
 - **The tunnels hold:** the wild Cobalt Sentinel at a fixed spot (`GameState.SENTINEL_AT`, 10 % daily chance out [PLACEHOLDER]; a player creeps up with the lights low and catches it with the cup), crystal ore, magma and a pool of deep water. The story names the tunnels as Act II's unlock ("Terracotta Knee opens the Tunnels", `story.md`).
 - **On the farm:** ore fissures on the Terracotta Plateau (mined from the rover, regrow on a later morning); buried ore pockets from the farm's seed (`OrePocket`, 6 at a time, regrow after 3 days); buried gauge blocks, each one piece of the 81-piece inch set, size and grade from the seed (`GaugeSet`, `ReferenceBlock`); digging in 0.5 m steps (`Terrain.DIG_STEP_M`); stone pieces; **pit water** (`PitWater`): a pit 3 steps deep or more seeps to the water table, 0.5 m at three steps and 1 m at four, a rover wades shallow water and stops at deep water.
-- **Everything buried comes from the farm's seed**, so every PC agrees and nothing about it is saved but what was found. §12 reuses that pattern.
+- **Everything buried comes from the farm's seed**, so every PC agrees. The save keeps only what changed: the cells found, `new_pockets` and `pocket_pending` for ore, and `pit_seep` for the ground water. §12 reuses that pattern.
+- **The game runs one current scene** (`SceneSwitcher`): farm, dome or tunnels. The rover's place is one saved flag (`rover_in_tunnels`).
 - **There is no hazard system.** Nothing in the rover or the tunnels costs time, items or wear except steering drift and the uplink (line of sight and lag). No heat, no cold, no air.
 
 ### 0.2 Day, night and sleep
@@ -38,11 +39,11 @@ Written against main at `c094966`, from the code.
 
 ### 0.3 The lab, OIRM, Bram and the cast
 
-- Instruments drift with the clock; an out-of-tolerance as-found starts a recall. Plants need water. The auditor comes every 5th morning. Robots exist (`data/robots.json`: collect spool, calibrate, trellis cards today; the WATER card is designed, `equipment_skills_robots.md`).
+- Instruments drift with the clock; an out-of-tolerance as-found starts a recall. Plants need water. The auditor comes every 5th morning. Robots exist (`data/robots.json`: collect spool, calibrate, trellis cards today; the WATER card is designed, not built, `equipment_skills_robots.md`).
 - **No sprinkler or hired helper exists.** The Pavonis irrigation model is a prop only.
 - **OIRM:** `GameState.at_oirm`, `oirm_trips`, `certificates`, the drop pod on audit mornings. A trip takes days.
 - **Cast:** Lin (greenhouse, buys crops), Bram (garage, sells standards, ore), Old Orin (surveyor, beacons), Odalys Brandt (dispatcher), Kestrel (the contractor before you, sells slings off-world), Chet (rival, later an errand runner), Vance (inspector). Lines come from `data/dialogue_dispatches.json`.
-- **Species** (`data/tarantula_species.json`): Curlyhair, Mexican Redknee, Brazilian Black, Cobalt Sentinel, Terracotta Knee, Crystal Weaver, Orbital Silk-Spinner, Basalt Thermal-Vent. The real ones live at 23 to 25 °C and 54 to 68 % relative humidity; the Cobalt Sentinel wants 80 % relative humidity. The story already puts a Phobos site (the Larder) at the end.
+- **Species** (`data/tarantula_species.json`): Curlyhair, Mexican Redknee, Brazilian Black, Cobalt Sentinel, Terracotta Knee, Crystal Weaver, Orbital Silk-Spinner, Basalt Thermal-Vent. Only the three real ones and the Cobalt Sentinel carry temperature and humidity numbers: 23 to 25 °C and 54 to 68 % relative humidity for the real ones, 25 °C and 80 % relative humidity for the Sentinel. Terracotta Knee, Crystal Weaver, Orbital Silk-Spinner and Basalt Thermal-Vent have none yet (null). The story already puts a Phobos site (the Larder) at the end.
 - **Quests:** the engine, the one-use rewards (`one_use_rewards` in `data/quests.json`: id, name, holder player or farm, a percent, lines), the lab-level gates (`lab_gates` in `data/skills.json`) and the 99-level curve are built. Lab quests and the lab level are shared; personal quests belong to a player (`quests_levels_story.md`).
 - **Co-op:** host-authoritative. The host saves; a guest's personal skills live in the guest's own file. Players can already be in different scenes (farm, dome, tunnels): the host refuses a command that needs the rover in a scene where the rover is not. I have not traced how a guest's tunnels scene is fed beyond that, so §12 treats "several areas at once" as new work.
 
@@ -70,23 +71,23 @@ Bands overlap on purpose. Ryan's anchors: underground about 5 to 20, the moons a
 | **Lava Tubes** (the basalt tunnels, grown) | 5 to 20 | Real Mars lava tubes: long dark tubes with skylight pits (Pavonis Mons has them, and the station is named for it) | Heat near vents, loose basalt, dark | Crystal ore, basalt glass, vent samples for OIRM | Thermal-vent morph near the warm vents [ASSUMPTION] | The tunnel mouth the rover already drives into |
 | **Flooded Aquifer** | 8 to 24 | Ice-cemented caverns where ground water seeps, a cousin of `PitWater` | Water depth, pressure drops, slow wading | Water and brine samples, drowned gear, sealed gauge-block cases | None (too wet), or a damp-moss morph [PLACEHOLDER] | A sinkhole south of the plateau, reached by rover |
 | **Abandoned Colony Mine** | 12 to 30 | The first colonists' ore mine, shored up with kit that was never inspected | Collapses, bad air pockets, old charges | Ore, lost gear, robot parts, gauge blocks | None | A sealed gate on the plateau road, opened by a key quest |
-| **Polar Ice Caves** | 18 to 35 | Layered water-ice and CO₂ ice under the cap, with climate records in the layers | Cold, slick ice, white-out dust | Ice cores (OIRM samples), minerals, frozen probes | Cold-adapted morph [PLACEHOLDER] | A long drive north, then a ramp |
+| **Polar Ice Caves** | 18 to 35 | Layered water-ice and CO₂ ice under the cap, with climate records in the layers | Cold, slick ice, white-out dust | Ice cores (OIRM samples), minerals, frozen probes | **Terraform test pods**: a sealed, heated trial pod left under the ice, still warm and wet inside [ASSUMPTION] | A long drive north, then a ramp |
 | **Phobos** | 21 to 40 | Dark, crumbly moon; Stickney crater; an abandoned research station | Very low gravity, dust, the launch window | Station data, robot parts, **escaped station stock** | Escaped stock adapted in warm service tunnels | Shuttle from the pad (§8) |
-| **Deimos** | 26 to 50 | Smaller, smoother, quieter; a back-of-beyond hideout | Low gravity, dust, long days between windows | Smuggled crates, lost standards, **smuggler caches** | Cached tarantulas in warm crates, and **terraform test pods** | Shuttle from the pad (§8) |
+| **Deimos** | 26 to 50 | Smaller, smoother, quieter; a back-of-beyond hideout | Low gravity, dust, long days between windows | Smuggled crates, lost standards, **smuggler caches** | Cached tarantulas in warm crates | Shuttle from the pad (§8) |
 | Far Mars, belt and outer moons | 50 to 99 | Sketched in §11 | | | | |
 
 [PLACEHOLDER] Phobos and Deimos as distinct places:
 
 | | Phobos | Deimos |
 |---|---|---|
-| Real fact | Orbits in about 7 h 39 min, about three times a Mars day; surface gravity about 1/1700 of Earth's | Orbits in about 30 h; smaller, smoother surface |
+| Real fact | Orbits in about 7 h 39 min, faster than Mars turns, so from the ground it crosses the sky about every 11 h (about twice a sol); surface gravity about 1/1700 of Earth's | Orbits in about 30 h, slower than Mars turns, so it is up for about 2.5 sols, then down for about 2.5 (a cycle of about 5.4 sols); smaller, smoother surface |
 | Feel | Busy, loud, ruined: a research station that someone left in a hurry | Quiet, tidy, odd: a place that was hidden on purpose |
 | Giver [ASSUMPTION] | Odalys, who knows the station from her orbital desk | Kestrel, who sells slings off-world and knows who else does |
-| Tarantula hook | Station stock, escaped and breeding where the service tunnels are warm | Smuggler caches, plus a test pod from a terraform trial that is still humid inside |
-| Launch windows | Three a day, nearly fixed (§8) | One a day that moves about six hours later each day (§8) |
+| Tarantula hook | Station stock, escaped and breeding where the service tunnels are warm | Smuggler caches in warm crates |
+| Launch windows | About every 11 game hours [PLACEHOLDER] (§8.2) | Open for about 2.5 days, shut for about 2.5 (§8.2) |
 | Obstacle shape | Low gravity jumps and dust; getting back before the window shuts | Locked crates, wrong labels, people who do not want visitors |
 
-**The tarantula hook is the same rule everywhere:** a tarantula needs warmth and humidity, so a wild one is never in the open. It is in a sealed, warm place that someone built. That is what keeps it real: the species in `tarantula_species.json` already carry the needed temperature and humidity, and a find is a habitat problem the player solves back in the dome (§10).
+**On the moons the hook is one rule:** a tarantula needs warmth and humidity, so a wild one on a moon is never in the open. It is in a sealed, warm place that someone built or left (station tunnels, a smuggler's crate, a terraform pod, which sits in the Ice Caves). On Mars it is different: the Cobalt Sentinel is already wild in the natural tunnels. The three real species and the Sentinel already carry the needed temperature and humidity; a find from a moon is a habitat problem the player solves back in the dome (§10).
 
 ## 3. Hubs and depths
 
@@ -141,7 +142,7 @@ Finds are placed by the seed per depth and day, so a daily layout holds a handfu
 
 ## 5. Hazards and costs (no death)
 
-Ryan chose: no death; hazards cost time, items and instrument wear (decisions 3 and 4). The rule for every hazard is **a small, visible cost you can see coming, and always a way out.**
+Ryan chose: no death; hazards cost time, items and instrument wear (decision 4). The rule for every hazard is **a small, visible cost you can see coming, and always a way out.**
 
 | Cost | What it means in play |
 |---|---|
@@ -179,10 +180,10 @@ Today there is no rescue (§0.2). Ryan chose a small cost, like Stardew passing 
 |---|---|
 | 00:00 [PLACEHOLDER] | A phone warning: "Recall in 2 hours. Get to a lift or the landing." (Dispatch voice: Odalys.) |
 | 02:00 | **You are rescued.** A recovery crew carries you out. You wake in your bed at 06:00. |
-| Cost [PLACEHOLDER] | A rescue fee of 50 CR from the shared wallet. Finds in your hands are kept; unfinished **ore** you carried is dropped at the spot; any one pack instrument takes a drift hit. |
+| Cost [PLACEHOLDER] | A rescue fee of 50 CR from the shared wallet, plus part of the **ore** in your pack (about a third [PLACEHOLDER]) left at the spot. Finds (a tarantula, a block, a part, a sample) are kept. No extra drift hit. |
 | Quests | Quest progress is kept. A "be back by" step simply fails for the day and offers again. |
 
-- The crew **leaves the rover at the hub's pad**; it can be driven home on your next visit. [ASSUMPTION; ties to "the rover is in one place"]
+- The crew **brings the rover home** to the farm pad, so a rescue never strands it in a zone. [ASSUMPTION; ties to "the rover is in one place", §8.1]
 - Rescue is **not shame**, it is a small bill. It must never leave the player worse off than a day lost.
 - **Co-op:** the rescued player counts as "in bed" for the day's end, so the all-in-bed rule still holds (§12.4).
 
@@ -223,7 +224,7 @@ Table in the style of `quests_levels_story.md` §3.4. "Also needs" is a conditio
 | 18 | Ice Caves hub (warning below 18) | | NEW |
 | 20 | **Shuttle license**: day trips to Phobos | OIRM account | NEW |
 | 24 | Mine depth 5 and below | lift repaired at depth 4 | NEW |
-| 26 | Deimos day trips | license | NEW |
+| 26 | Deimos hub (warning below 26) | the shuttle license | NEW |
 | 30 | **Expedition permit** (multi-day trips, §8.3) | | NEW |
 | 35 | Ice Caves deep cores | | NEW |
 | 40 | Phobos deep station | | NEW |
@@ -231,7 +232,9 @@ Table in the style of `quests_levels_story.md` §3.4. "Also needs" is a conditio
 
 - **A second way through each gate** (rule from the main design): a gated part may have a quest version that opens it early, like the provisional way through a lab-level gate (`quests_levels_story.md` §3.2.1). [ASSUMPTION]
 - **No story beat sits above lab level 60** (a rule from the same doc). Zones past 60 (§11) are for repeatable work, prestige and cosmetics. [ASSUMPTION]
-- A zone's hub itself is open from level 1 with a warning, so a player who wants to see the place is never told no.
+- **Hubs are never hard-gated by level.** Below a band's start a hub shows the §7.1 warning and lets you in. Only the deep parts and the shuttle license are hard gates. Two named exceptions, neither a level wall: the **moons** need the shuttle license (Deimos below level 26 is a warning, but still behind the license), and the **Colony Mine's entrance** needs the gate-key quest (the level 12 there is a warning).
+- Every number in this table is a [PLACEHOLDER] except the band starts Ryan gave (5 and 21), and "a lift every third depth" is too.
+- **Bands against the hour budget.** Lab level 20 is about 5 hours of play and 40 about 20 hours (`quests_levels_story.md`). So most zone play happens while the lab level is still low, and trips feed the traveller's **personal** skills and quest points more than shared lab XP (§9.5).
 
 ## 8. Travel
 
@@ -242,7 +245,9 @@ Ryan chose both: a real entrance the first visit, then fast travel from a termin
 | Visit | How |
 |---|---|
 | **First time** | A real entrance: drive the rover to it, or walk where the zone allows it. Reaching the hub's pad unlocks the zone for the farm (shared). |
-| **After that** | A **terminal** at the dome pad (or the farm's parking pad) opens a list of unlocked hubs. Pick one; a short fade. The rover goes with you [ASSUMPTION], so there is no "my rover is on the farm" problem (§12.3). |
+| **After that** | A **terminal** at the dome pad (or the farm's parking pad) opens a list of unlocked hubs. Pick one; a short fade. You arrive **on foot**, and each zone has its own **field rover** at its pad [ASSUMPTION; Open question 7]. |
+
+**Why not "the farm rover goes with the fast-traveller":** the rover is one saved place today (`rover_in_tunnels`). If it travels, the friend who stays home is stranded without it, which breaks decisions 3 (anyone, anywhere) and 11 (a friend covers the lab). A field rover per zone costs one more vehicle and no new rule about who owns it. §12.3 names the save and protocol change.
 
 An unlocked list is per farm. A guest who joins sees what the farm has opened; a guest does **not** get a free skip of the first visit for a zone the farm has not opened.
 
@@ -250,10 +255,11 @@ An unlocked list is per farm. A guest who joins sees what the farm has opened; a
 
 - **Shuttle license** at lab level 20 (§7.2). A real quest step gives it (a short exam at the bench with Vance) [PLACEHOLDER].
 - **The fee:** a fare per person for a day trip, about 40 CR [PLACEHOLDER].
-- **Launch windows:** Phobos orbits Mars in about 7 h 39 min, so it is overhead about three times in a 24 h day. A shuttle can only leave and land with the moon overhead. [ASSUMPTION] The clock shows the next window on the terminal. A trip is "go, work, come back to the window", so a day on Phobos is two or three windows long.
-  - **Phobos**: three windows a day, at about 06:00, 13:40 and 21:20 [PLACEHOLDER; rounded from 7 h 39 min].
-  - **Deimos**: orbits in about 30 h, so its window moves about six hours later each day. One window a day, at a time that moves. [PLACEHOLDER]
-- **Missing a window** means waiting for the next one: more time away, not a penalty, and at night the recall (§6) fetches you from the surface if you are inside it.
+- **Launch windows** (real science, lightly): Phobos orbits Mars in 7 h 39 min, faster than Mars turns, so it crosses the sky about every 11 hours, about twice a sol. Deimos is slow: it stays up for about 2.5 sols, then is down for about 2.5, a cycle of about 5.4 sols. A shuttle can only leave and land with its moon up. [ASSUMPTION] The terminal shows the next window.
+  - **Phobos**: a window about every 11 game hours, so about two a day, at times that drift [PLACEHOLDER].
+  - **Deimos**: open for about 2.5 days, then shut for about 2.5. A trip must be planned inside the open spell. [PLACEHOLDER]
+  - Ryan's decision text stays as he said it (day trips with a fee, plus expeditions); this is the in-game reading of it.
+- **Missing a window** means waiting for the next one (a Deimos miss may mean days: plan, or camp, §6.2): more time away, not a penalty, and at night the recall (§6) fetches you from the surface if you are inside it.
 - A day trip cannot run past the recall (02:00). A trip that does should be an expedition.
 
 ### 8.3 Expeditions (multi-day)
@@ -315,7 +321,7 @@ Using the four kinds (story, lab, personal, daily) from `quests_levels_story.md`
 
 | Kind | What a zone gives it |
 |---|---|
-| **Story** | The tunnels already open Act II. Phobos is where the Larder is. A story beat may *start* in a zone but must have a version that is open without it [ASSUMPTION]. |
+| **Story** | The tunnels already open Act II. A story beat may *start* in a zone but should have a version open without it [ASSUMPTION]. **Exceptions to say out loud:** the story puts the Larder on Phobos, and `quests_levels_story.md` §3.4 puts it at lab level 60, above the Phobos band (21 to 40) and level with the late-game zones. Either the Larder gets a non-Phobos way in, or it is an exception (Open question 10). The Station's Last Log and The Test Pod below are the same: each needs a non-zone version, or is an exception. |
 | **Lab** | A job for the lab: bring back a sample, run a field calibration at depth. Shared lab XP and credits. |
 | **Personal** | A favor or a challenge for one player: catch a tarantula, reach a depth, find a block. Personal XP, quest points, keepsakes. |
 | **Daily** | A small ask per zone per day: "bring back 3 vent samples" [PLACEHOLDER]. |
@@ -333,11 +339,11 @@ Using the four kinds (story, lab, personal, daily) from `quests_levels_story.md`
 | | Personal | **The Colonist's Set.** Find three blocks the farm has not found | Bram | Earthworks XP, a keepsake |
 | Ice Caves (18 to 35) | Lab | **A Core to Certify.** Bring a layered ice core to OIRM | Vance | Lab XP, certificate |
 | | Personal | **Cold Calibration.** Check a probe at depth, then at the lift | Odalys | Calibration XP |
-| Phobos (21 to 40) | Story | **The Station's Last Log.** Reach the old research desk | Odalys | Quest point, XP certificate |
+| Phobos (21 to 40) | Story | **The Station's Last Log.** Reach the old research desk (zone-only: an exception, see §10.2) | Odalys | Quest point, XP certificate |
 | | Personal | **Strays.** Catch one escaped station tarantula in a warm service tunnel | Odalys | Husbandry XP, a new species |
 | | Lab | **Window Dressing.** Bring back a field-calibrated gauge before the window | Vance | Lab XP |
 | Deimos (26 to 50) | Personal | **A Quiet Crate.** Open a smuggler's cache with Kestrel's proof | Kestrel | Husbandry XP, a new species |
-| | Story | **The Test Pod.** Find the terraform pod whose air is still warm and wet | Kestrel | Quest point |
+| | Story | **The Test Pod.** Find the terraform pod whose air is still warm and wet (zone-only: an exception, see §10.2) | Kestrel | Quest point |
 | Camp-out line (any) | Personal | **Two Sunsets.** Survey the shaft over a night at the camp | Orin | XP certificate |
 
 Each quest names a giver already in the cast. The one with no easy home (Phobos escapee and the pod) is the part Ryan most wants to tune.
@@ -351,10 +357,10 @@ Ryan chose all three: far Mars sites, the asteroid belt and the outer moons (dec
 | **Valles Marineris** | 50 to 62 | A canyon system; layered rock on both walls | Wind, long drives, thin air | Old sediment samples, layered rock |
 | **Olympus Mons caves** | 55 to 70 | Lava tubes at a larger scale, a cousin of the Lava Tubes | Heat, scale, getting lost | Mineral veins, big skylights |
 | **Polar caps** | 60 to 72 | The cap itself: spiral troughs, layered ice | Cold, white-out | Ice cores of old climate |
-| **Asteroid belt** | 70 to 85 | A mining outpost between rocks; a different calibration problem (no gravity at all) | Drift in the real sense, vacuum, debris | Metal samples, a spider farm in a tin can [ASSUMPTION] |
-| **Outer moons** (Europa/Ganymede-style ice) | 85 to 99 | Ice shells over oceans, radiation, a long way from home | Radiation, cold, delay of days | A prestige tarantula and a prestige standard [PLACEHOLDER] |
+| **Asteroid belt** | 70 to 85 | A mining outpost between rocks; a different calibration problem (almost no gravity) | Drift in the real sense, vacuum, debris | Metal samples, a spider farm in a tin can [ASSUMPTION] |
+| **Outer moons** (Europa/Ganymede-style ice) | 85 to 99 | Ice shells over oceans, radiation, a long way from home | Radiation, cold, a long trip home | A prestige tarantula and a prestige standard [PLACEHOLDER] |
 
-- Real science, lightly: the belt's rocks are far apart; Europa and Ganymede are real ice-covered worlds and the outer system is hours of light-time away, so trips are multi-day by nature (expeditions, §8.3).
+- Real science, lightly: belt rocks are very far apart and gravity there is almost none. Europa and Ganymede are real ice-covered worlds. Jupiter is about 35 to 55 light-minutes from Mars, so radio delay is minutes, not days; **travel time** is a separate thing and is long, so these trips are multi-day by nature (expeditions, §8.3). Shallow liquid groundwater on Mars is speculative; the Aquifer is fiction in that sense.
 - Everything here is **optional** and reuses the zone frame: a hub, depths by seed, hazards as time/items/wear, soft gates, fast travel after the first visit.
 - The doc does not design these yet. §13 ends with them on purpose.
 
@@ -368,23 +374,35 @@ Today a co-op farm keeps one farm scene running on the host. Guests in other sce
 
 ### 12.2 Proposed approach [ASSUMPTION]
 
-- **A zone is its own scene** (a hub) plus generated depths, loaded **only while someone is in it.** The host loads the zone the first time a player enters it and unloads it when the last one leaves.
+- **Plainly:** the game runs **one current scene** per PC (`SceneSwitcher`). Several live 3D zones on one PC would need separate `World3D`s or `SubViewport`s, which nothing here does. So the host does **not** run zone worlds. It runs **pure zone rules** (is the zone open, does the find exist, is it taken, what does the hazard cost), like the Sentinel catch is guarded in `GameState`, plus **seed functions** for layout. The 3D scene for a zone exists only on the PC of whoever is standing in it.
+- **A zone is its own scene** (a hub) plus generated depths, loaded **only on the PC of a player who is in it.** The host's rules know every player's zone and depth; its 3D scene is only its own player's.
 - **Everything is derived from the seed**, as `OrePocket`, `PitWater` and the daily asks already do: the layout, the finds and the hazards come from (farm seed, zone, depth, day). Every PC computes the same zone from the same inputs. The host does not need to send a world.
 - **Commands go to the host**, like `dig` and `till` do today: a guest in a zone sends "take find 7 at depth 3" and the host checks it (the zone is open, the find exists, the player is there, the find is not taken) and answers. This is the existing farm-command pattern, with a zone and a depth added to the address.
+- **Layout uses the project's own integer hash, not Godot's RNG**, so every PC builds the same depth.
 - **What the host saves:** which finds were taken (per zone, per day), the lifts repaired, the camps used, what is unlocked, who is where. Nothing else.
-- **What the host simulates:** only the zones with players in them. A zone with nobody in it does not run. [ASSUMPTION] A hazard's timer (a vent cycle) is a pure function of the clock, so a late player finds it at the right phase.
-- **A cap:** at most a few zones loaded at once [ASSUMPTION], because a farm has a few players. The host's PC is the limit.
-- **Presence:** the host knows each player's place (`farm`, `dome`, `zone_id` plus depth); the phone shows friends' zones.
+- **Hazard state, one by one:**
+
+| State | Kind |
+|---|---|
+| A dropped item lying in a depth | **Synced** while the depth is occupied; **daily-reset** (gone at 06:00) |
+| A collapsed room, a flooded low room | **Daily-reset**, from the seed; no save |
+| A cleared rockfall, a shored room, a shut valve | **Synced** to others in the depth; **daily-reset** |
+| A taken find | **Saved** (per zone per day) |
+| A repaired lift, an unlock, a used camp | **Saved** (permanent for the farm) |
+| A vent cycle | Pure function of the clock; not stored |
+
+- **A cap:** at most a few zones occupied at once [ASSUMPTION], because a farm has a few players.
+- **Presence:** the host tracks each player's place (`farm`, `dome`, `zone_id` plus depth). **This model comes before the first depth** (§13).
 
 ### 12.3 Technical risk (marked clearly)
 
 | Risk | Why | Mitigation |
 |---|---|---|
-| **Host load** with players in 2 or 3 zones | A scene each, plus the farm | Zones load only while occupied; small hubs; a cap on concurrent zones |
+| **Host load** with players in 2 or 3 zones | Rules and seed work per zone; no extra 3D world on the host | Pure host-side rules; the 3D scene only on the occupant's PC; a cap on occupied zones |
 | **Consistency** between PCs | Procedural depths can drift if any input differs | Seed only; no float chance in the layout; the same rule as `PitWater` ("no chance in it") |
-| **A guest drops mid-trip** | They are in a zone that is not theirs | The host unloads the zone when empty; the guest's finds were kept at pickup |
+| **A guest drops mid-trip** | They are in a zone that is not theirs | The host forgets their place; the guest's finds were kept at pickup |
 | **Join late** | A guest joins while a friend is in a zone | The farm sends the zone's taken-finds list at join, as it sends the farm's |
-| **The rover is in one place** | The old rule says the rover is in one scene | A zone has its own **field rover** at its pad [ASSUMPTION], or the farm rover goes with whoever fast-travels (§8.1). **Open question 7** |
+| **The rover is in one place** | Today one saved flag, `rover_in_tunnels`, says where it is | A **field rover per zone** at its pad, or on foot [ASSUMPTION]. This means **generalizing `rover_in_tunnels` to a zone id**: a **save change and a protocol change** (it is a synced and saved field). "The farm rover goes with the fast-traveller" would strand the home player (§8.1). **Open question 7** |
 | **Save size** | Taken finds per zone per day grow | Keep only today's list and the permanent unlocks |
 
 ### 12.4 The day's end with players in different places
@@ -401,23 +419,25 @@ The all-in-bed rule stands (`CoopBeds`): the day ends when everyone is in bed, a
 
 Each PR logs its decisions in `docs/decisions.md` and names its placeholders.
 
-1. **The recall.** The 02:00 rescue with its small cost and a 00:00 warning, working in the **existing tunnels**. A phone line; the player wakes in bed. Tests for the cost and the day's end. No new area. (This is the whole first rule of Ryan's decision 2, and it works today.)
+1. **The recall.** The 02:00 rescue (50 CR plus some carried ore, finds kept, rover brought home) and a 00:00 warning, working in the **existing tunnels**. A phone line; the player wakes in bed. Tests for the cost and the day's end. No new area. (The whole first rule of Ryan's decision 2; it works today.)
 2. **Zone data.** `data/zones.json`: id, name, band, hazards, finds, hub scene, entrance. A data check. No scene. The tunnels get a row.
 3. **Soft-gate warning.** The terminal and lift line from §7.1, and the lab-level rows of §7.2 in `lab_gates`. Works on the tunnels.
-4. **First slice: Lava Tubes hub, one depth, entrance, rescue.** The tunnel mouth stays the entrance. The hub gains Orin's beacon rack, a notice board and a lift; **depth 1** is generated from the seed. Quest: Beacon Run. This is the first PR a player sees.
-5. **Fast-travel terminal.** The list of unlocked hubs; the rover goes with you. After a first visit.
-6. **Hazard system.** Time, items, wear; heat in the Lava Tubes (vent cycle, instrument drift multiplier). One hazard.
-7. **Depths 2 and 3, and the lift.** The repair, the daily reseed, the checkpoint.
-8. **Co-op presence.** The host loads a zone while someone is in it; guests receive it; commands carry a zone address. **The highest-risk PR; it needs a second reviewer and a two-PC test.**
-9. **Helper and the reward.** Lin tends the lab; the `lab_sitter` one-use reward.
-10. **Camp-outs.** The camp spot, supplies, and `CoopBeds` learning that a camp is a bed.
-11. **Flooded Aquifer.** One PR: hub, depth 1, pump, water hazard.
-12. **Abandoned Colony Mine.** One PR: hub, gate key quest, collapse hazard.
-13. **Polar Ice Caves.** One PR: hub, cold hazard.
-14. **Shuttle and license.** The pad, the fee, launch windows, the exam.
-15. **Phobos hub,** with the station and the escapee hook. Then **Deimos hub,** with the cache and test-pod hooks.
-16. **Expeditions.** A multi-day quest line with a camp.
-17. **Late game zones** (§11), one per PR.
+4. **Zone address and presence model.** The host tracks each player's place (`farm`, `dome`, `zone_id`, depth); the phone shows it; `rover_in_tunnels` becomes a zone id (a save and protocol change). Pure rules, no new scene. **Needs a second reviewer.** Everything below depends on it.
+5. **Lava Tubes hub.** The tunnel mouth stays the entrance. Orin's beacon rack, a notice board and the quest Beacon Run. No generated depth yet.
+6. **First depth generator.** Depth 1 from the integer hash (farm seed, zone, depth, day); taken finds saved per day. This is the first full PR a player sees.
+7. **Fast-travel terminal.** The list of unlocked hubs, after a first visit. **Depends on Open question 7** (field rover per zone, or on foot); no rover answer is built before Ryan picks.
+8. **Hazard system.** Time, items, wear; heat in the Lava Tubes (vent cycle, instrument drift multiplier). One hazard.
+9. **Depths 2 and 3, the lift and the checkpoint.** The repair, the daily reseed, the lift (once, not repeated elsewhere).
+10. **Co-op hardening.** Two-PC test of players in different zones, late join, a guest dropping mid-trip. **Highest-risk PR; second reviewer and a two-PC test.**
+11. **Helper and the reward.** Lin tends the lab; the `lab_sitter` one-use reward.
+12. **Camp-outs.** The camp spot, supplies, and `CoopBeds` learning that a camp is a bed.
+13. **Flooded Aquifer.** One PR: hub, depth 1, pump, water hazard.
+14. **Abandoned Colony Mine.** One PR: hub, gate key quest, collapse hazard.
+15. **Polar Ice Caves.** One PR: hub, cold hazard.
+16. **Shuttle and license.** The pad, the fee, launch windows, the exam.
+17. **Phobos hub,** with the station and the escapee hook. Then **Deimos hub,** with the cache and test-pod hooks.
+18. **Expeditions.** A multi-day quest line with a camp.
+19. **Late game zones** (§11), one per PR.
 
 ## 14. Open questions for Ryan
 
@@ -432,7 +452,7 @@ Each has a recommended option first.
    - (b) Chet, once he is an errand runner.
    - (c) A new hire.
 3. **What does the rescue cost?**
-   - (a) 50 CR and some carried ore, no lost finds (recommended: small, as you asked).
+   - (a) 50 CR plus some carried ore [PLACEHOLDER], finds kept, no extra drift hit, the crew brings the rover home (recommended: small, as you asked; the same as §6.1).
    - (b) 50 CR only.
    - (c) A bigger fee and one random item.
 4. **Can a helper calibrate?**
@@ -447,9 +467,9 @@ Each has a recommended option first.
    - (b) The Colony Mine.
    - (c) The Polar Ice Caves.
 7. **How does the rover work in zones?**
-   - (a) The farm rover goes with whoever fast-travels, and the rover is still in one place (recommended: fewest new rules, but only one player can have it).
-   - (b) Each zone has its own field rover at its pad, so friends can be in several zones at once.
-   - (c) On foot, no rover, in the hubs.
+   - (a) Each zone has its own field rover at its pad (or you go on foot), so friends can be in several zones at once (recommended: keeps decisions 3 and 11; needs `rover_in_tunnels` generalized to a zone id).
+   - (b) On foot, no rover, in the hubs.
+   - (c) The farm rover goes with whoever fast-travels. Not recommended: it strands the home player and breaks decisions 3 and 11.
 8. **Do the moons' escaped tarantulas get their own species?**
    - (a) New moon-adapted forms with a wider climate band (recommended: the hook is "they adapted", so they should be different).
    - (b) The existing alien species, found in a new place.
@@ -457,11 +477,15 @@ Each has a recommended option first.
 9. **How much does a shuttle day trip cost?**
    - (a) About 40 CR a person (recommended: noticeable, not a wall).
    - (b) A flat fee per trip.
-   - (c) Free once the license is held.
+   - (c) A season pass bought once a game year (a cheap way to stop paying each trip).
 10. **Should the zone hubs gate the story at all?**
-    - (a) No: every story beat has a version open without a zone (recommended; matches "nothing is a wall").
-    - (b) Phobos is required for the Larder only.
-    - (c) Some beats are zone-only.
+    - (a) No: every story beat has a version open without a zone (recommended; matches "nothing is a wall"). This means the Larder needs a non-Phobos way in, or it is an exception; level 60 sits above the Phobos band (21 to 40).
+    - (b) Phobos is required for the Larder only (an exception).
+    - (c) Some beats are zone-only (the Station's Last Log and the Test Pod are today).
+11. **Which gauge-block pieces does a zone cache hold?**
+    - (a) Only pieces the farm has not found, so each fills a gap in the 81-piece set (recommended).
+    - (b) Random pieces; duplicates become credits.
+    - (c) A separate zone set.
 
 ## 15. Assumptions in one place
 
@@ -472,19 +496,21 @@ All of these are [ASSUMPTION]s unless noted.
 - Lift stations are shared by the farm and need a one-time repair (§3.3).
 - Quest items and gauge blocks are exempt from item loss (§5).
 - Extra drift in a zone is a multiplier on the existing drift, not a new mechanism (§5).
-- The rescue is at 02:00, with a 00:00 warning, and costs 50 CR and some carried ore (§6).
-- The rover stays at the hub after a rescue (§6.1) and goes with a fast-traveller (§8.1).
+- The rescue is at 02:00, with a 00:00 warning, and costs 50 CR and some carried ore; finds are kept; no drift hit (§6).
+- The crew brings the rover home after a rescue (§6.1). Each zone has a field rover, or you go on foot, until Ryan answers Open question 7 (§8.1).
 - A camp counts as a bed and is a quest feature (§6.2).
-- Phobos launch windows are three a day at about 06:00, 13:40 and 21:20; Deimos has one that moves about six hours later each day (§8.2).
+- Phobos launch windows come about every 11 hours (about two a day); Deimos is open about 2.5 days, then shut about 2.5 (§8.2).
+- Hubs are never hard-gated by level; the moons need the license and the Mine hub needs the gate-key quest (§7.2).
+- Every number in §7.2 and "a lift every third depth" are [PLACEHOLDER]s.
 - The shuttle license needs lab level 20 and an OIRM account; an expedition permit needs 30 (§7.2).
 - Lin tends the lab for about 40 CR a day, cannot calibrate, and a free helper day is a `lab_sitter` one-use reward (§9).
 - Sprinklers are a future item (§9.2).
 - Cast placement: Orin in the Lava Tubes, Vance in the Aquifer and Ice Caves, Bram in the Mine, Odalys on Phobos, Kestrel on Deimos (§2, §10.3).
 - Real tarantulas only live in sealed warm places; the thermal-vent morph near the warm vents and a damp-moss or cold morph are guesses (§2).
 - A zone's gauge-block cache holds blocks the farm has not found yet (§10.1).
-- A zone loads on the host only while occupied; a few at once at most (§12.2).
+- The host runs pure zone rules and seed functions, not zone worlds; the 3D scene lives only on the occupant's PC (§12.2).
 - `CoopBeds.scene_refusal` learns two exceptions: a camp and the recall (§12.4).
 - No story beat sits above lab level 60 (§7.2, §11).
 - Zone content is optional: no zone holds the only copy of anything the story needs.
 
-Facts used lightly and checked against the usual references: Phobos orbits Mars in about 7 h 39 min and Deimos in about 30 h; both have a surface gravity far below 1/1000 of Earth's (Phobos about 1/1700); Mars has real lava tubes (skylights near Pavonis Mons); Europa and Ganymede are real ice-covered moons; a real tarantula needs warmth and humidity.
+Facts used lightly and checked against the usual references: Phobos orbits Mars in about 7 h 39 min (it crosses the sky about every 11 h) and Deimos in about 30 h (up about 2.5 sols, down about 2.5); both have a surface gravity far below 1/1000 of Earth's (Phobos about 1/1700); Mars has real lava tubes (skylights near Pavonis Mons); Europa and Ganymede are real ice-covered moons; a real tarantula needs warmth and humidity.
