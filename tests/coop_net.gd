@@ -61,7 +61,7 @@ func _stranger(host: Node, hello: bool) -> ENetMultiplayerPeer:
 	_raw.append(peer)
 	_until(func() -> bool: return peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED and not host._links.is_empty())
 	if hello:
-		peer.put_packet(var_to_bytes([SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}]))
+		peer.put_packet(var_to_bytes([SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}, ProfileScript.no_record()]))
 		_until(func() -> bool: return host.players.size() == 2)
 	return peer
 

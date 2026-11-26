@@ -249,13 +249,13 @@ func test_guest_file_from_the_old_curve() -> String:
 	var key: String = "0".repeat(32)
 	var factor: int = int(DataManager.get_number(&"skills", "old_curve/xp_factor", 0.0))
 	var old: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"calibration":%d,"field_ops":7}}' % [key, OLD_TOP_XP]).to_utf8_buffer())
-	if old != { "key": key, "skills": { "calibration": OLD_TOP_XP * factor, "field_ops": 7 * factor } }:
+	if old != { "key": key, "skills": { "calibration": OLD_TOP_XP * factor, "field_ops": 7 * factor } }.merged(ProfileScript.no_record()):
 		return "An old guest file is multiplied by %d: %s" % [factor, old]
 	var new: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"calibration":%d},"curve":%d}' % [key, OLD_TOP_XP, ProfileScript.CURVE]).to_utf8_buffer())
-	if new != { "key": key, "skills": { "calibration": OLD_TOP_XP } }:
+	if new != { "key": key, "skills": { "calibration": OLD_TOP_XP } }.merged(ProfileScript.no_record()):
 		return "A new guest file is read as it is: %s" % [new]
 	var before: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"field_ops":900},"curve":2}' % key).to_utf8_buffer())
-	if before != { "key": key, "skills": { "field_ops": 900 } }:
+	if before != { "key": key, "skills": { "field_ops": 900 } }.merged(ProfileScript.no_record()):
 		return "A guest file from before Agronomy is read as it is: %s" % [before]
 	for curve: String in ["1", "4", "2.5", "\"2\""]:
 		var odd: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"calibration":5},"curve":%s}' % [key, curve]).to_utf8_buffer())

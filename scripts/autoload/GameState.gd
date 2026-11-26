@@ -375,8 +375,13 @@ var lab_areas_paid: Dictionary = {}
 ## it (the day accepted, the steps done, counts, who took part, the day done).
 ## Only update_quests() writes it, on the host.
 var quest_state: Dictionary = {}
+## Player id -> quest id -> a player's own quests (scope "player"), as
+## quest_state keeps the farm's, with what they brought from other farms
+## ("carried"). Only QuestEngine writes it, on the host.
+var player_quest_state: Dictionary = {}
 ## Player id -> quest id -> the quest points that quest paid them. Kept here for
-## every player, guests too; a guest's own file gets them at build step 8.
+## every player, guests too; a guest's own file has theirs as well (CoopProfile),
+## and the two meet in let_in_guest().
 var quest_points: Dictionary = {}
 ## Player id -> { certificate id: XP }: the XP certificates each player holds and
 ## has not spent (docs/design/quests_levels_story.md section 4.4). A quest gives
@@ -387,6 +392,9 @@ var xp_certificates: Dictionary = {}
 ## How many certificates this farm has ever given. The next one's number is one
 ## more, so an id is never used again, not after a spend either.
 var xp_certificates_given: int = 0
+## Player id -> the sources (quest ids) of the certificates they have spent, here
+## or on another farm. A quest never gives a player its certificate twice.
+var xp_certificates_spent: Dictionary = {}
 ## Crop id -> how many of that crop Lin has bought in spec, from the whole farm.
 ## sell_harvest_to_lin() is the only writer; a quest counts it.
 var crops_sold_in_spec: Dictionary = {}
@@ -575,7 +583,8 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
-	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec"]
+	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
+	"player_quest_state", "xp_certificates_spent"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -758,6 +767,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 		quest_problem = xp_certificates_problem(data.get("xp_certificates", {}), data.get("xp_certificates_given", 0))
 	if quest_problem == "" and not QuestEngine._text_to_counts(data.get("crops_sold_in_spec", {})):
 		quest_problem = "'crops_sold_in_spec' has a count that is not a whole number."
+	if quest_problem == "":
+		quest_problem = QuestEngine.player_state_problem(data.get("player_quest_state", {}))
+	if quest_problem == "":
+		quest_problem = xp_certificates_spent_problem(data.get("xp_certificates_spent", {}))
 	if quest_problem != "":
 		return quest_problem
 	var robot_problem: String = _robots_dict_problem(data.get("robots", {}))
@@ -1559,8 +1572,9 @@ func max_skill_level() -> int:
 
 ## Host: the player this guest is, new or back again, or "" if already in. Each
 ## own skill is the better of what the farm has and what the guest brings, up to
-## the top level [ASSUMPTION].
-func let_in_guest(key: String, brought: Dictionary, players: Array[String]) -> String:
+## the top level [ASSUMPTION]. `record` is the rest of the guest's own file
+## (CoopProfile.record()): see _take_guest_record().
+func let_in_guest(key: String, brought: Dictionary, players: Array[String], record: Dictionary = {}) -> String:
 	var hashed: String = key.sha256_text()
 	var player_id: String = guest_ids.get(hashed, "")
 	if player_id in players:
@@ -1579,7 +1593,67 @@ func let_in_guest(key: String, brought: Dictionary, players: Array[String]) -> S
 		if not is_farm_skill(skill) and xp > skill_xp(skill, player_id):
 			player_skill_xp[player_id][skill] = xp
 			skill_xp_changed.emit(player_id, skill)
+	_take_guest_record(player_id, record)
 	return player_id
+
+
+## Host: a guest's own record meets this farm's copy of it. This farm is the
+## authority for what happens here; the file is the guest's record of everywhere
+## else. Nothing is added, so coming again, or by way of another farm, never
+## pays twice:
+## - Quest points: by quest, the higher of the two, and no more than the quest
+##   pays here.
+## - XP certificates: one for each quest, on every farm together. One spent
+##   anywhere is spent here; one held anywhere is held here, worth no more than
+##   the quest gives here.
+## - Their own quests: QuestEngine.take_brought().
+## Only what this build's quests pay is taken, so a file can't fill the farm,
+## and the file is read as CoopProfile.is_record() checked it.
+func _take_guest_record(player_id: String, record: Dictionary) -> void:
+	var rewards: Dictionary = {}
+	for quest: Dictionary in QuestEngine.quests():
+		if QuestEngine.data_problem(quest) == "":
+			rewards[str(quest["id"])] = quest.get("rewards", {})
+	var quests_moved: bool = false
+	var certificates_moved: bool = false
+	var spent: Variant = record.get("xp_certificates_spent", [])
+	for source: Variant in (spent if spent is Array else []):
+		if not source is String or int((rewards.get(source, {}) as Dictionary).get(QuestEngine.XP_CERTIFICATE, 0)) <= 0:
+			continue
+		var gone: Array = xp_certificates_spent.get_or_add(player_id, [])
+		if not source in gone:
+			gone.append(source)
+			certificates_moved = true
+		var mine: Dictionary = xp_certificates.get(player_id, {})
+		for id: String in mine.keys():
+			if xp_certificate_source(id) == source:
+				mine.erase(id)
+				certificates_moved = true
+		if mine.is_empty():
+			xp_certificates.erase(player_id)
+	var held: Variant = record.get("xp_certificates", {})
+	for source: Variant in (held if held is Dictionary else {}):
+		var worth: int = int((rewards.get(source, {}) as Dictionary).get(QuestEngine.XP_CERTIFICATE, 0)) if source is String else 0
+		if worth <= 0 or not held[source] is int or has_had_xp_certificate(source, player_id):
+			continue
+		give_xp_certificate(player_id, source, mini(held[source], worth))
+	var points: Variant = record.get("quest_points", {})
+	for quest_id: Variant in (points if points is Dictionary else {}):
+		var pays: int = int((rewards.get(quest_id, {}) as Dictionary).get("quest_points", 0)) if quest_id is String else 0
+		if pays <= 0 or not points[quest_id] is int:
+			continue
+		var here: Dictionary = quest_points.get(player_id, {})
+		if mini(points[quest_id], pays) > int(here.get(quest_id, 0)):
+			here[quest_id] = mini(points[quest_id], pays)
+			quest_points[player_id] = here
+			quests_moved = true
+	var own: Variant = record.get("quests", {})
+	if own is Dictionary and QuestEngine.take_brought(self, player_id, own):
+		quests_moved = true
+	if quests_moved:
+		quests_changed.emit()
+	if certificates_moved:
+		xp_certificates_changed.emit()
 
 
 ## So strangers can't fill the farm: the first guest who isn't in, and the skills
@@ -1593,7 +1667,9 @@ func _forget_a_guest(players: Array[String]) -> void:
 			skill_effect_floor.erase(player_id)
 			action_counts.erase(player_id)
 			quest_points.erase(player_id)
+			player_quest_state.erase(player_id)
 			xp_certificates.erase(player_id)
+			xp_certificates_spent.erase(player_id)
 			for entry: Variant in quest_state.values():
 				if entry is Dictionary and entry.get("players") is Array:
 					(entry["players"] as Array).erase(player_id)
@@ -1953,6 +2029,10 @@ func spend_xp_certificate(certificate_id: String, skill_id: String, player_id: S
 	held.erase(certificate_id)
 	if held.is_empty():
 		xp_certificates.erase(player_id)
+	var source: String = xp_certificate_source(certificate_id)
+	var gone: Array = xp_certificates_spent.get_or_add(player_id, [])
+	if not source in gone:
+		gone.append(source)
 	give_skill_xp(skill_id, xp, player_id)
 	xp_certificates_changed.emit()
 	return ""
@@ -1976,6 +2056,27 @@ static func xp_certificates_problem(held: Dictionary, given: Variant = 0) -> Str
 			if number < 1 or number > given or number in numbers:
 				return "'xp_certificates' has a certificate with no number of its own."
 			numbers.append(number)
+	return ""
+
+
+## Whether `player_id` ("" = the local player) holds a certificate from `source`
+## (a quest's id) or has spent one, on this farm or on one they came from.
+func has_had_xp_certificate(source: String, player_id: String = "") -> bool:
+	player_id = _player(player_id)
+	if source in (xp_certificates_spent.get(player_id, []) as Array):
+		return true
+	for id: String in (xp_certificates.get(player_id, {}) as Dictionary):
+		if xp_certificate_source(id) == source:
+			return true
+	return false
+
+
+## "" or why saved xp_certificates_spent can't be loaded: player id -> the
+## sources spent, each once.
+static func xp_certificates_spent_problem(spent: Dictionary) -> String:
+	for player: Variant in spent:
+		if not player is String or player == "" or not QuestEngine._all_text(spent[player]):
+			return "'xp_certificates_spent' has an entry that is not a player's sources."
 	return ""
 
 

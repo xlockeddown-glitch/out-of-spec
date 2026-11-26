@@ -29,7 +29,7 @@ signal walked(player_id: String, pose: Array)
 signal walkers_told(poses: Dictionary)
 
 ## Raise it whenever two versions could disagree about the farm or the messages.
-const PROTOCOL: int = 14
+const PROTOCOL: int = 15
 const DEFAULT_PORT: int = 24711
 const MAX_PLAYERS: int = 4
 
@@ -46,6 +46,9 @@ const NO_STEAM: String = "Steam unavailable."
 ## Connections beyond the players, so a full farm can still say so.
 const SPARE_CONNECTIONS: int = 4
 const MAX_GUEST_BYTES: int = 2048
+## A hello is bigger: it brings the guest's record (CoopProfile.record()). One
+## that would be bigger still is sent with an empty record [PLACEHOLDER].
+const MAX_HELLO_BYTES: int = 32768
 const MAX_HOST_BYTES: int = 4 * 1024 * 1024
 const MAX_ARGUMENTS: int = 8
 const MAX_TEXT: int = 64
@@ -301,7 +304,7 @@ func _host_read(from: int, packet: PackedByteArray, now: int, reliable: bool) ->
 	link["drive_tokens"] = minf(DRIVE_BURST, link["drive_tokens"] + (now - link["at"]) * DRIVE_RATE / 1000.0)
 	link["at"] = now
 	link["tokens" if reliable else "drive_tokens"] -= 1.0
-	if link["tokens"] < 0.0 or link["drive_tokens"] < 0.0 or packet.size() > MAX_GUEST_BYTES:
+	if link["tokens"] < 0.0 or link["drive_tokens"] < 0.0 or packet.size() > (MAX_HELLO_BYTES if link["player"] == "" else MAX_GUEST_BYTES):
 		return false
 	var message: Array = _unpack(packet)
 	if link["player"] == "":
@@ -311,11 +314,11 @@ func _host_read(from: int, packet: PackedByteArray, now: int, reliable: bool) ->
 		if message[1] != protocol:
 			_send(from, [REFUSED, "version"])
 			return true
-		if not _is_shape(message, [HELLO, TYPE_INT, TYPE_STRING, TYPE_DICTIONARY]):
+		if not _is_shape(message, [HELLO, TYPE_INT, TYPE_STRING, TYPE_DICTIONARY, TYPE_DICTIONARY]):
 			return false
-		if not CoopProfile.is_key(message[2]) or not CoopProfile.are_skills(message[3]):
+		if not CoopProfile.is_key(message[2]) or not CoopProfile.are_skills(message[3]) or not CoopProfile.is_record(message[4]):
 			return false
-		_let_in(from, message[2], message[3])
+		_let_in(from, message[2], message[3], message[4])
 		return true
 	if not reliable and _is_shape(message, [WALK, TYPE_ARRAY]):
 		# The shape is the sender's to get right; where it says it is, is judged later.
@@ -351,11 +354,11 @@ func _host_read(from: int, packet: PackedByteArray, now: int, reliable: bool) ->
 	return true
 
 
-func _let_in(id: int, key: String, skills: Dictionary) -> void:
+func _let_in(id: int, key: String, skills: Dictionary, record: Dictionary) -> void:
 	var reason: String = "full" if players.size() >= MAX_PLAYERS else ""
 	var player_id: String = ""
 	if reason == "":
-		player_id = _farm_commands()._farm().let_in_guest(key, skills, players)
+		player_id = _farm_commands()._farm().let_in_guest(key, skills, players, record)
 		reason = "here" if player_id == "" else ""
 	if reason != "":
 		# The guest hangs up, or is dropped when its time is up.
@@ -407,8 +410,16 @@ func _poll_guest() -> void:
 		return
 	if not _hello_sent and status == MultiplayerPeer.CONNECTION_CONNECTED:
 		_hello_sent = true
-		var card: Dictionary = (profile if profile != null else CoopProfile).card()
-		_send(1, [HELLO, protocol, card["key"], card["skills"]])
+		var mine: Node = profile if profile != null else CoopProfile
+		_send(1, hello(mine.card(), mine.record()))
+
+
+## A guest's first message: who they are and what they bring.
+func hello(card: Dictionary, record: Dictionary) -> Array:
+	var message: Array = [HELLO, protocol, card["key"], card["skills"], record]
+	if var_to_bytes(message).size() > MAX_HELLO_BYTES:
+		message[4] = CoopProfile.no_record()
+	return message
 
 
 func _expire(now: int) -> void:

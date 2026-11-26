@@ -182,7 +182,11 @@ func test_strangers_and_forgeries_are_dropped() -> String:
 	var bench: Array = [SessionScript.COMMAND, 1, "calibrate_at_bench", [GameStateScript.HYGROMETER_ID]]
 	var too_long: String = "x".repeat(SessionScript.MAX_TEXT + 1)
 	var typed: Array[String] = [GameStateScript.HYGROMETER_ID]
-	var hello: Callable = func(key: String, skills: Dictionary) -> Array: return [SessionScript.HELLO, SessionScript.PROTOCOL, key, skills]
+	var hello: Callable = func(key: String, skills: Dictionary) -> Array: return [SessionScript.HELLO, SessionScript.PROTOCOL, key, skills, ProfileScript.no_record()]
+	var with: Callable = func(part: String, value: Variant) -> Array:
+		var record: Dictionary = ProfileScript.no_record()
+		record[part] = value
+		return [SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}, record]
 	var bad: Array = [
 		# Not let in yet.
 		[false, bench], [false, [SessionScript.HELLO, "1"]], [false, [SessionScript.HELLO, SessionScript.PROTOCOL]],
@@ -190,6 +194,19 @@ func test_strangers_and_forgeries_are_dropped() -> String:
 		[false, hello.call("0".repeat(32), { "calibration": -1 })], [false, hello.call("0".repeat(32), { "calibration": 1.5 })],
 		[false, hello.call("-" + "0".repeat(31), {})], [false, hello.call("0".repeat(32), {}) + [1]],
 		 [false, [SessionScript.WELCOME, "player_1", []]],
+		# A hello from before the record, and records that are not one.
+		[false, [SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}]],
+		[false, [SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}, {}]],
+		[false, with.call("quest_points", { "q": -1 })], [false, with.call("quest_points", { "q": 1.5 })], [false, with.call("quest_points", { 1: 1 })],
+		[false, with.call("quest_points", { too_long: 1 })], [false, with.call("xp_certificates", { "q": 0 })],
+		[false, with.call("xp_certificates", { "q": ProfileScript.MOST_XP + 1 })],
+		[false, with.call("xp_certificates_spent", ["q", "q"])], [false, with.call("xp_certificates_spent", [1])], [false, with.call("xp_certificates_spent", {})],
+		[false, with.call("quests", { "q": {} })], [false, with.call("quests", { "q": { "done": 1, "steps": [], "counts": {} } })],
+		[false, with.call("quests", { "q": { "done": true, "steps": [""], "counts": {} } })],
+		[false, with.call("quests", { "q": { "done": true, "steps": [], "counts": { "s": -1 } } })],
+		[false, with.call("quests", { "q": { "done": true, "steps": [], "counts": {}, "more": 1 } })],
+		[false, with.call("more", 1)],
+		[false, hello.call("0".repeat(32), {}) + ["x".repeat(SessionScript.MAX_HELLO_BYTES)]],
 		# The host's messages, from a guest.
 		[true, [SessionScript.WELCOME, "player_1", []]], [true, [SessionScript.STATE, {}]], [true, [SessionScript.ANSWER, 1, ""]],
 		[true, [SessionScript.LEFT, "player_1"]], [true, [SessionScript.HELLO, SessionScript.PROTOCOL]],

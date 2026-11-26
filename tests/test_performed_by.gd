@@ -53,7 +53,7 @@ func test_callers_name_the_player() -> String:
 				"has_skill_unlock", "skill_text", "skill_effects_text", "robot_build_problem", "robot_card_slots",
 				"robot_job_gate", "robot_calibrate_targets", "robot_calibrate_gaps", "job_bench_problem",
 				"job_minutes", "job_finish_day", "lin_pays", "harvest_bin_value",
-				"held_xp_certificates", "level_with_xp", "xp_certificate_problem"]:
+				"held_xp_certificates", "level_with_xp", "xp_certificate_problem", "has_had_xp_certificate"]:
 			actions[str(method["name"])] = args.find("player_id") if "player_id" in args else args.find("performed_by")
 	var call_site: RegEx = RegEx.create_from_string(r"GameState\.(\w+)(?:\.bind)?\(")
 	var comment: RegEx = RegEx.create_from_string(r"(?m)(^|\s)#.*$")
