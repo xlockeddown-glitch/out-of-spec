@@ -216,6 +216,8 @@ func test_strangers_and_forgeries_are_dropped() -> String:
 		[true, [SessionScript.COMMAND, 1, "till", [Vector3.ZERO]]], [true, [SessionScript.COMMAND, 1, "start_lab_grow", [{}]]],
 		[true, [SessionScript.COMMAND, 1, "start_lab_grow", range(SessionScript.MAX_ARGUMENTS + 1)]],
 		[true, [SessionScript.COMMAND, 1, "x".repeat(SessionScript.MAX_GUEST_BYTES), []]],
+		# A hello's room is for a hello: once let in, a guest has 2048 bytes.
+		[true, with.call("xp_certificates_spent", range(40).map(func(i: int) -> String: return ("%d" % i).rpad(SessionScript.MAX_TEXT, "s")))],
 		[true, [SessionScript.COMMAND, 1, "calibrate_at_bench", typed]],
 		[true, [SessionScript.COMMAND, 1, "start_lab_grow", [RefCounted.new()]]],
 	]
@@ -230,6 +232,38 @@ func test_strangers_and_forgeries_are_dropped() -> String:
 			return _finish("Must be dropped and do nothing: %s" % str(attempt).left(200))
 		_finish("")
 	return ""
+
+
+func test_a_hello_refused_can_be_said_again() -> String:
+	var host: Node = _host()
+	var peer: ENetMultiplayerPeer = _stranger(host, false)
+	var record: Dictionary = ProfileScript.no_record().merged({ "quest_points": { "first_contract": 1 } }, true)
+	var good: Array = [SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}, record]
+	var answers: Array = []
+	var answered: Callable = func() -> bool:
+		while peer.get_available_packet_count() > 0:
+			answers.append(bytes_to_var(peer.get_packet()))
+		return not answers.is_empty()
+	# Another version: told so, not let in, and the record is not looked at.
+	peer.put_packet(var_to_bytes([SessionScript.HELLO, SessionScript.PROTOCOL + 1, "0".repeat(32), {}, record]))
+	_until(answered)
+	if answers != [[SessionScript.REFUSED, "version"]] or host._links.size() != 1 or host.players != ["player_1"]:
+		return _finish("Another version is refused and nothing more: %s, %s" % [answers, host.players])
+	if not host.commands.state.quest_points.is_empty() or not host.commands.state.guest_ids.is_empty():
+		return _finish("A refused hello leaves nothing on the farm.")
+	# The same link says a good hello: let in once, with the record taken once.
+	answers.clear()
+	peer.put_packet(var_to_bytes(good))
+	_until(func() -> bool: return answered.call() and host.players.size() == 2)
+	if host.players != ["player_1", "player_2"] or answers.is_empty() or answers[0] != [SessionScript.WELCOME, "player_2", ["player_1"]]:
+		return _finish("A good hello after a refused one is let in: %s, %s" % [answers, host.players])
+	var points: Dictionary = host.commands.state.quest_points.duplicate(true)
+	# And a third hello, from a guest now, is a forgery like any other.
+	peer.put_packet(var_to_bytes(good))
+	_until(func() -> bool: return host._links.is_empty())
+	if not host._links.is_empty() or host.players != ["player_1"] or host.commands.state.quest_points != points:
+		return _finish("A hello from a guest already in is dropped, and takes nothing: %s" % [host.players])
+	return _finish("")
 
 
 func test_naming_another_player_does_nothing() -> String:

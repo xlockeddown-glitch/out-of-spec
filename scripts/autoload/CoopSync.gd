@@ -95,6 +95,12 @@ func _on_joined() -> void:
 	_has_farm = false
 
 
+## Guest: true once the host's whole farm has come. Until then the farm here is
+## still the guest's own.
+func has_farm() -> bool:
+	return _has_farm
+
+
 func _on_state_received(data: Dictionary) -> void:
 	var problem: String = _take(data)
 	if problem != "":

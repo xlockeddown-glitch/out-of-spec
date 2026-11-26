@@ -578,7 +578,10 @@ static func travelling(farm: Node, player_id: String) -> Dictionary:
 ## again. One under way is taken up where it stands: a step done anywhere is
 ## done, and a count is the higher of here and there, never the two added.
 ## Only this build's player quests are taken, and only their steps. True if
-## anything changed. The next update() pays a quest whose last step came with it.
+## anything changed. A quest that comes with every step done was finished
+## somewhere, whatever its `done` says: it is done here and not paid, so a
+## record can't claim a quest's pay from a farm that saw none of it. A count
+## comes as no more than its step needs.
 static func take_brought(farm: Node, player_id: String, brought: Dictionary) -> bool:
 	var changed: bool = false
 	var alone: Array[String] = [player_id]
@@ -594,7 +597,7 @@ static func take_brought(farm: Node, player_id: String, brought: Dictionary) -> 
 		if int(entry["done"]) >= 0:
 			continue
 		var moved: bool = false
-		if theirs.get("done") == true:
+		if theirs.get("done") == true or _all_brought(quest, theirs):
 			entry["done"] = GameClock.get_day_index()
 			moved = true
 		else:
@@ -604,6 +607,21 @@ static func take_brought(farm: Node, player_id: String, brought: Dictionary) -> 
 			farm.player_quest_state[player_id] = own
 			changed = true
 	return changed
+
+
+## True if `theirs` has every step of `quest` done: by its id, or by a count
+## that is full.
+static func _all_brought(quest: Dictionary, theirs: Dictionary) -> bool:
+	var their_steps: Variant = theirs.get("steps", [])
+	var their_counts: Variant = theirs.get("counts", {})
+	for step: Variant in quest["steps"]:
+		var step_id: String = str(step.get("id", ""))
+		if their_steps is Array and step_id in their_steps:
+			continue
+		var counted: bool = str(step.get("check", "")) in COUNTING and their_counts is Dictionary and their_counts.get(step_id, 0) is int
+		if not counted or their_counts.get(step_id, 0) < step_need(step):
+			return false
+	return not (quest["steps"] as Array).is_empty()
 
 
 ## True if the entry took anything from `theirs`.
@@ -629,7 +647,8 @@ static func _take_steps(farm: Node, quest: Dictionary, entry: Dictionary, theirs
 			entry["base"][step_id] = check_value(farm, step, alone, player_id)
 		var there: int = 0
 		if their_counts is Dictionary and their_counts.get(step_id, 0) is int:
-			there = their_counts.get(step_id, 0)
+			# Never more than the step needs, whatever the record says.
+			there = mini(their_counts.get(step_id, 0), step_need(step))
 		var here: int = step_count(farm, step, entry, alone, player_id)
 		if there > here:
 			entry["carried"][step_id] = int(entry["carried"].get(step_id, 0)) + there - here

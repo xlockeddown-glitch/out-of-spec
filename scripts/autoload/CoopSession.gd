@@ -46,9 +46,9 @@ const NO_STEAM: String = "Steam unavailable."
 ## Connections beyond the players, so a full farm can still say so.
 const SPARE_CONNECTIONS: int = 4
 const MAX_GUEST_BYTES: int = 2048
-## A hello is bigger: it brings the guest's record (CoopProfile.record()). One
-## that would be bigger still is sent with an empty record [PLACEHOLDER].
-const MAX_HELLO_BYTES: int = 32768
+## A hello is bigger: it brings the guest's record (CoopProfile.record()), which
+## is never more than CoopProfile.MAX_RECORD_BYTES, so it always fits [PLACEHOLDER].
+const MAX_HELLO_BYTES: int = 65536
 const MAX_HOST_BYTES: int = 4 * 1024 * 1024
 const MAX_ARGUMENTS: int = 8
 const MAX_TEXT: int = 64
@@ -414,10 +414,14 @@ func _poll_guest() -> void:
 		_send(1, hello(mine.card(), mine.record()))
 
 
-## A guest's first message: who they are and what they bring.
+## A guest's first message: who they are and what they bring. A record too big
+## gives up progress in the player's own quests, never points or certificates
+## (CoopProfile.fitted).
 func hello(card: Dictionary, record: Dictionary) -> Array:
-	var message: Array = [HELLO, protocol, card["key"], card["skills"], record]
+	var message: Array = [HELLO, protocol, card["key"], card["skills"], CoopProfile.fitted(record)]
 	if var_to_bytes(message).size() > MAX_HELLO_BYTES:
+		# Only a record that is not one (CoopProfile.is_record) gets here.
+		push_warning("CoopSession: the guest's record does not fit in a hello; joining without it.")
 		message[4] = CoopProfile.no_record()
 	return message
 

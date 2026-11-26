@@ -16,11 +16,24 @@ const KEY_BYTES: int = 16
 const MOST_XP: int = 1000000000
 ## So that they fit in a guest's message.
 const MOST_SKILLS: int = 16
-const MAX_FILE_BYTES: int = 65536
-## The quests a record may name, and the steps of one of them [PLACEHOLDER]: so
-## that a record fits in a guest's hello (CoopSession.MAX_HELLO_BYTES).
-const MOST_QUESTS: int = 64
+## Room for any record of MAX_RECORD_BYTES as JSON writes it, with the key and
+## the skills [PLACEHOLDER].
+const MAX_FILE_BYTES: int = 131072
+## The quests a record may name in its points, in its certificates held and in
+## its certificates spent [PLACEHOLDER]. More than data/quests.json has
+## (tests/test_coop_quests.gd checks), so none of these is ever left out: they
+## are what stops a quest paying twice.
+const MOST_QUESTS: int = 128
+## The player's own quests a record may keep progress in, and the steps of one
+## of them [PLACEHOLDER].
+const MOST_PROGRESS: int = 64
 const MOST_STEPS: int = 12
+## The most a record weighs as var_to_bytes() gives it, in the file and in a
+## hello alike (fitted) [PLACEHOLDER]. Points, certificates held and spent at
+## MOST_QUESTS each, and MOST_PROGRESS quests marked done, are under 40000
+## bytes, so they always fit. With the key and the skills it is under
+## CoopSession.MAX_HELLO_BYTES.
+const MAX_RECORD_BYTES: int = 49152
 ## Written to the file as "curve". 2 is XP counted on the 99-level curve, from
 ## when Robotics and Husbandry were a farm's and crops fed Field Ops. 3 is that
 ## with every skill the player's own and crop XP in Agronomy (4 of
@@ -47,6 +60,8 @@ const QUEST_KEYS: Array[String] = ["done", "steps", "counts"]
 var path: String = PATH
 var session: Node
 var farm: Node
+## What says whether the host's farm has come (CoopSync). Tests leave it null.
+var sync: Node
 
 ## Made when there is no file, and kept in case none can be written.
 var _key: String = ""
@@ -55,6 +70,7 @@ var _failed: bool = false
 
 func _ready() -> void:
 	start(CoopSession, GameState)
+	sync = CoopSync
 	CoopSync.farm_ready.connect(keep)
 
 
@@ -73,12 +89,42 @@ func card() -> Dictionary:
 	return { "key": all["key"], "skills": all["skills"] }
 
 
-## What a host is told besides: the RECORD_KEYS.
+## What a host is told besides: the RECORD_KEYS, small enough for a hello.
 func record() -> Dictionary:
 	var all: Dictionary = _all()
 	var out: Dictionary = {}
 	for key: String in RECORD_KEYS:
 		out[key] = all[key]
+	return fitted(out)
+
+
+## `record`, or a copy of it that weighs no more than MAX_RECORD_BYTES. Only
+## progress in the player's own quests is given up: first the steps and counts
+## of the quests that are done (nothing reads them: done is done), then the
+## quests under way, the biggest first. Points, certificates held and spent,
+## and which quests are done, are never dropped.
+static func fitted(record: Dictionary) -> Dictionary:
+	if var_to_bytes(record).size() <= MAX_RECORD_BYTES:
+		return record
+	var out: Dictionary = record.duplicate(true)
+	var quests: Dictionary = out["quests"]
+	for id: Variant in quests:
+		if quests[id]["done"] == true:
+			quests[id] = { "done": true, "steps": [], "counts": {} }
+	var dropped: int = 0
+	while var_to_bytes(out).size() > MAX_RECORD_BYTES:
+		var biggest: Variant = null
+		var most: int = -1
+		for id: Variant in quests:
+			var size: int = -1 if quests[id]["done"] == true else var_to_bytes([id, quests[id]]).size()
+			if size > most:
+				most = size
+				biggest = id
+		if biggest == null:
+			break
+		quests.erase(biggest)
+		dropped += 1
+	push_warning("CoopProfile: the record was over %d bytes; the progress of %d quest(s) under way was left out. Points and certificates are all kept." % [MAX_RECORD_BYTES, dropped])
 	return out
 
 
@@ -89,7 +135,9 @@ static func no_record() -> Dictionary:
 ## Guest: keeps what this player has here, unless more is kept already: the XP,
 ## and the record.
 func keep() -> void:
-	if not session.is_guest():
+	# Between the host's welcome and its farm, the farm here is still this
+	# player's own: nothing of it is a guest's to keep.
+	if not session.is_guest() or (sync != null and not sync.has_farm()):
 		return
 	var mine: Dictionary = _all()
 	var changed: bool = false
@@ -105,7 +153,9 @@ func keep() -> void:
 
 ## The host's copy of this player's record goes into `mine`. Points and counts
 ## by the higher value, steps and spent certificates by union; a certificate is
-## held until it is spent anywhere. True if `mine` changed.
+## held until it is spent anywhere. True if `mine` changed. Points and
+## certificates have their own room (MOST_QUESTS each), apart from quest
+## progress (MOST_PROGRESS), so progress can never crowd them out.
 func _keep_record(mine: Dictionary) -> bool:
 	var me: String = farm.local_player_id
 	var changed: bool = false
@@ -113,9 +163,14 @@ func _keep_record(mine: Dictionary) -> bool:
 		changed = true
 	var spent: Array = mine["xp_certificates_spent"]
 	for source: Variant in farm.xp_certificates_spent.get(me, []):
-		if _is_name(source) and not source in spent and spent.size() < MOST_QUESTS:
-			spent.append(source)
-			changed = true
+		if not _is_name(source) or source in spent:
+			continue
+		if spent.size() >= MOST_QUESTS:
+			# More spent certificates than there are quests: not from this game's data.
+			push_warning("CoopProfile: no room to keep that the certificate of '%s' is spent." % source)
+			continue
+		spent.append(source)
+		changed = true
 	var held: Dictionary = mine["xp_certificates"]
 	var here: Dictionary = {}
 	var theirs: Dictionary = farm.xp_certificates.get(me, {})
@@ -131,7 +186,7 @@ func _keep_record(mine: Dictionary) -> bool:
 	var quests: Dictionary = mine["quests"]
 	var now: Dictionary = QuestEngine.travelling(farm, me)
 	for id: Variant in now:
-		if not _is_name(id) or not (quests.has(id) or quests.size() < MOST_QUESTS):
+		if not _is_name(id) or not (quests.has(id) or quests.size() < MOST_PROGRESS):
 			continue
 		var moved: bool = not quests.has(id)
 		var kept: Dictionary = quests.get(id, { "done": false, "steps": [], "counts": {} })
@@ -195,7 +250,7 @@ static func is_record(value: Variant) -> bool:
 	if not _are_names(value["xp_certificates_spent"], MOST_QUESTS):
 		return false
 	var quests: Variant = value["quests"]
-	if not quests is Dictionary or quests.size() > MOST_QUESTS:
+	if not quests is Dictionary or quests.size() > MOST_PROGRESS:
 		return false
 	for id: Variant in quests:
 		var quest: Variant = quests[id]
@@ -206,8 +261,9 @@ static func is_record(value: Variant) -> bool:
 	return true
 
 
+## Counted in bytes, so that what a record may weigh is known (MAX_RECORD_BYTES).
 static func _is_name(value: Variant) -> bool:
-	return value is String and value != "" and value.length() <= CoopSession.MAX_TEXT
+	return value is String and value != "" and value.to_utf8_buffer().size() <= CoopSession.MAX_TEXT
 
 
 ## A list of names, each once.
@@ -331,12 +387,18 @@ func _write(data: Dictionary) -> void:
 	var file: FileAccess = FileAccess.open(temp, FileAccess.WRITE)
 	var done: bool = file != null
 	if done:
-		var all: Dictionary = { "key": data["key"], "skills": data["skills"], "curve": CURVE }
+		var record: Dictionary = {}
 		for key: String in RECORD_KEYS:
-			all[key] = data[key]
+			record[key] = data[key]
+		var all: Dictionary = { "key": data["key"], "skills": data["skills"], "curve": CURVE }
+		# What is too big gives up quest progress, never points or certificates.
+		all.merge(fitted(record))
 		var text: String = JSON.stringify(all, "\t")
-		# A file too big to read back is not written over one that can be.
+		# A file too big to read back is not written over one that can be. A
+		# fitted record is never that big (MAX_FILE_BYTES).
 		done = text.to_utf8_buffer().size() <= MAX_FILE_BYTES
+		if not done:
+			push_warning("CoopProfile: %s not written: %d bytes is over %d." % [path, text.to_utf8_buffer().size(), MAX_FILE_BYTES])
 		if done:
 			file.store_string(text)
 			done = file.get_error() == OK

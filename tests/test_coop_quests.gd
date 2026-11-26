@@ -362,17 +362,20 @@ func test_the_record_goes_in_the_hello() -> String:
 			guest.leave()
 			_until(func() -> bool: return host.players.size() == 1)
 			_log.clear()
-		# A record too big for a hello is left at home; the guest still joins.
-		var big: Dictionary = ProfileScript.no_record()
-		for i: int in ProfileScript.MOST_QUESTS:
+		# A record too big for a hello gives up quest progress, and nothing else.
+		var big: Dictionary = ProfileScript.no_record().merged({ "quest_points": { FARM_Q: 2 }, "xp_certificates_spent": [FARM_Q] }, true)
+		for i: int in ProfileScript.MOST_PROGRESS:
 			var steps: Array = []
 			for j: int in ProfileScript.MOST_STEPS:
 				steps.append(("%d_" % j).rpad(SessionScript.MAX_TEXT, "x"))
 			big["quests"][("%d_" % i).rpad(SessionScript.MAX_TEXT, "q")] = { "done": false, "steps": steps, "counts": {} }
 		var card: Dictionary = { "key": KEY, "skills": {} }
 		var small: Dictionary = ProfileScript.no_record().merged({ "quest_points": { FARM_Q: 2 } }, true)
-		if not ProfileScript.is_record(big) or host.hello(card, big)[4] != ProfileScript.no_record() or host.hello(card, small)[4] != small:
-			return "A hello has the record, or none if it is too big."
+		var sent: Dictionary = host.hello(card, big)[4]
+		if not ProfileScript.is_record(big) or not ProfileScript.is_record(sent) or host.hello(card, small)[4] != small:
+			return "A hello has the record."
+		if sent["quest_points"] != { FARM_Q: 2 } or sent["xp_certificates_spent"] != [FARM_Q] or sent["quests"].is_empty() or sent["quests"].size() >= ProfileScript.MOST_PROGRESS:
+			return "A record too big goes without some quest progress, and with its points and spent certificates: %d quests" % sent["quests"].size()
 		if var_to_bytes(host.hello(card, big)).size() > SessionScript.MAX_HELLO_BYTES or SessionScript.PROTOCOL != 15:
 			return "A hello fits, and the protocol says the hello changed."
 		return "")
@@ -423,3 +426,202 @@ func test_quests_reach_a_guest_with_the_farm() -> String:
 		GameClock.paused = paused
 		SaveGame.farm_open = open
 		return problem)
+
+
+func test_a_record_can_t_say_not_done_and_be_paid() -> String:
+	return _run(func() -> String:
+		var with: Callable = func(steps: Array, counts: Dictionary) -> Dictionary:
+			return ProfileScript.no_record().merged({ "quests": { OWN_Q: { "done": false, "steps": steps, "counts": counts } } }, true)
+		# Every step brought, by id or by a full count: done somewhere, so not paid here.
+		for record: Dictionary in [with.call(["till", "pay"], {}), with.call(["pay"], { "till": 1000000 }), with.call(["pay", "till", "x"], { "till": 0 })]:
+			var farm: Node = _farm()
+			farm.credits = RICH
+			var id: String = _join(farm, record)
+			farm.update_quests(_both(id))
+			farm.update_quests(_both(id))
+			var entry: Dictionary = farm.player_quest_state.get(id, {}).get(OWN_Q, {})
+			if int(entry.get("done", -1)) < 0 or farm.credits != RICH or farm.quest_points.get(id, {}).has(OWN_Q):
+				return "A record with every step done is done and unpaid: %s -> %s, %d CR, %s" % [record["quests"], entry, farm.credits, farm.quest_points]
+			if QuestEngine.travelling(farm, id)[OWN_Q]["done"] != true:
+				return "And it travels on as done."
+		# A count comes as no more than its step needs.
+		var other: Node = _farm()
+		var other_id: String = _join(other, with.call([], { "till": 1000000 }))
+		var got: Dictionary = other.player_quest_state[other_id][OWN_Q]
+		if got["shown"] != { "till": 3 } or got["carried"] != { "till": 3 } or int(got["done"]) >= 0:
+			return "A huge count is the step's need and no more: %s" % [got]
+		# The rest of it is still done here, and paid here.
+		other.update_quests(_both(other_id))
+		if other.credits != 0 or other.player_quest_state[other_id][OWN_Q]["steps_done"] != ["till"]:
+			return "The last step is not done yet: %s" % [other.player_quest_state[other_id]]
+		other.credits = RICH
+		other.update_quests(_both(other_id))
+		if other.credits != RICH + 100 or other.quest_points[other_id].get(OWN_Q) != 1:
+			return "A quest whose last step is done here pays here: %d, %s" % [other.credits, other.quest_points]
+		return "")
+
+
+## Names as long as a name may be, each different, that JSON writes longer.
+func _names(count: int, mark: String) -> Array:
+	var out: Array = []
+	for i: int in count:
+		out.append(("%s%d" % [mark, i]).rpad(SessionScript.MAX_TEXT, '"'))
+	return out
+
+
+func test_a_record_too_big_keeps_points_and_certificates() -> String:
+	return _run(func() -> String:
+		# As much as a record may hold.
+		var big: Dictionary = ProfileScript.no_record()
+		for name: String in _names(ProfileScript.MOST_QUESTS, "p"):
+			big["quest_points"][name] = ProfileScript.MOST_XP
+		for name: String in _names(ProfileScript.MOST_QUESTS, "h"):
+			big["xp_certificates"][name] = ProfileScript.MOST_XP
+		big["xp_certificates_spent"] = _names(ProfileScript.MOST_QUESTS, "s")
+		var steps: Array = _names(ProfileScript.MOST_STEPS, "t")
+		var counts: Dictionary = {}
+		for step: String in steps:
+			counts[step] = ProfileScript.MOST_XP
+		var ids: Array = _names(ProfileScript.MOST_PROGRESS, "q")
+		for i: int in ids.size():
+			# The first is the smallest one under way.
+			big["quests"][ids[i]] = { "done": i % 2 == 1, "steps": steps.duplicate() if i > 0 else [], "counts": counts.duplicate() if i > 0 else {} }
+		if not ProfileScript.is_record(big) or var_to_bytes(big).size() <= SessionScript.MAX_HELLO_BYTES:
+			return "The biggest record is a record, and too big for a hello: %d" % var_to_bytes(big).size()
+		var fit: Dictionary = ProfileScript.fitted(big)
+		if not ProfileScript.is_record(fit) or var_to_bytes(fit).size() > ProfileScript.MAX_RECORD_BYTES:
+			return "A fitted record is a record that fits: %d" % var_to_bytes(fit).size()
+		for part: String in ["quest_points", "xp_certificates", "xp_certificates_spent"]:
+			if fit[part] != big[part]:
+				return "Fitting never drops %s." % part
+		var under_way: int = 0
+		for i: int in ids.size():
+			var quest: Variant = fit["quests"].get(ids[i])
+			if i % 2 == 1 and quest != { "done": true, "steps": [], "counts": {} }:
+				return "A quest that is done stays done: %s" % [quest]
+			if i % 2 == 0 and quest != null:
+				under_way += 1
+				if quest != big["quests"][ids[i]]:
+					return "A quest under way is kept whole or not at all."
+		if under_way == 0 or under_way == ids.size() / 2 or not fit["quests"].has(ids[0]):
+			return "The biggest quests under way go first: %d kept" % under_way
+		if big["quests"][ids[1]]["steps"].is_empty() or ProfileScript.fitted(fit) != fit:
+			return "Fitting changes a copy, and only once."
+		# It fits a hello, with as many skills as a card may have.
+		var skills: Dictionary = {}
+		for name: String in _names(ProfileScript.MOST_SKILLS, "k"):
+			skills[name] = ProfileScript.MOST_XP
+		var session: Node = SessionScript.new()
+		_profiles.append(session)
+		var card: Dictionary = { "key": KEY, "skills": skills }
+		var hello: Array = session.hello(card, big)
+		if not ProfileScript.are_skills(skills) or hello[4] != fit or var_to_bytes(hello).size() > SessionScript.MAX_HELLO_BYTES:
+			return "A hello with the biggest record fits: %d" % var_to_bytes(hello).size()
+		# And the file: written, not refused, and read back the same.
+		var failed: Array = []
+		var on_failed: Callable = func(message: String) -> void: failed.append(message)
+		SaveGame.save_failed.connect(on_failed)
+		var profile: Node = _profile()
+		profile._write({ "key": KEY, "skills": skills }.merged(big))
+		SaveGame.save_failed.disconnect(on_failed)
+		var size: int = FileAccess.get_file_as_bytes(FILE).size()
+		if not failed.is_empty() or size == 0 or size > ProfileScript.MAX_FILE_BYTES:
+			return "The biggest record is written: %s, %d bytes" % [failed, size]
+		if profile.record() != fit or profile.card() != card or FileAccess.file_exists(FILE + ".unreadable"):
+			return "And read back with every point and certificate."
+		return "")
+
+
+func test_spent_certificates_are_never_crowded_out() -> String:
+	return _run(func() -> String:
+		# More than the 64 a file once had room for, and quest progress to the brim.
+		var count: int = 100
+		var farm: Node = _farm()
+		farm.local_player_id = "player_2"
+		var spent: Array = []
+		var points: Dictionary = {}
+		var held: Dictionary = {}
+		for i: int in count:
+			spent.append("spent_%d" % i)
+			points["quest_%d" % i] = 1
+			held["held_%d#%d" % [i, i + 1]] = 10
+		farm.xp_certificates_spent["player_2"] = spent
+		farm.quest_points["player_2"] = points
+		farm.xp_certificates["player_2"] = held
+		var own: Dictionary = {}
+		for i: int in ProfileScript.MOST_PROGRESS + 5:
+			own["own_%d" % i] = { "accepted": 0, "steps_done": [], "base": {}, "shown": {}, "players": ["player_2"], "done": -1, "carried": {} }
+		farm.player_quest_state["player_2"] = own
+		var profile: Node = _profile()
+		profile.farm = farm
+		profile.keep()
+		var read: Node = ProfileScript.new()
+		_profiles.append(read)
+		read.path = FILE
+		var kept: Dictionary = read.record()
+		if kept["xp_certificates_spent"] != spent or kept["quest_points"] != points or kept["xp_certificates"].size() != count:
+			return "Every spent certificate, point and held certificate is kept: %d, %d, %d" % [kept["xp_certificates_spent"].size(), kept["quest_points"].size(), kept["xp_certificates"].size()]
+		if kept["quests"].size() != ProfileScript.MOST_PROGRESS or count <= 64:
+			return "Quest progress has its own room: %d" % kept["quests"].size()
+		# One spent later is kept, though quest progress is full.
+		farm.xp_certificates["player_2"].erase("held_0#1")
+		farm.xp_certificates_spent["player_2"] = ["held_0"]
+		profile.keep()
+		kept = read.record()
+		if kept["xp_certificates"].has("held_0") or kept["xp_certificates_spent"] != spent + ["held_0"]:
+			return "Spending drops the held one and forgets no other."
+		return "")
+
+
+## Not a fixture: the game's own quests must fit a guest's record.
+func test_the_shipped_quests_fit_a_record() -> String:
+	var all: Array[Dictionary] = QuestEngine.quests()
+	var own: int = 0
+	for quest: Dictionary in all:
+		var id: String = str(quest.get("id", ""))
+		if not ProfileScript._is_name(id):
+			return "Quest id '%s' is not a name a record can keep." % id
+		if str(quest.get("scope", "farm")) != "player":
+			continue
+		own += 1
+		var steps: Array = quest.get("steps", [])
+		if steps.size() > ProfileScript.MOST_STEPS:
+			return "Quest '%s' has %d steps; a record keeps %d (CoopProfile.MOST_STEPS)." % [id, steps.size(), ProfileScript.MOST_STEPS]
+		for step: Variant in steps:
+			if not ProfileScript._is_name(step.get("id")):
+				return "Quest '%s' has a step id a record can't keep." % id
+	if all.is_empty() or all.size() > ProfileScript.MOST_QUESTS:
+		return "data/quests.json has %d quests; a record keeps points and certificates for %d (CoopProfile.MOST_QUESTS)." % [all.size(), ProfileScript.MOST_QUESTS]
+	if own > ProfileScript.MOST_PROGRESS:
+		return "data/quests.json has %d player quests; a record keeps progress in %d (CoopProfile.MOST_PROGRESS)." % [own, ProfileScript.MOST_PROGRESS]
+	return ""
+
+
+## A stand-in for CoopSync.
+class Sync extends Node:
+	var here: bool = false
+	func has_farm() -> bool:
+		return here
+
+
+func test_nothing_is_kept_before_the_host_s_farm_comes() -> String:
+	return _run(func() -> String:
+		var profile: Node = _profile()
+		var before: Dictionary = profile.record()
+		var sync: Node = Sync.new()
+		_profiles.append(sync)
+		profile.sync = sync
+		# The player's own farm, under the id the host just gave them.
+		var home: Node = _farm()
+		home.local_player_id = "player_2"
+		home.quest_points["player_2"] = { FARM_Q: 2 }
+		home.xp_certificates_spent["player_2"] = [FARM_Q]
+		profile.farm = home
+		profile.keep()
+		if profile.record() != before:
+			return "Welcomed, but the farm here is still home: nothing is kept. %s" % [profile.record()]
+		sync.here = true
+		profile.keep()
+		if profile.record()["quest_points"] != { FARM_Q: 2 }:
+			return "Once the host's farm has come it is kept."
+		return "")
