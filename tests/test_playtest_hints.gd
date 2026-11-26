@@ -88,7 +88,11 @@ func test_a_guest_hears_the_cup_pointer() -> String:
 	var got: Array = _request(guest, &"catch_sentinel", [80.0])
 	_until(func() -> bool: return not got.is_empty())
 	var problem: String = ""
-	var line: String = "" if farm.phone_log.is_empty() else farm.phone_log[farm.phone_log.size() - 1]
+	# The last line about the catch: a quest's line may follow a command.
+	var line: String = ""
+	for said: String in farm.phone_log:
+		if "hygrometer" in said:
+			line = said
 	if got != [""] or farm.is_caught(SENTINEL) or not "The hygrometer read 80 %. Was it right?" in line:
 		problem = "The host decides: %s, %s" % [got, line]
 	elif not SessionScript.is_plain([line]):

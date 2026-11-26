@@ -70,7 +70,10 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	var passed: Array = arguments.duplicate()
 	if _player_index(action) >= 0:
 		passed.append(player_id)
-	return _farm().callv(action, passed)
+	var result: Variant = _farm().callv(action, passed)
+	# The quests only watch: after anything a player did, they look again.
+	_farm().update_quests()
+	return result
 
 
 ## True unless `action` acts at a cell farther from the farm's rover than a player

@@ -201,6 +201,18 @@
         "Tip for Thursday's audit: zero your hygrometers before noon. The drone always checks the dome first.",
         "When a solar flare hits, park the bots and stay indoors. Saves me welding your bumper back on."
       ]
+    },
+    "vance": {
+      "name": "Inspector Vance",
+      "quests": {
+        "every_sticker_counts_done": "One audit with nothing to write down. The stickers on your bench mean something now. Keep them that way."
+      }
+    },
+    "oirm": {
+      "name": "OIRM",
+      "quests": {
+        "first_contract_done": "Contract on file. A lab that holds a run of on-time calibrations is a lab we can plan around."
+      }
     }
   }
 }
