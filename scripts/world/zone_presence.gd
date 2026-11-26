@@ -120,26 +120,24 @@ static func report_scene(path: String, tree: SceneTree, tries: int, wait_s: floa
 	_sending = true
 	var session: int = _session
 	var failed: int = 0
-	var failing: Array = []
+	var counted: int = -1
 	while session == _session:
 		var now: Array = next_to_send(_acknowledged, _latest)
 		if now.is_empty():
 			break
-		if now != failing:
-			failing = now
+		if _reports != counted:
+			# A new report since the last try (even the same place again, after a
+			# trip there and back, or one made during a retry wait): fresh tries.
+			counted = _reports
 			failed = 0
-		var seen: int = _reports
 		var answer: Variant = await FarmCommands.request(&"report_place", now)
 		if session != _session or answer == NOT_CONNECTED:
 			break
 		_acknowledged = acknowledged_after(now, answer)
 		if answer != NO_ANSWER:
 			continue
-		if _reports != seen:
-			# A new report came while this one waited (even the same place again,
-			# after a trip there and back): it gets its own tries.
-			failed = 0
-			continue
+		if _reports != counted:
+			continue  # a new report came while this one waited: send it now
 		if failed >= tries:
 			# Given up on this place; the next swap sends again.
 			_latest = []
