@@ -22,7 +22,9 @@ func _run(body: Callable) -> String:
 	_own(gs, "rotary_table")
 	_own(gs, "reference_gauge")
 	_own(gs, "field_meter_dc")
-	var problem: String = body.call(gs)
+	# A body that stops on a script error returns null, which must not pass.
+	var out: Variant = body.call(gs)
+	var problem: String = out if out is String else "The test stopped before it finished."
 	gs.free()
 	GameClock.elapsed_days = saved
 	return problem

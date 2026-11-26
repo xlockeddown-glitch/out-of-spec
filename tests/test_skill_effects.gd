@@ -15,7 +15,9 @@ func _run(body: Callable) -> String:
 	gs.tier1_unlocked = true
 	for id: String in gs.sensors:
 		gs.get_sensor(id).max_error = INF
-	var problem: String = body.call(gs)
+	# A body that stops on a script error returns null, which must not pass.
+	var out: Variant = body.call(gs)
+	var problem: String = out if out is String else "The test stopped before it finished."
 	gs.free()
 	GameClock.elapsed_days = saved
 	return problem

@@ -10,7 +10,9 @@ func _farm(answer: Callable) -> String:
 	var clock: Node = ClockScript.new()
 	var beds: Node = BedsScript.new()
 	beds.start(host, clock)
-	var problem: String = answer.call(host, beds, clock)
+	# A body that stops on a script error returns null, which must not pass.
+	var out: Variant = answer.call(host, beds, clock)
+	var problem: String = out if out is String else "The test stopped before it finished."
 	beds.free()
 	clock.free()
 	return _finish(problem)

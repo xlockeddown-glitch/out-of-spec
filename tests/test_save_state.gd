@@ -175,7 +175,9 @@ func test_bad_data_is_refused_whole() -> String:
 func _with_live(body: Callable) -> String:
 	var held: Dictionary = SaveGame.snapshot()
 	_clean_files()
-	var problem: String = body.call()
+	# A body that stops on a script error returns null, which must not pass.
+	var out: Variant = body.call()
+	var problem: String = out if out is String else "The test stopped before it finished."
 	_clean_files()
 	var back: String = SaveGame.restore(held)
 	return problem if problem != "" else back

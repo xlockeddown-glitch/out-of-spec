@@ -12,7 +12,9 @@ func _run(body: Callable) -> String:
 	gs.build_registry()
 	gs.hygrometer.max_error = INF
 	gs.hygrometer.error = 0.0
-	var problem: String = body.call(gs)
+	# A body that stops on a script error returns null, which must not pass.
+	var out: Variant = body.call(gs)
+	var problem: String = out if out is String else "The test stopped before it finished."
 	gs.free()
 	GameClock.elapsed_days = elapsed
 	return problem
@@ -139,7 +141,7 @@ func test_its_silk_cuts_the_lag_to_030_and_may_replace_the_curlyhairs() -> Strin
 
 func test_the_sentinel_uses_real_cobalt_blue_care_figures() -> String:
 	return _run(func(_gs: GameStateScript) -> String:
-		var species: Dictionary = DataManager.tarantulas.get(SENTINEL, {})
+		var species: Dictionary = DataManager.get_record(GameStateScript.SPECIES_TABLE, StringName(SENTINEL))
 		if species.is_empty():
 			return "The Sentinel must be in the species data."
 		if absf(float(species.get("ideal_temp_c", NAN)) - 25.0) > 0.001 or absf(float(species.get("ideal_humidity_pct", NAN)) - 80.0) > 0.001:
