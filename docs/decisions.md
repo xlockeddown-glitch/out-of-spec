@@ -1894,3 +1894,31 @@ Ryan's answers: a one-use reward is spent on its own on the next action it is fo
 
 - Is 10 % right for the discount, and is "the next lab space cleared costs nothing" the right reading of a free refit?
 - Should a held reward travel in a guest's own file, so the discount a guest earned goes with them to another farm?
+
+## 2026-11-26: Quests L4, P1 and P2 (build order step 12, part 2, of quests_levels_story.md)
+
+### Ryan chose
+
+- The second half of step 12: L4 "Greenhouse Four" (Bram, lab level 20), P1 "Bram's Ore Run" (Bram, no gate) and P2 "On the Dot" (a skill challenge, Uncertainty 5), as section 6 of the design has them, with the smallest stand-in wherever the game lacks the exact check. No new systems.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- **No favor system exists, so P1 is just Bram's quest.** The design says P1 "introduces favors"; nothing in the game gives or owes a favor. P1 is Bram's own quest for each player: mine five fissures yourself. The first real favor is left for when favors are built.
+- **L4 has four ordered steps** (the design's "600 CR and 4 crystal ore" is two steps, because a step checks one stat): 600 CR (`stat_at_least credits`), 4 ore (`stat_at_least crystal_ore`), then the medium lab, then one new space fitted out (`counter lab_area`).
+- **"Start the grow" and "move in" are one step** [ASSUMPTION]. The engine cannot read `lab_build`, and no check means "the grow was accepted", so the step is `lab_size >= 1`: done two days after the grow starts, when the lab is ready. A farm that is already medium has moved in at once but still waits on the money steps and the fit.
+- **"Fit one new area" is the `lab_area` counter.** It counts only a space the area never had before (`lab_areas_paid`), from when the step opens, so a space cleared and fitted again does not count. Only a player's fit counts; a farm quest sums every known player.
+- **L4 pays 500 lab XP** (the design's figure) and the farm's `free_lab_refit` one-use reward, held by the farm. No credits, no quest points (a lab quest).
+- **P1 counts the player's own `mine_fissure` counter, from the offer.** A fissure mined before Bram asks, or by a friend, does not count. The ore goes to the shared wallet as always. P1 pays Field Ops XP 100 [PLACEHOLDER], 1 quest point and the player's own `bram_discount_10`.
+- **P2's giver is Vance** [ASSUMPTION]. The design does not name one; Vance is the inspector who follows OIRM rules exactly, and the skill is Uncertainty. P2 is the player's own, gated on Uncertainty level 5.
+- **P2's step is the `calibrate_on_time` counter, a little stricter than the design's "cal_log rows by you, on_time true".** The counter is the one that pays Uncertainty XP: the calibration must also be traceable, not too soon (half the interval at least), and not by a robot. A late one just does not add; nothing resets. Five count from the offer.
+- **P2 pays an XP certificate of 100 XP** [PLACEHOLDER] and the keepsake `pocket_watch` (the data entry already existed). No quest points, as the design has it.
+- **Words are placeholders** [PLACEHOLDER]: Bram's offer and done lines for L4 and P1, Vance's offer and done lines for P2.
+- **No save or protocol change.** `SaveGame.VERSION` stays 1 and `CoopSession.PROTOCOL` stays 16; no new farm field.
+- **Tests added** (`tests/test_quests_l4_p1_p2.gd`): the three quests' data and the wrong holder of a one-use reward refused; each quest offered when its gate holds and not before; L4's steps through a real grow, move-in and fit, paid once with the refit held by the farm; an already medium lab; P1's own fissures only, paid once with the discount held by the player alone, and each player's own P1 through a co-op guest; P2's on-time calibrations (a late one and a friend's do not add), the certificate and the watch paid once; and a guest running none of them.
+
+### Questions for Ryan
+
+- Is Vance right as P2's giver?
+- Is the merged "start the grow and move in" step fine, and is the stricter on-time count (traceable, not too soon) fine?
+- Are the numbers right: Field Ops 100 XP for P1, a 100 XP certificate for P2, 500 lab XP for L4?
+- Should a real favor system come later, and what should P1's first favor be?
