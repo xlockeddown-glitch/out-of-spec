@@ -1,5 +1,5 @@
 {
-  "_note": "Player skills (docs/design/equipment_skills_robots.md section 2; the curve is docs/design/quests_levels_story.md section 2). scope player: each player has their own; farm: one shared by the whole farm [ASSUMPTION]. level_curve: going from level n to n + 1 costs base_xp × growth^(n − 1), so total XP to reach level n = round(base_xp × (growth^(n − 1) − 1) / (growth − 1)). effect_share: how much of an effect's full cut a level has, in straight lines between the rows. calibration_tier_xp: XP from a calibration is multiplied by the entry for the tier of the standard used (Tier 0 first). effects: full is the cut at the top level, as a fraction of the base; what is left is never under floor. unlocks: the level that shows more. old_curve is only for converting a save from the 10-level curve (total = base_xp × (n − 1) × n / 2): its XP is multiplied by xp_factor, and old_per_level under each effect is what one old level cut. Every number is a [PLACEHOLDER]; the xp_sources are today's ×5, right for levels 1 to 25 only and not yet tuned to the hour budget. calibrate_robot and calibrate_robot_player replace calibrate_player for a robot's sensor.",
+  "_note": "Player skills (docs/design/equipment_skills_robots.md section 2; the curve is docs/design/quests_levels_story.md section 2). scope player: each player has their own; farm: one shared by the whole farm [ASSUMPTION]. level_curve: going from level n to n + 1 costs base_xp × growth^(n − 1), so total XP to reach level n = round(base_xp × (growth^(n − 1) − 1) / (growth − 1)). effect_share: how much of an effect's full cut a level has, in straight lines between the rows. calibration_tier_xp: XP from a calibration is multiplied by the entry for the tier of the standard used (Tier 0 first). effects: full is the cut at the top level, as a fraction of the base; what is left is never under floor. unlocks: the level that shows more. old_curve is only for converting a save from the 10-level curve (total = base_xp × (n − 1) × n / 2): its XP is multiplied by xp_factor, and old_per_level under each effect is what one old level cut. Every number is a [PLACEHOLDER]; the xp_sources are today's ×5, right for levels 1 to 25 only and not yet tuned to the hour budget. calibrate_robot and calibrate_robot_player replace calibrate_player for a robot's sensor. A source with per gives its xp for each of those, rounded to a whole XP: job_done for every finished paid job and job_clean too when it was on time and traceable, both by the credits paid after any cut; harvest_in_spec for a crop harvested in spec and sell_crop for a sale to Lin, both by what Lin pays for the crops before fronted seed is taken out [PLACEHOLDER]. crop: the source is crop work. Its XP goes to Field Ops until Agronomy exists, and each player's total from these is kept (GameState.action_counts) so it can move then.",
   "level_curve": {
     "max_level": 99,
     "base_xp": 50,
@@ -38,7 +38,12 @@
     { "id": "commission_robot", "skill": "robotics", "xp": 125 },
     { "id": "robot_job", "skill": "robotics", "xp": 5 },
     { "id": "calibrate_robot", "skill": "robotics", "xp": 25 },
-    { "id": "calibrate_robot_player", "skill": "calibration", "xp": 25 }
+    { "id": "calibrate_robot_player", "skill": "calibration", "xp": 25 },
+    { "id": "job_done", "skill": "calibration", "xp": 0.5, "per": "credit paid" },
+    { "id": "job_clean", "skill": "uncertainty", "xp": 0.25, "per": "credit paid" },
+    { "id": "plant_crop", "skill": "field_ops", "xp": 5, "crop": true },
+    { "id": "harvest_in_spec", "skill": "field_ops", "xp": 0.25, "per": "credit of the crop's price", "crop": true },
+    { "id": "sell_crop", "skill": "field_ops", "xp": 0.25, "per": "credit of the crops' price", "crop": true }
   ],
   "effects": [
     { "id": "bench_time", "display_name": "Bench time", "skill": "calibration", "full": 0.72, "old_per_level": 0.08, "floor": 0.0 },
