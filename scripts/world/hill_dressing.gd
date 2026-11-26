@@ -62,9 +62,9 @@ const ROCK_TURNS: Dictionary[Vector2i, int] = {
 	Vector2i(-31, 47): 3, Vector2i(-31, 49): 3, Vector2i(-31, 51): 2,
 	Vector2i(77, 45): 0, Vector2i(77, 47): 1, Vector2i(77, 49): 1,
 }
-## The least ground height a rock may stand on. It was 2 m, which kept rows off the
-## plateau's rim (1.5 m, up to 1.9 m near the east hill; 1.5 keeps the flat rim in); the hills are no steeper
-## for this change [PLACEHOLDER].
+## The least ground height a rock may stand on [PLACEHOLDER]. It was 2 m, which kept
+## rows off the plateau's rim (1.5 m, up to 1.9 m near the east hill). The hills are
+## no steeper for this change.
 const ROCK_MIN_HEIGHT_M: float = 1.5
 ## Cells this near a rock can't be dug [PLACEHOLDER].
 const ROCK_MARGIN_M: float = 0.5

@@ -80,8 +80,7 @@ func test_rocks_stand_clear_on_high_ground() -> String:
 	return ""
 
 
-## The 2 m rule is relaxed: a terrace row stands out at the plateau's edge, and the
-## hills are no steeper (the steepest step between neighbors stays as it was).
+## The 2 m rule is relaxed: a terrace row stands out at the plateau's edge.
 func test_a_terrace_row_reaches_the_plateau_edge_and_every_rock_is_on_the_map() -> String:
 	var at_edge: Array[Vector2i] = []
 	for rock: Vector2i in HillDressing.ROCKS:
@@ -98,13 +97,16 @@ func test_a_terrace_row_reaches_the_plateau_edge_and_every_rock_is_on_the_map() 
 	return ""
 
 
+## The steepest step between whole-meter neighbors before the 2 m rule was relaxed.
+const STEEPEST_BEFORE_M: float = 0.7618
+## The hills are no steeper (the steepest step between neighbors stays as it was).
 func test_hills_are_no_steeper_than_before() -> String:
 	var steepest: float = 0.0
 	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M):
 		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M):
 			var here: float = Terrain.height(Vector2(x, z), _none)
 			steepest = maxf(steepest, maxf(absf(Terrain.height(Vector2(x + 1, z), _none) - here), absf(Terrain.height(Vector2(x, z + 1), _none) - here)))
-	return "" if steepest <= 0.7618 else "The steepest step is %.4f m per meter." % steepest
+	return "" if steepest <= STEEPEST_BEFORE_M + 0.0001 else "The steepest step is %.4f m per meter." % steepest
 
 
 ## From level ground every line to the relay's dish misses every rock.
