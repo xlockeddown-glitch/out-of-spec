@@ -18,6 +18,7 @@ var _built_levels: Array[float] = []
 ## What the water was last worked out from: the dug steps and the channel cells.
 var _seen_dug: Dictionary[Vector2i, int] = {}
 var _seen_channels: Dictionary[Vector2i, bool] = {}
+var _seen_levels: Dictionary[Vector2i, float] = {}
 var _seen_seep: Dictionary[Vector2i, float] = {}
 var _worked: bool = false
 var _asked: bool = false
@@ -61,12 +62,13 @@ func _refresh() -> void:
 	var channels: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in StonePieces.channel_cells(GameState.stone_pieces):
 		channels[cell] = true
-	if _worked and GameState.dug == _seen_dug and channels == _seen_channels and PitWater.shown(GameState.pit_seep, GameState.dug) == _seen_seep:
+	if _worked and GameState.dug == _seen_dug and channels == _seen_channels and Terrain.level_points == _seen_levels and PitWater.shown(GameState.pit_seep, GameState.dug) == _seen_seep:
 		return
 	_worked = true
 	worked_count += 1
 	_seen_dug = GameState.dug.duplicate()
 	_seen_channels = channels
+	_seen_levels = Terrain.level_points.duplicate()
 	_seen_seep = PitWater.shown(GameState.pit_seep, GameState.dug)
 	PitWater.use(PitWater.work_out(GameState.dug, GameState.stone_pieces, GameState.pit_seep), GameState.dug)
 	var keep: Dictionary[int, bool] = {}

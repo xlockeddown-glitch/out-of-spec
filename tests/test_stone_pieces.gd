@@ -7,6 +7,7 @@ const SEED: int = 424242
 
 var _none: Array[Transform3D] = []
 var _no_pieces: Dictionary[Vector2i, int] = {}
+var _no_dug: Dictionary[Vector2i, int] = {}
 
 
 func _make() -> Node:
@@ -22,7 +23,7 @@ func _cells(count: int) -> Array[Vector2i]:
 	for x: int in range(-20, 20, 4):
 		for z: int in range(-20, 20, 4):
 			var cell := Vector2i(x, z)
-			if found.size() < count and StonePieces.problem(cell, StonePieces.WALL, _no_pieces, _none) == "":
+			if found.size() < count and StonePieces.problem(cell, StonePieces.WALL, _no_pieces, _none, _no_dug) == "":
 				found.append(cell)
 	return found
 
@@ -111,7 +112,7 @@ func test_a_piece_is_refused_without_stone_or_where_it_cannot_stand() -> String:
 		problems.append("A refusal changed the stock or the pieces.")
 	# What must stay clear: the relay and the spawn.
 	for place: Vector2 in [Terrain.RELAY, Vector2.ZERO]:
-		if StonePieces.problem(Terrain.cell_at(place), StonePieces.PAD, _no_pieces, _none) == "":
+		if StonePieces.problem(Terrain.cell_at(place), StonePieces.PAD, _no_pieces, _none, _no_dug) == "":
 			problems.append("A piece was allowed at %s" % [place])
 	gs.free()
 	return "\n".join(problems)
@@ -125,8 +126,14 @@ func test_a_wall_needs_room_and_never_traps_a_rover() -> String:
 	gs.rover_transforms[gs.ROVER] = _pose(cell)
 	if gs.place_stone(_at(cell), StonePieces.WALL) == "":
 		problems.append("A wall was built under the rover.")
+	# A pad moves the ground under it, so it is not built under the rover either.
+	if gs.place_stone(_at(cell), StonePieces.PAD) != "The rover is in the way. Back it up." or not gs.stone_pieces.is_empty():
+		problems.append("A pad was built under the rover.")
+	var parked: Transform3D = gs.rover_transforms[gs.ROVER]
+	gs.rover_transforms.erase(gs.ROVER)
 	if gs.place_stone(_at(cell), StonePieces.PAD) != "" or gs.stone_pieces.get(cell, -1) != StonePieces.PAD:
-		problems.append("A pad is for driving over, so it may go under the rover.")
+		problems.append("With the rover gone the pad is built.")
+	gs.rover_transforms[gs.ROVER] = parked
 	gs.place_stone(_at(cell), StonePieces.TAKE_UP)
 	if not gs.stone_pieces.is_empty():
 		problems.append("The second press must take the pad up, as TAKE_UP.")
@@ -137,7 +144,7 @@ func test_a_wall_needs_room_and_never_traps_a_rover() -> String:
 	var rovers: Array[Transform3D] = [_pose(cell)]
 	var walls: Dictionary[Vector2i, int] = {}
 	for i: int in around.size():
-		var problem: String = StonePieces.problem(around[i], StonePieces.WALL, walls, rovers)
+		var problem: String = StonePieces.problem(around[i], StonePieces.WALL, walls, rovers, _no_dug)
 		var last: bool = i == around.size() - 1
 		if last and not problem.begins_with("That would trap"):
 			problems.append("The wall that shut the rover in was allowed: '%s'" % problem)
@@ -164,15 +171,15 @@ func test_ground_under_a_piece_cannot_be_dug_or_filled() -> String:
 	var problems: PackedStringArray = []
 	gs.stone = 50
 	gs.dig(_at(cell))
-	gs.place_stone(_at(cell), StonePieces.PAD)
+	gs.place_stone(_at(cell), StonePieces.WALL)
 	if gs.dig(_at(cell)) != GameStateScript.STONE_IN_THE_WAY or gs.fill(_at(cell)) != GameStateScript.STONE_IN_THE_WAY:
-		problems.append("The ground under a pad was changed.")
+		problems.append("The ground under a wall was changed.")
 	if gs.dug.get(cell, 0) != 1:
-		problems.append("The dug depth under a pad moved: %d" % gs.dug.get(cell, 0))
+		problems.append("The dug depth under a wall moved: %d" % gs.dug.get(cell, 0))
 	gs.place_stone(_at(cell), StonePieces.TAKE_UP)
 	var problem: String = gs.fill(_at(cell))
 	if problem != "" or gs.dug.has(cell):
-		problems.append("The ground could not be filled once the pad was up: %s" % problem)
+		problems.append("The ground could not be filled once the wall was up: %s" % problem)
 	gs.free()
 	return "\n".join(problems)
 
@@ -286,6 +293,6 @@ func test_a_save_with_a_piece_where_a_rock_now_stands_loads() -> String:
 			return "The save with a wall at %s is refused." % cell
 		var none: Dictionary[Vector2i, int] = {}
 		var rovers: Array[Transform3D] = []
-		if StonePieces.problem(cell, StonePieces.WALL, none, rovers) == "":
+		if StonePieces.problem(cell, StonePieces.WALL, none, rovers, _no_dug) == "":
 			return "A wall is built in the rock at %s." % cell
 	return ""

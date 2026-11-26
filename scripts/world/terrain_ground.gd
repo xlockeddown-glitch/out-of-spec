@@ -14,6 +14,8 @@ const LOW_M: float = -1.0
 @export var material: Material
 
 var _dug: Dictionary[Vector2i, int] = {}
+## The pads' level points shown (Terrain.level_points).
+var _levelled: Dictionary[Vector2i, float] = {}
 var _chunks: Dictionary[Vector2i, MeshInstance3D] = {}
 var _shape := HeightMapShape3D.new()
 ## The ground at every point, row by row along z.
@@ -25,6 +27,7 @@ var _tints := PackedColorArray()
 func _ready() -> void:
 	# The rover looks for the ground under it before the scene shows what was dug.
 	_dug = GameState.dug.duplicate()
+	_levelled = Terrain.level_points.duplicate()
 	_heights.resize((Terrain.SIZE_M + 1) * (Terrain.SIZE_M + 1))
 	_tints.resize(_heights.size())
 	for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
@@ -46,9 +49,18 @@ func _ready() -> void:
 			_build(Vector2i(x, z))
 
 
-## Shows this digging (cell -> steps deep) instead of what was shown.
+## Shows this digging (cell -> steps deep) and the pads' level ground (Terrain)
+## instead of what was shown.
 func show_dug(dug: Dictionary[Vector2i, int]) -> void:
 	var changed: Array[Vector2i] = []
+	# A pad's cell has all its points changed; its edge's are in the cell too.
+	for point: Vector2i in _levelled:
+		if Terrain.level_points.get(point, INF) != _levelled[point]:
+			changed.append(_cell_of_point(point))
+	for point: Vector2i in Terrain.level_points:
+		if not _levelled.has(point):
+			changed.append(_cell_of_point(point))
+	_levelled = Terrain.level_points.duplicate()
 	for cell: Vector2i in dug:
 		if _dug.get(cell, 0) != dug[cell]:
 			changed.append(cell)
@@ -75,6 +87,11 @@ func show_dug(dug: Dictionary[Vector2i, int]) -> void:
 	for chunk: Vector2i in rebuild:
 		if _chunks.has(chunk):
 			_build(chunk)
+
+
+## A cell whose corners include `point`, for rebuilding around it.
+func _cell_of_point(point: Vector2i) -> Vector2i:
+	return Terrain.cell_at(Vector2(point) + Vector2(0.5, 0.5))
 
 
 func height_at(at: Vector3) -> float:

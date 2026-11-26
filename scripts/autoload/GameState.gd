@@ -799,6 +799,7 @@ func put_farm(data: Dictionary) -> void:
 		else:
 			set(field, value)
 	fresh.free()
+	_level_pads()
 	if not data.has("stone"):
 		# From before stone, so its broken boulders gave none.
 		for boulder: StringName in BOULDERS:
@@ -4496,6 +4497,8 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 	var problem: String = Terrain.dig_problem(at, dug) if cell.y == 0 else "This ground can't be dug."
 	if stone_pieces.has(at):
 		problem = STONE_IN_THE_WAY
+	if problem == "" and cell.y == 0:
+		problem = StonePieces.dig_beside_pad_problem(at, dug)
 	if problem == "":
 		dug[at] = dug.get(at, 0) + 1
 		_set_seep(PitWater.seep(pit_seep, dug, 0.0), true)
@@ -4529,6 +4532,7 @@ func place_stone(cell: Vector3i, kind: int, player_id: String = "") -> String:
 			return "Nothing is built here."
 		stone = mini(stone + StonePieces.cost(stone_pieces[at]), StonePieces.MAX_STONE)
 		stone_pieces.erase(at)
+		_level_pads(true)
 		stone_changed.emit()
 		return ""
 	SaveGame.saving.emit()  # rovers say where they are
@@ -4538,15 +4542,56 @@ func place_stone(cell: Vector3i, kind: int, player_id: String = "") -> String:
 			rovers.append(rover_transforms[id])
 	if rover_in_tunnels:
 		rovers.clear()  # its place is in there
-	var problem: String = StonePieces.problem(at, kind, stone_pieces, rovers)
+	var walkers: Array[Vector2] = []
+	if not rover_in_tunnels:
+		for pose: Array in CoopWalkers.out.values():
+			walkers.append(Vector2(pose[0], pose[2]))
+	var problem: String = StonePieces.problem(at, kind, stone_pieces, rovers, dug, walkers)
 	if problem != "":
 		return problem
 	if stone < StonePieces.cost(kind):
 		return "Needs %d stone; carrying %d." % [StonePieces.cost(kind), stone]
 	stone -= StonePieces.cost(kind)
 	stone_pieces[at] = kind
+	_level_pads(kind == StonePieces.PAD)
 	stone_changed.emit()
 	return ""
+
+
+## Levels the ground under the pads (Terrain.use_pads), in the autoload only: the
+## ground is one for the whole game, a copy of a farm made for a check leaves it
+## alone. `host` is true when this farm built or took up a pad: if the ground then
+## changed, whoever is standing on it is lifted, the pit water works itself out
+## again and everything is told. A guest is told by FarmSync.
+func _level_pads(host: bool = false) -> void:
+	if not is_inside_tree():
+		return
+	var before: Dictionary[Vector2i, float] = Terrain.level_points
+	Terrain.use_pads(StonePieces.pad_cells(stone_pieces), dug)
+	if not host or Terrain.level_points == before:
+		return
+	_lift_to_ground()
+	_set_seep(PitWater.seep(pit_seep, dug, 0.0), true)
+	_seep_full = false
+	terrain_changed.emit()
+
+
+## The rovers parked on the farm and the players on foot, as the host knows them,
+## are no lower than the ground. A rover or a player on this screen lifts itself
+## too, when it hears of the ground (the scene's _show_dug).
+func _lift_to_ground() -> void:
+	for id: Variant in rover_transforms:
+		if rover_is_away(id):
+			continue  # a pose in the tunnels is not on the farm
+		var pose: Transform3D = rover_transforms[id]
+		var ground_m: float = Terrain.height(Vector2(pose.origin.x, pose.origin.z), dug)
+		if pose.origin.y < ground_m:
+			pose.origin.y = ground_m
+			rover_transforms[id] = pose
+	if rover_in_tunnels:
+		return  # the players are in there too
+	for pose: Array in CoopWalkers.out.values():
+		pose[1] = maxf(pose[1], Terrain.height(Vector2(pose[0], pose[2]), dug))
 
 
 ## The cells that hold a channel, for water to run in.

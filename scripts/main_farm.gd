@@ -446,6 +446,8 @@ func _total_dug() -> int:
 func _show_dug() -> void:
 	_rover.ground.show_dug(GameState.dug)
 	_rover.keep_above_ground()
+	if _walkers != null:
+		_walkers.keep_above_ground()
 
 
 func _input(event: InputEvent) -> void:

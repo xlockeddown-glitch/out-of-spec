@@ -77,6 +77,18 @@ const WASH_NEAR_M: float = 1.0
 const ROVER_HALF_WIDTH_M: float = 0.8
 const ROVER_REACH_M: float = 1.45
 
+## A stone pad levels the ground under it (StonePieces). Pads that touch, corners
+## too, are one flat top; no point of it may be this far from the natural ground
+## [PLACEHOLDER]. A group that would be is not levelled at all.
+const PAD_SHIFT_M: float = 0.75
+## Between two points a meter apart the ground may change this much beside a pad:
+## the rover slides up 45 degrees, a meter per meter [PLACEHOLDER].
+const PAD_STEP_M: float = 0.9
+
+## Where pads level the ground now: point -> its height. Set by use_pads(), from
+## the farm's pieces, so every PC has the same.
+static var level_points: Dictionary[Vector2i, float] = {}
+
 ## What natural() found before, by point.
 static var _natural: PackedFloat32Array = PackedFloat32Array()
 
@@ -302,8 +314,15 @@ static func neighbors(cell: Vector2i) -> Array[Vector2i]:
 
 ## The ground at a point in whole meters. `dug` is cell -> steps deep. Points
 ## between cells are as deep as the shallowest of those that meet there, so a
-## hole's sides slope.
+## hole's sides slope. A pad's level (level_points) is the ground under it.
 static func point_height(point: Vector2i, dug: Dictionary[Vector2i, int]) -> float:
+	if not level_points.is_empty() and level_points.has(point):
+		return level_points[point]
+	return dug_height(point, dug)
+
+
+## point_height without the pads: the natural ground less the digging.
+static func dug_height(point: Vector2i, dug: Dictionary[Vector2i, int]) -> float:
 	var ground_m: float = natural(point)
 	if dug.is_empty():
 		return ground_m
@@ -314,6 +333,110 @@ static func point_height(point: Vector2i, dug: Dictionary[Vector2i, int]) -> flo
 		for z: int in range(first.y, last.y + 1):
 			steps = mini(steps, _dug_steps(Vector2i(x, z), dug))
 	return ground_m - steps * DIG_STEP_M
+
+
+## The pads in groups: pads that touch, corners too, are one group.
+static func pad_groups(pads: Array[Vector2i]) -> Array[Array]:
+	var groups: Array[Array] = []
+	var is_pad: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in pads:
+		is_pad[cell] = true
+	var seen: Dictionary[Vector2i, bool] = {}
+	for start: Vector2i in pads:
+		if seen.has(start):
+			continue
+		var group: Array[Vector2i] = [start]
+		seen[start] = true
+		var next: int = 0
+		while next < group.size():
+			for around: Vector2i in neighbors(group[next]):
+				if is_pad.has(around) and not seen.has(around):
+					seen[around] = true
+					group.append(around)
+			next += 1
+		groups.append(group)
+	return groups
+
+
+## Every point under a group of pad cells, edges too.
+static func group_points(group: Array) -> Dictionary[Vector2i, bool]:
+	var points: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in group:
+		for x: int in CELL_M + 1:
+			for z: int in CELL_M + 1:
+				points[cell * CELL_M + Vector2i(x, z)] = true
+	return points
+
+
+## The level a group would be flat at: the mean of the natural ground under all of
+## it, to a 1/HEIGHT_PARTS of a meter. Natural heights are whole parts of that, so
+## the sum is exact and the order of the points does not matter.
+static func group_level_m(points: Dictionary[Vector2i, bool]) -> float:
+	var total: float = 0.0
+	for point: Vector2i in points:
+		total += natural(point)
+	return roundf(total / points.size() * HEIGHT_PARTS) / HEIGHT_PARTS
+
+
+## Why a group of pads is not levelled, or "": a pad on dug ground or by the water
+## (a save from before the rules) or a level that would be over PAD_SHIFT_M from
+## the natural ground anywhere. Such a group follows the ground as it is.
+static func group_unlevelled(group: Array, dug: Dictionary[Vector2i, int]) -> String:
+	for cell: Vector2i in group:
+		if dug.get(cell, 0) > 0:
+			return "on dug ground"
+		if is_near_water(cell):
+			return "by the water"
+	var points: Dictionary[Vector2i, bool] = group_points(group)
+	var level_m: float = group_level_m(points)
+	for point: Vector2i in points:
+		if absf(level_m - natural(point)) > PAD_SHIFT_M:
+			return "too steep"
+	return ""
+
+
+## The height of every point under the pads that are levelled: each group that
+## qualifies (group_unlevelled) is flat at its group_level_m. Only the pads and the
+## digging decide it, so it can be worked out again from a save, and a group that
+## does not qualify never makes the rest fail.
+static func pad_levels(pads: Array[Vector2i], dug: Dictionary[Vector2i, int]) -> Dictionary[Vector2i, float]:
+	var levels: Dictionary[Vector2i, float] = {}
+	for group: Array in pad_groups(pads):
+		if group_unlevelled(group, dug) != "":
+			continue
+		var points: Dictionary[Vector2i, bool] = group_points(group)
+		var level_m: float = group_level_m(points)
+		for point: Vector2i in points:
+			levels[point] = level_m
+	return levels
+
+
+## The most a level point is from the natural ground.
+static func pad_shift_m(levels: Dictionary[Vector2i, float]) -> float:
+	var shift_m: float = 0.0
+	for point: Vector2i in levels:
+		shift_m = maxf(shift_m, absf(levels[point] - natural(point)))
+	return shift_m
+
+
+## The most the ground changes between two points a meter apart, east-west or
+## north-south, where one of them is in `points`: `levels` are the pad points, the
+## rest as dug. PAD_STEP_M is the most a rover can climb.
+static func max_step_m(points: Dictionary[Vector2i, bool], levels: Dictionary[Vector2i, float], dug: Dictionary[Vector2i, int]) -> float:
+	var steepest_m: float = 0.0
+	for point: Vector2i in points:
+		var here_m: float = levels.get(point, dug_height(point, dug))
+		for side: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var next: Vector2i = point + side
+			if absi(next.x) > HALF_M or absi(next.y) > HALF_M:
+				continue
+			steepest_m = maxf(steepest_m, absf(here_m - levels.get(next, dug_height(next, dug))))
+	return steepest_m
+
+
+## Levels the ground under these pad cells from now on.
+static func use_pads(pads: Array[Vector2i], dug: Dictionary[Vector2i, int]) -> void:
+	level_points = pad_levels(pads, dug)
 
 
 ## A cell's digging. The water's bed is fixed, so an older save's digging in or by
