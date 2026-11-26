@@ -66,7 +66,7 @@ func _ready() -> void:
 	if _below:
 		# The depth has its own finds, and none of the hub's rack, board or beacons.
 		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
-		_vents = ZoneHazards.vents_for(GameState.world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, int(ZoneDepth.local_layout.get("day", 0)))
+		_vents = ZoneHazards.vents_for(GameState.world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, _built_day)
 		_depth_props.build_vents(_vents)
 		GameState.finds_changed.connect(_on_finds_changed)
 		var wild: Node = get_node_or_null("WorldView/WorldViewport/World/WildSentinel")
@@ -171,6 +171,8 @@ func _watch_vents(rover_free: bool) -> void:
 		_near_vent = near_text
 		if near_text != "":
 			_hud.push_log(ZoneHazards.hint(ZoneHazards.vent_in(_vents, near_text), now))
+	if in_text != "" and (SceneSwitcher.is_busy() or _moving or not (CoopRovers.driver(GameState.TUNNEL_ROVER) in ["", GameState.local_player_id])):
+		in_text = ""  # swapping scenes, or somebody else drives: not this screen's to tell
 	if in_text != _in_vent:
 		_in_vent = in_text
 		if in_text != "":
@@ -178,8 +180,13 @@ func _watch_vents(rover_free: bool) -> void:
 
 
 func _enter_vent(vent_id: String) -> void:
-	var problem: String = await FarmCommands.request(&"enter_vent", [vent_id, int(ZoneDepth.local_layout.get("day", 0))])
-	if is_inside_tree() and problem != "":
+	var problem: String = await FarmCommands.request(&"enter_vent", [vent_id, _built_day])
+	if not is_inside_tree():
+		return
+	if problem == "Still waiting for the host.":
+		_in_vent = ""  # another command was in flight: ask again next frame
+		return
+	if problem != "":
 		_hud.push_log("VENT: " + problem)  # on success the host's phone line says it
 
 

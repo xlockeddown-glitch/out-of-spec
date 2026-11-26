@@ -3423,6 +3423,7 @@ func _grow_pockets(day: int) -> void:
 func _on_day_started(day: int) -> void:
 	# A rover below stands on the new day's floor.
 	settle_rover_depth()
+	zone_heat_trip = false  # a heat trip is one day's trip
 	# Judged before the refill: the level only falls during the day, so empty
 	# now means it ran dry and the crops had no water.
 	var watered: bool = cistern_liters > 0.0
@@ -4070,7 +4071,10 @@ func add_rover_usage(meters: float, player_id: String = "", rover_id: String = "
 		return
 	# A vent's heat (zone_heat_trip) multiplies the wear that is already there, on the
 	# instruments that ride the rover; the wheel nuts' count below is not wear.
-	var heat: float = ZoneHazards.DRIFT_MULTIPLIER if zone_heat_trip else 1.0
+	# Only the rover that is in the zone feels it: the field rover, or the farm rover while
+	# lent. The farm rover on the farm never does.
+	var hot_rover: bool = rover_id == TUNNEL_ROVER or (rover_lent and rover_id == ROVER)
+	var heat: float = ZoneHazards.DRIFT_MULTIPLIER if zone_heat_trip and hot_rover else 1.0
 	steering.add_usage(meters * heat * skill_factor("steering_usage", player_id))
 	add_tire_usage(meters * heat)
 	# The wheels that wear are the farm rover's: a field rover's metres are not
@@ -4336,12 +4340,14 @@ func fast_travel(zone_id: String, player_id: String = "") -> String:
 		SaveGame.saving.emit()
 		rover_transforms[TUNNEL_ROVER] = TUNNEL_START
 		rover_zone = zone_id  # the farm rover stays where it is, home
+		zone_heat_trip = false  # a new trip, even into the zone the rover already stood in
 		_ore_at_entry = -1  # a fast-travel rescue takes credits only [PLACEHOLDER]: the farm's ore is not the zone's
 		rover_epoch += 1
 	elif plan == FastTravel.RE_PARK:
 		if CoopRovers.driver(TUNNEL_ROVER) != "":
 			return FastTravel.text("someone_driving")
 		rover_depth = 0
+		zone_heat_trip = false  # a new trip from the hub
 		rover_transforms[TUNNEL_ROVER] = TUNNEL_START
 		rover_epoch += 1
 	player_places[player_id] = [zone_id, rover_depth]
@@ -5084,10 +5090,10 @@ func enter_vent(vent_id: String, layout_day: int, player_id: String = "") -> Str
 	var vents: Array = ZoneHazards.vents_for(world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, day)
 	var reason: String = ZoneHazards.entry_problem(vent_id, vents, GameClock.elapsed_days, place_of(player_id), depth_of(player_id), rover_depth)
 	if reason == "":
-		SaveGame.saving.emit()  # the rover on this screen says where it is
 		var today: Dictionary = ZoneDepth.layout(world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, day)
 		var vent: Dictionary = ZoneHazards.vent_in(vents, vent_id)
-		reason = ZoneHazards.reach_problem(TunnelRock.at_in(today["grid"], vent["cell"]), rover_zone, rover_transforms.has(TUNNEL_ROVER), parked_rover_transform(TUNNEL_ROVER).origin)
+		var at: Variant = _rover_pose_now(TUNNEL_ROVER)  # honours the told pose and the drive lease
+		reason = ZoneHazards.reach_problem(TunnelRock.at_in(today["grid"], vent["cell"]), rover_zone, at != null, at if at != null else Vector3.ZERO)
 	if reason != "":
 		return reason
 	if not zone_heat_trip:

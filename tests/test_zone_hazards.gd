@@ -338,14 +338,19 @@ func test_the_rules_alone_judge_an_entry() -> String:
 
 # --- The multiplier ---------------------------------------------------------------------
 
-func _wear(heat: bool) -> Array[float]:
+## [steering, tire, wheel] wear from 100 m. The tire gauge is in service and the farm rover
+## is lent to the zone, so every one of the three moves.
+func _wear(heat: bool, rover_id: String = "", lent: bool = true) -> Array[float]:
 	var gs: GameStateScript = _state()
+	gs.owned_standards["reference_gauge"] = 0
+	gs.rover_zone = ZONE
+	gs.rover_lent = lent
 	gs.zone_heat_trip = heat
 	var before_steer: float = gs.steering.error
 	var tire: DriftingSensor = gs.get_sensor(gs.TIRE_ID)
 	var before_tire: float = tire.error
 	var wheels: float = gs.wheel_meters
-	gs.add_rover_usage(100.0, HOST, gs.TUNNEL_ROVER)
+	gs.add_rover_usage(100.0, HOST, gs.TUNNEL_ROVER if rover_id == "" else rover_id)
 	var out: Array[float] = [absf(gs.steering.error - before_steer), absf(tire.error - before_tire) if gs.is_in_service(gs.TIRE_ID) else 0.0, gs.wheel_meters - wheels]
 	gs.free()
 	return out
@@ -358,9 +363,64 @@ func test_a_heat_trip_doubles_the_wear_that_is_already_there() -> String:
 		return "Plain driving should wear the steering encoder."
 	if not is_equal_approx(hot[0], plain[0] * ZoneHazards.DRIFT_MULTIPLIER):
 		return "Steering wear %f was not %f times %f." % [hot[0], ZoneHazards.DRIFT_MULTIPLIER, plain[0]]
+	if plain[1] <= 0.0 or plain[2] <= 0.0:
+		return "Plain driving should wear the tire and count wheel metres (%f, %f)." % [plain[1], plain[2]]
 	if not is_equal_approx(hot[1], plain[1] * ZoneHazards.DRIFT_MULTIPLIER):
 		return "Tire wear %f was not %f times %f." % [hot[1], ZoneHazards.DRIFT_MULTIPLIER, plain[1]]
 	return "" if is_equal_approx(hot[2], plain[2]) else "Heat changed the wheel nuts' metres."
+
+
+func test_the_farm_rover_on_the_farm_takes_no_heat_wear() -> String:
+	var plain: Array[float] = _wear(false, "rover_1", false)
+	var hot: Array[float] = _wear(true, "rover_1", false)
+	var lent_plain: Array[float] = _wear(false, "rover_1", true)
+	var lent_hot: Array[float] = _wear(true, "rover_1", true)
+	var field_plain: Array[float] = _wear(false, "rover_1_tunnels", false)
+	var field_hot: Array[float] = _wear(true, "rover_1_tunnels", false)
+	var problems: Array[String] = []
+	if plain[0] <= 0.0:
+		problems.append("The farm rover should wear the steering at home")
+	if not is_equal_approx(hot[0], plain[0]) or not is_equal_approx(hot[1], plain[1]):
+		problems.append("A field rover's heat wore the farm rover at home")
+	if not is_equal_approx(lent_hot[0], lent_plain[0] * ZoneHazards.DRIFT_MULTIPLIER):
+		problems.append("The lent farm rover took no heat wear")
+	if field_plain[0] <= 0.0 or not is_equal_approx(field_hot[0], field_plain[0] * ZoneHazards.DRIFT_MULTIPLIER):
+		problems.append("The field rover took no heat wear")
+	return "
+".join(problems)
+
+
+func test_a_new_day_ends_the_trip() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZONE
+	_hot_trip(gs)
+	gs._on_day_started(2)
+	var cleared: bool = not gs.zone_heat_trip
+	gs.free()
+	return "" if cleared else "A new day left the trip hot."
+
+
+func test_re_parking_the_rover_at_the_hub_starts_a_cool_trip() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(3.0, 0.0, 3.0))
+	gs.player_places[HOST] = [ZonePresence.DOME, 0]
+	var held: float = GameClock.elapsed_days
+	GameClock.elapsed_days = TunnelRecall.at_hour(1, 12.0)
+	var problems: Array[String] = []
+	if gs.fast_travel(ZONE, HOST) != "":
+		problems.append("The first trip was refused")
+	gs.rover_depth = 1
+	gs.player_places[HOST] = [ZonePresence.DOME, 1]
+	_hot_trip(gs)
+	gs.player_places[HOST] = [ZonePresence.DOME, 0]
+	if gs.fast_travel(ZONE, HOST) != "":
+		problems.append("The re-park trip was refused")
+	if gs.zone_heat_trip:
+		problems.append("A re-parked rover started its new trip hot")
+	GameClock.elapsed_days = held
+	gs.free()
+	return "
+".join(problems)
 
 
 func test_heat_changes_no_reading_by_itself() -> String:
