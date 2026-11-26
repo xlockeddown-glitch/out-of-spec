@@ -25,7 +25,10 @@ const VERDICT_UNCLEAR: String = "unclear"
 
 
 ## The block in `cell` of the farm with `world_seed`, or {}: { cell, certified,
-## u, k, true_value } in degrees. true_value is hidden from the player.
+## u, k, true_value, size_index, grade } in degrees. true_value is hidden from the
+## player. size_index and grade (0 is best) make it a piece of the GaugeSet; they
+## are rolled after the angle, so the angle and its true value are as they were.
+## size_index is the block's first choice only: GaugeSet.pieces moves it to a free size.
 static func at(world_seed: int, cell: Vector2i) -> Dictionary:
 	if not Terrain.can_dig(cell):
 		return {}
@@ -35,7 +38,12 @@ static func at(world_seed: int, cell: Vector2i) -> Dictionary:
 		return {}
 	var certified: float = ANGLES_DEG[rng.randi() % ANGLES_DEG.size()]
 	var off: float = clampf(rng.randfn(0.0, U_DEG / K), -U_DEG, U_DEG)
-	return { "cell": cell, "certified": certified, "u": U_DEG, "k": K, "true_value": certified + off }
+	var size_index: int = rng.randi() % GaugeSet.size_count()
+	var grade: int = GaugeSet.grade_from_roll(rng.randi() % 100)
+	return {
+		"cell": cell, "certified": certified, "u": U_DEG, "k": K, "true_value": certified + off,
+		"size_index": size_index, "grade": grade,
+	}
 
 
 ## Why `sensor` can't be checked with a block, or "".

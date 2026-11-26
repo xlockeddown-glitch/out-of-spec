@@ -251,6 +251,10 @@ var boulder_hits: Dictionary[StringName, int] = {}
 var found_blocks: Dictionary[Vector2i, bool] = {}
 ## The cells whose ore pocket was dug up.
 var found_pockets: Dictionary[Vector2i, bool] = {}
+## Pockets that grew after the first ones, drawn by the host (OrePocket.replacement).
+var new_pockets: Array[Vector2i] = []
+## Dug pocket -> the day its replacement is due.
+var pocket_pending: Dictionary[Vector2i, int] = {}
 ## Stone from broken boulders, spent on pieces (StonePieces), shared by the farm.
 var stone: int = 0
 ## The pieces built, cell of Terrain -> StonePieces kind.
@@ -499,7 +503,7 @@ const MAX_KNOWN_GUESTS: int = 64
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
-	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep"]
+	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -572,6 +576,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if not cell is Vector2i or not data["found_pockets"][cell] is bool or not data["found_pockets"][cell] \
 				or not Terrain.can_dig(cell):
 			return "'found_pockets' has a cell that can't be dug."
+	var regrow: String = OrePocket.regrow_problem(data.get("new_pockets", []), data.get("pocket_pending", {}), data.get("found_pockets", {}), data.get("world_seed", 0))
+	if regrow != "":
+		return regrow
 	if data.get("stone", 0) < 0 or data.get("stone", 0) > StonePieces.MAX_STONE:
 		return "'stone' is not a stock that can be held."
 	var pieces_problem: String = StonePieces.pieces_problem(data.get("stone_pieces", {}))
@@ -801,6 +808,11 @@ func put_farm(data: Dictionary) -> void:
 	if not data.has("pit_seep"):
 		# From before the seep: its pits were full.
 		pit_seep.assign(PitWater.work_out(dug, stone_pieces)["levels"])
+	if not data.has("pocket_pending"):
+		# From before new pockets: every dug pocket grows its replacement.
+		pocket_pending.clear()
+		for cell: Vector2i in found_pockets:
+			pocket_pending[cell] = GameClock.get_day_index() + OrePocket.REGROW_DAYS
 	_seep_days = 0.0
 	_seep_full = false
 	_morning = false
@@ -2244,6 +2256,30 @@ func add_credits(amount: int) -> void:
 	credits_changed.emit(credits)
 
 
+## Grows the pocket that replaces each dug one whose day has come: the host's
+## clock only, and a guest is told. Oldest first; a draw that finds no room waits.
+func _grow_pockets(day: int) -> void:
+	if FarmCommands.guest or pocket_pending.is_empty() or new_pockets.size() >= OrePocket.MAX_NEW:
+		return
+	var due: Array[Vector2i] = []
+	for cell: Vector2i in pocket_pending:
+		if pocket_pending[cell] <= day:
+			due.append(cell)
+	due.sort_custom(func(a: Vector2i, b: Vector2i) -> bool:
+		return [pocket_pending[a], a.x, a.y] < [pocket_pending[b], b.x, b.y])
+	var changed: bool = false
+	for cell: Vector2i in due:
+		if new_pockets.size() >= OrePocket.MAX_NEW:
+			break  # the farm's cap: the rest stay pending
+		var grown: Vector2i = OrePocket.replacement(world_seed, cell, dug, found_pockets, new_pockets, stone_pieces)
+		if grown != OrePocket.NONE:
+			new_pockets.append(grown)
+			pocket_pending.erase(cell)
+			changed = true
+	if changed:
+		pockets_changed.emit()
+
+
 func _on_day_started(day: int) -> void:
 	# Judged before the refill: the level only falls during the day, so empty
 	# now means it ran dry and the crops had no water.
@@ -2252,6 +2288,7 @@ func _on_day_started(day: int) -> void:
 	_post_morning_dispatch(day)
 	# Courier returns land in the morning, before an audit that day.
 	_receive_oirm_returns(day)
+	_grow_pockets(day)
 	_finish_lab_build(day)
 	_finish_robot_builds(day)
 	_hold_relay_lock()
@@ -4469,8 +4506,9 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 		if not found_blocks.has(at) and not ReferenceBlock.at(world_seed, at).is_empty():
 			found_blocks[at] = true
 			blocks_changed.emit()
-		if not found_pockets.has(at) and at in OrePocket.cells(world_seed):
+		if not found_pockets.has(at) and (at in OrePocket.cells(world_seed) or at in new_pockets):
 			found_pockets[at] = true
+			pocket_pending[at] = GameClock.get_day_index() + OrePocket.REGROW_DAYS
 			crystal_ore += OrePocket.ORE
 			pockets_changed.emit()
 			ore_changed.emit(crystal_ore)
@@ -4532,6 +4570,12 @@ func channel_cells() -> Array[Vector2i]:
 	return StonePieces.channel_cells(stone_pieces)
 
 
+## The gauge set the found blocks make (GaugeSet.pieces): size index -> best grade.
+## Worked out from found_blocks, so it is the host's and nothing more is saved.
+func gauge_pieces() -> Dictionary:
+	return GaugeSet.pieces(world_seed, found_blocks.keys())
+
+
 ## The block a check uses: the last one found. {} with none.
 func block_in_hand() -> Dictionary:
 	var cells: Array[Vector2i] = found_blocks.keys()
@@ -4558,7 +4602,7 @@ func survey_ore() -> Dictionary:
 	if not rover_transforms.has(ROVER):
 		return { "refused": true, "reason": "The rover's place is not known." }
 	var at: Vector3 = parked_rover_transform(ROVER).origin
-	return OrePocket.survey(get_sensor(STEERING_ID), world_seed, found_pockets, Vector2(at.x, at.z))
+	return OrePocket.survey(get_sensor(STEERING_ID), world_seed, found_pockets, Vector2(at.x, at.z), new_pockets)
 
 
 ## Fills a dug cell one step. Returns "" or why not.

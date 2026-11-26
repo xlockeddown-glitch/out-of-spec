@@ -32,6 +32,8 @@ var _credibility_label: Label
 var _molt_label: Label
 ## "LIGHTS: LOW" or "LIGHTS: ON" in the tunnels; hidden elsewhere.
 var _lights_label: Label
+## "GAUGE SET n/81" once a reference block is found; hidden until then.
+var _gauge_label: Label
 ## Accepted jobs and today's offers, under the credibility row.
 var _jobs_box: VBoxContainer
 ## Holds _jobs_box; scrolls when the jobs are taller than JOBS_MAX_HEIGHT.
@@ -85,6 +87,10 @@ func _ready() -> void:
 	_lights_label.name = "LightsLabel"
 	_lights_label.hide()
 	_credibility_label.add_sibling(_lights_label)
+	_gauge_label = _credibility_label.duplicate()
+	_gauge_label.name = "GaugeSetLabel"
+	_gauge_label.hide()
+	_molt_label.add_sibling(_gauge_label)
 	_jobs_box = VBoxContainer.new()
 	_jobs_box.name = "JobsBox"
 	_jobs_box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -93,7 +99,7 @@ func _ready() -> void:
 	_jobs_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_jobs_scroll.add_child(_jobs_box)
 	clock_row.get_parent().add_child(_jobs_scroll)
-	clock_row.get_parent().move_child(_jobs_scroll, _molt_label.get_index() + 1)
+	clock_row.get_parent().move_child(_jobs_scroll, _gauge_label.get_index() + 1)
 	_jobs_box.minimum_size_changed.connect(_fit_jobs_scroll)
 
 
@@ -154,6 +160,12 @@ func set_credits(credits: int) -> void:
 ## the open contract objective (GameState.contract_text()) on a second line.
 func set_credibility(text: String, contract: String = "") -> void:
 	_credibility_label.text = "CRED: %s" % text + ("" if contract == "" else "\n" + contract)
+
+
+## The gauge set's progress (GaugeSet.text), "" to hide the row.
+func set_gauge_set(text: String) -> void:
+	_gauge_label.visible = text != ""
+	_gauge_label.text = text
 
 
 ## The enclosure's molt, "" to hide the row.
