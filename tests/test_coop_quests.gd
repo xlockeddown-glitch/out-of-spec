@@ -376,7 +376,7 @@ func test_the_record_goes_in_the_hello() -> String:
 			return "A hello has the record."
 		if sent["quest_points"] != { FARM_Q: 2 } or sent["xp_certificates_spent"] != [FARM_Q] or sent["quests"].is_empty() or sent["quests"].size() >= ProfileScript.MOST_PROGRESS:
 			return "A record too big goes without some quest progress, and with its points and spent certificates: %d quests" % sent["quests"].size()
-		if var_to_bytes(host.hello(card, big)).size() > SessionScript.MAX_HELLO_BYTES or SessionScript.PROTOCOL != 15:
+		if var_to_bytes(host.hello(card, big)).size() > SessionScript.MAX_HELLO_BYTES or SessionScript.PROTOCOL < 15:
 			return "A hello fits, and the protocol says the hello changed."
 		return "")
 

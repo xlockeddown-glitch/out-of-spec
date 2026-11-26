@@ -1959,10 +1959,12 @@ func give_skill_xp(skill: String, gained: int, player_id: String) -> void:
 ## (FarmCommands.execute), so an offer never lands on what the command said. On
 ## the host only: a guest's copy is the host's. `present` is who is on the farm;
 ## left empty, the session says.
-func update_quests(present: Array[String] = [], offers: bool = true) -> void:
+## `played` is the mini-game the command before this look was played with
+## (QuestEngine.played_game), or nothing.
+func update_quests(present: Array[String] = [], offers: bool = true, played: Dictionary = {}) -> void:
 	if FarmCommands.guest:
 		return
-	if QuestEngine.update(self, players_present() if present.is_empty() else present, offers):
+	if QuestEngine.update(self, players_present() if present.is_empty() else present, offers, played):
 		quests_changed.emit()
 
 

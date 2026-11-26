@@ -95,8 +95,13 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 			result[MinigameScore.RECORD_KEY] = score
 	# The quests only watch: after anything a player did, they look again. New
 	# ones are offered in the morning, not on top of this command's own line.
+	# A score the host counted for a calibration that happened is told to that
+	# look, for a quest step that carries the game (section 7.2's quest grade).
+	var played: Dictionary = {}
+	if scored and score != MinigameScore.SKIPPED and result is Dictionary and result.has("as_left"):
+		played = QuestEngine.played_game(MinigameScore.SET_THE_ZERO, str(passed[0]), player_id, score)
 	var none: Array[String] = []
-	_farm().update_quests(none, false)
+	_farm().update_quests(none, false, played)
 	return result
 
 

@@ -206,7 +206,8 @@
       "name": "Dr. Lin",
       "quests": {
         "thirsty_probe_offer": "Your irrigation thinks the bed is at 40 %. Your turnip disagrees. I trust the turnip.",
-        "thirsty_probe_done": "Your probe is lying to you. Was. Better."
+        "thirsty_probe_done": "Your probe is lying to you. Was. Better.",
+        "thirsty_probe_reference": "I checked your zero against my own scale. Twice. I found nothing to complain about. I did look."
       }
     },
     "vance": {
