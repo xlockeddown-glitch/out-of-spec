@@ -16,13 +16,44 @@ func _farm(answer: Callable) -> String:
 	return _finish(problem)
 
 
-func test_alone_there_is_no_bed() -> String:
+func test_alone_going_to_bed_ends_the_day() -> String:
 	return _farm(func(_host_side: Node, beds: Node, clock: Node) -> String:
 		beds._look()
-		if beds.go_to_bed("player_1") == "" or not beds.in_bed.is_empty() or clock.morning_waits:
-			return "Alone there must be no one to wait for"
-		clock.advance(1.5)
-		return "" if clock.get_day_index() == 2 else "Alone the day must go over on its own")
+		clock.elapsed_days = 0.5
+		if clock.morning_waits or beds.go_to_bed("player_1") != "":
+			return "Alone, going to bed must be allowed and not wait"
+		if clock.get_day_index() != 2 or clock.elapsed_days != 1.0 or not beds.in_bed.is_empty():
+			return "Alone, going to bed must go straight to the next morning: %s" % clock.format_now()
+		if beds.go_to_bed("player_9") == "":
+			return "A player who isn't on the farm can't go to bed"
+		clock.elapsed_days = 1.5
+		clock.advance(1.0)
+		return "" if clock.get_day_index() == 3 else "Alone the day must still go over on its own")
+
+
+func test_with_no_session_going_to_bed_ends_the_day() -> String:
+	var host: Node = _host()
+	var clock: Node = ClockScript.new()
+	var beds: Node = BedsScript.new()
+	host.players.clear()
+	beds.start(host, clock)
+	var answer: String = beds.go_to_bed("player_1")
+	var day: int = clock.get_day_index()
+	beds.free()
+	clock.free()
+	var problem: String = "" if answer == "" and day == 2 else "No session: bed must end the day (%s, day %d)" % [answer, day]
+	return _finish(problem)
+
+
+func test_host_with_a_guest_still_waits_for_both() -> String:
+	return _farm(func(host: Node, beds: Node, clock: Node) -> String:
+		_guest(host)
+		clock.elapsed_days = 0.5
+		if beds.go_to_bed("player_1") != "" or clock.elapsed_days != 0.5:
+			return "With a guest, one in bed must not end the day"
+		if beds.go_to_bed("player_2") != "" or clock.elapsed_days != 1.0:
+			return "Both in bed must end the day"
+		return "")
 
 
 func test_the_day_waits_until_everyone_is_in_bed() -> String:
