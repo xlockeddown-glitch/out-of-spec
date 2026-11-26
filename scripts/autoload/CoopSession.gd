@@ -719,6 +719,8 @@ func _forget_places() -> void:
 	var farm: Node = _farm_commands()._farm()
 	if farm.has_method("clear_other_places"):
 		farm.clear_other_places()
+	# A new host has heard nothing from this screen yet.
+	ZonePresence.forget_acknowledged()
 
 
 func _farm_commands() -> Node:

@@ -69,6 +69,12 @@ static var _acknowledged: Array = []
 static var _sending: bool = false
 
 
+## Forgets what the host last took, so the next report is sent even if it names
+## the same place (a session started or ended). A sender still running keeps going.
+static func forget_acknowledged() -> void:
+	_acknowledged = []
+
+
 ## Forgets what was said (tests).
 static func reset_reports() -> void:
 	_latest = []
