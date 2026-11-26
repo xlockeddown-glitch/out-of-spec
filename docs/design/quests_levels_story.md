@@ -54,7 +54,11 @@ Written against main at `3b9fe96`.
 
 ### 0.2 A name clash to settle
 
-`data/dialogue_dispatches.json` has `"megacorp_name": "OmniSpec Orbital Compliance"`, senders such as "Orbital Compliance" and "Audit Division", and a dispatch (`disp_04`) that says "OmniSpec". The story's corporation is **BNH** (Brightwell-Nonesuch Habitats, "Every Sticker Counts"), and the dispatches there are signed "Warmly, Dispatch" by Odalys Brandt. No script reads `megacorp_name`, so the fix is text only. **Decided (§10, 6): BNH sends the dispatches and Odalys signs them "Warmly, Dispatch". OmniSpec is dropped from the dispatch file.** That text fix is its own small PR (§9, step 12); this PR does not touch the data file.
+`data/dialogue_dispatches.json` has `"megacorp_name": "OmniSpec Orbital Compliance"`, senders such as "Orbital Compliance" and "Audit Division", and a dispatch (`disp_04`) that says "OmniSpec". The story's corporation is **BNH** (Brightwell-Nonesuch Habitats, "Every Sticker Counts"), and the dispatches there are signed "Warmly, Dispatch" by Odalys Brandt. A third string is in Bram's greetings (`npcs.bram.greetings`: "If OmniSpec asks, this whole garage is 'temporarily uncalibrated.'"). No script reads `megacorp_name`, so the fix is text only. **Decided (§10, 6): BNH sends the dispatches and Odalys signs them "Warmly, Dispatch". OmniSpec is dropped from the dispatch file.** That text fix is its own small PR (§9, step 17); this PR does not touch the data file.
+
+The fix covers every OmniSpec string: `megacorp_name`, `disp_04`, and Bram's greeting. A search for "OmniSpec" over `data/` must come back empty afterward.
+
+Sender names under BNH [ASSUMPTION]: the department names stay, as BNH departments ("Calibration Desk", "Audit Division", "Metrology Governance", "HR & Morale", "Supply Chain", "Telemetry Ops", "Bio-Security Bot", "Drop-Pod Dispatch"). "Orbital Compliance" becomes "BNH Compliance". Odalys relays all of them, so each message closes with "Warmly, Dispatch". `megacorp_name` becomes "Brightwell-Nonesuch Habitats".
 
 ## 1. The spine and how episodes hang off it
 
@@ -138,13 +142,30 @@ Proposal: **multiply today's XP sources by 5** [PLACEHOLDER]. Then:
 A flat ×5 is not enough for the top. At 50 XP each, level 99 would need about 114 000 calibrations. So XP must grow with the work:
 
 - **Tier multiplier.** Calibrating a unit against a Tier 0 standard gives ×1, Tier 1 ×1.5, Tier 2 ×2.5, Tier 3 ×4 [PLACEHOLDER].
-- **Paid jobs give XP** (closes a logged open item): XP = pay ÷ 2 [PLACEHOLDER], to the skill named by the job's discipline.
+- **Paid jobs give XP** (closes a logged open item). A job's discipline (angle, humidity, electrical, temperature, pressure, soil moisture) is not a skill, so the rule does not use it: the player who finishes the job gets pay ÷ 2 as Calibration XP, plus pay ÷ 4 as Uncertainty XP when the job is on time and traceable [PLACEHOLDER].
 - **Crops give XP** (closes a logged open item): see Agronomy in §4.
 - **Quests give XP in lumps**, sized to the quest's gate level.
 - **Mini-games multiply XP** up to ×1.5 [PLACEHOLDER] (§7).
 - The rule that stays: `_xp_after_calibration` gives no XP for an untraceable calibration or one done before half the interval. Spamming the bench earns nothing.
 
-**Decided (§10, 3): about 150 hours of play to level 99 in one skill, for a player who favors that skill.** The multipliers above must be tuned to hit that; nobody has checked yet that they do. The pace along the way (for example, when level 50 comes) is still open.
+**Decided (§10, 3): about 150 hours of play to level 99 in one skill, for a player who favors that skill.** **The numbers above do not reach it yet.** 5 693 968 XP in 150 hours is about 38 000 XP an hour on average. A top-tier calibration pays 50 × 4 = 200 XP, so that is about 190 top-tier calibrations an hour. One game day is 12 min and intervals run for days, so the bench cannot give that. Calibrations alone will never carry a skill to 99.
+
+So the XP per source must be set from a budget of hours, not from a flat ×5. A first budget [PLACEHOLDER]:
+
+| Levels | XP in the band | Hours | XP per hour needed |
+|---|---:|---:|---:|
+| 1 to 25 | 4 425 | 3 | about 1 500 |
+| 25 to 50 | 48 434 | 12 | about 4 000 |
+| 50 to 75 | 524 775 | 35 | about 15 000 |
+| 75 to 99 | 5 116 334 | 100 | about 51 000 |
+
+What that means for the sources:
+
+- Late XP has to come mostly from work that grows with the lab: paid jobs (pay grows with band and tier), contracts and quests. Their XP is set per band to meet the table.
+- Skills fed by tiny sources need multipliers of their own. At `till` 5 XP, 38 000 XP an hour would be 7 600 tilled cells an hour. `mine_fissure` (10) and spools (50) have the same problem. Each of those skills gets its own source values, set from the hourly budget for that skill, and bigger actions to earn from (a harvest, a sale, a full spool run).
+- The ×5 table above is right only for the first band.
+
+This tuning needs a spreadsheet or a small simulation before step 1 of the build order ships numbers.
 
 ### 2.4 Level effects spread over 99 levels
 
@@ -165,6 +186,15 @@ Straight lines between the rows. A new player feels the skill move early. A leve
 
 On first load after the change, XP is multiplied by the same 5 and the level is read off the new curve. Nobody drops below what they can already do: anything a save has unlocked stays unlocked, and the lab level is credited from the farm's `cal_log`, `job_log` and `audit_log` (decided, §10, 5).
 
+**Effects are kept too.** The level number alone would not keep the promise. A level 10 save today has 2 250 XP. Times 5 is 11 250, which is about level 34 on the new curve, and level 34 gives about 53 % of the full effect (§2.4). Today that save has 100 %. So conversion also stores a floor:
+
+- For each skill, the save records the share of the full effect it had before the change (`effect_floor`, 0 to 1).
+- The share in use is max(`effect_floor`, the share for the new level).
+- The floor never rises. Once the new level's share passes it, the floor does nothing.
+- The two skill unlocks (`molt_on_phone`, `budget_view`) stay unlocked if the save had them.
+
+A new farm has no floor.
+
 ## 3. The lab level
 
 ### 3.1 What it is
@@ -181,6 +211,8 @@ Lab XP is earned by anything done in the lab, by anyone, including robots.
 |---|---|---:|
 | A traceable calibration by a player | `cal_log` / `calibration_recorded` | 25 × tier multiplier |
 | A calibration by a robot (CALIBRATE card) | `cal_log`, `performed_by` a robot | 10 × tier multiplier |
+| A standard bought | `buy_standard` (was Instrumentation XP) | 75 × tier multiplier |
+| A standard calibrated | `calibrate_standard` (was Instrumentation XP) | 100 × tier multiplier |
 | A paid job finished | `job_log` | pay ÷ 2 |
 | A clean audit | `audit_log`, `clean_audit_streak` | 250 |
 | An OIRM certificate comes back | `certificates` | 200 |
@@ -190,6 +222,20 @@ Lab XP is earned by anything done in the lab, by anyone, including robots.
 | A lab quest finished | quest log (§5) | by quest |
 
 Farming, digging and driving do not feed the lab level. They feed personal skills.
+
+### 3.2.1 The honest shortfall, and the rule that fixes it
+
+The amounts in that table are 25 to 500 per action. The curve asks for 137 901 lab XP at level 60, 358 476 at 70, 930 591 at 80 and 2 414 510 at 90. A lab earning a few hundred XP an action would need thousands of actions for each of those. With story beats on those rows, that is a wall, and it breaks the second rule of this doc.
+
+Three changes keep it true:
+
+1. **Lab XP grows with the lab.** Every lab XP amount is multiplied by the lab's size: small ×1, medium ×3, large ×8 [PLACEHOLDER]. A bigger lab does bigger work. This stacks with the tier multiplier, so a Tier 3 calibration in a large lab pays 25 × 4 × 8 = 800 lab XP against 25 for the first one.
+2. **No story beat sits above lab level 60.** The unlock table (§3.4) is reordered. Levels 61 to 99 hold robots, board size and cosmetics only. A farm that never passes 60 misses no episode.
+3. **Lab XP is set from a budget of hours, like skill XP (§2.3).** Target [PLACEHOLDER]: lab level 20 by about 5 hours of farm play, 40 by about 20 hours, 60 by about 50 hours. Lab level 99 is a prestige goal with no deadline. The whole farm, robots included, feeds one bar, so more players reach it sooner.
+
+Even with these, the table's amounts are not proven to hit the target. They need the same spreadsheet pass as §2.3 before the lab-level gates turn on (§9, step 9).
+
+**A second way through every gate.** If a farm meets a row's "also needs" condition and is short of the lab level, the giver of that row's lab quest offers a "provisional" version: the row opens early for that quest only, and finishing the quest pays enough lab XP to close most of the gap [ASSUMPTION]. So a level number alone never holds a story beat shut.
 
 ### 3.3 Which skills move to the lab
 
@@ -213,27 +259,32 @@ Built mostly from things that exist or are already designed in `docs/design/equi
 | 1 | The closet lab, Tier 0 standards, the bench | | exists |
 | 3 | Daily asks on the phone (§6, D2) | | NEW |
 | 5 | Tier 1 standards (FM-3 field meter, WD-1 gauge) | one clean audit | exists |
-| 8 | A second accepted job at once | | NEW |
+| 8 | A wall for framed certificates | | NEW, cosmetic |
 | 10 | The job board | Trusted | exists |
 | 12 | An OIRM account can be opened | | exists |
 | 15 | The first OIRM contract is offered | Trusted | exists |
 | 18 | Tier 2 standards (TW-6 torque, HM-3 calibrator) | OIRM account | exists |
 | 20 | Medium lab, "Greenhouse Four" (5 areas) | 600 CR, 4 ore | exists |
 | 25 | First robot and the WATER card | | designed |
-| 30 | COLLECT SPOOL card; job board shows 4 jobs | | designed / NEW |
-| 35 | Second robot | | designed |
+| 28 | Job board shows 4 jobs | | NEW |
+| 30 | COLLECT SPOOL card | | designed |
+| 35 | Second robot; a second OIRM contract | | designed / NEW |
 | 40 | Tier 3 standards (HB-700, LS-8.5, Rb-2D) | traceable lab, certified Tier 2 | exists |
-| 45 | CALIBRATE card | | designed |
-| 50 | Large lab (8 areas); Accredited jobs | 1 500 CR, 8 ore; Accredited | exists |
-| 55 | Third robot; a second OIRM contract | | NEW |
-| 60 | The relay dish azimuth and the Gossamer link | | NEW |
-| 65 | Job board shows 5 jobs | | NEW |
-| 70 | The master audit can be asked for | Accredited | NEW |
+| 42 | CALIBRATE card | | designed |
+| 45 | Large lab (8 areas); Accredited jobs | 1 500 CR, 8 ore; Accredited | exists |
+| 48 | The relay dish azimuth and the Gossamer link | Orbital Silk-Spinner reticle silk (`story.md`) | NEW |
+| 52 | The master audit can be asked for | Accredited | NEW |
+| 56 | The intrinsic silk standard contract | | NEW |
+| 60 | The Larder | | NEW |
+| 65 | Third robot; job board shows 5 jobs | | NEW |
 | 75 | Fourth robot | | NEW |
-| 80 | The intrinsic silk standard contract | | NEW |
-| 90 | The Larder | | NEW |
+| 85 | Robot paint and nameplates | | NEW, cosmetic |
 | 92 | A plaque for the wall: "HALFWAY THERE" | | NEW, cosmetic |
 | 99 | Gold border on every certificate the lab prints; Odalys sends her mug | | NEW, cosmetic |
+
+Every story beat is at or below 60 (§3.2.1). The game already lets a farm hold more than one accepted job (`active_jobs` is a list), so no row is spent on that.
+
+**The first contract and Tier 3.** The contract is offered at lab level 15, but its prize is 50 % off the HB-700, a Tier 3 standard that opens at lab level 40 with a traceable lab and a certified Tier 2 standard. The rule: **the discount does not bypass the tier gate.** Finishing the five calibrations sets `contract_state` to "complete" and the discount is then held, with no expiry, until Tier 3 opens. The quest's main step is done at "complete". Its optional "fulfilled" step waits for Tier 3. [ASSUMPTION] This is what the code does today; whoever builds the gates checks `buy_standard()` and `bram_catalog()` to confirm.
 
 Between the rows, every level gives a small shared thing so "something unlocks every few levels" holds: a new job template, a bench decoration, a paint for the robots, one more line of phone gossip. [ASSUMPTION] These fillers are cosmetic or flavor, so an empty row never blocks anyone.
 
@@ -390,6 +441,7 @@ A new QUESTS section in the phone HUD, in the phone's current look. No restyle.
 - One per story quest, one per larger personal quest [PLACEHOLDER]. Lab and daily quests pay none.
 - Personal. They travel with a guest.
 - Used as a gate on a few later episodes and for keepsakes from the cast (decided, §10, 11). They buy no power.
+- For a farm-scope episode gated on quest points, the highest count among the players on the farm at that moment is the one that counts [ASSUMPTION]. A guest with many points can open an episode for a host with few. A solo host uses their own.
 - Shown on the SKILLS view next to total level.
 
 ### 5.7 The first contract and the job board as quests
@@ -398,7 +450,7 @@ A new QUESTS section in the phone HUD, in the phone's current look. No restyle.
 
 - Offered when `contract_state` becomes "active".
 - One step: `state_is contract_state complete`, with the count read from `contract_run` (shown as "3 of 5").
-- A second, optional step: `state_is contract_state fulfilled` (the HB-700 was bought at the discount).
+- A second, optional step: `state_is contract_state fulfilled` (the HB-700 was bought at the discount). It waits for Tier 3 (§3.4): the discount is held and does not open the tier early.
 - Rewards: the discount the contract already gives, plus lab XP. A save that already finished the contract shows the quest as done.
 
 Later contracts are written straight into `data/quests.json` as lab quests, with no new code in `GameState`.
@@ -443,9 +495,9 @@ Chet's van-rover says CERTIFIED in three fonts. He undercuts you, then slips an 
 |---|---|
 | Accept the envelope job | NEW: a job handed out by a quest, not by the board. Same shape as a board job, in `active_jobs` |
 | Calibrate the gauge for the customer | `job_log` row with that `job_id`. Its as-found is out of tolerance by design |
-| Finish it on time and traceable | that row has `on_time` and `traceable` true |
+| Hand it back | any `job_log` row for that `job_id` finishes the quest. `on_time` and `traceable` set the reward |
 
-Reward: cash in the envelope (200 CR), 1 quest point, and Chet owes you one. Later (not in this slice): a choice between logging the as-found honestly and keeping it quiet.
+Reward: 1 quest point for any finish. On time and traceable: the full envelope (200 CR) and Chet owes you one. Late or untraceable: half the envelope and a sour line from Chet. If the job is dropped or runs out, the envelope is back under the airlock the next morning, as often as it takes. The quest cannot be lost. Later (not in this slice): a choice between logging the as-found honestly and keeping it quiet.
 
 ### Lab
 
@@ -467,7 +519,7 @@ Reward: lab XP 250. Tier 1 opens as it does today. A save that already has `tier
 
 Reward: lab XP 300, 100 CR toward the next trip.
 
-**L3. The First Contract** (giver: OIRM). The wrapper from §5.7. Gate: Trusted. Reward: what the contract gives today, plus lab XP 400.
+**L3. The First Contract** (giver: OIRM). The wrapper from §5.7. Gate: lab level 15 and Trusted (§3.4). A save whose contract is already active or done shows the quest whatever its lab level (§2.5). Reward: what the contract gives today, plus lab XP 400.
 
 **L4. Greenhouse Four** (giver: Bram). Gate: lab level 20.
 
@@ -478,7 +530,7 @@ Reward: lab XP 300, 100 CR toward the next trip.
 | Move in | `lab_size` is `medium` |
 | Fit one new area | `lab_areas` grew by one (`fit_lab_area`) |
 
-Reward: lab XP 500 and a free refit of one area.
+Reward: lab XP 500 and a free refit of one area (NEW: a one-use free refit).
 
 ### Personal
 
@@ -488,7 +540,7 @@ Reward: lab XP 500 and a free refit of one area.
 |---|---|
 | Mine 5 fissures yourself | NEW per-player counter (§5.3), source `mine_fissure` |
 
-Reward: Field Ops XP, 1 quest point, and Bram knocks 10 % off your next standard. The ore still goes to the shared wallet, so the farm gains too.
+Reward: Field Ops XP, 1 quest point, and Bram knocks 10 % off your next standard (NEW: a one-use discount). The ore still goes to the shared wallet, so the farm gains too.
 
 **P2. On the Dot** (skill challenge, Uncertainty). Gate: Uncertainty 5.
 
@@ -518,7 +570,7 @@ Reward: Earthworks XP, 1 quest point, a felt-lined case for the set (cosmetic).
 |---|---|
 | Lin: "Three Biscuit Reeds, in spec." | sale counter, `biscuit_reed` |
 | Bram: "Two ore, if you are out that way." | per-player `mine_fissure` count |
-| Odalys: "Check the dome hygrometer against a block for me." | `check_with_block("hygrometer")` |
+| Odalys: "Check the rover's steering encoder against a block for me." | `check_with_block("rover_steering_encoder")`. A buried block is an angle block (`scripts/metrology/reference_block.gd`), so it can only check an instrument that reads degrees. If the player has no block yet, the day's seed picks another ask |
 | Orin: "Till me a row by the beacon." | per-player `till` count |
 
 Reward: 30 to 60 CR and a small XP certificate. A missed ask is gone the next morning with no penalty.
@@ -531,6 +583,8 @@ Reward: 30 to 60 CR and a small XP certificate. A missed ask is gone the next mo
 4. The XP certificate.
 5. The mug ring prop.
 6. Two mini-games (§7): "Set the Zero" in S1, "Wring the Blocks" in P3.
+7. One-use rewards: Bram's 10 % discount on a standard (P1) and a free refit of one lab area (L4).
+8. Keepsakes and cosmetics: the pocket watch (P2), the felt-lined case (P3), and a place to see them. They do nothing but exist.
 
 Left for later slices: the first flare night with Kestrel, the Terracotta Knee, AUD-1T's uncalibrated gauge, anything past Trusted.
 
@@ -556,7 +610,7 @@ How each plays:
 
 - **Set the Zero.** A needle sweeps back and forth across a scale. A green sweet spot sits at zero. Press once to stop the needle for the coarse adjust. It sweeps again, slower and over a narrower scale, for the fine adjust. Press again. The score is how close the second stop is to zero.
 - **Hold the Reading.** The reading wanders up and down as the standard settles. A tolerance band is drawn around it. Hold a button to lift your bracket and let go to drop it, and keep the reading inside your bracket. The wander calms over time. The score is the share of time the reading was inside.
-- **Wring the Blocks.** Drag one block across the other. A speed gauge must stay in the green: too fast and it skips, too slow and it will not cling. Then a quarter turn at the end, released on the mark. For a stack, pick the blocks that add to the target length first (real gauge block practice), then wring each joint. The score is the average of the joints.
+- **Wring the Blocks.** Drag one block across the other. A speed gauge must stay in the green: too fast and it skips, too slow and it will not cling. Then a quarter turn at the end, released on the mark. For a stack, pick the blocks that add to the target first (real gauge block practice), then wring each joint. Every found block is both an angle block and a piece of the 81-piece set (`docs/decisions.md`), so the target can be a length or an angle. The score is the average of the joints.
 - **Torque to Spec.** Five nuts. For each, hold the button as the torque climbs and let go at the click line. The nuts come in star order, and the game shows which is next. The score is the average closeness.
 - **Thread the Spool.** The spool sways. Move left and right to keep it centered on the slot while it lowers. The score is how centered it was when it seats.
 
@@ -590,7 +644,7 @@ The score is 0 to 100. The game shows it as a grade on the result.
 | Earthworks | Widens the green on the speed gauge in "Wring the Blocks" |
 | Husbandry | Slows the sway in "Thread the Spool" |
 
-These follow the same front-loaded shape as §2.4. The existing effects stay and stack: the Calibration skill still shrinks the base residual, and a good score shrinks it again. So a level 40 player with an average score lands near a level 10 player with a perfect one. Leveling feels good, and so does a steady hand.
+These follow the same front-loaded shape as §2.4. The existing effects stay and stack: the Calibration skill still shrinks the base residual, and a good score shrinks it again. The two multiply. On a single calibration a perfect score counts for more than levels do: by §2.4 and §7.2, a level 10 player with a Reference score ends closer to zero than a level 40 player with a Good one. Skill pays in two other ways: it makes the high grades easier to hit, and it improves every one-click calibration, where there is no score at all.
 
 ### 7.4 Where they appear
 
@@ -643,18 +697,23 @@ A guest who finishes a story quest on a friend's farm keeps the quest point. The
 
 ## 9. Build order (small PRs, one job each)
 
-1. **The curve.** `data/skills.json` gets the geometric curve, top level 99 and the ×5 sources. Effects respread. Old saves convert. No new features.
-2. **XP for jobs and crops.** The logged open item. Adds the per-player action counter.
-3. **The lab level.** Lab XP, its feeds, shown on the SKILLS view and phone. Instrumentation folds in. No gates yet.
-4. **Robotics and Husbandry go personal; Agronomy and Earthworks arrive.** As decided in §10, 1 and 2.
-5. **Quest engine.** `data/quests.json`, `quest_state` in the save, the checks in §5.3, three quests (S1 without its mini-game, L1, L3). Progress goes to the phone as plain lines.
-6. **Quest log on the phone.**
-7. **Co-op for quests.** Personal quest state and quest points in the guest file. Lab quests in the farm sync.
-8. **Lab-level gates.** Turn on the table in §3.4, once Ryan sets the levels. Existing saves keep what they have.
-9. **Mini-game 1: Set the Zero.** With skip, difficulty and the CAREFUL switch. Added to S1.
-10. **The rest of the first slice.** S2, S3, L2, L4, P1 to P3, daily asks.
-11. **Mini-games 2 to 5,** one PR each.
-12. **Dispatch names.** The text fix from §0.2: BNH in place of OmniSpec in `data/dialogue_dispatches.json`, signed "Warmly, Dispatch". It depends on nothing else here and can go first.
+1. **The curve.** `data/skills.json` gets the geometric curve, top level 99 and source values set from the hour budget (§2.3). Effects respread. **Save conversion, stage 1:** every skill's XP converts, farm skills included, and each skill's `effect_floor` is stored (§2.5). Instrumentation stays a farm skill for now, with its converted XP. No lab level yet.
+2. **XP for jobs and crops.** The logged open item. Adds the per-player action counter. Agronomy does not exist yet, so crop XP goes to Field Ops for now (where `till` is today). The counter records how much came from crop sources.
+3. **The lab level.** Lab XP, its feeds and the size multiplier, shown on the SKILLS view and phone. No gates yet. **Save conversion, stage 2:** the lab level is credited from `cal_log`, `job_log` and `audit_log`, and the farm's Instrumentation XP is added to lab XP one for one. Then Instrumentation is removed and its two sources feed lab XP.
+4. **Robotics and Husbandry go personal; Agronomy and Earthworks arrive.** As decided in §10, 1 and 2. Each player gets the farm's old Robotics and Husbandry XP once. Crop XP earned as Field Ops since step 2 moves to Agronomy, by the counter. `till`, `dig` and the rest move to their new skills from here on.
+5. **Quest engine.** `data/quests.json`, `quest_state` in the save, the checks in §5.3, and the plain reward kinds: credits, skill XP, lab XP, quest points, a phone line. Quest points are kept per player id in the host's save from this step on, guests included. Two quests ship: L1 and L3. Progress goes to the phone as plain lines.
+6. **The XP certificate.** The pick-a-skill reward and its small picker. S1 ships here, without its mini-game.
+7. **Quest log on the phone.**
+8. **Co-op for quests.** Personal quest state and quest points also go into the guest's own file, so they travel. Until this step a guest's points live only on the host's save. Lab quests join the farm sync.
+9. **Lab-level gates.** Turn on the table in §3.4 and the provisional way through (§3.2.1), once Ryan sets the levels and the lab XP budget has been checked. Existing saves keep what they have.
+10. **One-use rewards and keepsakes.** The standard discount, the free refit, and keepsakes with a place to see them.
+11. **Mini-game 1: Set the Zero.** With skip, difficulty and the CAREFUL switch. Added to S1.
+12. **More of the first slice.** S2 (with the mug ring prop), L2, L4, P1, P2.
+13. **Quest-issued jobs.** Chet's envelope, then S3.
+14. **Daily asks.** D2.
+15. **Mini-game 2: Wring the Blocks,** then P3, which needs it.
+16. **Mini-games 3 to 5,** one PR each. Torque to Spec needs a rover repair action first.
+17. **Dispatch names.** The text fix from §0.2: every OmniSpec string in `data/dialogue_dispatches.json` becomes BNH, with the sender names settled there. It depends on nothing else here and can go first.
 
 Each PR logs its decisions in `docs/decisions.md` and names its placeholders.
 
@@ -669,7 +728,7 @@ Ryan answered every open question. He took the recommended option each time. The
 | 3 | How long to level 99 in one skill? | About 150 hours of play. | §2.3 |
 | 4 | Lab level and the existing gates? | Both. A thing opens when the lab level is reached and its existing condition is met. | §3.4 |
 | 5 | Saves that exist today? | Everything unlocked stays unlocked. XP converts to the new curve. The lab level is credited from the farm's logs. | §2.5 |
-| 6 | OmniSpec or BNH? | BNH sends the dispatches. Odalys signs "Warmly, Dispatch". OmniSpec is dropped from the dispatch file. | §0.2, §9 step 12 |
+| 6 | OmniSpec or BNH? | BNH sends the dispatches. Odalys signs "Warmly, Dispatch". OmniSpec is dropped from the dispatch file. | §0.2, §9 step 17 |
 | 7 | Whose progress is a story quest in co-op? | The farm's. Steps are shared, and every player who took part gets the quest point. | §5.1, §8 |
 | 8 | Catch-up for friends who play less? | As proposed: the lab level opens the same doors, and XP certificates lift low levels most. No mentor bonus. | §4.4 |
 | 9 | How often do bench mini-games come up? | On quest steps, on the first calibration of each instrument type, and when CAREFUL is on. | §7.4 |
@@ -680,7 +739,8 @@ Still open after these answers:
 
 - Every number. The curve's base and growth, the ×5, the tier multipliers, every level in the unlock tables, every reward and every mini-game figure are [PLACEHOLDER].
 - The assumptions in §11.
-- Decision 3 sets the total (about 150 hours). The XP numbers have not been checked against it, and the pace along the way needs playtesting.
+- Decision 3 sets the total (about 150 hours). The XP numbers do not reach it yet; §2.3 says by how much and what must change. The lab level has the same gap (§3.2.1).
+- Sender names under BNH (§0.2), whose quest points count for a farm-scope gate (§5.6), and the provisional way through a lab gate (§3.2.1) are my assumptions.
 - Decision 7 says "every player who took part". [ASSUMPTION] A player took part if they were on the farm when any step was done. A point is paid once per player per quest, on any farm (§8).
 
 ## 11. Assumptions in one place
@@ -695,4 +755,8 @@ Still open after these answers:
 - Rewards are the same on every mini-game difficulty (§7.5).
 - The host trusts the guest's mini-game score after clamping it (§7.6).
 - There is no rover repair action today (§7.1).
+- The contract discount does not bypass the Tier 3 gate in today's code (§3.4). Not confirmed in `buy_standard()`.
+- BNH keeps the dispatch department names (§0.2).
+- For a farm-scope quest-point gate, the highest count among players present is used (§5.6).
+- A farm short of a lab level can open a row early through its lab quest (§3.2.1).
 - Names from `story.md` marked "(proposed)" there are still proposed here.
