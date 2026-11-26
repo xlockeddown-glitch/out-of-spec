@@ -260,9 +260,22 @@ var rng := RandomNumberGenerator.new()
 ## rover id -> Transform3D where it was parked. Rovers belong to the farm, not
 ## to a player. Change it with park_rover().
 var rover_transforms: Dictionary = {}
-## The one rover is on the farm or in the tunnels, and has an id in each, so
-## neither scene's place is taken for the other's. Change it with move_rover().
-var rover_in_tunnels: bool = false
+## Where the one rover is: "" on the farm, else a zone id (data/zones.json;
+## only "lava_tubes", the tunnels, has a scene yet). It has an id in each place,
+## so neither scene's place is taken for the other's. Change it with move_rover().
+var rover_zone: String = ""
+## The same word as a yes or no: in the tunnels. Computed from rover_zone, not
+## saved; setting it true means "lava_tubes" and false means the farm.
+var rover_in_tunnels: bool:
+	get:
+		return rover_zone != ""
+	set(value):
+		rover_zone = TUNNELS_ZONE if value else ""
+const TUNNELS_ZONE: String = "lava_tubes"
+## Host: where each player is, as player id -> [place, depth] (ZonePresence). A
+## player not in it is on the farm. Not saved: a loaded farm has everyone on the
+## farm. A guest holds the host's copy, from the clock (FarmSync).
+var player_places: Dictionary = {}
 const ROVER: String = "rover_1"
 const TUNNEL_ROVER: String = "rover_1_tunnels"
 ## The middles of the pads that lead in and out, and how near the rover must be
@@ -610,7 +623,7 @@ const KEPT_CONTRACT_SALE: String = "contract_stock"
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
-	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
+	"boulder_hits", "found_blocks", "found_pockets", "rover_zone", "enclosures", "stone", "stone_pieces",
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
@@ -621,6 +634,7 @@ const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
 	"_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry",
+	"rover_in_tunnels", "player_places",
 ]
 
 
@@ -714,6 +728,12 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var liters: Variant = data.get("cistern_liters", CISTERN_CAPACITY_L)
 	if not liters is float or liters < 0.0 or liters > CISTERN_CAPACITY_L:
 		return "'cistern_liters' is out of range."
+	var zone: Variant = data.get("rover_zone", "")
+	if zone is String and zone != "" and not ZoneData.has_zone(StringName(zone)):
+		return "'rover_zone' is not a zone."
+	# Saves before zones say it as a yes or no.
+	if not data.get("rover_in_tunnels", false) is bool:
+		return "'rover_in_tunnels' is not a yes or no."
 	if data.get("sentinel_days_unseen", 0) < 0 or data.get("sentinel_days_unseen", 0) > SENTINEL_DAYS_MAX:
 		return "'sentinel_days_unseen' is out of range."
 	if data.get("sentinel_out", false) and data.get("enclosures", {}).has(String(SENTINEL)):
@@ -913,6 +933,7 @@ func farm_from_dict(data: Dictionary) -> String:
 		return problem
 	put_farm(data)
 	sentinel_sighted = false
+	player_places.clear()
 	_recall_warned_day = 0
 	_recall_rescued_day = 0
 	_rescue_notes.clear()
@@ -982,6 +1003,9 @@ func put_farm(data: Dictionary) -> void:
 		else:
 			set(field, value)
 	fresh.free()
+	if not data.has("rover_zone") and data.get("rover_in_tunnels", false):
+		# A save from before zones: the bool said the tunnels.
+		rover_zone = TUNNELS_ZONE
 	_level_pads()
 	if not data.has("stone"):
 		# From before stone, so its broken boulders gave none.
@@ -3996,6 +4020,43 @@ func service_wheels(player_id: String = "", score: int = MinigameScore.SKIPPED) 
 	_award_lab_xp("lab_wheels", player_id, xp_scale)
 	wheels_changed.emit()
 	return ""
+
+
+# --- Presence (zones doc section 12.2) ----------------------------------------
+
+## Host: a player says where they are. `player_id` is filled in from the
+## connection (FarmCommands), never from the message. Returns "" or why not.
+func report_place(place: String, depth: int, player_id: String = "") -> String:
+	var here: Array[String] = []
+	here.assign(CoopSession.players if not CoopSession.players.is_empty() else [local_player_id])
+	var reason: String = ZonePresence.problem(place, depth, player_id, player_id, here)
+	if reason != "":
+		return reason
+	player_places[player_id] = [place, depth]
+	return ""
+
+
+## Where a player is; the farm for one the host has not heard from.
+func place_of(player_id: String) -> String:
+	return str(player_places.get(player_id, [ZonePresence.DEFAULT_PLACE, 0])[0])
+
+
+func depth_of(player_id: String) -> int:
+	return int(player_places.get(player_id, [ZonePresence.DEFAULT_PLACE, 0])[1])
+
+
+## The players, in the order of `among`, who are in `place`.
+func players_in(place: String, among: Array[String]) -> Array[String]:
+	var found: Array[String] = []
+	for player_id: String in among:
+		if place_of(player_id) == place:
+			found.append(player_id)
+	return found
+
+
+## Host: a player left, or dropped.
+func forget_place(player_id: String) -> void:
+	player_places.erase(player_id)
 
 
 ## The id the rover goes by where it is now.

@@ -9,12 +9,13 @@ const ACTIONS: Array[StringName] = [
 	&"accept_job", &"add_robot_calibrate_card", &"add_robot_card", &"add_robot_collect_card",
 	&"adjust_setpoint", &"build_block_stack", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
 	&"calibrate_at_bench", &"catch_sentinel", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
-	&"harvest_crop", &"hit_boulder", &"mine_fissure", &"move_rover", &"place_stone", &"plant_crop", &"release_robot", &"remove_robot_card",
+	&"harvest_crop", &"hit_boulder", &"mine_fissure", &"move_rover", &"place_stone", &"plant_crop", &"release_robot", &"remove_robot_card", &"report_place",
 	&"sell_harvest_to_lin", &"send_to_oirm", &"service_wheels", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay", &"spend_xp_certificate",
 	&"start_lab_grow", &"survey_ore", &"till", &"zero_steering",
 ]
-## What a player in bed may do and stay in bed: going to bed, and paperwork.
-const NO_WAKE: Array[StringName] = [&"go_to_bed", &"spend_xp_certificate"]
+## What a player in bed may do and stay in bed: going to bed, paperwork, and
+## saying where they are.
+const NO_WAKE: Array[StringName] = [&"go_to_bed", &"report_place", &"spend_xp_certificate"]
 ## What is done at a cell of the farm's ground: the cell in front of the rover, or
 ## under it. The cell's middle is within this far of the rover [PLACEHOLDER]: the
 ## 2 m it digs ahead, half a cell's corner and what the host's word of the

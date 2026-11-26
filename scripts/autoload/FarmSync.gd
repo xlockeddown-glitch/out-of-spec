@@ -39,7 +39,7 @@ const SHOWN_BY: Dictionary = {
 	&"blocks_changed": ["found_blocks"],
 	&"pockets_changed": ["found_pockets", "new_pockets", "pocket_pending"],
 	&"stone_changed": ["stone", "stone_pieces"],
-	&"rover_place_changed": ["rover_in_tunnels"],
+	&"rover_place_changed": ["rover_zone"],
 	&"sentinel_changed": ["sentinel_out", "sentinel_days_unseen"],
 	&"rover_lights_changed": ["rover_lights"],
 	&"wheels_changed": ["wheel_meters"],
@@ -60,19 +60,20 @@ const CARRIES: Dictionary = {
 ## inside a GameState or GameClock signal, where a change may be half made.
 static func capture(farm: Node = GameState) -> PackedByteArray:
 	SaveGame.saving.emit()  # rovers say where they are
-	var bytes: PackedByteArray = SaveGame.to_bytes({ "clock": clock(), "farm": farm.farm_to_dict() })
+	var bytes: PackedByteArray = SaveGame.to_bytes({ "clock": clock(farm), "farm": farm.farm_to_dict() })
 	if bytes.size() > MAX_BYTES:
 		return PackedByteArray()
 	return bytes
 
 
 ## On the host: its clock alone, small enough to send often.
-static func clock() -> Dictionary:
+static func clock(farm: Node = GameState) -> Dictionary:
 	return {
 		"elapsed_days": GameClock.elapsed_days,
 		"seconds_per_day": GameClock.seconds_per_day,
 		"paused": GameClock.paused,
 		"in_bed": Array(CoopBeds.in_bed, TYPE_NIL, &"", null),
+		"places": farm.player_places.duplicate(true),
 	}
 
 
@@ -81,18 +82,24 @@ static func follow_clock(data: Dictionary, farm: Node = GameState) -> String:
 	if not FarmCommands.guest:
 		return "Only a guest follows the host's clock."
 	var problem: String = _clock_problem(data)
-	if problem == "" and _follow(data):
+	if problem == "" and _follow(data, farm):
 		for shown: StringName in SHOW_THE_DAY:
 			_emit(farm, shown)
 	return problem
 
 
 ## True if the day changed.
-static func _follow(data: Dictionary) -> bool:
+static func _follow(data: Dictionary, farm: Node = GameState) -> bool:
 	var day: int = GameClock.get_day_index()
 	GameClock.follow(data["elapsed_days"], data["seconds_per_day"], data["paused"])
 	CoopBeds.in_bed.assign(data["in_bed"])
+	_follow_places(data, farm)
 	return GameClock.get_day_index() != day
+
+
+## Where everyone is, as the host has it (an older clock has none).
+static func _follow_places(data: Dictionary, farm: Node) -> void:
+	farm.player_places = (data["places"] as Dictionary).duplicate(true) if data.has("places") else {}
 
 
 ## On a guest, joining: takes the whole farm, as a load would. Scenes must
@@ -105,8 +112,10 @@ static func join(bytes: PackedByteArray, farm: Node = GameState) -> String:
 	# not be saved over, even after leaving.
 	SaveGame.farm_open = false
 	GameClock.elapsed_days = got["data"]["clock"]["elapsed_days"]
-	_follow(got["data"]["clock"])
+	_follow(got["data"]["clock"], farm)
 	farm.farm_from_dict(got["data"]["farm"])
+	# Loading a farm forgets everyone's place; the host's word comes back.
+	_follow_places(got["data"]["clock"], farm)
 	_renew_relay_certificates(farm)
 	return ""
 
@@ -124,7 +133,7 @@ static func update(bytes: PackedByteArray, farm: Node = GameState) -> String:
 	for field: String in OWN:
 		got["data"]["farm"][field] = farm.get(field)
 	# The clock first, so listeners see the host's day.
-	var new_day: bool = _follow(got["data"]["clock"])
+	var new_day: bool = _follow(got["data"]["clock"], farm)
 	farm.put_farm(got["data"]["farm"])
 	_renew_relay_certificates(farm)
 	_show_changes(farm, before, new_day)
@@ -157,6 +166,8 @@ static func _clock_problem(data: Dictionary) -> String:
 	var in_bed: Variant = data.get("in_bed")
 	if typeof(in_bed) != TYPE_ARRAY or (in_bed as Array).any(func(id: Variant) -> bool: return typeof(id) != TYPE_STRING):
 		return "The host's clock has a bad 'in_bed'."
+	if data.has("places") and ZonePresence.table_problem(data["places"]) != "":
+		return "The host's clock has bad 'places'."
 	return "" if data.get("paused") is bool else "The host's clock has a bad 'paused'."
 
 

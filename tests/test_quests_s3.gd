@@ -760,8 +760,8 @@ func test_a_guest_sees_the_envelope_and_hands_out_none() -> String:
 func _check_guest(gs: GameStateScript) -> String:
 	var job: Dictionary = _offer(gs)
 	_own_gauge(gs)
-	if SessionScript.PROTOCOL != 16:
-		return "The envelope rides in fields guests already get: CoopSession.PROTOCOL stays 16."
+	if SessionScript.PROTOCOL != 17:
+		return "The envelope rides in fields guests already get: CoopSession.PROTOCOL stays 17."
 	var guest: GameStateScript = _farm()
 	var problem: String = guest.farm_from_dict(gs.farm_to_dict())
 	var out: String = ""

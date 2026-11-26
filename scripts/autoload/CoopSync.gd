@@ -61,7 +61,7 @@ func tick(now: int) -> void:
 		_clock_at = now + CLOCK_MS
 	elif now >= _clock_at:
 		_clock_at = now + CLOCK_MS
-		session.send_state({ "clock": FarmSync.clock() })
+		session.send_state({ "clock": FarmSync.clock(farm) })
 
 
 ## Host: sends the farm to one guest or ("") to all. Returns its size as sent, or
