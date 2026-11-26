@@ -550,7 +550,7 @@ func _check_rewards(gs: GameStateScript) -> String:
 		return "The quest point is the player's: %s" % [gs.quest_points]
 	if gs.action_counts.has(HOST):
 		return "A quest's lump is not counted as an action."
-	var said: String = "QUEST DONE: Test paid. Reward: %s CR, 60 lab XP, 30 Calibration XP, 1 quest point." % SP811.integer(1500)
+	var said: String = "QUEST DONE: Test paid. Reward: %s CR, 60 lab XP, 30 Calibration XP, 1 quest point, an XP certificate (200 XP)." % SP811.integer(1500)
 	if not _has_line(gs, said) or not _has_line(gs, "LIN: Good work."):
 		return "The reward is said on the phone: %s" % [gs.phone_log]
 	# A second look, more credits, and a save and load: nothing more.

@@ -1,7 +1,8 @@
 class_name SkillsUI
 extends Control
 ## The skills view: the lab's level, then each skill's level, XP and what it does. K opens and closes
-## it on the farm and in the dome.
+## it on the farm and in the dome. While the player holds an XP certificate it shows a button that
+## opens the picker (XpCertificateUI) over it.
 
 const TEAL: Color = Color("38E1C6")
 const TEXT: Color = Color(0.85, 0.95, 0.88)
@@ -9,6 +10,7 @@ const DIM: Color = Color(0.6, 0.68, 0.63)
 
 var _rows: VBoxContainer
 var _close_button: Button
+var _picker: XpCertificateUI
 
 
 func _ready() -> void:
@@ -34,6 +36,9 @@ func _ready() -> void:
 	column.add_child(_close_button)
 	GameState.skill_xp_changed.connect(_on_xp_changed)
 	GameState.lab_xp_changed.connect(_on_xp_changed.bind("", ""))
+	GameState.xp_certificates_changed.connect(_on_xp_changed.bind("", ""))
+	_picker = XpCertificateUI.new()
+	add_child(_picker)
 	hide()
 
 
@@ -46,7 +51,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			open()
 		return
 	if toggled or event.is_action_pressed(&"ui_cancel"):
-		hide()
+		# Esc or K steps back from the picker first.
+		if _picker.visible:
+			_picker.hide()
+			_close_button.grab_focus()
+		else:
+			hide()
 	# No key press reaches the farm or the scene swap behind the view. Driving
 	# polls Input, so the rover still answers.
 	if key != null or event is InputEventJoypadButton:
@@ -54,6 +64,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func open() -> void:
+	_picker.hide()
 	_refresh()
 	show()
 	_close_button.grab_focus()
@@ -73,3 +84,9 @@ func _refresh() -> void:
 	for id: String in GameState.skill_ids():
 		_rows.add_child(PlanBoardUI._label(GameState.skill_text(id), TEXT, 20))
 		_rows.add_child(PlanBoardUI._label("    " + GameState.skill_effects_text(id), DIM, 16))
+	var held: int = GameState.held_xp_certificates().size()
+	if held > 0:
+		var spend: Button = PlanBoardUI._button("SPEND AN XP CERTIFICATE  (%s held)" % SP811.integer(held))
+		spend.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		spend.pressed.connect(_picker.open)
+		_rows.add_child(spend)

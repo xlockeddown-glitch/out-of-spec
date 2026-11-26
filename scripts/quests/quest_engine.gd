@@ -23,8 +23,8 @@ extends RefCounted
 ##
 ## Not built yet: accept and turn-in by the player (the quest log, build step 7;
 ## until then an offered quest is accepted at once and paid when its last step
-## holds), player-scope quests (step 8), the XP certificate (step 6), mini-game
-## steps (step 11) and item rewards (step 10).
+## holds), player-scope quests (step 8), mini-game steps (step 11: a step may
+## carry "minigame", which nothing reads yet) and item rewards (step 10).
 
 const TABLE: StringName = &"quests"
 const SECTION: String = "quests"
@@ -41,6 +41,12 @@ const LOGS: Dictionary = { "cal_log": "cal_log", "job_log": "job_log", "audit_lo
 const COUNTING: Array[String] = ["count", "counter"]
 ## A reward of skill XP is "xp_<skill id>".
 const XP_PREFIX: String = "xp_"
+## A reward of an XP certificate: the XP it is worth in the one skill its holder
+## picks (section 4.4). Sized to the quest, never to the player.
+const XP_CERTIFICATE: String = "xp_certificate"
+## A `counter` that is not a source of data/skills.json: what Lin has bought in
+## spec, of the crop `where.crop_id` names or of every crop.
+const SOLD_IN_SPEC: String = "crops_sold_in_spec"
 
 
 static func quests() -> Array[Dictionary]:
@@ -124,7 +130,9 @@ static func _update_one(farm: Node, quest: Dictionary, present: Array[String], o
 		return true
 	var next: String = current_step_text(quest, entry)
 	if is_new:
-		farm.post_phone("%s: New quest, %s. %s" % [giver_name(quest), title, next])
+		# `offer_line`: what the giver says with the offer, a path or the words.
+		var said: String = phone_line(str(quest.get("offer_line", "")))
+		farm.post_phone("%s: New quest, %s. %s%s" % [giver_name(quest), title, "" if said == "" else said + " ", next])
 	elif not finished.is_empty():
 		farm.post_phone("QUEST %s: step done. Next: %s" % [title, next])
 	return moved
@@ -169,6 +177,12 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 	if int(rewards.get("quest_points", 0)) > 0:
 		for player: String in players:
 			(farm.quest_points.get_or_add(player, {}) as Dictionary)[str(quest["id"])] = int(rewards["quest_points"])
+	# One each, held until its player spends it (GameState.spend_xp_certificate).
+	var certificate: int = int(rewards.get(XP_CERTIFICATE, 0))
+	if certificate > 0 and not players.is_empty():
+		for player: String in players:
+			farm.give_xp_certificate(player, str(quest["id"]), certificate)
+		farm.post_phone("XP CERTIFICATE: %s XP in a skill of your choice, for each player who took part. Open SKILLS (K) to spend it." % SP811.integer(certificate))
 	var line: String = phone_line(str(rewards.get("phone", "")))
 	if line != "":
 		farm.post_phone("%s: %s" % [giver_name(quest), line])
@@ -190,10 +204,12 @@ static func reward_text(quest: Dictionary) -> String:
 	var points: int = int(rewards.get("quest_points", 0))
 	if points > 0:
 		parts.append("%s quest %s" % [SP811.integer(points), "point" if points == 1 else "points"])
+	if int(rewards.get(XP_CERTIFICATE, 0)) > 0:
+		parts.append("an XP certificate (%s XP)" % SP811.integer(int(rewards[XP_CERTIFICATE])))
 	return ", ".join(parts)
 
 
-## The skill a reward key names, or "" (the certificate is build step 6).
+## The skill a reward key names, or "" (the certificate names none).
 static func _reward_skill(key: String) -> String:
 	if not key.begins_with(XP_PREFIX):
 		return ""
@@ -403,11 +419,23 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String]) ->
 		"level":
 			return _best_level(farm, str(step.get("skill", "")), present)
 		"counter":
+			if str(step.get("counter", "")) == SOLD_IN_SPEC:
+				return _sold_in_spec(farm, step.get("where", {}))
 			var total: int = 0
 			for player: String in farm._known_players():
 				total += farm.action_count(str(step.get("counter", "")), player)
 			return total
 	return 0
+
+
+static func _sold_in_spec(farm: Node, where: Variant) -> int:
+	var sold: Dictionary = farm.crops_sold_in_spec
+	if where is Dictionary and where.has("crop_id"):
+		return int(sold.get(str(where["crop_id"]), 0))
+	var total: int = 0
+	for count: Variant in sold.values():
+		total += int(count)
+	return total
 
 
 static func _count_rows(farm: Node, log_name: String, where: Variant) -> int:
