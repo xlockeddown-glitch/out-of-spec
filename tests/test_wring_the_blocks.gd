@@ -377,3 +377,59 @@ func test_a_skip_and_a_stack_that_can_t_be_built_end_with_no_score() -> String:
 		problem = "A skip at the result keeps the score: %s" % [_scores]
 	game.free()
 	return problem
+
+
+func test_a_relaxed_turn_reaches_the_mark_within_one_hold() -> String:
+	# The slowest turn the seed can give, at Relaxed's speed, in one full hold.
+	var slowest: float = WringTheBlocks.TURN_MIN_PER_S * MinigameSettings.speed_factor(MinigameSettings.Mode.RELAXED) * WringTheBlocks.MAX_HOLD_S
+	if slowest < WringTheBlocks.TURN_MARK + WringTheBlocks.BASE_MARK:
+		return "One hold must reach the quarter-turn mark at Relaxed: %s degrees." % slowest
+	for motion_seed: int in [1, 2, 3, 4, 5, 811]:
+		var game: WringTheBlocks = _game()
+		var stack: Dictionary = _stack()
+		game.play(0.0, MinigameSettings.Mode.RELAXED, motion_seed, stack)
+		_pick(game, stack)
+		var guard: int = 0
+		while game.stage() != WringTheBlocks.Stage.TURN and guard < 60 * 120:
+			guard += 1
+			if game.stage() == WringTheBlocks.Stage.SLIDE:
+				game.hold(game.rate() < WringTheBlocks.GREEN_CENTRE)
+			game.advance(STEP)
+		# One press, never let go: the game ends the hold at MAX_HOLD_S.
+		game.hold(true)
+		var reached: float = 0.0
+		var held: float = 0.0
+		while game.stage() == WringTheBlocks.Stage.TURN and held < 10.0:
+			reached = maxf(reached, game.angle())
+			game.advance(STEP)
+			held += STEP
+		game.free()
+		if reached < WringTheBlocks.TURN_MARK or held > WringTheBlocks.MAX_HOLD_S + 2.0 * STEP:
+			return "Seed %d: one Relaxed hold turned %s degrees in %s s." % [motion_seed, reached, held]
+	return ""
+
+
+func test_a_hold_the_game_ends_is_said() -> String:
+	var game: WringTheBlocks = _game()
+	var stack: Dictionary = _stack()
+	game.play(0.0, MinigameSettings.Mode.STANDARD, 3, stack)
+	_pick(game, stack)
+	game.advance(WringTheBlocks.SETTLE_S + 0.1)
+	var hint: Label = game.get_node("%HintLabel") if game.has_node("%HintLabel") else game._hint_label
+	var problem: String = ""
+	game.hold(true)
+	game.advance(WringTheBlocks.MAX_HOLD_S - 0.2)
+	if hint.text.contains(WringTheBlocks.HOLD_CAP_HINT):
+		problem = "Nothing is said before the hold runs out."
+	game.advance(0.4)
+	if problem == "" and game.stage() == WringTheBlocks.Stage.SLIDE and not hint.text.begins_with(WringTheBlocks.HOLD_CAP_HINT):
+		problem = "A hold the game ended is said on the screen: '%s'" % hint.text
+	if problem == "" and game.stage() != WringTheBlocks.Stage.SLIDE:
+		problem = "The test's slide should outlast one hold."
+	# Said once, however often it happens in a stage, and gone with the stage.
+	game.hold(true)
+	game.advance(WringTheBlocks.MAX_HOLD_S + 0.2)
+	if problem == "" and game.stage() == WringTheBlocks.Stage.SLIDE and hint.text.count(WringTheBlocks.HOLD_CAP_HINT) != 1:
+		problem = "The cue is shown once: '%s'" % hint.text
+	game.free()
+	return problem

@@ -20,9 +20,10 @@ const TRAY_BLOCKS: int = 6
 
 ## The seed of the length a player is asked for: the farm's seed, the day and
 ## the player, all of which a guest's screen has too. So it is one length a day
-## for each player [ASSUMPTION].
+## for each player [ASSUMPTION]. A SHA-256 of text, as QuestEngine.daily_roll
+## is: hash() of an Array is not promised to be the same on every build.
 static func stack_seed(world_seed: int, day: int, player_id: String) -> int:
-	return hash([world_seed, day, player_id, "gauge_stack"])
+	return ("%d:%d:%s:gauge_stack" % [world_seed, day, player_id]).sha256_text().left(7).hex_to_int()
 
 
 ## The size indexes in `held` that are pieces of the set, each once, in order.

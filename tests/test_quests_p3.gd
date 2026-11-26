@@ -129,7 +129,13 @@ func _play(commands: Node, score: int, player: String = HOST) -> Variant:
 		_accept(gs)
 	_dig_blocks(gs, 3, player)
 	commands.execute(player, CHECK, [gs.STEERING_ID])
-	return commands.execute(player, BUILD, [score])
+	return _build(commands, player, score)
+
+
+## Builds today's stack as `player`, having played the length the farm names.
+func _build(commands: Node, player: String, score: int) -> Variant:
+	var stack: Dictionary = (commands.state as GameStateScript).block_stack_target(player)
+	return commands.execute(player, BUILD, [int(stack.get("target", 0)), score])
 
 
 # --- The data ---------------------------------------------------------------------
@@ -262,7 +268,7 @@ func test_a_check_of_any_instrument_does_the_second_step() -> String:
 		_accept(gs)
 		_dig_blocks(gs, 3)
 		# A build now is not the last step's.
-		commands.execute(HOST, BUILD, [100])
+		_build(commands, HOST, 100)
 		if _steps(gs) != ["find"]:
 			return "A stack built early does no step: %s" % [_entry(gs)]
 		var readings: String = var_to_str(gs.farm_to_dict()["sensors"]) if gs.farm_to_dict().has("sensors") else ""
@@ -281,7 +287,7 @@ func test_the_named_length_is_built_from_blocks_held() -> String:
 		var gs: GameStateScript = commands.state
 		if not gs.block_stack_target(HOST).is_empty():
 			return "With no blocks there is no length."
-		var refused: Variant = commands.execute(HOST, BUILD, [100])
+		var refused: Variant = _build(commands, HOST, 100)
 		if not refused is Dictionary or not refused.get("refused", false) or gs.action_count(gs.BLOCK_STACK_COUNT, HOST) != 0:
 			return "A stack takes two blocks: %s" % [refused]
 		_dig_blocks(gs, 5)
@@ -307,12 +313,15 @@ func test_the_named_length_is_built_from_blocks_held() -> String:
 		FarmCommands.guest = false
 		if problem != "" or not same:
 			return "A guest's copy of the farm names the same length. %s" % problem
-		var answer: Variant = commands.execute(HOST, BUILD, [250])
-		if not answer is Dictionary or int(answer.get("target", 0)) != sum or answer.get("sizes") != stack["sizes"] or int(answer.get("score", 0)) != 100:
-			return "The build answers with the length, its pieces and a score of 100 at most: %s" % [answer]
+		# No ask of Orin's is open here, so the host takes no score with the build.
+		var answer: Variant = _build(commands, HOST, 250)
+		if not answer is Dictionary or int(answer.get("target", 0)) != sum or answer.get("sizes") != stack["sizes"] or int(answer.get("score", 0)) != MinigameScore.SKIPPED or answer.has("changed"):
+			return "The build answers with the length and its pieces, and no score outside a quest: %s" % [answer]
+		if int(gs.build_block_stack(sum, 250, HOST).get("score", 0)) != 100:
+			return "The farm cuts a score to 100 at most."
 		# The manager is no player: nothing is counted for it.
-		gs.build_block_stack(90, gs.MANAGER_ID)
-		return "" if gs.action_count(gs.BLOCK_STACK_COUNT, HOST) == 1 and not gs.action_counts.has(gs.MANAGER_ID) else "A build is counted for the player who did it.")
+		gs.build_block_stack(sum, 90, gs.MANAGER_ID)
+		return "" if gs.action_count(gs.BLOCK_STACK_COUNT, HOST) == 2 and not gs.action_counts.has(gs.MANAGER_ID) else "A build is counted for the player who did it.")
 
 
 func test_a_build_changes_nothing_but_its_count() -> String:
@@ -321,7 +330,7 @@ func test_a_build_changes_nothing_but_its_count() -> String:
 		_dig_blocks(gs, 5)
 		var before: Dictionary = str_to_var(var_to_str(gs.farm_to_dict()))
 		var log: int = gs.phone_log.size()
-		commands.execute(HOST, BUILD, [100])
+		_build(commands, HOST, 100)
 		var after: Dictionary = str_to_var(var_to_str(gs.farm_to_dict()))
 		for key: Variant in after:
 			if str(key) != "action_counts" and var_to_str(after[key]) != var_to_str(before.get(key)):
@@ -343,7 +352,7 @@ func test_the_stack_ends_the_quest_and_pays_once() -> String:
 		var credits: int = gs.credits
 		if not QuestEngine.keepsakes_of(gs, HOST).is_empty() or gs.quest_point_total(HOST) != 0:
 			return "Nothing is paid before the last step."
-		var answer: Variant = commands.execute(HOST, BUILD, [70])
+		var answer: Variant = _build(commands, HOST, 70)
 		if not answer is Dictionary or answer.get("refused", false) or not _is_done(gs):
 			return "The stack is the last step: %s %s" % [answer, _entry(gs)]
 		if gs.skill_xp(SKILL, HOST) != xp + XP or gs.quest_point_total(HOST) != 1 or gs.credits != credits:
@@ -353,7 +362,7 @@ func test_the_stack_ends_the_quest_and_pays_once() -> String:
 		if _lines(gs, DONE) != 1 or _lines(gs, ORIN_DONE) != 1 or _lines(gs, BONUS) != 0 or _lines(gs, ORIN_REFERENCE) != 0:
 			return "The phone says it is done and what it paid, and Orin has his word: %s" % [gs.phone_log]
 		# Good (60 to 79) is done with no bonus; and nothing is paid twice.
-		commands.execute(HOST, BUILD, [100])
+		_build(commands, HOST, 100)
 		commands.execute(HOST, CHECK, [gs.STEERING_ID])
 		_dig_blocks(gs, 1)
 		_morning(gs, 3)
@@ -372,7 +381,7 @@ func test_fine_and_reference_add_to_the_xp() -> String:
 			_dig_blocks(gs, 3)
 			commands.execute(HOST, CHECK, [gs.STEERING_ID])
 			var xp: int = gs.skill_xp(SKILL, HOST)
-			commands.execute(HOST, BUILD, [score])
+			_build(commands, HOST, score)
 			if not _is_done(gs):
 				return "A stack scored %d does the step." % score
 			paid[score] = [gs.skill_xp(SKILL, HOST) - xp, _lines(gs, BONUS), _lines(gs, ORIN_REFERENCE), _lines(gs, ORIN_DONE),
@@ -438,7 +447,7 @@ func test_it_is_saved_under_way_and_done() -> String:
 		# It goes on from the file, the stack's score with it.
 		commands.state = back
 		var xp: int = back.skill_xp(SKILL, HOST)
-		commands.execute(HOST, BUILD, [85])
+		_build(commands, HOST, 85)
 		if not _is_done(back) or back.skill_xp(SKILL, HOST) != xp + XP + 15:
 			return "The loaded quest is finished and paid with its bonus: %s" % [_entry(back)]
 		var done: Dictionary = str_to_var(var_to_str(back.farm_to_dict()))
@@ -447,7 +456,7 @@ func test_it_is_saved_under_way_and_done() -> String:
 			return "A farm with P3 done must load: %s" % again.farm_dict_problem(done)
 		again.update_quests()
 		commands.state = again
-		commands.execute(HOST, BUILD, [100])
+		_build(commands, HOST, 100)
 		if again.skill_xp(SKILL, HOST) != xp + XP + 15 or again.quest_point_total(HOST) != 1 or QuestEngine.keepsakes_of(again, HOST) != [CASE]:
 			return "After a load the quest is done, paid once, and the case is held."
 		# Nothing new is saved for the case or the build: the quest and a count.
@@ -480,14 +489,14 @@ func test_a_guest_has_their_own_p3() -> String:
 		commands.execute(id, CHECK, [host.STEERING_ID])
 		if _steps(host, id) != ["find", "check"] or _steps(host) != ["find"]:
 			return "The guest's check is the guest's step: %s" % [host.player_quest_state]
-		commands.execute(HOST, BUILD, [100])
+		_build(commands, HOST, 100)
 		if _is_done(host, id) or _is_done(host) or not (_entry(host, id).get("scores", {}) as Dictionary).is_empty():
 			return "The host's stack does not do the guest's step, or give it a score."
 		if host.block_stack_target(id) == host.block_stack_target(HOST) and host.gauge_pieces().size() > 3:
 			return "Each player is named a length of their own."
 		var host_xp: int = host.skill_xp(SKILL, HOST)
 		var guest_xp: int = host.skill_xp(SKILL, id)
-		var answer: Variant = commands.execute(id, BUILD, [97])
+		var answer: Variant = _build(commands, id, 97)
 		if not answer is Dictionary or answer.get("refused", false) or not _is_done(host, id) or _is_done(host):
 			return "The guest's stack ends the guest's quest alone: %s %s" % [answer, host.player_quest_state]
 		if host.skill_xp(SKILL, id) != guest_xp + XP + 30 or host.skill_xp(SKILL, HOST) != host_xp:
@@ -507,7 +516,7 @@ func test_a_guest_has_their_own_p3() -> String:
 			return "The guest's copy holds their done quest and their case. %s" % problem
 		# The host's own goes on, and is saved with the guest's.
 		commands.execute(HOST, CHECK, [host.STEERING_ID])
-		commands.execute(HOST, BUILD, [10])
+		_build(commands, HOST, 10)
 		if not _is_done(host) or host.skill_xp(SKILL, HOST) != host_xp + XP or host.skill_xp(SKILL, id) != guest_xp + XP + 30:
 			return "The host's own P3 is paid to the host, as written."
 		var saved: Dictionary = str_to_var(var_to_str(host.farm_to_dict()))
@@ -549,3 +558,112 @@ func test_a_done_p3_and_its_case_travel() -> String:
 		if _steps(d, id_d) != ["find", "check"] or _is_done(d, id_d) or not QuestEngine.keepsakes_of(d, id_d).is_empty():
 			return "It is taken up where it stood, with no case yet: %s" % [d.player_quest_state]
 		return "")
+
+
+# --- What the host takes from the sender ------------------------------------------
+
+func test_a_score_sent_with_no_open_step_is_not_kept() -> String:
+	return _run(func(commands: Node) -> String:
+		var host: GameStateScript = commands.state
+		_dig_blocks(host, 2)
+		_morning(host)
+		var id: String = host.let_in_guest(KEY, {}, [HOST] as Array[String], ProfileScript.no_record())
+		if id == "":
+			return "The guest was not let in."
+		CoopSession.players.assign([HOST, id])
+		host.update_quests()
+		_dig_blocks(host, 3, id)
+		if _steps(host, id) != ["find"] or QuestEngine.has_minigame_step(host, MinigameScore.WRING_THE_BLOCKS, "", id):
+			return "The test's guest has P3 with its stack step not yet open: %s" % [_entry(host, id)]
+		# A guest's PC sends 100 with the step not open: the build is a skip.
+		var xp: int = host.skill_xp(SKILL, id)
+		var early: Variant = _build(commands, id, 100)
+		if not early is Dictionary or early.get("refused", false) or int(early.get("score", 0)) != MinigameScore.SKIPPED:
+			return "With no open step the host answers a skip, whatever was sent: %s" % [early]
+		if not (_entry(host, id).get("scores", {}) as Dictionary).is_empty() or _steps(host, id) != ["find"] or host.skill_xp(SKILL, id) != xp:
+			return "Nothing is kept of a score sent with no open step: %s" % [_entry(host, id)]
+		# With the step open the same call is taken; here the guest skips, and
+		# nothing of the early 100 is found in the pay.
+		commands.execute(id, CHECK, [host.STEERING_ID])
+		if not QuestEngine.has_minigame_step(host, MinigameScore.WRING_THE_BLOCKS, "", id) or QuestEngine.has_minigame_step(host, MinigameScore.WRING_THE_BLOCKS, "", HOST):
+			return "The stack step is open for the guest alone."
+		_build(commands, id, MinigameScore.SKIPPED)
+		if not _is_done(host, id) or host.skill_xp(SKILL, id) != xp + XP or _lines(host, BONUS) != 0 or not (_entry(host, id).get("scores", {}) as Dictionary).is_empty():
+			return "The early score gives no grade later: %d XP, %s" % [host.skill_xp(SKILL, id) - xp, _entry(host, id)]
+		return "")
+
+
+func test_a_length_played_across_0600_is_a_skip() -> String:
+	return _run(func(commands: Node) -> String:
+		var gs: GameStateScript = commands.state
+		_accept(gs)
+		_dig_blocks(gs, 3)
+		commands.execute(HOST, CHECK, [gs.STEERING_ID])
+		# The player opens the game on one day and ends it after 06:00 of another.
+		var played: int = int(gs.block_stack_target(HOST)["target"])
+		var day: int = GameClock.get_day_index()
+		for later: int in range(1, 20):
+			GameClock.elapsed_days += 1.0
+			if int(gs.block_stack_target(HOST)["target"]) != played:
+				break
+		var today: int = int(gs.block_stack_target(HOST)["target"])
+		if today == played or GameClock.get_day_index() == day:
+			return "The test needs a day that names another length."
+		var xp: int = gs.skill_xp(SKILL, HOST)
+		var answer: Variant = commands.execute(HOST, BUILD, [played, 100])
+		if not answer is Dictionary or answer.get("refused", false) or not answer.get("changed", false):
+			return "The host says the length changed: %s" % [answer]
+		if int(answer["target"]) != today or int(answer["score"]) != MinigameScore.SKIPPED:
+			return "Today's length is built, and the score is a skip's: %s" % [answer]
+		if not _is_done(gs) or gs.skill_xp(SKILL, HOST) != xp + XP or _lines(gs, BONUS) != 0 or not (_entry(gs).get("scores", {}) as Dictionary).is_empty():
+			return "A build of a changed length does the step as a skip does: %d XP, %s" % [gs.skill_xp(SKILL, HOST) - xp, _entry(gs)]
+		# The length played and today's the same: the score is taken.
+		var same: Dictionary = gs.build_block_stack(today, 88, HOST)
+		return "" if int(same.get("score", 0)) == 88 and not same.has("changed") else "The same length is no change: %s" % [same])
+
+
+func test_a_find_mid_game_changes_the_length_plainly() -> String:
+	return _run(func(commands: Node) -> String:
+		var gs: GameStateScript = commands.state
+		_accept(gs)
+		_dig_blocks(gs, 3)
+		commands.execute(HOST, CHECK, [gs.STEERING_ID])
+		var played: int = int(gs.block_stack_target(HOST)["target"])
+		# Blocks dug by another while the game is open, until the length is another.
+		for more: int in 12:
+			_dig_blocks(gs, 1)
+			if int(gs.block_stack_target(HOST)["target"]) != played:
+				break
+		if int(gs.block_stack_target(HOST)["target"]) == played:
+			return ""  # this seed's finds never moved it: nothing to show
+		var answer: Variant = commands.execute(HOST, BUILD, [played, 100])
+		return "" if answer is Dictionary and answer.get("changed", false) and int(answer["score"]) == MinigameScore.SKIPPED and _lines(gs, BONUS) == 0 else "A find mid-game makes the try a skip: %s" % [answer])
+
+
+func test_a_guest_who_plays_to_reference_gets_the_bonus() -> String:
+	return _run(func(commands: Node) -> String:
+		var host: GameStateScript = commands.state
+		if str(_shipped().get("scope", "")) != QuestEngine.SCOPE_PLAYER:
+			return "P3 is a player's own quest."
+		_dig_blocks(host, 2)
+		_morning(host)
+		var id: String = host.let_in_guest(KEY, {}, [HOST] as Array[String], ProfileScript.no_record())
+		if id == "":
+			return "The guest was not let in."
+		CoopSession.players.assign([HOST, id])
+		host.update_quests()
+		_dig_blocks(host, 3, id)
+		commands.execute(id, CHECK, [host.STEERING_ID])
+		var host_xp: int = host.skill_xp(SKILL, HOST)
+		var guest_xp: int = host.skill_xp(SKILL, id)
+		var credits: int = host.credits
+		var answer: Variant = _build(commands, id, 100)
+		if not answer is Dictionary or int(answer.get("score", 0)) != 100 or not _is_done(host, id) or _is_done(host):
+			return "The guest's stack ends the guest's P3: %s" % [answer]
+		if host.skill_xp(SKILL, id) != guest_xp + XP + 30:
+			return "The guest who played gets the XP and Reference's 20 %% more: %d" % [host.skill_xp(SKILL, id) - guest_xp]
+		if host.skill_xp(SKILL, HOST) != host_xp or host.credits != credits or host.quest_point_total(HOST) != 0:
+			return "The host gets nothing of the guest's quest: %d XP" % [host.skill_xp(SKILL, HOST) - host_xp]
+		if _entry(host, id).get("scores", {}) != { "stack": 100 } or not (_entry(host).get("scores", {}) as Dictionary).is_empty():
+			return "The score is kept with the guest's quest alone: %s" % [host.player_quest_state]
+		return "" if _lines(host, "QUEST BONUS: The Missing Blocks, played to REFERENCE. 30 Earthworks XP more.") == 1 and _lines(host, ORIN_REFERENCE) == 1 else "The bonus is said once: %s" % [host.phone_log])

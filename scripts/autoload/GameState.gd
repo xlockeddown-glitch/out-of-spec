@@ -5480,19 +5480,28 @@ func block_stack_target(player_id: String = "") -> Dictionary:
 ## Builds today's length from the gauge set: { target, sizes, score }, or
 ## { refused, reason }. `score` is Wring the Blocks' (0 to 100), or
 ## MinigameScore.SKIPPED with no game: FarmCommands hands a graded one to the
-## quests, and nothing here reads it. A build is counted for who did it
+## quests, and nothing here reads it. `target` is the length the player's screen
+## showed. The day may have turned at 06:00, or a find reached the farm, while
+## they played: then the length built is today's, the answer has `changed`, and
+## the score is a skip's, as it was earned on another length. The blocks picked
+## on the screen are not sent and not checked: picking is the game's own, and
+## the host builds the length from the pieces it holds. A build is counted for who did it
 ## (action_counts, as BLOCK_STACK_COUNT, with no XP), and that count is all it
 ## changes: the blocks, every instrument and every log stay as they were, so a
 ## poor try and a skip leave the same farm.
-func build_block_stack(score: int, player_id: String = "") -> Dictionary:
+func build_block_stack(target: int, score: int, player_id: String = "") -> Dictionary:
 	var stack: Dictionary = block_stack_target(player_id)
 	if stack.is_empty():
 		return { "refused": true, "reason": "A stack takes two gauge blocks. Dig for more." }
 	if _player(player_id) != MANAGER_ID:
 		var done: Dictionary = (action_counts.get_or_add(_player(player_id), {}) as Dictionary).get_or_add(BLOCK_STACK_COUNT, { "count": 0, "xp": 0 })
 		done["count"] = int(done["count"]) + 1
-	return { "target": int(stack["target"]), "sizes": stack["sizes"],
+	var built: Dictionary = { "target": int(stack["target"]), "sizes": stack["sizes"],
 		"score": clampi(score, MinigameScore.SKIPPED, MinigameScore.MAX_SCORE) }
+	if target != int(stack["target"]):
+		built["score"] = MinigameScore.SKIPPED
+		built["changed"] = true
+	return built
 
 
 ## Surveys for ore from where the rover is, as OrePocket.survey() says, or

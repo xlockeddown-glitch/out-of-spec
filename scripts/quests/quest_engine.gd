@@ -943,8 +943,11 @@ static func is_stack_step(step: Dictionary) -> bool:
 ## player's own quests for that player. It only reads quest_state and
 ## player_quest_state, which a guest has as the host's copy, so it answers the
 ## same on a guest. In a quest done in order only the first step not done is open.
+## Wring the Blocks has no instrument: its step is one that counts built stacks,
+## and `instrument_id` is "" for it.
 static func has_minigame_step(farm: Node, minigame: String, instrument_id: String, player_id: String) -> bool:
-	if instrument_id == "":
+	var stack: bool = minigame == MinigameScore.WRING_THE_BLOCKS
+	if instrument_id == "" and not stack:
 		return false
 	for quest: Dictionary in quests():
 		if data_problem(quest) != "":
@@ -959,7 +962,7 @@ static func has_minigame_step(farm: Node, minigame: String, instrument_id: Strin
 		for step: Variant in quest["steps"]:
 			if str(step.get("id", "")) in entry.get("steps_done", []):
 				continue
-			if str(step.get("minigame", "")) == minigame and step_instrument(step) == instrument_id:
+			if str(step.get("minigame", "")) == minigame and (is_stack_step(step) if stack else step_instrument(step) == instrument_id):
 				return true
 			if in_order:
 				break

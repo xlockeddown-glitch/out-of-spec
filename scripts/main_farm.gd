@@ -460,13 +460,22 @@ func _build_block_stack() -> void:
 		RoverController.input_blocked = was_blocked
 		if not is_inside_tree():
 			return
-	var record: Dictionary = await FarmCommands.request(&"build_block_stack", [score])
+	# The length played goes with the score: the host builds today's, and counts
+	# no score earned on another (the day can turn at 06:00 mid-game).
+	var record: Dictionary = await FarmCommands.request(&"build_block_stack", [int(stack["target"]), score])
 	if record.is_empty() or not is_inside_tree():
 		return
 	if record.get("refused", false):
 		_hud.push_log("BLOCK STACK REFUSED: %s" % str(record["reason"]))
 		return
+	if record.get("changed", false):
+		_hud.push_log("BLOCK STACK: the length asked for changed while you worked. %s was built from %s blocks, and the try is not graded." % [
+			GaugeStack.length_text(int(record["target"])), SP811.integer((record["sizes"] as Array).size())])
+		return
 	var graded: String = MinigameScore.grade_text(WringTheBlocks.GAME_NAME, int(record["score"]))
+	if graded == "" and score >= 0:
+		# No open ask of Orin's carries the game: the host kept no score.
+		graded = MinigameScore.grade_text(WringTheBlocks.GAME_NAME, score) + " Practice: nothing is kept."
 	_hud.push_log("BLOCK STACK: %s from %s blocks.%s" % [
 		GaugeStack.length_text(int(record["target"])), SP811.integer((record["sizes"] as Array).size()),
 		"" if graded == "" else " " + graded])

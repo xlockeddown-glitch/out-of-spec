@@ -65,6 +65,8 @@ const STEP_S: float = 1.0 / 60.0
 const SETTLE_S: float = 0.6
 const RESULT_S: float = 1.6
 const SKIP_HINT: String = "Esc/Skip builds the stack without the game."
+## Shown when the game ends a hold at MAX_HOLD_S.
+const HOLD_CAP_HINT: String = "The hold ran out. Press again to go on."
 const GAME_NAME: String = "Wring"
 
 const COLOR_BAR := Color(0.03, 0.06, 0.04)
@@ -295,6 +297,10 @@ func _step(seconds: float) -> void:
 		_hold_s += seconds
 		if _hold_s >= MAX_HOLD_S and _stage in [Stage.SLIDE, Stage.TURN]:
 			_let_go()
+			# Said over whatever the stage now shows: a turn that was cut is taken
+			# where it stood, and the next stage's own line follows.
+			if not _hint_label.text.begins_with(HOLD_CAP_HINT):
+				_hint_label.text = HOLD_CAP_HINT + "\n" + _hint_label.text
 	var moved: float = seconds * _speed
 	match _stage:
 		Stage.SETTLE:
