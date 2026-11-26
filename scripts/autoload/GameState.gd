@@ -1195,12 +1195,12 @@ func _seep_pits(delta_days: float) -> void:
 		_seep_days = 0.0
 
 
-## Takes this as the ground water, and says so if it is not what it was.
-func _set_seep(next: Dictionary[Vector2i, float]) -> void:
-	var settled: bool = next == pit_seep
-	# Said only when the water shows a change, each centimeter, not every step.
-	var shows: bool = PitWater.shown(next) != PitWater.shown(pit_seep) or (settled and not _seep_full)
-	_seep_full = settled
+## Takes this as the ground water. A step of time says so only when the water shows
+## a change (each centimeter, or a pit reaching its end level); with `any_change`, as
+## after digging, any change in the numbers is said, and no change is not.
+func _set_seep(next: Dictionary[Vector2i, float], any_change: bool = false) -> void:
+	var shows: bool = next != pit_seep if any_change else PitWater.shown(next, dug) != PitWater.shown(pit_seep, dug)
+	_seep_full = next == pit_seep
 	pit_seep = next
 	if shows:
 		pit_seep_changed.emit()
@@ -4461,7 +4461,8 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 		problem = STONE_IN_THE_WAY
 	if problem == "":
 		dug[at] = dug.get(at, 0) + 1
-		_set_seep(PitWater.seep(pit_seep, dug, 0.0))
+		_set_seep(PitWater.seep(pit_seep, dug, 0.0), true)
+		# The digging may have changed where the water ends, so look at it next step.
 		_seep_full = false
 		terrain_changed.emit()
 		if not found_blocks.has(at) and not ReferenceBlock.at(world_seed, at).is_empty():
@@ -4555,7 +4556,8 @@ func fill(cell: Vector3i, player_id: String = "") -> String:
 		dug[at] -= 1
 		if dug[at] == 0:
 			dug.erase(at)
-		_set_seep(PitWater.seep(pit_seep, dug, 0.0))
+		_set_seep(PitWater.seep(pit_seep, dug, 0.0), true)
+		# The digging may have changed where the water ends, so look at it next step.
 		_seep_full = false
 		terrain_changed.emit()
 	return problem

@@ -81,7 +81,8 @@ func test_the_host_seeps_on_its_clock_and_a_guest_does_not() -> String:
 		gs.free()
 		return "A half step must wait for the other half."
 	gs._on_time_advanced(GameStateScript.SEEP_STEP_DAYS / 2.0)
-	var risen: bool = gs.pit_seep.has(FLAT) and told[0] == 1
+	# The first step is still dry to the eye, so it need not say so.
+	var risen: bool = gs.pit_seep.has(FLAT) and told[0] <= 1
 	var held: bool = FarmCommands.guest
 	FarmCommands.guest = true
 	var before: Dictionary[Vector2i, float] = gs.pit_seep.duplicate()
@@ -242,3 +243,90 @@ func test_a_guest_gets_the_seep_on_join_and_update() -> String:
 	if not joined:
 		return "A joining guest lacks the ground water."
 	return "" if updated else "An update must carry the ground water and say so."
+
+
+func _full() -> Dictionary[Vector2i, float]:
+	return PitWater.seep({}, _pit(), 1000.0)
+
+
+func _lowered(by_m: float) -> Dictionary[Vector2i, float]:
+	var out: Dictionary[Vector2i, float] = {}
+	var full: Dictionary[Vector2i, float] = _full()
+	for cell: Vector2i in full:
+		out[cell] = full[cell] - by_m
+	return out
+
+
+func test_a_pit_that_reaches_its_end_is_drawn_at_it_and_says_so() -> String:
+	var cap: float = _full()[FLAT]
+	# A hair under the end shows differently from the end, so the screens redraw.
+	if PitWater.shown(_lowered(0.0005), _pit()) == PitWater.shown(_full(), _pit()):
+		return "The last bit before the end shows the same as the end."
+	if not is_equal_approx(_level(_full()), cap):
+		return "A full pit is drawn at %f, not %f." % [_level(_full()), cap]
+	return ""
+
+
+func test_water_is_never_drawn_above_where_it_ends() -> String:
+	var cap: float = _full()[FLAT]
+	for hair: int in range(1, 100):
+		var level: float = _level(_lowered(hair * 0.0001))
+		if level > cap:
+			return "Water shown at %f is above its end %f." % [level, cap]
+	return ""
+
+
+func test_a_dig_far_from_every_pit_sends_no_seep_change() -> String:
+	var gs: GameStateScript = _state()
+	gs._on_time_advanced(1000.0)
+	var told: Array[int] = [0]
+	gs.pit_seep_changed.connect(func() -> void: told[0] += 1)
+	gs.dig(Vector3i(20, 0, 20))
+	gs._on_time_advanced(GameStateScript.SEEP_STEP_DAYS)
+	gs._on_time_advanced(1.0)
+	gs.free()
+	return "" if told[0] == 0 else "A far dig sent %d seep changes." % told[0]
+
+
+func test_digging_a_seeping_pit_deeper_keeps_its_level() -> String:
+	var gs: GameStateScript = _state()
+	# A pit three steps down, to dig its middle one deeper.
+	gs.dug[FLAT] = 3
+	gs._on_time_advanced(0.2)
+	var before: float = gs.pit_seep[FLAT]
+	var problem: String = gs.dig(Vector3i(FLAT.x, 0, FLAT.y))
+	var after: float = gs.pit_seep.get(FLAT, -INF)
+	gs.free()
+	if problem != "":
+		return "The dig was refused: %s" % problem
+	return "" if is_equal_approx(before, after) else "Digging deeper changed %f to %f." % [before, after]
+
+
+func test_pits_that_join_take_the_higher_level() -> String:
+	var dug: Dictionary[Vector2i, int] = _pit()
+	var seeped: Dictionary[Vector2i, float] = {}
+	var low: float = _full()[FLAT] - 0.5
+	seeped[FLAT] = low
+	seeped[FLAT + Vector2i(1, 0)] = low + 0.1
+	var next: Dictionary[Vector2i, float] = PitWater.seep(seeped, dug, 0.0)
+	if not is_equal_approx(next[FLAT], low + 0.1) or not is_equal_approx(next[FLAT + Vector2i(1, 1)], low + 0.1):
+		return "The joined pit did not take the higher level."
+	return ""
+
+
+func test_filling_the_floor_above_the_water_leaves_no_water_below_it() -> String:
+	var gs: GameStateScript = _state()
+	gs._on_time_advanced(0.1)
+	var problem: String = gs.fill(Vector3i(FLAT.x, 0, FLAT.y))
+	var worked: Dictionary[Vector2i, float] = PitWater.work_out(gs.dug, {}, gs.pit_seep)["levels"]
+	var bad: String = ""
+	var floor_m: float = INF
+	for cell: Vector2i in gs.pit_seep:
+		floor_m = minf(floor_m, Terrain.point_height(Vector2i(cell * 2) + Vector2i.ONE, gs.dug))
+	for cell: Vector2i in gs.pit_seep:
+		if gs.pit_seep[cell] < floor_m:
+			bad = "A kept level is below the pit's floor."
+		if worked.has(cell) and worked[cell] < floor_m:
+			bad = "Water is drawn below the floor."
+	gs.free()
+	return problem if problem != "" else bad

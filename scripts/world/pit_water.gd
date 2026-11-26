@@ -51,12 +51,7 @@ static var _point_cache: Dictionary[Vector2i, float] = {}
 static func work_out(dug: Dictionary[Vector2i, int], pieces: Dictionary[Vector2i, int], seeped: Variant = null) -> Dictionary:
 	var wet: Dictionary[Vector2i, float] = {}
 	for pit: Dictionary in _pits(dug):
-		var level: float = pit["cap"]
-		if seeped is Dictionary:
-			var reached: float = _reached(pit, seeped)
-			# Full is full, not the centimeter below it.
-			if reached < level:
-				level = maxf(snappedf(reached, SEEP_SHOWN_M), pit["low"])
+		var level: float = _pit_level(pit, seeped as Dictionary) if seeped is Dictionary else pit["cap"]
 		if level > pit["low"] + MIN_DEPTH_M:
 			for member: Vector2i in pit["cells"]:
 				wet[member] = level
@@ -106,11 +101,25 @@ static func _reached(pit: Dictionary, seeped: Dictionary) -> float:
 	return reached
 
 
-## The ground water as it shows: each level in whole SEEP_SHOWN_M.
-static func shown(seeped: Dictionary[Vector2i, float]) -> Dictionary[Vector2i, float]:
+## The level a pit shows for what has seeped in: whole SEEP_SHOWN_M, rounded down so it
+## never shows above where it would end, and exactly that end once it is reached.
+static func _pit_level(pit: Dictionary, seeped: Dictionary) -> float:
+	var reached: float = _reached(pit, seeped)
+	if reached >= pit["cap"]:
+		return pit["cap"]
+	return maxf(floorf(reached / SEEP_SHOWN_M + 0.000001) * SEEP_SHOWN_M, pit["low"])
+
+
+## The ground water as it shows, for these dug steps: each pit cell's level as work_out
+## draws it. Two seeps that show the same need no redraw.
+static func shown(seeped: Dictionary[Vector2i, float], dug: Dictionary[Vector2i, int]) -> Dictionary[Vector2i, float]:
 	var out: Dictionary[Vector2i, float] = {}
-	for cell: Vector2i in seeped:
-		out[cell] = snappedf(seeped[cell], SEEP_SHOWN_M)
+	for pit: Dictionary in _pits(dug):
+		var level: float = _pit_level(pit, seeped)
+		for member: Vector2i in pit["cells"]:
+			out[member] = level
+	_ground_cache.clear()
+	_natural_cache.clear()
 	return out
 
 

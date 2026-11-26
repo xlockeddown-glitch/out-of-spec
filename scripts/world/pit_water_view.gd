@@ -61,13 +61,13 @@ func _refresh() -> void:
 	var channels: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in StonePieces.channel_cells(GameState.stone_pieces):
 		channels[cell] = true
-	if _worked and GameState.dug == _seen_dug and channels == _seen_channels and PitWater.shown(GameState.pit_seep) == _seen_seep:
+	if _worked and GameState.dug == _seen_dug and channels == _seen_channels and PitWater.shown(GameState.pit_seep, GameState.dug) == _seen_seep:
 		return
 	_worked = true
 	worked_count += 1
 	_seen_dug = GameState.dug.duplicate()
 	_seen_channels = channels
-	_seen_seep = PitWater.shown(GameState.pit_seep)
+	_seen_seep = PitWater.shown(GameState.pit_seep, GameState.dug)
 	PitWater.use(PitWater.work_out(GameState.dug, GameState.stone_pieces, GameState.pit_seep), GameState.dug)
 	var keep: Dictionary[int, bool] = {}
 	for stretch: Array[Vector2i] in _stretches_of(PitWater.levels(), PitWater.film()):
