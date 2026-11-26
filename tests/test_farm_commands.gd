@@ -307,3 +307,35 @@ func test_screens_do_not_change_the_farm_directly() -> String:
 		if not action in CommandsScript.ACTIONS:
 			problems.append("%s is not an action" % action)
 	return "\n".join(problems)
+
+
+func test_a_guest_far_from_the_rover_acts_on_nothing_there() -> String:
+	var commands: Node = _make()
+	var state: Node = commands.state
+	state.local_player_id = "player_1"
+	# Before the rover's place is known, or in the tunnels, nothing is judged.
+	var anywhere: Vector3i = Vector3i(30, 0, 30)
+	if not commands.is_within_reach(&"dig", [anywhere]):
+		_free(commands)
+		return "No place is known"
+	state.rover_transforms[state.ROVER] = Transform3D(Basis.IDENTITY, Vector3(1.0, 0.0, 1.0))
+	var near: Array = [commands.is_within_reach(&"dig", [Vector3i(0, 0, 0)]), commands.is_within_reach(&"till", [Vector3i(1, 0, 1)]),
+		commands.is_within_reach(&"fill", [Vector3i(0, 0, 2)])]
+	var far: Array = [commands.is_within_reach(&"dig", [anywhere]), commands.is_within_reach(&"plant_crop", [anywhere, "", 0]),
+		commands.is_within_reach(&"place_stone", [anywhere, 0]), commands.is_within_reach(&"harvest_crop", [anywhere])]
+	var guest_dig: Variant = commands.execute("player_2", &"dig", [anywhere])
+	var guest_till: Variant = commands.execute("player_2", &"till", [Vector3i(0, 0, 0)])
+	var host_dig: Variant = commands.execute("player_1", &"dig", [anywhere])
+	var other: bool = commands.is_within_reach(&"get_into_rover", [])
+	state.rover_in_tunnels = true
+	var away: bool = commands.is_within_reach(&"dig", [anywhere])
+	_free(commands)
+	if near.has(false):
+		return "Near the rover must be in reach: %s" % [near]
+	if far.has(true) or str(guest_dig) != CommandsScript.FAR_REFUSAL:
+		return "Far must be refused: %s, %s" % [far, guest_dig]
+	if str(guest_till) == CommandsScript.FAR_REFUSAL:
+		return "Near the rover must be done"
+	if str(host_dig) == CommandsScript.FAR_REFUSAL:
+		return "The host's own screen judges its own reach"
+	return "" if other and away else "Only cells, and only on the farm"

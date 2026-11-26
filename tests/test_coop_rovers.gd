@@ -146,8 +146,8 @@ func test_leaving_frees_the_rover() -> String:
 
 
 func test_bad_poses_end_the_connection() -> String:
-	var bad: Array = [[], [0.0, 0.0, 0.0, 0.0, 0.0], [NAN, 0.0, 0.0, 0.0, 0.0, true], [0, 0.0, 0.0, 0.0, 0.0, true],
-		[INF, 0.0, 0.0, 0.0, 0.0, true], [501.0, 0.0, 0.0, 0.0, 0.0, true], [0.0, 0.0, 0.0, 0.0, 0.0, 1]]
+	# Not a pose at all. Numbers that are not real or not here are only refused.
+	var bad: Array = [[], [0.0, 0.0, 0.0, 0.0, 0.0], [0, 0.0, 0.0, 0.0, 0.0, true], [0.0, 0.0, 0.0, 0.0, 0.0, 1]]
 	for pose: Array in bad:
 		var host: Node = _host()
 		_rovers(host)
@@ -209,3 +209,54 @@ func test_a_friend_who_comes_later_is_told_where_it_is_now() -> String:
 	mine.tick(FAR)
 	_until(func() -> bool: return theirs._told_driver.has(ID))
 	return _end_with("" if theirs.place(ID) == _at(42.0) else "Told %s" % theirs.place(ID))
+
+
+func test_a_pose_that_is_not_real_is_refused_and_the_guest_stays() -> String:
+	var all: Array = _pair()
+	var state: Node = all[0].commands.state
+	var mine: Node = all[2]
+	mine._on_driven("player_2", ID, _pose(1.0), 1000)
+	for bad: Array in [[NAN, 0.0, 0.0, 0.0, 0.0, true], [INF, 0.0, 0.0, 0.0, 0.0, true], [501.0, 0.0, 0.0, 0.0, 0.0, true],
+			[0.0, 0.0, 0.0, 0.0, 9.0, true], [Terrain.HALF_M + 20.0, 0.0, 0.0, 0.0, 0.0, true]]:
+		mine._on_driven("player_2", ID, bad, 1000)
+		if state.rover_transforms[ID] != _at(1.0):
+			return _end_with("%s must be refused" % [bad])
+	# Near the edge, the distance allowed is not what refuses it: the edge is.
+	state.park_rover(ID, _at(Terrain.HALF_M - 1.0))
+	mine._reach.erase(ID)
+	mine._poses.erase(ID)
+	mine._on_driven("player_2", ID, _pose(Terrain.HALF_M + 3.0), 5000)
+	if state.rover_transforms[ID] != _at(Terrain.HALF_M - 1.0):
+		return _end_with("A rover 3 m past the edge must be refused")
+	mine._on_driven("player_2", ID, _pose(Terrain.HALF_M + 1.0), 5100)
+	if state.rover_transforms[ID] != _at(Terrain.HALF_M + 1.0):
+		return _end_with("A rover 1 m past the edge is still on the land")
+	if mine.is_sane([0.0, 0.0, 0.0, 0.0, 7.6, true]) or not mine.is_sane([0.0, 0.0, 0.0, 0.0, 6.0, true]):
+		return _end_with("A rover goes 6 m/s and no more than 7.5")
+	# One packet of nonsense does not end the connection.
+	all[1]._put(1, var_to_bytes([SessionScript.DRIVE, ID, [NAN, 0.0, 0.0, 0.0, 0.0, true]]), false)
+	var polls: Array = [0]
+	_until(func() -> bool:
+		polls[0] += 1
+		return polls[0] > 100 or all[0].players.size() < 2)
+	return _end_with("" if all[0].players.size() == 2 else "A refused pose must not drop its sender")
+
+
+func test_walking_speed_is_accepted_and_a_rover_jump_after_a_dig_or_the_tunnel_too() -> String:
+	var all: Array = _pair()
+	var state: Node = all[0].commands.state
+	var mine: Node = all[2]
+	# A rover at its own top speed, 50 ms apart.
+	for i: int in 20:
+		mine._on_driven("player_2", ID, _pose(0.3 * (i + 1)), 1000 + 50 * i)
+	if state.rover_transforms[ID] != _at(6.0):
+		return _end_with("Driving at 6 m/s must be taken")
+	# A dig floods its place and it is put up to 16 m away.
+	mine._on_driven("player_2", ID, _pose(22.0), 2000)
+	if state.rover_transforms[ID] != _at(22.0):
+		return _end_with("The pit rescue (16 m) must be taken")
+	# Into the tunnels, out again somewhere else: the host says where, and who knows it.
+	state.rover_transforms[ID] = _at(-40.0)
+	state.rover_place_changed.emit()
+	mine._on_driven("player_2", ID, _pose(-39.0), 2100)
+	return _end_with("" if state.rover_transforms[ID] == _at(-39.0) else "The rover must go on from its new place")
