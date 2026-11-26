@@ -37,7 +37,7 @@ func test_a_new_pit_is_dry_and_fills_at_the_seep_rate() -> String:
 	var one_day: float = seeped[FLAT]
 	if not is_equal_approx(one_day, minf(end_m, low_m + PitWater.SEEP_M_PER_DAY)):
 		return "A day of seep gave %f, not %f." % [one_day, minf(end_m, low_m + PitWater.SEEP_M_PER_DAY)]
-	if end_m > low_m + PitWater.SEEP_M_PER_DAY and _level(seeped) != one_day:
+	if end_m > low_m + PitWater.SEEP_M_PER_DAY and absf(_level(seeped) - one_day) > PitWater.SEEP_SHOWN_M:
 		return "The pit must hold what has seeped."
 	return ""
 
@@ -145,3 +145,97 @@ func test_a_bad_seep_is_refused() -> String:
 	var problem: String = gs.farm_dict_problem(data)
 	gs.free()
 	return "" if problem != "" else "A seep in a cell that can't be dug was accepted."
+
+
+func test_a_seep_value_that_is_not_a_finite_number_is_refused() -> String:
+	var gs: GameStateScript = _state()
+	var data: Dictionary = gs.farm_to_dict()
+	var cell: Vector2i = FLAT
+	for bad: Variant in ["deep", INF, NAN, 3]:
+		(data["pit_seep"] as Dictionary)[cell] = bad
+		if gs.farm_dict_problem(data) == "":
+			gs.free()
+			return "A seep of %s was accepted." % str(bad)
+	gs.free()
+	return ""
+
+
+func test_a_full_pit_is_not_worked_out_again_until_the_digging_changes() -> String:
+	var gs: GameStateScript = _state()
+	gs._on_time_advanced(1000.0)
+	gs._on_time_advanced(GameStateScript.SEEP_STEP_DAYS)
+	var settled: bool = gs._seep_full
+	var told: Array[int] = [0]
+	gs.pit_seep_changed.connect(func() -> void: told[0] += 1)
+	gs._on_time_advanced(10.0)
+	var quiet: bool = told[0] == 0
+	gs.dig(Vector3i(20, 0, 20))
+	var woke: bool = not gs._seep_full
+	gs.free()
+	if not settled:
+		return "A pit at its end level was not marked full."
+	if not quiet:
+		return "A full pit said it changed."
+	return "" if woke else "Digging must wake the seep."
+
+
+func test_a_rising_pit_says_so_only_each_centimeter() -> String:
+	var gs: GameStateScript = _state()
+	var told: Array[int] = [0]
+	gs.pit_seep_changed.connect(func() -> void: told[0] += 1)
+	# One step is 1.25 mm at the seep rate, so eight steps are a centimeter.
+	for i: int in 8:
+		gs._on_time_advanced(GameStateScript.SEEP_STEP_DAYS)
+	gs.free()
+	return "" if told[0] <= 2 else "Eight steps said %d times." % told[0]
+
+
+func test_the_view_follows_a_seep_change() -> String:
+	var gs: GameStateScript = _state()
+	var saved: Dictionary[Vector2i, int] = GameState.dug.duplicate()
+	GameState.dug.clear()
+	GameState.dug.merge(_pit())
+	GameState.pit_seep.clear()
+	var view := PitWaterView.new()
+	view._ready()
+	var dry: bool = view.worked_count == 1 and PitWater.levels().is_empty()
+	GameState.pit_seep.assign(PitWater.seep({}, GameState.dug, 1000.0))
+	GameState.pit_seep_changed.emit()
+	view._refresh()
+	var wet: bool = view.worked_count == 2 and PitWater.levels().has(FLAT)
+	GameState.dug.clear()
+	GameState.dug.merge(saved)
+	GameState.pit_seep.clear()
+	view.free()
+	gs.free()
+	if not dry:
+		return "A new pit must start dry in the view."
+	return "" if wet else "The view did not follow the seep."
+
+
+func test_a_guest_gets_the_seep_on_join_and_update() -> String:
+	var host: GameStateScript = _state()
+	host._on_time_advanced(0.1)
+	var guest: GameStateScript = GameStateScript.new()
+	guest.build_registry()
+	var held: bool = FarmCommands.guest
+	var bytes: PackedByteArray = FarmSync.capture(host)
+	FarmCommands.guest = true
+	var problem: String = FarmSync.join(bytes, guest)
+	var joined: bool = guest.pit_seep == host.pit_seep and not host.pit_seep.is_empty()
+	FarmCommands.guest = false
+	host._on_time_advanced(0.1)
+	bytes = FarmSync.capture(host)
+	FarmCommands.guest = true
+	var told: Array[int] = [0]
+	guest.pit_seep_changed.connect(func() -> void: told[0] += 1)
+	problem += FarmSync.update(bytes, guest)
+	var updated: bool = guest.pit_seep == host.pit_seep and told[0] == 1
+	FarmCommands.guest = held
+	host.free()
+	guest.free()
+	if problem != "":
+		return problem
+	if not joined:
+		return "A joining guest lacks the ground water."
+	return "" if updated else "An update must carry the ground water and say so."

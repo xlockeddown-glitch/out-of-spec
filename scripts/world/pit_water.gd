@@ -1,8 +1,9 @@
 class_name PitWater
 extends RefCounted
 ## Where dug pits hold water, worked out from what is known: the dug steps, the stone
-## pieces and the land. Nothing of it is saved or sent, and there is no chance in it,
-## so every PC finds the same water.
+## pieces, the land and how far the ground water has seeped in (GameState.pit_seep,
+## which the host keeps, saves and sends). Nothing else is saved, and there is no
+## chance in it, so every PC finds the same water.
 ##
 ## The ground seeps. A pit three steps deep or more, and every such pit touching it,
 ## fills to the water table, but never above the lowest ground round it. Two steps
@@ -22,6 +23,9 @@ const WADE_MIN_M: float = 0.1
 ## Ground water enters a pit this fast, in meters a day: a shallow pit is full in two
 ## days, a deep one in four [PLACEHOLDER].
 const SEEP_M_PER_DAY: float = 0.25
+## A pit shows its water in steps of this much, so a slow seep redraws it only each
+## centimeter [PLACEHOLDER].
+const SEEP_SHOWN_M: float = 0.01
 ## Water this shallow is no water at all.
 const MIN_DEPTH_M: float = 0.02 ## [PLACEHOLDER]
 
@@ -49,7 +53,10 @@ static func work_out(dug: Dictionary[Vector2i, int], pieces: Dictionary[Vector2i
 	for pit: Dictionary in _pits(dug):
 		var level: float = pit["cap"]
 		if seeped is Dictionary:
-			level = minf(level, maxf(_reached(pit, seeped), pit["low"]))
+			var reached: float = _reached(pit, seeped)
+			# Full is full, not the centimeter below it.
+			if reached < level:
+				level = maxf(snappedf(reached, SEEP_SHOWN_M), pit["low"])
 		if level > pit["low"] + MIN_DEPTH_M:
 			for member: Vector2i in pit["cells"]:
 				wet[member] = level
@@ -99,9 +106,19 @@ static func _reached(pit: Dictionary, seeped: Dictionary) -> float:
 	return reached
 
 
+## The ground water as it shows: each level in whole SEEP_SHOWN_M.
+static func shown(seeped: Dictionary[Vector2i, float]) -> Dictionary[Vector2i, float]:
+	var out: Dictionary[Vector2i, float] = {}
+	for cell: Vector2i in seeped:
+		out[cell] = snappedf(seeped[cell], SEEP_SHOWN_M)
+	return out
+
+
 ## The ground water after `days` more: each pit's level rises SEEP_M_PER_DAY from
 ## where it was (the floor, for a new pit) and stops at the level it would reach in the
-## end. A pit that can't hold water any more is forgotten. Host only: a guest is told.
+## end. A pit that can't hold water any more is forgotten. Where pits join, or a
+## pit is dug wider, the whole takes the highest level any of its cells had at once
+## [ASSUMPTION]. Host only: a guest is told.
 static func seep(seeped: Dictionary[Vector2i, float], dug: Dictionary[Vector2i, int], days: float) -> Dictionary[Vector2i, float]:
 	var next: Dictionary[Vector2i, float] = {}
 	for pit: Dictionary in _pits(dug):
