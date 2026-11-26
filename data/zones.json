@@ -1,5 +1,11 @@
 {
   "_note": "Zones (docs/design/zones.md, build step 2). One row per zone. band is the lab level the content is tuned for, [min, max]; bands overlap on purpose and are not gates. Ryan's anchors: underground about 5 to 20, the moons about 21 to 50, far sites 50 to 99; every other band edge is [PLACEHOLDER]. Names come from the doc; the ids, the word lists and the far-site entrances are [PLACEHOLDER] (invented for code). hazards and finds are words from ZoneData.HAZARDS and ZoneData.FINDS (section 5 and section 4 of the doc; far sites use the one-line ideas of section 11). hub_scene is the res:// path of the zone's hub scene, or an empty string while it has none; only the basalt tunnels have a scene today. entrance is how the first visit gets there (section 2, section 8). area is underground, moon or far. tarantula_hook is a short string, empty when the zone has none. notes holds Ryan's answers from section 14.1 as short strings. No hazard or find has any rule or number yet; this table is data only.",
+  "warning": {
+    "_note": "The soft-gate warning of docs/design/zones.md section 7.1 [PLACEHOLDER words]. line takes the band start, the lab level and one of the two lines; hard takes the lab level of the zone's deep_gate row in data/skills.json lab_gates. A zone with no deep_gate gets the soft line. No hub is hard-gated by level.",
+    "line": "Recommended lab level %s. You are level %s. %s Go anyway?",
+    "soft": "The hazards here are harder than you are used to.",
+    "hard": "Deeper levels need a lab level of %s."
+  },
   "zones": [
     {
       "id": "lava_tubes",

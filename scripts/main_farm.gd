@@ -67,9 +67,16 @@ var _inspect_left: float = 0.0
 ## (key or button) arms the offer and shows the price; a second press on the
 ## same offer buys it. Leaving the bay or pressing another offer re-arms.
 var _armed_standard: String = ""
+## The zone the tunnel mouth leads to (data/zones.json).
+const TUNNELS_ZONE: StringName = &"lava_tubes"
+
 ## This player asked to move the rover; the host said yes.
 var _moving: bool = false
 var _move_granted: bool = false
+## The game day the soft-gate warning was shown on at the tunnel mouth (-1: not
+## shown); E again that day goes in. Getting out of the rover or leaving the pad
+## clears it, and so does a new day.
+var _tunnel_warned_day: int = -1
 
 
 func _ready() -> void:
@@ -133,6 +140,7 @@ func _ready() -> void:
 	_bram_bay.rover_exited.connect(_on_rover_exited_bay)
 	_cal_pad.rover_entered.connect(_on_rover_entered_cal_pad)
 	_tunnel_pad.rover_entered.connect(func() -> void: _hud.push_log("TUNNEL MOUTH: press E to enter."))
+	_tunnel_pad.rover_exited.connect(func() -> void: _tunnel_warned_day = -1)
 	_hud.trade_pressed.connect(_try_trade)
 	_hud.wheel_service_pressed.connect(_try_wheel_service)
 	GameState.wheels_changed.connect(_on_wheels_changed)
@@ -565,6 +573,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			_refuse_on_foot()
 	elif away and event.is_action_pressed(&"interact"):
+		# The rover is already in the tunnels: joining it is no new trip, so no
+		# soft-gate warning here (it was given, or skipped, when it went in).
 		get_viewport().set_input_as_handled()
 		SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
 	elif away and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
@@ -951,6 +961,7 @@ func _go_to_dome() -> void:
 
 ## F: out of the stopped rover, or back in from nearby.
 func _get_out_or_in() -> void:
+	_tunnel_warned_day = -1
 	if CoopWalkers.asking:
 		return
 	if CoopWalkers.on_foot():
@@ -1000,6 +1011,18 @@ func _say_if_away() -> void:
 func _enter_tunnels() -> void:
 	if _moving:
 		return
+	# Soft gate (zones doc section 7.1): under the band's start, say so and wait
+	# for a second E. Not a wall. A guest's copy has the same lab level, so it is
+	# asked on its own screen before the command goes to the host.
+	# Skipped when the host will refuse anyway (the mouth is closed after the
+	# rescue hour, or someone else drives): the player then sees only that refusal.
+	var refused: bool = TunnelRecall.closed(GameClock.elapsed_days) \n			or not CoopRovers.driver(GameState.rover_here()) in ["", GameState.local_player_id]
+	var warning: String = "" if refused else ZoneData.warning_text(TUNNELS_ZONE, GameState.lab_level())
+	if warning != "" and _tunnel_warned_day != int(GameClock.elapsed_days):
+		_tunnel_warned_day = int(GameClock.elapsed_days)
+		_hud.push_log("TUNNEL MOUTH: %s Press E again to go in, or drive off the pad to stay." % warning)
+		return
+	_tunnel_warned_day = -1
 	_moving = true
 	var problem: String = await FarmCommands.request(&"move_rover", [true])
 	if not is_inside_tree():

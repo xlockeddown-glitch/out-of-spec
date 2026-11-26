@@ -1972,3 +1972,11 @@ Ryan's idea: stage areas almost level specific. Underground for lab levels about
 ### Ryan's answers to the eleven open questions (2026-11-26)
 
 1 depths change every game day; 2 the lab sitter is a new hire (new character); 3 rescue costs 50 CR plus some carried ore, finds kept, rover brought home; 4 the sitter cannot calibrate; 5 lift stations per farm; 6 Flooded Aquifer is the second area; 7 a field rover per zone; 8 new moon-adapted tarantula forms; 9 shuttle day trip about 40 CR a person; 10 the Larder on Phobos is the only story exception (other zone story quests get a non-zone way); 11 zone caches hold only missing gauge-block pieces, and on other planets or moons there are exotic-material blocks with lower thermal expansion that need calibration less often. Full text in `docs/design/zones.md` §14.1.
+
+## 2026-11-26: Zones step 3, the soft-gate warning (`docs/design/zones.md` section 13)
+
+- **What it does.** Driving the rover onto the tunnel pad and pressing E under the Lava Tubes band start (lab level 5) shows "Recommended lab level 5. You are level N. ... Go anyway?" in the phone log; E again goes in, driving off the pad stays out. At or above level 5 nothing changes. Not a wall: `move_rover` has no level check, and hubs are never hard-gated by level.
+- **Pure function.** `ZoneData.warning_text(zone_id, lab_level)` returns the line or "". The extra line is the hard-gate one ("Deeper levels need a lab level of N.") when the zone row names a `deep_gate` (a `lab_gates` row id), else the soft one. The tunnels have no depths yet, so `lava_tubes` has no `deep_gate` and gets the soft line [ASSUMPTION]. Words are in `data/zones.json` `warning` [PLACEHOLDER].
+- **Confirm style [ASSUMPTION].** The game has no yes/no dialog; its two-press confirm (Bram's buys) is reused: second E is Yes, leaving the pad is No. Guests run the same check on the synced lab level before sending `move_rover`, so `CoopSession.PROTOCOL` stays 16 and the host is unchanged.
+- **Rows.** 13 new `lab_gates` rows from section 7.2 (levels 5, 8, 10, 12, 14, 18, 20, 24, 26, 30, 35, 40, 45), all `built:false` so they gate nothing; the level-5 Lava Tubes row is the warning level only. All levels [PLACEHOLDER]. Hours test still passes; the printed list includes them.
+- **Not done:** the lift line (no lift yet), saves (VERSION stays 1).
