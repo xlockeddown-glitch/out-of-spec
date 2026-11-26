@@ -16,6 +16,8 @@ var _bed: Button
 var _close_button: Button
 var _addresses: PackedStringArray = []
 var _problem: String = ""
+## What the bed button last said, shown as its own line.
+var _bed_note: String = ""
 
 
 func _ready() -> void:
@@ -84,6 +86,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func open() -> void:
 	_problem = ""
+	_bed_note = ""
 	_addresses = local_addresses()
 	_refresh()
 	_panel.show()
@@ -101,21 +104,27 @@ func _refresh() -> void:
 	else:
 		_action.text = "HOST THIS FARM"
 		_about.text = _problem if _problem != "" else "Hosting lets friends join this farm while you play. Anyone who knows your address can join, so share it only with friends."
-	_bed.visible = CoopBeds.together()
+	_bed.visible = true
 	_bed.text = "GET UP" if GameState.local_player_id in CoopBeds.in_bed else "GO TO BED"
-	if _bed.visible:
+	var here: String = CoopBeds.here_refusal()
+	_bed.disabled = here != "" and not GameState.local_player_id in CoopBeds.in_bed
+	if FarmCommands.guest or CoopBeds.together():
 		_about.text += "\n\nThe day ends when everyone is in bed, and waits at 06:00 for anyone still up."
-		if _problem != "":
-			_about.text += "\n\n" + _problem
+	else:
+		_about.text += "\n\nGO TO BED ends the day."
+	if _bed.disabled:
+		_about.text += " " + here
+	if _bed_note != "":
+		_about.text += "\n\n" + _bed_note
 	# A farm run on its own, not from the title menu, is nobody's to share.
 	_action.disabled = not FarmCommands.guest and not SaveGame.farm_open
 
 
 func _on_bed() -> void:
 	if GameState.local_player_id in CoopBeds.in_bed:
-		_problem = str(await FarmCommands.request(&"get_up"))
+		_bed_note = str(await FarmCommands.request(&"get_up"))
 	else:
-		_problem = str(await FarmCommands.request(&"go_to_bed"))
+		_bed_note = str(await FarmCommands.request(&"go_to_bed"))
 	if _panel.visible:
 		_refresh()
 
