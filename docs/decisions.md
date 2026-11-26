@@ -1946,3 +1946,7 @@ Ryan's idea: stage areas almost level specific. Underground for lab levels about
 ### Agent's notes (flagged for Ryan, not his words)
 
 - The design PR changes no code and no data. Every band, fee, time and name in it is a [PLACEHOLDER] or [ASSUMPTION]; the eleven open questions are at the end of the design.
+
+### Ryan's answers to the eleven open questions (2026-11-26)
+
+1 depths change every game day; 2 the lab sitter is a new hire (new character); 3 rescue costs 50 CR plus some carried ore, finds kept, rover brought home; 4 the sitter cannot calibrate; 5 lift stations per farm; 6 Flooded Aquifer is the second area; 7 a field rover per zone; 8 new moon-adapted tarantula forms; 9 shuttle day trip about 40 CR a person; 10 the Larder on Phobos is the only story exception (other zone story quests get a non-zone way); 11 zone caches hold only missing gauge-block pieces, and on other planets or moons there are exotic-material blocks with lower thermal expansion that need calibration less often. Full text in `docs/design/zones.md` §14.1.

@@ -1,6 +1,6 @@
 # Zones: level-banded areas away from the farm (design proposal)
 
-Status: **proposal, 2026-11-26. Ryan answered twelve questions the same day (§1); they are decisions for this feature and are logged in `docs/decisions.md`.** This PR changes no code and no data table. Every number and name below is a [PLACEHOLDER] or an [ASSUMPTION] until Ryan sets it.
+Status: **design, 2026-11-26; Ryan answered the open questions too (§14.1). Ryan answered twelve questions the same day (§1); they are decisions for this feature and are logged in `docs/decisions.md`.** This PR changes no code and no data table. Every number and name below is a [PLACEHOLDER] or an [ASSUMPTION] until Ryan sets it.
 
 Ryan's idea, in his words: stage areas to be almost level specific. Underground, for lab levels about 5 to 20, you deal with things that suit the quests of those levels. From about 21 to 50 you are somewhere else, such as Phobos or Deimos, searching for rare tarantulas and getting past obstacles, and you still come home to tend the lab. In co-op, one player can stay and the other go, like mining in Stardew. There can be several areas that cover the same or overlapping levels. "Not one way to do it."
 
@@ -486,6 +486,22 @@ Each has a recommended option first.
     - (a) Only pieces the farm has not found, so each fills a gap in the 81-piece set (recommended).
     - (b) Random pieces; duplicates become credits.
     - (c) A separate zone set.
+
+### 14.1 Ryan's answers (2026-11-26)
+
+Ryan answered all eleven the same day. They are decisions and override the text above where they differ.
+
+1. Depths change **every game day**, the same for everyone.
+2. The lab sitter is **a new hire**, a new character (name and look [PLACEHOLDER]); not Lin or Chet.
+3. Rescue costs **50 CR plus some carried ore** [PLACEHOLDER numbers]; finds kept, no extra drift, the crew brings the rover home.
+4. The sitter **cannot calibrate**: only a person at the bench makes a traceable calibration.
+5. Lift stations are **per farm**.
+6. The second area is the **Flooded Aquifer**.
+7. **A field rover per zone** (or on foot); the farm rover stays home.
+8. The moons' escaped tarantulas are **new moon-adapted forms** with a wider climate band.
+9. A shuttle day trip costs **about 40 CR a person** [PLACEHOLDER].
+10. **The Larder on Phobos is the only story exception.** Every other story beat has a way without a zone, so the Station's Last Log and the Test Pod (§10.3) need a non-zone version, or move to lab/personal quests, when they are built.
+11. A zone cache holds **only pieces the farm has not found**, each filling a gap in the 81-piece set. Ryan added: **on other planets and moons you can find exotic-material blocks** whose low coefficient of thermal expansion means they **need calibration less often**. (Real gauge blocks come in steel, ceramic and carbide with different expansion; a low-expansion exotic grade is a game idea. How much longer the interval runs is [PLACEHOLDER].)
 
 ## 15. Assumptions in one place
 
