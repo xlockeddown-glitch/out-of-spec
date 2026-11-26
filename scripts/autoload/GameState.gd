@@ -351,6 +351,9 @@ var skill_curve: int = SKILL_CURVE
 ## the lab (lab_xp_sources in data/skills.json). It never goes down.
 ## _award_lab_xp is the only writer in play.
 var lab_xp: int = 0
+## Discipline -> the most spaces its lab area has had that the lab has its XP
+## for (lab_area). A space cleared and fitted again gives none.
+var lab_areas_paid: Dictionary = {}
 ## Robot id ("TR-1") -> { frame, name, state (ROBOT_STATES), done_day,
 ## ordered_by }. Assembled robots' sensors are in `sensors` as "sensor@robot".
 var robots: Dictionary = {}
@@ -535,7 +538,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
-	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp"]
+	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -584,7 +587,7 @@ func farm_dict_problem(data: Dictionary) -> String:
 					return "'%s' has an entry of the wrong type." % field
 	if data.has("_spool_damaged") and data["_spool_damaged"].size() > data["_spool_species"].size():
 		return "'_spool_damaged' has more entries than there are spools."
-	for needs: Array in [["at_oirm", TYPE_INT], ["suspect_units", TYPE_INT], ["mined_fissures", TYPE_INT], ["lab_areas", TYPE_INT],
+	for needs: Array in [["at_oirm", TYPE_INT], ["suspect_units", TYPE_INT], ["mined_fissures", TYPE_INT], ["lab_areas", TYPE_INT], ["lab_areas_paid", TYPE_INT],
 			["offence_counts", TYPE_INT], ["rover_uplinks", TYPE_BOOL], ["rover_transforms", TYPE_TRANSFORM3D]]:
 		var values: Dictionary = data.get(needs[0], {})
 		for key: Variant in values:
@@ -870,6 +873,9 @@ func put_farm(data: Dictionary) -> void:
 	if not data.has("skill_curve"):
 		# From the 10-level curve.
 		_convert_old_skills()
+	if not data.has("lab_areas_paid"):
+		# From before areas were marked: the spaces it has are not paid for again.
+		lab_areas_paid = lab_areas.duplicate()
 	if skill_curve != SKILL_CURVE or not data.has("skill_curve"):
 		# From before the lab level.
 		_credit_lab_from_logs()
@@ -1604,9 +1610,10 @@ func _lab_source_xp(source_id: String, scale: float = 1.0) -> float:
 
 ## Gives the lab the XP of one of its sources, times `scale` and the lab's size,
 ## rounded to a whole XP. Anyone's work counts, the manager's and a robot's too.
-## It is counted for the acting player (action_counts) when `counted`: not for
-## the manager, and not for what no one player did (an audit, a build that
-## finishes in the morning).
+## It is counted for `player_id` (action_counts) when `counted`: who did it, or
+## for a robot's work who programmed or ordered it. Never for the manager, and
+## not for what no one player did: an audit, a certificate that comes back, the
+## lab grown.
 func _award_lab_xp(source_id: String, player_id: String = "", scale: float = 1.0, counted: bool = true) -> void:
 	var gained: int = roundi(_lab_source_xp(source_id, scale) * lab_xp_scale())
 	if gained <= 0:
@@ -1621,7 +1628,7 @@ func _award_lab_xp(source_id: String, player_id: String = "", scale: float = 1.0
 	lab_xp = mini(lab_xp + gained, MOST_SKILL_XP)
 	lab_xp_changed.emit()
 	if lab_level() > before:
-		post_phone("LAB LEVEL UP: %s. K shows skills." % lab_text())
+		post_phone("LAB LEVEL UP: %s." % lab_phone_text())
 
 
 ## Line for the skills view: "Lab level 2  (60 XP, 105 for level 3)  farm".
@@ -1650,7 +1657,7 @@ func lab_phone_text() -> String:
 func _credit_lab_from_logs() -> void:
 	var credited: float = float(clampi(int(farm_skill_xp.get(OLD_LAB_SKILL, 0)), 0, MOST_SKILL_XP))
 	for record: Dictionary in cal_log:
-		if not record.get("traceable", true) \
+		if not record.get("traceable", str(record.get("standard_id", "")) != "") \
 				or int(record.get("days_in_service", 0)) < ceili(int(record.get("previous_interval_days", 0)) / 2.0):
 			continue
 		var by_robot: bool = str(record.get("programmed_by", "")) != ""
@@ -1658,10 +1665,12 @@ func _credit_lab_from_logs() -> void:
 			calibration_xp_scale(str(record.get("standard_id", "")))))
 	for result: Dictionary in job_log:
 		var paid: Variant = result.get("pay", 0)
-		if paid is int or paid is float:
+		if (paid is int or paid is float) and is_finite(paid):
 			credited += roundi(_lab_source_xp("lab_job", maxf(float(paid), 0.0)))
 	for report: Dictionary in audit_log:
-		if report.get("clean", false) is bool and report.get("clean", false):
+		# An audit from before reports were marked clean was clean if it passed.
+		var clean: Variant = report.get("clean", report.get("passed", false))
+		if clean is bool and clean:
 			credited += roundi(_lab_source_xp("lab_clean_audit"))
 	lab_xp = int(clampf(lab_xp + credited, 0.0, MOST_SKILL_XP))
 	farm_skill_xp.erase(OLD_LAB_SKILL)
@@ -4576,7 +4585,7 @@ func lab_fit_problem(discipline: String) -> String:
 
 
 ## Gives a free space to `discipline` (free of charge). Returns "" or why not.
-func fit_lab_area(discipline: String) -> String:
+func fit_lab_area(discipline: String, player_id: String = "") -> String:
 	var problem: String = lab_fit_problem(discipline)
 	if problem != "":
 		return problem
@@ -4587,7 +4596,10 @@ func fit_lab_area(discipline: String) -> String:
 	var plural: String = "" if spaces == 1 else "s"
 	post_phone("LAB: the %s area has %s space%s (%s): up to %s job%s at once." % [discipline,
 		SP811.integer(spaces), plural, lab_area_size(spaces).to_upper(), SP811.integer(spaces), plural])
-	_award_lab_xp("lab_area", "", 1.0, false)
+	if spaces > int(lab_areas_paid.get(discipline, 0)):
+		# Only a space this area never had: clearing and fitting again gives none.
+		lab_areas_paid[discipline] = spaces
+		_award_lab_xp("lab_area", player_id)
 	lab_changed.emit()
 	return ""
 
@@ -4678,6 +4690,7 @@ func reset_lab() -> void:
 			if owned_standards.has(str(id)):
 				lab_areas[str(discipline)] = 1
 				break
+	lab_areas_paid = lab_areas.duplicate()
 	_sync_lab_layout()
 	lab_changed.emit()
 

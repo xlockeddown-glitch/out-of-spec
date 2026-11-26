@@ -198,7 +198,7 @@ func _check_jobs(gs: GameStateScript) -> String:
 		return "Pay / 2, times 8 in a large lab: %d for %d CR" % [gs.lab_xp, result["pay"]]
 	if gs.skill_xp("calibration", GUEST) != roundi(int(result["pay"]) * 0.5):
 		return "The lab's size multiplies no skill's XP."
-	if gs.lab_level() <= 1 or not gs.phone_log.any(func(line: String) -> bool: return line.begins_with("LAB LEVEL UP: Lab level")):
+	if gs.lab_level() <= 1 or not gs.phone_log.any(func(line: String) -> bool: return line.begins_with("LAB LEVEL UP: level ") and not "farm" in line):
 		return "A lab level gained is told on the phone: %s" % [gs.phone_log]
 	result = gs.complete_job(_take(gs), gs.MANAGER_ID)
 	if not result.get("ok", false) or gs.lab_xp != gained + roundi(int(result["pay"]) * float(DESIGN["lab_job"]) * 8.0):
@@ -247,13 +247,34 @@ func _check_building(gs: GameStateScript) -> String:
 		return "A lab grown gives 500, at its new size: %d" % gs.lab_xp
 	var before: int = gs.lab_xp
 	var discipline: String = str(gs.job_disciplines().keys()[0])
-	if gs.fit_lab_area(discipline) != "" or gs.lab_xp != before + _xp("lab_area") * 3:
-		return "An area fitted gives 150: %d" % (gs.lab_xp - before)
-	gs.lab_build = { "kind": "refit", "discipline": discipline, "done_day": 7 }
+	var spaces: int = gs.lab_space(discipline)
+	if gs.fit_lab_area(discipline, GUEST) != "" or gs.lab_xp != before + _xp("lab_area") * 3 or gs.action_count("lab_area", GUEST) != 1:
+		return "An area fitted gives 150, counted for who fitted it: %d" % (gs.lab_xp - before)
+	# Cleared and fitted again, the same space gives none.
 	before = gs.lab_xp
-	gs._finish_lab_build(7)
-	if gs.lab_xp != before:
-		return "A cleared space gives none."
+	for i: int in 2:
+		if gs.clear_lab_area(discipline) != "":
+			return "The space must be cleared: %s" % gs.lab_clear_problem(discipline)
+		gs._finish_lab_build(int(gs.lab_build["done_day"]))
+		if gs.fit_lab_area(discipline, GUEST) != "" or gs.lab_space(discipline) != spaces + 1:
+			return "The space must be fitted again."
+		if gs.lab_xp != before or gs.action_count("lab_area", GUEST) != 1:
+			return "A space cleared and fitted again gives none: %d" % (gs.lab_xp - before)
+	if gs.farm_to_dict().get("lab_areas_paid", {}).get(discipline) != spaces + 1:
+		return "What is paid for is saved: %s" % [gs.lab_areas_paid]
+	# A save from before the mark: the spaces it has are not paid for again.
+	var old: Dictionary = gs.farm_to_dict()
+	old.erase("lab_areas_paid")
+	gs.lab_areas_paid.clear()
+	if gs.farm_from_dict(old) != "" or gs.lab_areas_paid != gs.lab_areas:
+		return "An older save's areas are marked as paid: %s" % [gs.lab_areas_paid]
+	old["lab_areas_paid"] = { discipline: "two" }
+	if gs.farm_dict_problem(old) == "":
+		return "A mark that is not a count is refused."
+	before = gs.lab_xp
+	if gs.fit_lab_area(discipline) != "" or gs.lab_xp != before + _xp("lab_area") * 3:
+		return "A space the area never had gives XP: %d" % (gs.lab_xp - before)
+	before = gs.lab_xp
 	gs.lab_size = 0
 	gs.optical_silk_spools = 3
 	gs._spool_species.assign([&"a", &"b", &"c"])
@@ -292,9 +313,19 @@ func _old_farm(gs: GameStateScript) -> int:
 	var loose: Dictionary = record.duplicate(true)
 	loose["traceable"] = false
 	gs.cal_log.append(loose)
+	# From before records said if they were traceable: one with a standard is.
+	var unmarked: Dictionary = record.duplicate(true)
+	unmarked.erase("traceable")
+	gs.cal_log.append(unmarked)
+	worth += _xp("lab_calibration", gs.calibration_xp_scale(str(record["standard_id"])))
+	var bare: Dictionary = unmarked.duplicate(true)
+	bare["standard_id"] = ""
+	gs.cal_log.append(bare)
 	gs.audit_log.append({ "day": 3, "passed": true, "clean": true, "total_fine": 0, "lines": [], "interlocks": [] })
 	gs.audit_log.append({ "day": 5, "passed": false, "total_fine": 200, "lines": [], "interlocks": [] })
-	worth += _xp("lab_clean_audit")
+	# From before reports were marked clean: one that passed was.
+	gs.audit_log.append({ "day": 4, "passed": true, "total_fine": 0, "lines": [], "interlocks": [] })
+	worth += 2 * _xp("lab_clean_audit")
 	return worth
 
 
@@ -304,7 +335,7 @@ func test_a_save_from_before_the_lab_level_converts() -> String:
 
 func _check_stage_1(gs: GameStateScript) -> String:
 	var worth: int = _old_farm(gs)
-	if gs.cal_log.size() != 4 or gs.job_log.size() != 2 or worth <= _xp("lab_clean_audit"):
+	if str(gs.cal_log[0].get("standard_id", "")) == "" or gs.cal_log.size() != 6 or gs.job_log.size() != 2 or worth <= _xp("lab_clean_audit"):
 		return "The farm must have its logs: %d calibrations, %d jobs." % [gs.cal_log.size(), gs.job_log.size()]
 	gs.farm_skill_xp = { "instrumentation": 400, "husbandry": 60 }
 	var calibration: int = gs.skill_xp("calibration", GUEST)
