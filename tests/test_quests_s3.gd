@@ -404,6 +404,129 @@ func _check_board_cuts(gs: GameStateScript) -> String:
 
 # --- Running out, and dropped -----------------------------------------------------
 
+func test_bench_work_across_dawn_is_late_and_not_handed_out_again() -> String:
+	return _run(_check_across_dawn, _only_s3())
+
+
+func _check_across_dawn(gs: GameStateScript) -> String:
+	# Offered on day 2, due day 5, so the dawn it crosses (day 6) has no audit.
+	GameClock.elapsed_days = 1.0
+	var job: Dictionary = _offer(gs)
+	_own_gauge(gs)
+	_all_in_date(gs)
+	var job_id: String = str(job["job_id"])
+	var due: int = int(job["due_day"])
+	if (due + 1) % int(DataManager.get_number(&"sensor_drift_config", "audit_schedule/cadence_days", 5.0)) == 0:
+		return "The test needs a dawn with no audit, got day %d." % (due + 1)
+	# Started 10 min before the 06:00 after its due day: 40 min of work.
+	GameClock.elapsed_days = float(due) - 10.0 / 1440.0
+	var at_dawn: Dictionary = { "seen": false, "kept": false, "jobs": 0 }
+	var on_morning: Callable = func(_day: int) -> void:
+		at_dawn["seen"] = true
+		at_dawn["kept"] = gs.quest_job(S3).get("job_id", "") == job_id
+		at_dawn["jobs"] = _quest_jobs(gs)
+	var before: int = gs.credits
+	var points: int = gs.credibility
+	GameClock.day_started.connect(gs._on_day_started)
+	GameClock.day_started.connect(on_morning)
+	var result: Dictionary = gs.complete_job(job_id)
+	GameClock.day_started.disconnect(on_morning)
+	GameClock.day_started.disconnect(gs._on_day_started)
+	if not at_dawn["seen"] or GameClock.get_day_index() != due + 1:
+		return "The test must cross into day %d, got %d." % [due + 1, GameClock.get_day_index()]
+	if not at_dawn["kept"] or at_dawn["jobs"] != 1:
+		return "The morning during the work keeps the envelope and hands out no other: %s" % [at_dawn]
+	if not result.get("ok", false) or result["on_time"] or not result["traceable"]:
+		return "Work that ends after the due day is late: %s" % [result]
+	if int(result["pay"]) != 100 or gs.credits != before + 100:
+		return "Late across dawn is half the envelope: %s" % [result]
+	if gs.credibility != maxi(points + int(gs._jobs_number("late_job_points", 0.0)), 0):
+		return "Late costs what a late board job costs, got %d from %d." % [gs.credibility, points]
+	gs.update_quests()
+	if _quest_jobs(gs) != 0 or _lines(gs, YOURS) != 1 or _lines(gs, RAN_OUT) != 0 or _lines(gs, _said("certified_in_three_fonts_again")) != 0:
+		return "A finished envelope is not handed out again: %s" % [gs.phone_log]
+	if not QuestEngine.is_done(gs, S3) or _lines(gs, _said("certified_in_three_fonts_sour")) != 1:
+		return "The quest is done, with the sour line."
+	if ENVELOPE in gs._board_taken:
+		return "The envelope is not one of the board's taken jobs: %s" % [gs._board_taken]
+	return ""
+
+
+func test_work_that_would_end_past_the_grace_days_is_refused() -> String:
+	return _run(_check_past_grace, _only_s3())
+
+
+func _check_past_grace(gs: GameStateScript) -> String:
+	GameClock.elapsed_days = 1.0
+	var job: Dictionary = _offer(gs)
+	_own_gauge(gs)
+	var job_id: String = str(job["job_id"])
+	var cutoff: int = int(job["due_day"]) + int(gs._jobs_number("late_grace_days", 3.0))
+	# 10 min before the 06:00 that takes it away: the work would cross it.
+	GameClock.elapsed_days = float(cutoff) - 10.0 / 1440.0
+	var before: int = gs.credits
+	var result: Dictionary = gs.complete_job(job_id)
+	if result.get("ok", true) or not str(result.get("reason", "")).contains("Not enough time"):
+		return "Work that would end after the envelope runs out is refused: %s" % [result]
+	if gs.credits != before or not gs.job_log.is_empty() or gs.quest_job(S3).get("job_id", "") != job_id or GameClock.get_day_index() != cutoff:
+		return "A refused envelope is left as it was, and no time passes."
+	# The morning then takes it away and brings another, at no cost.
+	var day: int = cutoff + 1
+	if day % int(DataManager.get_number(&"sensor_drift_config", "audit_schedule/cadence_days", 5.0)) == 0:
+		return "The test needs a morning with no audit, got day %d." % day
+	var points: int = gs.credibility
+	_morning(gs, day)
+	var again: Dictionary = gs.quest_job(S3)
+	if again.is_empty() or again["job_id"] == job_id or _quest_jobs(gs) != 1 or _lines(gs, RAN_OUT) != 1:
+		return "It runs out that morning and is handed out again: %s" % [gs.active_jobs]
+	if gs.credibility != points or QuestEngine.is_done(gs, S3):
+		return "Running out costs nothing and the quest stays open."
+	return ""
+
+
+# --- The lab's areas ------------------------------------------------------------
+func _pressure_offer(gs: GameStateScript) -> Dictionary:
+	return { "id": "test_pressure_gauge", "customer": "A customer", "item": "a gauge", "discipline": "pressure", "min_band": gs.credibility_band(),
+		"min_tier": 1, "pay": 50, "due_in_days": 2, "bench_minutes": 10 }
+
+
+func test_the_envelope_takes_no_space_in_the_pressure_area() -> String:
+	return _run(_check_area, _only_s3())
+
+
+func _check_area(gs: GameStateScript) -> String:
+	gs.lab_areas["pressure"] = 1
+	gs.credits = 100000
+	gs.crystal_ore = 1000
+	_offer(gs)
+	if _quest_jobs(gs) != 1 or gs.quest_job(S3)["discipline"] != "pressure":
+		return "The test needs the envelope out, as a pressure job."
+	if gs.jobs_in_progress("pressure") != 0 or gs._lab_spaces_in_use("pressure") != 0:
+		return "The envelope holds no space: %d in progress." % gs.jobs_in_progress("pressure")
+	# With no pressure standard the envelope cannot be done, and the one space
+	# can still be cleared for another discipline.
+	if gs.lab_clear_problem("pressure") != "":
+		return "The envelope must not keep the pressure space from being cleared: %s" % gs.lab_clear_problem("pressure")
+	_own_gauge(gs)
+	if gs.job_area_problem(_pressure_offer(gs)) != "":
+		return "A one-space pressure area still has room with the envelope out: %s" % gs.job_area_problem(_pressure_offer(gs))
+	gs.job_board.assign([_pressure_offer(gs), _pressure_offer(gs)])
+	var first: String = gs.accept_job(0)
+	if first != "" or gs.active_jobs.size() != 2 or _quest_jobs(gs) != 1:
+		return "A pressure board job is accepted beside the envelope, got '%s'." % first
+	# The board's own job does hold the space.
+	var second: String = gs.accept_job(0)
+	if second.find("area is full") < 0 or gs.jobs_in_progress("pressure") != 1:
+		return "A second board job needs a second space, got '%s'." % second
+	if gs.lab_clear_problem("pressure").find("job in progress") < 0:
+		return "A board job in progress keeps its space: '%s'" % gs.lab_clear_problem("pressure")
+	# And the envelope is done as before, area or no area.
+	var result: Dictionary = gs.complete_job(str(gs.quest_job(S3)["job_id"]))
+	if not result.get("ok", false) or int(result["pay"]) != 200:
+		return "The envelope is still done at the bench: %s" % [result]
+	return ""
+
+
 func test_an_envelope_that_runs_out_is_back_the_same_morning() -> String:
 	return _run(_check_runs_out)
 
@@ -429,7 +552,7 @@ func _check_runs_out(gs: GameStateScript) -> String:
 		seen.append(str(again["job_id"]))
 		if int(again["due_day"]) != day + 3 or int(again["accepted_day"]) != day:
 			return "Round %d: the new envelope is dated from that morning: %s" % [round, again]
-		if gs.credibility < points or _lines(gs, "cancelled") != 0:
+		if gs.credibility != points or _lines(gs, "cancelled") != 0:
 			return "Round %d: an envelope that runs out costs no credibility (%d from %d)." % [round, gs.credibility, points]
 		if _lines(gs, RAN_OUT) != round or _lines(gs, _said("certified_in_three_fonts_again")) != round or _lines(gs, YOURS) != round + 1:
 			return "Round %d: it is said to have run out and to be back: %s" % [round, gs.phone_log]
@@ -598,6 +721,32 @@ func _check_bad_save(gs: GameStateScript) -> String:
 	bad["active_jobs"][0]["flat_cut_pct"] = "half"
 	if gs.farm_dict_problem(bad) == "":
 		return "A job whose flat cut is not a number must be refused."
+	# A quest's job is never on the board.
+	var offer: Dictionary = { "id": "test_offer", "customer": "A customer", "item": "a gauge", "discipline": "pressure", "min_band": gs.credibility_band(),
+		"min_tier": 1, "pay": 50, "due_in_days": 2, "bench_minutes": 10 }
+	bad = gs.farm_to_dict().duplicate(true)
+	bad["job_board"].append(offer.duplicate())
+	if gs.farm_dict_problem(bad) != "":
+		return "The test needs a board offer the save check takes: %s" % gs.farm_dict_problem(bad)
+	for mark: Array in [["quest", S3], ["flat_cut_pct", 50]]:
+		bad = gs.farm_to_dict().duplicate(true)
+		var marked: Dictionary = offer.duplicate()
+		marked[mark[0]] = mark[1]
+		bad["job_board"].append(marked)
+		if gs.farm_dict_problem(bad) == "":
+			return "A board offer with '%s' must be refused." % mark[0]
+	# One quest has one job out.
+	bad = gs.farm_to_dict().duplicate(true)
+	var twin: Dictionary = bad["active_jobs"][0].duplicate(true)
+	twin["job_id"] = "JOB-9999"
+	bad["active_jobs"].append(twin)
+	if gs.farm_dict_problem(bad) == "":
+		return "Two active jobs from one quest must be refused."
+	# Two jobs with no quest are two board jobs, as before.
+	bad["active_jobs"][0].erase("quest")
+	bad["active_jobs"][1].erase("quest")
+	if gs.farm_dict_problem(bad) != "":
+		return "Two board jobs are a good save: %s" % gs.farm_dict_problem(bad)
 	return ""
 
 

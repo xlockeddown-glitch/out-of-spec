@@ -698,6 +698,19 @@ func farm_dict_problem(data: Dictionary) -> String:
 			if not _optional_fields(job, ["id", "customer", "item", "discipline", "area", "min_band", QUEST_JOB],
 					["pay", "min_tier", "bench_minutes", "due_in_days", "accepted_day", "flat_cut_pct"]):
 				return "'%s' has a field of the wrong type." % list
+	# Only a job a quest handed out has these two, and such a job is never on
+	# the board. A quest has one job out at a time.
+	for offer: Dictionary in data["job_board"]:
+		if offer.has(QUEST_JOB) or offer.has("flat_cut_pct"):
+			return "'job_board' has a quest's job."
+	var quests_with_a_job: Array[String] = []
+	for job: Dictionary in data["active_jobs"]:
+		var from_quest: String = str(job.get(QUEST_JOB, ""))
+		if from_quest == "":
+			continue
+		if from_quest in quests_with_a_job:
+			return "'active_jobs' has two jobs from one quest."
+		quests_with_a_job.append(from_quest)
 	for entry: Dictionary in data["harvest_bin"]:
 		if not _optional_fields(entry, [], ["advance"]):
 			return "'harvest_bin' has a field of the wrong type."
@@ -4691,8 +4704,10 @@ func complete_job(job_id: String, player_id: String = "") -> Dictionary:
 	if minutes > 0.0:
 		GameClock.advance(minutes / 1440.0)
 	active_jobs.erase(job)
-	# Taken today: a promotion from this payout must not offer it again.
-	_board_taken.append(str(job.get("id", "")))
+	# Taken today: a promotion from this payout must not offer it again. A
+	# quest's job was never the board's to offer.
+	if str(job.get(QUEST_JOB, "")) == "":
+		_board_taken.append(str(job.get("id", "")))
 	var today: int = GameClock.get_day_index()
 	var on_time: bool = today <= int(job["due_day"])
 	var offered: int = int(job.get("pay", 0))
@@ -4767,7 +4782,8 @@ func _expire_jobs(day: int) -> void:
 			active_jobs.erase(job)
 			# A quest's job costs nothing when it runs out: the quest hands it out
 			# again at its next look, this same morning. Said now, so the line is
-			# before the one that brings it back.
+			# before the one that brings it back: _morning_notes are posted after
+			# that look, which would put "ran out" after the new job's line.
 			if str(job.get(QUEST_JOB, "")) != "":
 				post_phone("%s ran out: %s went back to %s." % [job["job_id"], job.get("item", "?"), job.get("customer", "?")])
 				jobs_changed.emit()
@@ -4947,18 +4963,21 @@ func _lab_size_for_area_text(need: int) -> String:
 func _lab_spaces_in_use(discipline: String) -> int:
 	var keep: int = 0
 	for job: Dictionary in active_jobs:
-		if str(job.get("discipline", "")) != discipline:
+		if str(job.get("discipline", "")) != discipline or str(job.get(QUEST_JOB, "")) != "":
 			continue
 		var size_id: String = str(job.get("area", ""))
 		keep = maxi(keep, lab_area_spaces_needed(size_id) if size_id != "" else 1)
 	return keep
 
 
-## Accepted jobs of `discipline` (at the bench or waiting).
+## Accepted board jobs of `discipline` (at the bench or waiting): the jobs that
+## hold a space of its area. A quest's job holds none. It is handed out without
+## asking the lab for room and complete_job asks for none, so it must not fill
+## an area or keep one from being cleared while it cannot be done yet.
 func jobs_in_progress(discipline: String) -> int:
 	var count: int = 0
 	for job: Dictionary in active_jobs:
-		if str(job.get("discipline", "")) == discipline:
+		if str(job.get("discipline", "")) == discipline and str(job.get(QUEST_JOB, "")) == "":
 			count += 1
 	return count
 
