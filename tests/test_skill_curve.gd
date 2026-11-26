@@ -169,7 +169,7 @@ func _check_old(gs: GameStateScript) -> String:
 	for id: String in ["bench_time", "as_left_residual", "molt_time"]:
 		if absf(gs.skill_factor(id) - old_top[id]) > EPS:
 			return "%s must stay %s: %s" % [id, old_top[id], gs.skill_factor(id)]
-	if gs.effect_floor("calibration") != 1.0 or gs.effect_floor("husbandry") != 1.0:
+	if absf(gs.effect_floor("calibration") - 1.0) > EPS or absf(gs.effect_floor("husbandry") - 1.0) > EPS:
 		return "An old level 10 keeps the whole effect: %s" % [gs.skill_effect_floor]
 	# Old level 8 was on the floor already: 1 - 0.1 x 7 = 0.3.
 	if absf(gs.skill_factor("operator_uncertainty") - 0.3) > EPS:
@@ -250,5 +250,9 @@ func test_guest_file_from_the_old_curve() -> String:
 	var new: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"calibration":%d},"curve":%d}' % [key, OLD_TOP_XP, ProfileScript.CURVE]).to_utf8_buffer())
 	if new != { "key": key, "skills": { "calibration": OLD_TOP_XP } }:
 		return "A new guest file is read as it is: %s" % [new]
+	for curve: String in ["1", "3", "\"2\""]:
+		var odd: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"calibration":5},"curve":%s}' % [key, curve]).to_utf8_buffer())
+		if not odd.is_empty():
+			return "A guest file with curve %s is refused: %s" % [curve, odd]
 	var most: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"calibration":%d}}' % [key, ProfileScript.MOST_XP]).to_utf8_buffer())
 	return "" if most.get("skills") == { "calibration": ProfileScript.MOST_XP } else "Converted XP stays in range: %s" % [most]

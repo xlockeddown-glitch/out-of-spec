@@ -117,6 +117,9 @@ static func _parse(bytes: PackedByteArray) -> Dictionary:
 	if not is_key(json.data.get("key")) or not skills is Dictionary:
 		return {}
 	# XP from the 10-level curve converts as a farm's does (GameState._convert_old_xp).
+	# A curve this build does not know is refused rather than guessed at.
+	if json.data.has("curve") and not (json.data["curve"] is float and int(json.data["curve"]) == CURVE):
+		return {}
 	var factor: float = 1.0 if json.data.has("curve") else DataManager.get_number(&"skills", "old_curve/xp_factor", 5.0)
 	var whole: Dictionary = {}
 	for skill: Variant in skills:
