@@ -53,6 +53,7 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	RoverController.input_blocked = false
 	if get_tree() != null and visible:
 		get_tree().paused = false
 
@@ -91,10 +92,12 @@ func open() -> void:
 	show()
 	if alone and is_inside_tree():
 		get_tree().paused = true
+	RoverController.input_blocked = not alone
 	_resume_button.grab_focus()
 
 
 func close() -> void:
+	RoverController.input_blocked = false
 	if is_inside_tree():
 		get_tree().paused = false
 	hide()

@@ -147,3 +147,25 @@ func test_quit_warns_guests_then_reports_a_failed_save() -> String:
 	pause.free()
 	tree.paused = false
 	return problem
+
+
+func test_the_menu_blocks_driving_keys_only_while_the_game_runs_on() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var pause := PauseUI.new()
+	tree.root.add_child(pause)
+	var problem: String = ""
+	pause.open()
+	if RoverController.input_blocked:
+		problem = "Alone the tree is paused; nothing to block."
+	pause.close()
+	CoopSession.players = ["player_1", "player_2"]
+	pause.open()
+	if not RoverController.input_blocked:
+		problem = "With a guest, the menu must block driving keys."
+	pause.close()
+	if RoverController.input_blocked:
+		problem = "Closing must clear the block."
+	CoopSession.players = []
+	pause.free()
+	tree.paused = false
+	return problem

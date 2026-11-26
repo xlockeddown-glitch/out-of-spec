@@ -284,6 +284,10 @@ func _on_dig_rejected(reason: String) -> void:
 	_hud.push_log("DIG FAILED: %s" % reason + (" Dig on the hills outside." if reason == RoverController.ROCK_REFUSAL else ""))
 
 
+func _on_fill_rejected(reason: String) -> void:
+	_hud.push_log("FILL FAILED: %s" % reason)
+
+
 func _on_blocks_changed() -> void:
 	for cell: Vector2i in GameState.found_blocks:
 		if not cell in _blocks_told:
