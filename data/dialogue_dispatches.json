@@ -1,138 +1,138 @@
 {
   "schema_version": "1.0",
-  "megacorp_name": "OmniSpec Orbital Compliance",
+  "megacorp_name": "Brightwell-Nonesuch Habitats",
   "morning_dispatches": [
     {
       "id": "disp_01",
-      "sender": "Orbital Compliance",
+      "sender": "BNH Compliance",
       "severity": "warning",
-      "text": "Reminder: Tractor wheel circumference exceeds nominal spec by 1.4 %. Any unauthorized harvest mileage will be billed as recreational joyriding."
+      "text": "Reminder: Tractor wheel circumference exceeds nominal spec by 1.4 %. Any unauthorized harvest mileage will be billed as recreational joyriding. Warmly, Dispatch."
     },
     {
       "id": "disp_02",
       "sender": "Calibration Desk",
       "severity": "info",
-      "text": "Your bench hygrometer's gold sticker expired at 03:00. All humidity observed since then is legally considered hearsay."
+      "text": "Your bench hygrometer's gold sticker expired at 03:00. All humidity observed since then is legally considered hearsay. Warmly, Dispatch."
     },
     {
       "id": "disp_03",
       "sender": "Bio-Security Bot",
       "severity": "warning",
-      "text": "Thermal scan detected eight-legged heat signatures indoors. Please confirm they are licensed productivity assets and not emotional support arthropods."
+      "text": "Thermal scan detected eight-legged heat signatures indoors. Please confirm they are licensed productivity assets and not emotional support arthropods. Warmly, Dispatch."
     },
     {
       "id": "disp_04",
       "sender": "Telemetry Ops",
       "severity": "alert",
-      "text": "Solar flare expected at noon. OmniSpec is not liable if your mower develops free will or harvests your mailbox."
+      "text": "Solar flare expected at noon. BNH is not liable if your mower develops free will or harvests your mailbox. Warmly, Dispatch."
     },
     {
       "id": "disp_05",
       "sender": "Audit Division",
       "severity": "info",
-      "text": "Quarterly surprise inspection scheduled for Thursday. Please act surprised; our drone logs facial enthusiasm."
+      "text": "Quarterly surprise inspection scheduled for Thursday. Please act surprised; our drone logs facial enthusiasm. Warmly, Dispatch."
     },
     {
       "id": "disp_06",
       "sender": "Supply Chain",
       "severity": "warning",
-      "text": "Unregistered optical silk detected in relay dish #1. Great signal-to-noise ratio, terrible paperwork. Expect a form."
+      "text": "Unregistered optical silk detected in relay dish #1. Great signal-to-noise ratio, terrible paperwork. Expect a form. Warmly, Dispatch."
     },
     {
       "id": "disp_07",
       "sender": "HR & Morale",
       "severity": "info",
-      "text": "Outpost loneliness is down 4 % after we reclassified talking to your rover as 'verbal diagnostics.'"
+      "text": "Outpost loneliness is down 4 % after we reclassified talking to your rover as 'verbal diagnostics.' Warmly, Dispatch."
     },
     {
       "id": "disp_08",
       "sender": "Metrology Governance",
       "severity": "alert",
-      "text": "A neighbor reported your soil plots look 'suspiciously straight.' Prepare to prove your laser level is traceable to Orbit."
+      "text": "A neighbor reported your soil plots look 'suspiciously straight.' Prepare to prove your laser level is traceable to Orbit. Warmly, Dispatch."
     },
     {
       "id": "disp_09",
-      "sender": "Orbital Compliance",
+      "sender": "BNH Compliance",
       "severity": "warning",
-      "text": "Reminder: 'Eyeballing it' is not an approved uncertainty budget method under Frontier Clause 19-B."
+      "text": "Reminder: 'Eyeballing it' is not an approved uncertainty budget method under Frontier Clause 19-B. Warmly, Dispatch."
     },
     {
       "id": "disp_10",
       "sender": "Drop-Pod Dispatch",
       "severity": "info",
-      "text": "Your replacement reference weight fell off the cargo rail at 12 000 meters. Please re-zero it before use."
+      "text": "Your replacement reference weight fell off the cargo rail at 12 000 meters. Please re-zero it before use. Warmly, Dispatch."
     },
     {
       "id": "disp_11",
       "sender": "Calibration Desk",
       "severity": "warning",
-      "text": "Your steering test uncertainty ratio (TUR) fell below 4:1. The approval button has been replaced with a larger button labeled 'Are You Sure?'"
+      "text": "Your steering test uncertainty ratio (TUR) fell below 4:1. The approval button has been replaced with a larger button labeled 'Are You Sure?' Warmly, Dispatch."
     },
     {
       "id": "disp_12",
-      "sender": "Orbital Compliance",
+      "sender": "BNH Compliance",
       "severity": "warning",
-      "text": "The rover is inside tolerance but outside our guard-banded acceptance limit. It may remain parked in the space marked 'Technically Fine.'"
+      "text": "The rover is inside tolerance but outside our guard-banded acceptance limit. It may remain parked in the space marked 'Technically Fine.' Warmly, Dispatch."
     },
     {
       "id": "disp_13",
       "sender": "Audit Division",
       "severity": "info",
-      "text": "Encoder error logged at −0.48° as found and +0.12° as left. Inspector Vance has asked that the turnip rows be given the same chance to correct themselves."
+      "text": "Encoder error logged at −0.48° as found and +0.12° as left. Inspector Vance has asked that the turnip rows be given the same chance to correct themselves. Warmly, Dispatch."
     },
     {
       "id": "disp_14",
       "sender": "Metrology Governance",
       "severity": "warning",
-      "text": "Your bench hygrometer's uncertainty budget lists the reference standard, resolution and repeatability. Please add the fan you switched off for the auditor."
+      "text": "Your bench hygrometer's uncertainty budget lists the reference standard, resolution and repeatability. Please add the fan you switched off for the auditor. Warmly, Dispatch."
     },
     {
       "id": "disp_15",
       "sender": "Supply Chain",
       "severity": "warning",
-      "text": "One calibration certificate is missing from your reference hygrometer's traceability chain. We can trace the invoice all the way to Orbit."
+      "text": "One calibration certificate is missing from your reference hygrometer's traceability chain. We can trace the invoice all the way to Orbit. Warmly, Dispatch."
     },
     {
       "id": "disp_16",
       "sender": "Calibration Desk",
       "severity": "info",
-      "text": "Drift history supports a shorter calibration interval. Procurement asks whether the encoder could drift more slowly until the next budget cycle."
+      "text": "Drift history supports a shorter calibration interval. Procurement asks whether the encoder could drift more slowly until the next budget cycle. Warmly, Dispatch."
     },
     {
       "id": "disp_17",
       "sender": "Bio-Security Bot",
       "severity": "info",
-      "text": "Tarantula molt logged as a second resident. Please submit a departure time for whichever spider is empty."
+      "text": "Tarantula molt logged as a second resident. Please submit a departure time for whichever spider is empty. Warmly, Dispatch."
     },
     {
       "id": "disp_18",
       "sender": "Telemetry Ops",
       "severity": "alert",
-      "text": "Uplink delay climbed behind the boulder again. If you already sent reverse, give it a moment before sending reverse with feeling."
+      "text": "Uplink delay climbed behind the boulder again. If you already sent reverse, give it a moment before sending reverse with feeling. Warmly, Dispatch."
     },
     {
       "id": "disp_19",
       "sender": "HR & Morale",
       "severity": "info",
-      "text": "Employee engagement fell 3 % after we made the morning morale survey mandatory. The survey now opens before your rover controls."
+      "text": "Employee engagement fell 3 % after we made the morning morale survey mandatory. The survey now opens before your rover controls. Warmly, Dispatch."
     },
     {
       "id": "disp_20",
       "sender": "Drop-Pod Dispatch",
       "severity": "warning",
-      "text": "Your seed order landed 5 m outside the plot. The delivery photo shows a boulder signing for it."
+      "text": "Your seed order landed 5 m outside the plot. The delivery photo shows a boulder signing for it. Warmly, Dispatch."
     },
     {
       "id": "disp_21",
       "sender": "Telemetry Ops",
       "severity": "info",
-      "text": "Optical silk cleared the morning packet backlog. Your rover has now received all seven copies of 'please ignore my last command.'"
+      "text": "Optical silk cleared the morning packet backlog. Your rover has now received all seven copies of 'please ignore my last command.' Warmly, Dispatch."
     },
     {
       "id": "disp_22",
       "sender": "Audit Division",
       "severity": "info",
-      "text": "AUD-1T flagged a crooked sticker on its own charging dock. The dock has requested a different inspector."
+      "text": "AUD-1T flagged a crooked sticker on its own charging dock. The dock has requested a different inspector. Warmly, Dispatch."
     }
   ],
   "audit_fines": [
@@ -179,7 +179,7 @@
       "location": "scrapyard_rover_bay",
       "greetings": [
         "Morning, Doc. Heard your tractor tried to till a boulder again—need a fresh axle or a therapist?",
-        "If OmniSpec asks, this whole garage is 'temporarily uncalibrated.' Saves me three hundred credits a week.",
+        "If BNH asks, this whole garage is 'temporarily uncalibrated.' Saves me three hundred credits a week.",
         "Coffee's burnt, treads are bald, and the orbital relay's blinking amber. Standard Tuesday.",
         "Look who crawled out of the spider dome. Bring me anything shiny from the canyon?",
         "Morning, Doc. Park it over the old oil stain. We'll see if it can make a better one.",
