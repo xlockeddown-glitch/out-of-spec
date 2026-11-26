@@ -82,7 +82,9 @@ func _as_guest(body: Callable) -> String:
 	var guest: GameStateScript = _make_state(7)
 	var bytes: PackedByteArray = FarmSync.capture(host)
 	FarmCommands.guest = true
-	var problem: String = body.call(host, guest, bytes)
+	# A body that stops on a script error returns null, which must not pass.
+	var out: Variant = body.call(host, guest, bytes)
+	var problem: String = out if out is String else "The test stopped early or did not return a String."
 	FarmCommands.guest = false
 	GameClock.elapsed_days = elapsed
 	GameClock.seconds_per_day = speed

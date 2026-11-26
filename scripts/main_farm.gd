@@ -5,6 +5,8 @@ extends Node
 
 ## Phone-log lines replayed into the HUD when the farm loads.
 const LOG_REPLAY_LINES: int = 6
+## A dig key press counts as this screen's own for this long, ms.
+const OWN_DIG_MS: int = 3000
 ## With the rover in the other scene, these only say where it is.
 const ROVER_KEYS: Array[StringName] = [
 	&"rover_forward", &"rover_reverse", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill"]
@@ -46,6 +48,10 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 @onready var _tunnel_pad: ParkingPad = %TunnelPad
 
 var _robots_ui: RobotsUI
+## Sum of the dug depths when last looked at, to tell a dig from a fill.
+var _dug_depth: int = 0
+## When this screen last pressed dig, so a snapshot or the other player's dig isn't ours.
+var _dig_pressed_msec: int = -OWN_DIG_MS
 var _walkers: FarmWalkers
 var _bram_line: String = ""
 ## Seconds left showing a clicked prop's text in the hover label.
@@ -68,6 +74,8 @@ func _ready() -> void:
 	_rover.dig_rejected.connect(_on_dig_rejected)
 	_rover.fill_rejected.connect(_on_fill_rejected)
 	GameState.terrain_changed.connect(_show_dug)
+	GameState.terrain_changed.connect(_say_dug)
+	_dug_depth = _total_dug()
 	_blocks_told.assign(GameState.found_blocks.keys())
 	GameState.blocks_changed.connect(_on_blocks_changed)
 	_pockets_told.assign(GameState.found_pockets.keys())
@@ -105,6 +113,7 @@ func _ready() -> void:
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.skill_leveled.connect(_on_skill_leveled)
 	SaveGame.save_failed.connect(_hud.push_log)
+	SaveGame.saved.connect(_hud.push_log.bind("Saved."))
 	GameState.rover_place_changed.connect(_on_rover_place_changed)
 	GameState.credits_changed.connect(_on_credits_changed)
 	GameState.ore_changed.connect(_on_ore_changed)
@@ -144,6 +153,9 @@ func _ready() -> void:
 	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text())
 	_hud.set_gauge_set(GaugeSet.text(GameState.gauge_pieces()))
 	_refresh_jobs_hud()
+	var pause := PauseUI.new()
+	_hud.get_parent().add_child(pause)
+	_hud.get_parent().move_child(pause, 0)
 	_hud.get_parent().add_child(SkillsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())
 	_say_if_away()
@@ -270,7 +282,7 @@ func _on_till_rejected(reason: String) -> void:
 
 
 func _on_dig_rejected(reason: String) -> void:
-	_hud.push_log("DIG FAILED: %s" % reason)
+	_hud.push_log("DIG FAILED: %s" % reason + (" Dig on the hills outside." if reason == RoverController.ROCK_REFUSAL else ""))
 
 
 func _on_fill_rejected(reason: String) -> void:
@@ -396,9 +408,32 @@ func _check_with_block() -> void:
 		SP811.number(record["error_u"], 2), verdict, SP811.number(record["mpe"], 2)])
 
 
+## Digging that finds nothing used to be silent. Blocks and ore pockets are
+## announced by their own lines, which follow this one.
+func _say_dug() -> void:
+	var total: int = _total_dug()
+	var own: bool = Time.get_ticks_msec() - _dig_pressed_msec < OWN_DIG_MS
+	if total > _dug_depth and own:
+		_dig_pressed_msec = -OWN_DIG_MS
+		_hud.push_log("Dug. H fills it again.")
+	_dug_depth = total
+
+
+func _total_dug() -> int:
+	var total: int = 0
+	for depth: int in GameState.dug.values():
+		total += depth
+	return total
+
+
 func _show_dug() -> void:
 	_rover.ground.show_dug(GameState.dug)
 	_rover.keep_above_ground()
+
+
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"rover_dig") and not RoverController.input_blocked and not (is_inside_tree() and get_tree().paused):
+		_dig_pressed_msec = Time.get_ticks_msec()
 
 
 func _unhandled_input(event: InputEvent) -> void:

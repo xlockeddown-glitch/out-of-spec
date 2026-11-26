@@ -14,7 +14,7 @@ signal accept_job_pressed(index: int)
 
 const MAX_LOG_LINES: int = 8
 ## Tallest the job list grows before it scrolls, px.
-const JOBS_MAX_HEIGHT: float = 86.0
+const JOBS_MAX_HEIGHT: float = 130.0 # [PLACEHOLDER] room for three offers
 ## The dispatch log always keeps room for this many lines, px.
 const LOG_MIN_HEIGHT: float = 80.0
 const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
@@ -30,6 +30,9 @@ var _standards_box: VBoxContainer
 var _credibility_label: Label
 ## The molt, once Husbandry shows it on the phone; hidden until then.
 var _molt_label: Label
+## "LIGHTS: LOW" or "LIGHTS: ON" in the tunnels; hidden elsewhere.
+var _lights_label: Label
+## "GAUGE SET n/81" once a reference block is found; hidden until then.
 var _gauge_label: Label
 ## Accepted jobs and today's offers, under the credibility row.
 var _jobs_box: VBoxContainer
@@ -80,6 +83,10 @@ func _ready() -> void:
 	_molt_label.name = "MoltLabel"
 	_molt_label.hide()
 	_credibility_label.add_sibling(_molt_label)
+	_lights_label = _credibility_label.duplicate()
+	_lights_label.name = "LightsLabel"
+	_lights_label.hide()
+	_credibility_label.add_sibling(_lights_label)
 	_gauge_label = _credibility_label.duplicate()
 	_gauge_label.name = "GaugeSetLabel"
 	_gauge_label.hide()
@@ -167,6 +174,13 @@ func set_molt(text: String) -> void:
 	_molt_label.text = text
 
 
+## The rover's headlights row, shown in the tunnels. ON is amber and LOW green, so they differ.
+func set_lights(on: bool, shown: bool = true) -> void:
+	_lights_label.visible = shown
+	_lights_label.text = "LIGHTS: " + ("ON" if on else "LOW")
+	_lights_label.add_theme_color_override("font_color", COLOR_WARN if on else COLOR_OK)
+
+
 func set_ore(ore: int) -> void:
 	_ore_label.text = "ORE %d   " % ore
 
@@ -230,7 +244,15 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 		label.add_theme_font_size_override("font_size", 14)
 		label.add_theme_color_override("font_color", COLOR_OK)
 		_jobs_box.add_child(label)
+	# Offers you can accept come first; `index` stays the board's own.
+	var order: Array[int] = []
 	for i: int in offers.size():
+		if not bool(offers[i]["disabled"]):
+			order.append(i)
+	for i: int in offers.size():
+		if bool(offers[i]["disabled"]):
+			order.append(i)
+	for i: int in order:
 		var button := Button.new()
 		button.text = "ACCEPT " + str(offers[i]["text"])
 		button.disabled = bool(offers[i]["disabled"])
