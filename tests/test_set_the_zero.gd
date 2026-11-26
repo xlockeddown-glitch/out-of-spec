@@ -23,7 +23,7 @@ func _free(commands: Node) -> void:
 	commands.free()
 
 
-## One bench calibration of the thermometer (a Set the Zero unit) by a guest on a fresh farm, with
+## One bench calibration of the rover's steering encoder (a Set the Zero unit) by a guest on a fresh farm, with
 ## `tail` after the command's own argument. The unit, its standard and the clock
 ## start the same every time, so two answers differ only by what the score did.
 ## `earlier` plain calibrations come first; with `skilled` the guest has the

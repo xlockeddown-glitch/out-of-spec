@@ -1164,9 +1164,14 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 	if sensor == null:
 		push_warning("GameState.calibrate: unknown instrument '%s'." % instrument_id)
 		return {}
-	# Hold the Reading's score, for this calibration only (a refusal uses it up too).
+	# Hold the Reading's score, for this calibration only (a refusal uses it up
+	# too). Never for a standard's own calibration (its U goes on its
+	# certificate) and never for a robot's (no one held anything): the factor is
+	# taken back and not used, whoever set it.
 	var operator_scale: float = clampf(sensor.next_operator_scale, 0.0, 1.0)
 	sensor.next_operator_scale = 1.0
+	if sensor.role == "standard" or robot_id != "":
+		operator_scale = 1.0
 	var missing: String = _bench_problem(instrument_id) if use_standard else ""
 	if missing != "":
 		return {
@@ -1199,8 +1204,9 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 	# What the record states as U and TUR: the budget with the operator's term
 	# times a played Hold the Reading's factor (quests_levels_story.md section
 	# 7.2). The standard's own terms, the resolution and a robot's term are as
-	# they were. The refusal above, the acceptance limit and the verdict are the
-	# plain budget's, so a score never changes them [ASSUMPTION].
+	# they were. The refusal above, the acceptance limit, the verdict and the
+	# clean-TUR XP ("plain_tur" in the record) are the plain budget's, so a score
+	# never changes them [ASSUMPTION].
 	var stated: Dictionary = budget
 	if standard != null and operator_scale < 1.0:
 		stated = CalUncertainty.budget(sensor, standard, float(budget["u_op"]) * operator_scale, float(budget["u_robot"]))
@@ -1276,6 +1282,9 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 		"standard_id": budget.get("standard_id", ""),
 		"standard_uncertainty": stated.get("expanded_uncertainty"),
 		"tur": stated.get("tur"),
+		# The TUR with no mini-game score: what the clean-TUR XP and the bench's
+		# "marginal" note are judged on. Over it, "tur" is the steady-hold figure.
+		"plain_tur": budget.get("tur"),
 		"acceptance_limit": limit,
 		"result": result,
 		"traceable": traceable,
@@ -2201,7 +2210,8 @@ func _xp_after_calibration(record: Dictionary) -> void:
 		_award_xp("calibrate_found_oot", player, scale)
 	if record["on_time"]:
 		_award_xp("calibrate_on_time", player, scale)
-	if float(record["tur"]) >= CalUncertainty.tur_clean():
+	# Judged on the plain TUR: a Hold the Reading score earns no XP a skip would not.
+	if float(record.get("plain_tur", record["tur"])) >= CalUncertainty.tur_clean():
 		_award_xp("calibrate_clean_tur", player, scale)
 
 

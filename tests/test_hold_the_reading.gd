@@ -36,8 +36,9 @@ func _free(commands: Node) -> void:
 ## by what the score did. `earlier` plain calibrations come first; with
 ## `skilled` the guest has the level that opens CAREFUL. Returns the answer, the
 ## farm's own record as "logged", the whole farm as "farm", and the standard's
-## certificate uncertainty as "standard_u".
-func _bench(tail: Array, earlier: int = 0, skilled: bool = false) -> Dictionary:
+## certificate uncertainty as "standard_u". `cert_u` at 0 or over is the
+## standard's certificate uncertainty for this calibration.
+func _bench(tail: Array, earlier: int = 0, skilled: bool = false, cert_u: float = -1.0) -> Dictionary:
 	var saved: float = GameClock.elapsed_days
 	var commands: Node = _make()
 	var gs: Node = commands.state
@@ -53,6 +54,8 @@ func _bench(tail: Array, earlier: int = 0, skilled: bool = false) -> Dictionary:
 	sensor._rng.seed = SEED
 	sensor.error = sensor.mpe * 0.25
 	standard.error = 0.0
+	if cert_u >= 0.0:
+		standard.certificate_uncertainty = cert_u
 	var plain: Dictionary = gs.calibration_budget(id, GUEST)
 	var answer: Variant = commands.execute(GUEST, BENCH, [id] + tail)
 	var out: Dictionary = (answer as Dictionary).duplicate() if answer is Dictionary else {}
@@ -145,7 +148,7 @@ func test_the_grades_are_the_design_table() -> String:
 			or MinigameScore.grade_name(60) != "Good" or MinigameScore.grade_name(10) != "Standard":
 		return "The grades are Set the Zero's."
 	var said: String = MinigameScore.result_text(97, GAME)
-	if said != "Hold score 97 of 100: REFERENCE, operator uncertainty 40 % of standard.":
+	if said != "Hold score 97 of 100: REFERENCE, your share of the uncertainty 60 % smaller.":
 		return "The result line: '%s'" % said
 	if MinigameScore.result_text(40, GAME) != "Hold score 40 of 100: STANDARD, standard result." \
 			or MinigameScore.result_text(MinigameScore.SKIPPED, GAME) != "":
@@ -324,9 +327,43 @@ func test_the_motion_is_the_seed_s() -> String:
 		return "The same seed and the same presses must give the same run and score."
 	if runs[0] == runs[2]:
 		return "Another seed must give another wander."
-	# The frame rate does not change it: one long step is the same as many short ones.
+	return ""
+
+
+## The game moves in whole steps of 1/60 s and carries the rest, so the frame
+## rate (and frames of uneven length) cannot change a run or its score. The
+## presses here follow the game's own clock, as a player's follow the picture.
+func test_the_frame_rate_does_not_change_the_score() -> String:
+	var frames: Array = [[STEP], [0.05], [0.1], [1.0 / 144.0], [1.0 / 30.0], [0.004, 0.031, 0.1, 0.0167, 0.07, 0.0009],
+		[0.1, 1.0 / 144.0, 0.05]]
 	var scores: Array[int] = []
-	for chunk: float in [STEP, 0.05, 0.1]:
+	var ends: Array[float] = []
+	for chunks: Array in frames:
+		var game: HoldTheReading = _game()
+		game.play(0.0, MinigameSettings.Mode.STANDARD, SEED)
+		game.hold(true)
+		var i: int = 0
+		while game.stage() == HoldTheReading.Stage.HOLD and i < 100000:
+			# One step at a time, so the press lands on the same step at any rate.
+			var left: float = chunks[i % chunks.size()]
+			i += 1
+			while left > 0.0 and game.stage() == HoldTheReading.Stage.HOLD:
+				game.hold(roundi(game._time * 60.0) % 40 < 22)
+				var part: float = minf(left, STEP / 4.0)
+				game.advance(part)
+				left -= part
+		scores.append(game._score)
+		ends.append(game.reading())
+		game.free()
+	for i: int in scores.size():
+		if scores[i] != scores[0] or ends[i] != ends[0]:
+			return "Frames of %s s gave score %d (reading %s), frames of 1/60 s gave %d (%s)." % [
+				frames[i], scores[i], ends[i], scores[0], ends[0]]
+	if scores[0] <= 0 or scores[0] >= 100:
+		return "The test wants a run with some time in and some out: %d." % scores[0]
+	# No press at all, whole frames given at once.
+	var idle: Array[int] = []
+	for chunk: float in [STEP, 0.05, 0.1, 1.0 / 144.0, 0.0333]:
 		var game: HoldTheReading = _game()
 		game.play(0.0, MinigameSettings.Mode.STANDARD, SEED)
 		game.hold(true)
@@ -335,11 +372,27 @@ func test_the_motion_is_the_seed_s() -> String:
 		while game.stage() == HoldTheReading.Stage.HOLD and gone < 20.0:
 			game.advance(chunk)
 			gone += chunk
-		scores.append(game._score)
+		idle.append(game._score)
 		game.free()
-	if scores[0] != scores[1] or scores[0] != scores[2]:
-		return "The score must not depend on the frame rate: %s" % [scores]
-	return ""
+	for score: int in idle:
+		if score != idle[0]:
+			return "The score must not depend on the frame rate: %s" % [idle]
+	# What is left of a frame is carried, never dropped: 144 frames of 1/144 s
+	# are one second of the run.
+	var carried: HoldTheReading = _game()
+	carried.play(0.0, MinigameSettings.Mode.STANDARD, SEED)
+	carried.hold(true)
+	for i: int in 144:
+		carried.advance(1.0 / 144.0)
+	var whole: HoldTheReading = _game()
+	whole.play(0.0, MinigameSettings.Mode.STANDARD, SEED)
+	whole.hold(true)
+	for i: int in 60:
+		whole.advance(STEP)
+	var same: bool = carried.reading() == whole.reading() and carried.bracket() == whole.bracket()
+	carried.free()
+	whole.free()
+	return "" if same else "144 frames of 1/144 s must be the same second as 60 of 1/60 s."
 
 
 func test_no_hold_is_over_the_cap() -> String:
@@ -511,6 +564,41 @@ func test_the_bench_opens_it_for_the_hygrometer() -> String:
 	return problem
 
 
+## Where the record's stated U and TUR are shown (the bench's standard line),
+## a counted score's figures are named as the steady-hold ones, and "marginal"
+## is said of the plain TUR.
+func test_the_bench_names_the_steady_hold_figures() -> String:
+	var root: Window = (Engine.get_main_loop() as SceneTree).root
+	var bench: CalBenchUI = (load("res://ui/cal_bench_ui.tscn") as PackedScene).instantiate()
+	root.add_child(bench)
+	var id: String = GameState.HYGROMETER_ID
+	var clean: float = CalUncertainty.tur_clean()
+	var record: Dictionary = { "instrument_id": id, "standard_id": GameState.get_sensor(id).calibrated_by,
+		"standard_uncertainty": 0.1, "tur": clean + 2.0, "plain_tur": clean + 2.0, "acceptance_limit": 1.0 }
+	var problem: String = ""
+	var plain: String = bench._standard_text(id, bench._recorded_budget(record))
+	if plain.contains("steady hold") or plain.contains("marginal"):
+		problem = "A plain record's line says nothing of a hold: %s" % plain
+	record["tur"] = clean + 3.0
+	var held: String = bench._standard_text(id, bench._recorded_budget(record))
+	if problem == "" and (not held.contains("(U and TUR with your steady hold)") or held.contains("marginal")):
+		problem = "A lifted record's U and TUR are named as the steady-hold figures: %s" % held
+	record["plain_tur"] = clean - 0.5
+	record["tur"] = clean + 0.5
+	var marginal: String = bench._standard_text(id, bench._recorded_budget(record))
+	if problem == "" and (not marginal.contains("U and TUR with your steady hold; without it TUR %s:1, marginal" % SP811.number(clean - 0.5, 1))
+			or not marginal.contains("TUR %s:1 (" % SP811.number(clean + 0.5, 1))):
+		problem = "A hold over the clean line from under it is still said to be marginal without it: %s" % marginal
+	# A record from before this field reads as a plain one.
+	record.erase("plain_tur")
+	var old: String = bench._standard_text(id, bench._recorded_budget(record))
+	if problem == "" and (old.contains("steady hold") or old.contains("marginal")):
+		problem = "A record with no plain TUR is read as plain: %s" % old
+	root.remove_child(bench)
+	bench.free()
+	return problem
+
+
 # --- What a score is worth -------------------------------------------------------
 
 func test_a_skip_and_a_poor_try_leave_the_same_farm() -> String:
@@ -540,9 +628,10 @@ func test_a_better_score_scales_the_operators_term_and_nothing_else() -> String:
 	if float(budget["u_op"]) <= 0.0 or not is_equal_approx(plain["logged"]["standard_uncertainty"], budget["expanded_uncertainty"]) \
 			or not is_equal_approx(plain["logged"]["tur"], budget["tur"]):
 		return "A plain calibration states the plain budget, with an operator's term in it."
-	var last_u: float = float(budget["expanded_uncertainty"])
-	var last_factor: float = 1.0
-	for score: int in [60, 80, 95, 100]:
+	# Section 7.2's grades, as plain numbers: the operator's term is times this.
+	var factors: Dictionary = { 60: 0.8, 80: 0.6, 95: 0.4, 100: 0.4 }
+	var stated_u: Dictionary = {}
+	for score: int in factors:
 		var scored: Dictionary = _bench([score])
 		var logged: Dictionary = scored["logged"]
 		var want: Dictionary = scored["scaled"]
@@ -553,18 +642,19 @@ func test_a_better_score_scales_the_operators_term_and_nothing_else() -> String:
 		for term: String in ["u_spec", "u_cert", "u_res", "u_robot", "k"]:
 			if want[term] != budget[term]:
 				return "The test's scaled budget changed %s." % term
-		if not is_equal_approx(want["u_op"], float(budget["u_op"]) * MinigameScore.operator_factor(score)):
+		if not is_equal_approx(MinigameScore.operator_factor(score), factors[score]):
+			return "Score %d is times %s, got %s." % [score, factors[score], MinigameScore.operator_factor(score)]
+		if not is_equal_approx(want["u_op"], float(budget["u_op"]) * float(factors[score])):
 			return "The test's scaled budget has the wrong operator's term."
 		if not is_equal_approx(logged["standard_uncertainty"], want["expanded_uncertainty"]) \
 				or not is_equal_approx(logged["tur"], want["tur"]):
 			return "Score %d must state U %s and TUR %s, got %s and %s." % [score, want["expanded_uncertainty"], want["tur"],
 				logged["standard_uncertainty"], logged["tur"]]
-		if logged["standard_uncertainty"] >= last_u and MinigameScore.operator_factor(score) < last_factor:
-			return "A better grade must state a smaller U."
-		last_factor = MinigameScore.operator_factor(score)
 		if logged["standard_uncertainty"] >= budget["expanded_uncertainty"] or logged["tur"] <= budget["tur"]:
 			return "A graded score lifts the TUR a little by a smaller U."
-		last_u = logged["standard_uncertainty"]
+		if not is_equal_approx(logged.get("plain_tur", -1.0), budget["tur"]):
+			return "The record keeps the plain TUR beside the stated one: %s" % [logged.get("plain_tur")]
+		stated_u[score] = logged["standard_uncertainty"]
 		# Never the as-found reading, the as-left, the verdict, the limit, the
 		# interval, or the standard itself.
 		for key: String in ["as_found", "as_left", "result", "mpe", "acceptance_limit", "due_day", "on_time",
@@ -575,17 +665,141 @@ func test_a_better_score_scales_the_operators_term_and_nothing_else() -> String:
 			return "A score never changes a standard's own uncertainty."
 		if scored["armed"] != [1.0, 1.0]:
 			return "The factor is used up by its calibration: %s" % [scored["armed"]]
-		# Across the whole farm: only the stated U and TUR of that record, and
-		# what a cleaner TUR earns in Uncertainty XP.
+		# Across the whole farm: only the stated U and TUR of that record. No XP,
+		# no lab level, nothing else.
 		var differences := PackedStringArray()
 		_differences(plain["farm"], scored["farm"], "farm", differences)
 		for path: String in differences:
-			if not (path.ends_with("/standard_uncertainty") or path.ends_with("/tur") or path.contains("skill_xp") \
-					or path.contains("lab_xp") or path.contains("lab_level")):
+			if not (path.ends_with("/standard_uncertainty") or path.ends_with("/tur")):
 				return "Score %d changed the farm at %s." % [score, path]
-		if differences.is_empty():
-			return "Score %d changed nothing." % score
+		if differences.size() != 2:
+			return "Score %d must change the record's stated U and TUR and no more: %s" % [score, differences]
+	if not (stated_u[60] > stated_u[80] and stated_u[80] > stated_u[95]) or stated_u[95] != stated_u[100]:
+		return "Good states less than Standard, Excellent less than Good, Reference less again: %s" % [stated_u]
+	if plain["logged"].get("plain_tur") != plain["logged"]["tur"]:
+		return "A plain calibration's plain TUR is its TUR."
 	return ""
+
+
+## Must-fix of the review: the clean-TUR XP is judged on the plain TUR, so a
+## Reference score that lifts the stated TUR over the clean line earns nothing
+## a skip would not.
+func test_a_score_over_the_clean_line_earns_no_xp() -> String:
+	var clean: float = CalUncertainty.tur_clean()
+	# The certificate uncertainty at which the hygrometer's plain TUR is just
+	# under the clean line (by halving: a larger one is a lower TUR).
+	var commands: Node = _make()
+	var gs: Node = commands.state
+	var id: String = gs.HYGROMETER_ID
+	var standard: DriftingSensor = gs.get_sensor(gs.get_sensor(id).calibrated_by)
+	var low: float = 0.0
+	var high: float = gs.get_sensor(id).mpe
+	standard.certificate_uncertainty = low
+	var best: float = gs.calibration_budget(id, GUEST)["tur"]
+	for i: int in 60:
+		var middle: float = (low + high) / 2.0
+		standard.certificate_uncertainty = middle
+		if float(gs.calibration_budget(id, GUEST)["tur"]) >= clean:
+			low = middle
+		else:
+			high = middle
+	_free(commands)
+	if best < clean:
+		return "The test wants a hygrometer that can reach the clean line: best TUR %s." % best
+	var under_u: float = high * 1.0005
+	var over_u: float = low * 0.9
+	var skipped: Dictionary = _bench([], 0, false, under_u)
+	var scored: Dictionary = _bench([100], 0, false, under_u)
+	var plain_tur: float = skipped["logged"]["tur"]
+	if plain_tur >= clean or plain_tur < CalUncertainty.tur_floor() or plain_tur < clean * 0.99:
+		return "The test wants a plain TUR just under the clean line: %s." % plain_tur
+	if scored.get(MinigameScore.RECORD_KEY) != 100 or float(scored["logged"]["tur"]) < clean:
+		return "The test wants a Reference score that states a TUR over the clean line: %s." % [scored["logged"]["tur"]]
+	if not is_equal_approx(scored["logged"]["plain_tur"], plain_tur):
+		return "The record keeps the plain TUR the XP is judged on."
+	var differences := PackedStringArray()
+	_differences(skipped["farm"], scored["farm"], "farm", differences)
+	for path: String in differences:
+		if not (path.ends_with("/standard_uncertainty") or path.ends_with("/tur")):
+			return "A Reference score over the clean line changed the farm at %s." % path
+	for key: String in ["player_skill_xp", "farm_skill_xp", "lab_xp"]:
+		if not skipped["farm"].has(key):
+			return "The test wants the farm's %s." % key
+		if skipped["farm"][key] != scored["farm"][key]:
+			return "A score must earn no %s a skip would not: %s, skip %s." % [key, scored["farm"][key], skipped["farm"][key]]
+	# And the line is real: a plain TUR over it does earn more than one under it.
+	var clean_plain: Dictionary = _bench([], 0, false, over_u)
+	if float(clean_plain["logged"]["tur"]) < clean:
+		return "The test wants a plain TUR over the clean line: %s." % [clean_plain["logged"]["tur"]]
+	if clean_plain["farm"]["player_skill_xp"] == skipped["farm"]["player_skill_xp"]:
+		return "A clean plain TUR earns XP a TUR under the line does not, or this test proves nothing."
+	return ""
+
+
+## Defence in depth: a factor left on a standard, or on a unit a robot then
+## calibrates, is taken back and not used.
+func test_a_standard_and_a_robot_take_no_operator_factor() -> String:
+	var saved: float = GameClock.elapsed_days
+	var problem: String = ""
+	# A standard calibrated on the colony against another (the reference gauge
+	# against the pressure controller, which settles).
+	var records: Array = []
+	for factor: float in [1.0, 0.4]:
+		var commands: Node = _make()
+		var gs: Node = commands.state
+		gs.set_world_seed(77)
+		var today: int = GameClock.get_day_index()
+		for id: String in ["pressure_controller", "reference_gauge"]:
+			gs.owned_standards[id] = today
+			gs.get_sensor(id)._rng.seed = SEED
+			gs.get_sensor(id).error = 0.0
+			if not gs.certificates.has(id):
+				gs._issue_certificate(id, today, null, 0.0, false, "the maker", "MKR")
+		var gauge: DriftingSensor = gs.get_sensor("reference_gauge")
+		var budget: Dictionary = gs.calibration_budget("reference_gauge", GUEST)
+		gauge.next_operator_scale = factor
+		var record: Dictionary = gs.calibrate("reference_gauge", GUEST)
+		if problem == "" and (gauge.role != "standard" or float(budget.get("u_op", 0.0)) <= 0.0 or record.get("refused", false) \
+				or not record.has("standard_uncertainty")):
+			problem = "The test wants a standard calibrated on the bench with an operator's term: %s" % [record]
+		elif problem == "" and (not is_equal_approx(record["standard_uncertainty"], budget["expanded_uncertainty"]) \
+				or not is_equal_approx(record["tur"], budget["tur"]) or gauge.next_operator_scale != 1.0):
+			problem = "A standard's own calibration states the plain budget and takes the factor back (factor %s)." % factor
+		records.append([record, gs.farm_to_dict()])
+		GameClock.elapsed_days = saved
+		_free(commands)
+	if problem == "":
+		var differences := PackedStringArray()
+		_differences(records[0][1], records[1][1], "farm", differences)
+		if not differences.is_empty():
+			problem = "A factor on a standard must change nothing: %s" % [differences]
+	# A robot's calibration of a Hold the Reading unit.
+	var farms: Array = []
+	for factor: float in [1.0, 0.4]:
+		var commands: Node = _make()
+		var gs: Node = commands.state
+		gs.set_world_seed(77)
+		var id: String = gs.HYGROMETER_ID
+		var sensor: DriftingSensor = gs.get_sensor(id)
+		sensor._rng.seed = SEED
+		var robot: String = str(gs.robots.keys()[0]) if not gs.robots.is_empty() else "TR-1"
+		var budget: Dictionary = gs.calibration_budget(id, GUEST, true)
+		sensor.next_operator_scale = factor
+		var record: Dictionary = gs.calibrate(id, GUEST, true, 0.0, robot)
+		if problem == "" and (float(budget.get("u_op", 0.0)) <= 0.0 or not record.has("standard_uncertainty")):
+			problem = "The test wants a robot's calibration with an operator's term in the budget: %s" % [record]
+		elif problem == "" and (not is_equal_approx(record["standard_uncertainty"], budget["expanded_uncertainty"]) \
+				or not is_equal_approx(record["tur"], budget["tur"]) or sensor.next_operator_scale != 1.0):
+			problem = "A robot's calibration states the plain budget and takes the factor back (factor %s)." % factor
+		farms.append(gs.farm_to_dict())
+		GameClock.elapsed_days = saved
+		_free(commands)
+	if problem == "":
+		var differences := PackedStringArray()
+		_differences(farms[0], farms[1], "farm", differences)
+		if not differences.is_empty():
+			problem = "A factor on a robot's calibration must change nothing: %s" % [differences]
+	return problem
 
 
 func test_a_score_never_passes_a_refused_calibration() -> String:
@@ -726,8 +940,42 @@ func test_a_quest_step_may_carry_it() -> String:
 	bad["steps"][0].erase("where")
 	if QuestEngine.data_problem(bad) == "":
 		return "A Hold the Reading step with no instrument must not load."
+	# A step must name the game its instrument plays, or it would never be
+	# offered: the hygrometer holds a reading, the soil probe sets a zero.
+	var wrong: Dictionary = quest.duplicate(true)
+	wrong["steps"][0]["minigame"] = "set_the_zero"
+	if QuestEngine.data_problem(wrong) == "":
+		return "A Set the Zero step on the hygrometer must not load."
+	wrong["steps"][0]["minigame"] = GAME
+	wrong["steps"][0]["where"]["instrument_id"] = "soil_probe"
+	if QuestEngine.data_problem(wrong) == "":
+		return "A Hold the Reading step on the soil probe must not load."
+	wrong["steps"][0]["where"]["instrument_id"] = "humidity_generator"
+	if QuestEngine.data_problem(wrong) == "":
+		return "A Hold the Reading step on a standard must not load."
+	wrong["steps"][0]["minigame"] = "set_the_zero"
+	wrong["steps"][0]["where"]["instrument_id"] = "soil_probe"
+	if QuestEngine.data_problem(wrong) != "":
+		return "A Set the Zero step on the soil probe loads: %s" % QuestEngine.data_problem(wrong)
+	# The dome pressure sensor starts on the reference gauge (Set the Zero) and
+	# the pressure controller takes it over (Hold the Reading): either may be named.
+	for game: String in ["set_the_zero", GAME]:
+		wrong["steps"][0]["minigame"] = game
+		wrong["steps"][0]["where"]["instrument_id"] = "dome_pressure"
+		if QuestEngine.data_problem(wrong) != "":
+			return "The dome pressure sensor may name %s: %s" % [game, QuestEngine.data_problem(wrong)]
+	if MinigameScore.games_in_data("hygrometer") != [GAME] or MinigameScore.games_in_data("soil_probe") != ["set_the_zero"] \
+			or MinigameScore.games_in_data("humidity_generator") != ["set_the_zero"] \
+			or MinigameScore.games_in_data("dome_pressure") != ["set_the_zero", GAME] \
+			or not MinigameScore.games_in_data("no_such_instrument").is_empty():
+		return "The data names each instrument's bench games."
+	# Every shipped quest passes, S1 with its soil probe among them.
+	for shipped: Dictionary in QuestEngine.quests():
+		if QuestEngine.data_problem(shipped) != "":
+			return "A shipped quest must load: %s" % QuestEngine.data_problem(shipped)
 	# A step is graded by the bench game its instrument plays, whichever of the
-	# two bench games it names. Wring the Blocks is its own.
+	# two bench games it names (only a taken-over unit can differ). Wring the
+	# Blocks is its own.
 	if not MinigameScore.grades_step(GAME, GAME) or not MinigameScore.grades_step("set_the_zero", GAME) \
 			or not MinigameScore.grades_step(GAME, "set_the_zero") or MinigameScore.grades_step("wring_the_blocks", GAME) \
 			or MinigameScore.grades_step(GAME, "wring_the_blocks") or MinigameScore.grades_step("", GAME) \

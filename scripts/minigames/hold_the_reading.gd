@@ -40,7 +40,8 @@ const BASE_BAND: float = 0.18
 const LIFT: float = 5.0
 const FALL: float = 5.0
 const DRAG: float = 4.0
-## Section 7.5: no hold longer than 3 s. The game lets go of a longer one.
+## Section 7.5 allows no hold longer than 3 s. This game lets go sooner, at
+## 2.5 s [PLACEHOLDER].
 const MAX_HOLD_S: float = 2.5
 const HOLD_CAP_HINT: String = "The hold ran out. Press again to lift."
 ## At the result a press sooner than this is not taken.
@@ -50,6 +51,8 @@ const RESULT_S: float = 1.6
 ## the same presses at the same times give the same score at any frame rate.
 const MAX_STEP_S: float = 0.1
 const STEP_S: float = 1.0 / 60.0
+## Rounding slack, so 0.05 s is three steps and not two and a carry.
+const STEP_SLACK_S: float = 0.000001
 ## Shown under the chart: what SKIP does at the bench.
 const SKIP_HINT: String = "Esc/Skip calibrates without the game."
 ## How much of the run the chart's trace shows, in seconds.
@@ -82,6 +85,8 @@ var _travel: float = 0.0
 var _trace: PackedFloat32Array = PackedFloat32Array()
 var _score: int = MinigameScore.SKIPPED
 ## The real clock at the last frame, in microseconds.
+## Time given to advance() and not yet stepped.
+var _carry_s: float = 0.0
 var _last_usec: int = 0
 
 @onready var _subject_label: Label = %SubjectLabel
@@ -164,6 +169,7 @@ func play(share: float, mode: int, motion_seed: int, subject: String = "") -> vo
 	_hold_button.disabled = false
 	_begin(Stage.READY)
 	show()
+	_carry_s = 0.0
 	_last_usec = Time.get_ticks_usec()
 	set_process(true)
 
@@ -209,13 +215,16 @@ func _process(_delta: float) -> void:
 	_last_usec = now
 
 
-## Moves the game on by `seconds`. Tests call it in place of frames.
+## Moves the game on by `seconds`. Tests call it in place of frames. The game
+## moves only in whole steps of STEP_S; what is left of `seconds` is carried to
+## the next call, so the frame rate and uneven frames cannot change a score.
 func advance(seconds: float) -> void:
-	var left: float = maxf(seconds, 0.0)
-	while left > 0.0 and _stage != Stage.IDLE:
-		var step: float = minf(left, STEP_S)
-		left -= step
-		_step(step)
+	_carry_s += maxf(seconds, 0.0)
+	while _carry_s >= STEP_S - STEP_SLACK_S and _stage != Stage.IDLE:
+		_carry_s = maxf(_carry_s - STEP_S, 0.0)
+		_step(STEP_S)
+	if _stage == Stage.IDLE:
+		_carry_s = 0.0
 	if _stage != Stage.IDLE:
 		_chart.queue_redraw()
 

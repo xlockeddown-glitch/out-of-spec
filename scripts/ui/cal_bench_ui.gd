@@ -46,6 +46,10 @@ var _limit: float = 0.0
 ## Standards only: sends the selected one to OIRM.
 var _send_button := Button.new()
 
+## After the U and TUR of a record a Hold the Reading score made smaller.
+const STEADY_HOLD_NOTE: String = "U and TUR with your steady hold"
+const STEADY_HOLD_MARGINAL: String = "%s; without it TUR %s:1, marginal, under %s:1"
+
 @onready var _instrument_option: OptionButton = %InstrumentOption
 @onready var _found_value: Label = %FoundValue
 @onready var _found_band: Label = %FoundBand
@@ -514,7 +518,11 @@ func _recorded_budget(record: Dictionary) -> Dictionary:
 		"tur": record["tur"],
 		"acceptance_limit": record["acceptance_limit"],
 		"refused": false,
-		"clean": float(record["tur"]) >= CalUncertainty.tur_clean(),
+		# "Marginal" is judged on the plain TUR, as the XP is; a steady hold's
+		# smaller U is labelled as that (_standard_text).
+		"clean": float(record.get("plain_tur", record["tur"])) >= CalUncertainty.tur_clean(),
+		"steady_hold": float(record["tur"]) > float(record.get("plain_tur", record["tur"])),
+		"plain_tur": float(record.get("plain_tur", record["tur"])),
 	}
 	var shown: Dictionary = _budget
 	var score: int = int(record.get(MinigameScore.RECORD_KEY, MinigameScore.SKIPPED))
@@ -631,6 +639,12 @@ func _standard_text(instrument_id: String, budget: Dictionary) -> String:
 	var tur: float = budget["tur"]
 	var tur_note: String = "REFUSED, under %s:1" % SP811.number(CalUncertainty.tur_floor(), 0) if budget["refused"] \
 		else ("" if budget["clean"] else "marginal, under %s:1" % SP811.number(CalUncertainty.tur_clean(), 0))
+	# A counted Hold the Reading score: the U and TUR are the steady-hold
+	# figures, and say so. The limit (and the verdict) are the plain budget's,
+	# and "marginal" is said of the plain TUR, which is then shown too.
+	if budget.get("steady_hold", false):
+		tur_note = STEADY_HOLD_NOTE if tur_note == "" else STEADY_HOLD_MARGINAL % [
+			STEADY_HOLD_NOTE, SP811.number(budget.get("plain_tur", tur), 1), SP811.number(CalUncertainty.tur_clean(), 0)]
 	return "Standard: %s   U ±%s   TUR %s:1%s   Limit ±%s" % [
 		GameState.instrument_name(budget["standard_id"], true),
 		_unsigned_precise(sensor, budget["expanded_uncertainty"]),

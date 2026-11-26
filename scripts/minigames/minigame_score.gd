@@ -71,8 +71,29 @@ static func game_for(farm: Node, instrument_id: String) -> String:
 	return SET_THE_ZERO
 
 
+## The bench games this instrument can play by the data alone, with no farm:
+## the game of the standard it starts on, and Hold the Reading if a standard
+## that settles takes it over when bought (takes_over). Empty for an instrument
+## the data does not have. Quest data is checked against this, so a step cannot
+## name a game its instrument never plays.
+static func games_in_data(instrument_id: String) -> Array[String]:
+	var games: Array[String] = []
+	var base: String = DriftingSensor.config_path(instrument_id)
+	if DataManager.get_value(DriftingSensor.CONFIG_TABLE, base) == null:
+		return games
+	var unit: bool = str(DataManager.get_value(DriftingSensor.CONFIG_TABLE, base + "/role", "unit")) != "standard"
+	var first: String = str(DataManager.get_value(DriftingSensor.CONFIG_TABLE, base + "/calibrated_by", ""))
+	games.append(HOLD_THE_READING if unit and first in SETTLING_STANDARDS else SET_THE_ZERO)
+	for standard: String in SETTLING_STANDARDS:
+		var taken: Variant = DataManager.get_value(DriftingSensor.CONFIG_TABLE, "instruments/%s/takes_over" % standard, [])
+		if unit and taken is Array and instrument_id in taken and not HOLD_THE_READING in games:
+			games.append(HOLD_THE_READING)
+	return games
+
+
 ## True where a step that names `step_game` is graded by a play of `played`:
-## the same game, or both bench games (the instrument picks which is played).
+## the same game, or both bench games (the instrument picks which is played;
+## a unit a settling standard takes over changes game when that is bought).
 static func grades_step(step_game: String, played: String) -> bool:
 	return step_game != "" and (step_game == played or (step_game in BENCH_GAMES and played in BENCH_GAMES))
 
@@ -111,16 +132,18 @@ const NOT_COUNTED_TEXT: String = "Score not counted (not a key moment)."
 
 
 ## "Zero score 97 of 100: REFERENCE, as-left residual 40 % of standard." For
-## Hold the Reading: "Hold score 97 of 100: REFERENCE, operator uncertainty 40 %
-## of standard."
+## Hold the Reading: "Hold score 97 of 100: REFERENCE, your share of the
+## uncertainty 60 % smaller."
 static func result_text(score: int, game: String = SET_THE_ZERO) -> String:
 	if score < 0:
 		return ""
 	var factor: float = residual_factor(score)
 	var hold: bool = game == HOLD_THE_READING
 	var gain: String = ", standard result"
-	if factor < 1.0:
-		gain = ", %s %d %% of standard" % ["operator uncertainty" if hold else "as-left residual", roundi(factor * 100.0)]
+	if factor < 1.0 and hold:
+		gain = ", your share of the uncertainty %d %% smaller" % roundi((1.0 - factor) * 100.0)
+	elif factor < 1.0:
+		gain = ", as-left residual %d %% of standard" % roundi(factor * 100.0)
 	return "%s score %d of %d: %s%s." % ["Hold" if hold else "Zero", score, MAX_SCORE, grade_name(score).to_upper(), gain]
 
 
@@ -171,7 +194,12 @@ static func is_due(farm: Node, instrument_id: String, player_id: String, careful
 
 
 ## The host's cut of a score that came with a command: SKIPPED where no game
-## could have been due, else held to 0 to MAX_SCORE.
+## could have been due, else held to 0 to MAX_SCORE. That is all the host can
+## check. It cannot know the game was played, or how well: the score is the
+## sender's word, for Hold the Reading as for Set the Zero. Among friends that
+## is accepted [ASSUMPTION]; what a made-up score can gain is bounded by the
+## grade table (the record's stated U and TUR, or the as-left residual, and a
+## quest's bonus), never a verdict, an audit or XP.
 static func allowed(farm: Node, instrument_id: String, player_id: String, score: int) -> int:
 	if not may_count(farm, instrument_id, player_id):
 		return SKIPPED

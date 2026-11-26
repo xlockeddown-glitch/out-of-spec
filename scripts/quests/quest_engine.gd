@@ -591,6 +591,12 @@ static func data_problem(quest: Dictionary) -> String:
 					return "step '%s' has Wring the Blocks and is not a counter of built stacks." % id
 			elif step_instrument(step) == "":
 				return "step '%s' has a mini-game and is not a count of one instrument's cal_log rows." % id
+			else:
+				# The instrument picks the bench game (MinigameScore.game_for): a step
+				# must name one its instrument plays, or it would never be offered.
+				var plays: Array[String] = MinigameScore.games_in_data(step_instrument(step))
+				if not plays.is_empty() and not step["minigame"] in plays:
+					return "step '%s' names %s and its instrument plays %s." % [id, step["minigame"], " or ".join(plays)]
 			if step.has(MINIGAME_LINE) and (not step[MINIGAME_LINE] is String or step[MINIGAME_LINE] == ""):
 				return "step '%s' has a mini-game line that is not text." % id
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:
