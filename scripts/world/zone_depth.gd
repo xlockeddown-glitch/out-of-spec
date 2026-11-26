@@ -20,6 +20,8 @@ const HEIGHT: int = 22
 ## Both are floor. The hub's cells are TunnelRock.MAP's, the depth's the layout's.
 const DESCENT_CELL := Vector2i(8, 16)
 const START_CELL := Vector2i(11, 18)
+## The cell of the way up (the exit pad of the tunnels scene).
+const UP_CELL := Vector2i(11, 20)
 ## How near the rover must be to the way down or a find [PLACEHOLDER]. A cell is
 ## 3 m wide.
 const REACH_M: float = 4.0
@@ -50,11 +52,15 @@ const NAMES: Dictionary = { "ore": "crystal ore", "mineral": "a mineral", "sampl
 const PER_ROOM: int = 2
 const ON_LANDING: int = 1
 
-## This screen's own player is below, and the layout they are in. Not saved and
-## not sent: a loaded farm, the farm scene and the title all put it back to the
-## hub (SceneSwitcher). The report of where this player is reads it.
+## The depth the one shared rover is at, and its layout, as this screen builds the
+## tunnels. Not saved and not sent: GameState.rover_depth is the truth (saved, and
+## sent to guests), and the tunnels scene copies it when it is built (follow).
+## Every screen in the tunnels shows the rover's depth.
 static var local_depth: int = 0
 static var local_layout: Dictionary = {}
+## Where the rover starts in the scene built after the rover changed depth.
+static var arrive_at: Transform3D = Transform3D.IDENTITY
+static var arrive_pending: bool = false
 
 
 # --- The hash -------------------------------------------------------------------
@@ -198,6 +204,59 @@ static func local_for(world_seed: int, day: int) -> Dictionary:
 	return local_layout
 
 
+## Takes the rover's depth for this screen: today's layout of it, or the hub.
+static func follow(depth: int, world_seed: int, day: int) -> void:
+	set_local(depth, layout(world_seed, ZONE, depth, day) if depth > 0 else {})
+
+
+## The map the rover is held to at `depth` on `day`: the hub's, or the layout's.
+static func grid_for(depth: int, world_seed: int, day: int) -> PackedStringArray:
+	if depth > 0:
+		var data: Dictionary = layout(world_seed, ZONE, depth, day)
+		if not data.is_empty():
+			return data["grid"]
+	return TunnelRock.MAP
+
+
+## How many finds a depth has (every day the same).
+static func find_count(depth: int) -> int:
+	return PER_ROOM * ROOM_SLOTS.size() + ON_LANDING if depth == DEPTH else 0
+
+
+## Where the rover starts when it goes down, and where it comes out by the hatch.
+static func start_transform() -> Transform3D:
+	return Transform3D(Basis.IDENTITY, TunnelRock.at_in(_blank(), START_CELL) + Vector3(0.0, 0.05, 0.0))
+
+
+static func hatch_exit_transform() -> Transform3D:
+	return Transform3D(Basis.IDENTITY, descent_position() + Vector3(0.0, 0.05, TunnelRock.CELL_M))
+
+
+## A grid of the depth's size, for places that only need its measures.
+static func _blank() -> PackedStringArray:
+	var out := PackedStringArray()
+	for row in HEIGHT:
+		out.append(".".repeat(WIDTH))
+	return out
+
+
+## Where the way up is (the exit pad's cell below).
+static func ascent_position() -> Vector3:
+	return TunnelRock.at_in(_blank(), UP_CELL)
+
+
+## Where the rover is put when it comes to `depth`: the start below, beside the hatch
+## in the hub.
+static func pose_for_depth(depth: int) -> Transform3D:
+	return start_transform() if depth > 0 else hatch_exit_transform()
+
+
+## True if a rover at `at` is within reach of the way up.
+static func near_ascent(at: Vector3) -> bool:
+	var there: Vector3 = TunnelRock.at_in(_blank(), UP_CELL)
+	return Vector2(there.x - at.x, there.z - at.z).length() <= REACH_M
+
+
 ## Goes below (or back): the layout the scene is built from, or nothing at depth 0.
 static func set_local(depth: int, layout_data: Dictionary) -> void:
 	local_depth = depth
@@ -223,7 +282,7 @@ static func reachable(grid: PackedStringArray, from: Vector2i) -> Array[Vector2i
 # --- The way down and the finds -------------------------------------------------
 
 static func descent_position() -> Vector3:
-	return TunnelRock.at(DESCENT_CELL)
+	return TunnelRock.at_in(TunnelRock.MAP, DESCENT_CELL)
 
 
 ## True if a rover at `at` is within reach of the way down in the hub.
@@ -296,12 +355,13 @@ static func with_taken(taken: Dictionary, zone: String, day: int, find_id_text: 
 	return out
 
 
-## The record without entries of past days. A copy.
+## The record with only today's entries: a past day is over, and a day that has not
+## come is not believed. A copy.
 static func prune(taken: Dictionary, day: int) -> Dictionary:
 	var out: Dictionary = {}
 	for zone: Variant in taken:
 		var entry: Variant = taken[zone]
-		if entry is Dictionary and int(entry.get("day", -1)) >= day:
+		if entry is Dictionary and int(entry.get("day", -1)) == day:
 			out[zone] = (entry as Dictionary).duplicate(true)
 	return out
 
@@ -313,8 +373,8 @@ static func taken_problem(taken: Variant) -> String:
 		return "'finds_taken' is not a dictionary."
 	for zone: Variant in taken:
 		var entry: Variant = taken[zone]
-		if not zone is String or zone == "" or not entry is Dictionary:
-			return "'finds_taken' has an entry that is not a zone's record."
+		if not zone is String or not StringName(zone) in ZoneData.ids() or not entry is Dictionary:
+			return "'finds_taken' has an entry that is not a known zone's record."
 		var day: Variant = entry.get("day")
 		if not day is int or day < 0:
 			return "'finds_taken' has a day that is not a day."
@@ -333,5 +393,8 @@ static func taken_problem(taken: Variant) -> String:
 
 static func _is_find_id(text: String) -> bool:
 	var parts: PackedStringArray = text.split("_f")
-	return text.begins_with("d") and parts.size() == 2 and parts[0].substr(1).is_valid_int() \
-			and parts[1].is_valid_int() and not parts[1].begins_with("-")
+	if not text.begins_with("d") or parts.size() != 2 or not parts[0].substr(1).is_valid_int() or not parts[1].is_valid_int():
+		return false
+	if parts[1].begins_with("-") or parts[1].begins_with("+"):
+		return false
+	return parts[1].to_int() < find_count(parts[0].substr(1).to_int())

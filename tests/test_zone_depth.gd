@@ -28,7 +28,13 @@ func _layout(day: int) -> Dictionary:
 func _below(gs: GameStateScript, find: Dictionary) -> void:
 	gs.player_places[HOST] = [ZoneDepth.ZONE, ZoneDepth.DEPTH]
 	gs.rover_zone = ZoneDepth.ZONE
-	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, TunnelRock.at(find["cell"]))
+	gs.rover_depth = ZoneDepth.DEPTH
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, _at(find["cell"]))
+
+
+## The middle of a cell of today's layout, whatever map this test process is on.
+func _at(cell: Vector2i) -> Vector3:
+	return TunnelRock.at_in(_layout(_today())["grid"], cell)
 
 
 func _commander(gs: GameStateScript) -> Node:
@@ -140,10 +146,10 @@ func test_a_find_in_reach_is_taken_once_and_paid() -> String:
 	_below(gs, find)
 	var ore: int = gs.crystal_ore
 	var credits: int = gs.credits
-	var first: String = gs.take_find(find["id"], HOST)
+	var first: String = gs.take_find(find["id"], _today(), HOST)
 	var paid_ore: int = gs.crystal_ore - ore
 	var paid_credits: int = gs.credits - credits
-	var again: String = gs.take_find(find["id"], HOST)
+	var again: String = gs.take_find(find["id"], _today(), HOST)
 	var pay: Dictionary = ZoneDepth.reward(str(find["kind"]))
 	var kept: Array = ZoneDepth.taken_today(gs.finds_taken, ZoneDepth.ZONE, _today())
 	gs.free()
@@ -165,23 +171,23 @@ func test_the_host_refuses_the_wrong_place_depth_find_or_rover() -> String:
 	# Never went down.
 	_below(gs, find)
 	gs.player_places[HOST] = [ZoneDepth.ZONE, 0]
-	wrong.append(gs.take_find(find["id"], HOST))
+	wrong.append(gs.take_find(find["id"], _today(), HOST))
 	# On the farm.
 	gs.player_places[HOST] = ["farm", 0]
-	wrong.append(gs.take_find(find["id"], HOST))
+	wrong.append(gs.take_find(find["id"], _today(), HOST))
 	# Below, but a find that is not there today.
 	_below(gs, find)
-	wrong.append(gs.take_find("d1_f99", HOST))
-	wrong.append(gs.take_find("", HOST))
+	wrong.append(gs.take_find("d1_f99", _today(), HOST))
+	wrong.append(gs.take_find("", _today(), HOST))
 	# The rover is not in the tubes, or not known, or too far.
 	gs.rover_zone = ""
-	wrong.append(gs.take_find(find["id"], HOST))
+	wrong.append(gs.take_find(find["id"], _today(), HOST))
 	_below(gs, find)
 	gs.rover_transforms.erase(gs.TUNNEL_ROVER)
-	wrong.append(gs.take_find(find["id"], HOST))
+	wrong.append(gs.take_find(find["id"], _today(), HOST))
 	_below(gs, far)
-	if TunnelRock.at(far["cell"]).distance_to(TunnelRock.at(find["cell"])) > ZoneDepth.REACH_M + ZoneDepth.HOST_REACH_SLACK_M:
-		wrong.append(gs.take_find(find["id"], HOST))
+	if _at(far["cell"]).distance_to(_at(find["cell"])) > ZoneDepth.REACH_M + ZoneDepth.HOST_REACH_SLACK_M:
+		wrong.append(gs.take_find(find["id"], _today(), HOST))
 	else:
 		wrong.append("skipped")
 	var nothing: bool = gs.finds_taken.is_empty() and gs.crystal_ore == 0 and gs.credits == 0
@@ -198,10 +204,10 @@ func test_the_command_runs_for_a_player_below_and_is_on_the_list() -> String:
 	var gs: GameStateScript = _state()
 	var commands: Node = _commander(gs)
 	var find: Dictionary = (_layout(_today())["finds"] as Array)[1]
-	var home: Variant = commands.execute(HOST, &"take_find", [find["id"]])
+	var home: Variant = commands.execute(HOST, &"take_find", [find["id"], _today()])
 	_below(gs, find)
-	var took: Variant = commands.execute(HOST, &"take_find", [find["id"]])
-	var twice: Variant = commands.execute(HOST, &"take_find", [find["id"]])
+	var took: Variant = commands.execute(HOST, &"take_find", [find["id"], _today()])
+	var twice: Variant = commands.execute(HOST, &"take_find", [find["id"], _today()])
 	commands.free()
 	gs.free()
 	if home == "":
@@ -215,11 +221,11 @@ func test_the_host_allows_a_little_slack_on_the_reach() -> String:
 	var gs: GameStateScript = _state()
 	var find: Dictionary = (_layout(_today())["finds"] as Array)[0]
 	_below(gs, find)
-	var spot: Vector3 = TunnelRock.at(find["cell"])
+	var spot: Vector3 = _at(find["cell"])
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, spot + Vector3(ZoneDepth.REACH_M + ZoneDepth.HOST_REACH_SLACK_M + 0.1, 0.0, 0.0))
-	var too_far: String = gs.take_find(find["id"], HOST)
+	var too_far: String = gs.take_find(find["id"], _today(), HOST)
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, spot + Vector3(ZoneDepth.REACH_M + ZoneDepth.HOST_REACH_SLACK_M - 0.1, 0.0, 0.0))
-	var lagging: String = gs.take_find(find["id"], HOST)
+	var lagging: String = gs.take_find(find["id"], _today(), HOST)
 	gs.free()
 	if too_far == "":
 		return "A rover just past the slack was accepted."
@@ -255,9 +261,9 @@ func test_taken_finds_survive_a_save() -> String:
 	var gs: GameStateScript = _state()
 	var finds: Array = _layout(_today())["finds"]
 	_below(gs, finds[0])
-	gs.take_find(finds[0]["id"], HOST)
+	gs.take_find(finds[0]["id"], _today(), HOST)
 	_below(gs, finds[2])
-	gs.take_find(finds[2]["id"], HOST)
+	gs.take_find(finds[2]["id"], _today(), HOST)
 	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
 	var problem: String = gs.farm_dict_problem(data)
 	gs.free()
@@ -326,7 +332,7 @@ func test_the_finds_are_back_on_a_new_day() -> String:
 	var gs: GameStateScript = _state()
 	var finds: Array = _layout(_today())["finds"]
 	_below(gs, finds[0])
-	gs.take_find(finds[0]["id"], HOST)
+	gs.take_find(finds[0]["id"], _today(), HOST)
 	var tomorrow: Array = ZoneDepth.taken_today(gs.finds_taken, ZoneDepth.ZONE, _today() + 1)
 	gs.free()
 	return "" if tomorrow.is_empty() else "Today's finds were still taken tomorrow."
@@ -340,7 +346,7 @@ func test_a_guest_is_shown_the_taken_finds() -> String:
 	var host: GameStateScript = _state()
 	var find: Dictionary = (_layout(_today())["finds"] as Array)[0]
 	_below(host, find)
-	host.take_find(find["id"], HOST)
+	host.take_find(find["id"], _today(), HOST)
 	var data: Dictionary = bytes_to_var(var_to_bytes(host.farm_to_dict()))
 	host.free()
 	var guest: GameStateScript = _state()
@@ -378,3 +384,282 @@ func test_presence_reports_depth_one_and_no_deeper() -> String:
 	if below != ["lava_tubes", 1]:
 		return "Below reported %s" % [below]
 	return "" if farm[1] == 0 else "The farm reported depth %s" % [farm]
+
+
+# --- One rover, one depth (review fixes) ------------------------------------------
+
+## HOST with the farm rover in the hub, parked at `at`.
+func _hub_rover(gs: GameStateScript, at: Vector3) -> void:
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.rover_depth = 0
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, at)
+
+
+func test_the_rover_depth_is_saved_and_an_old_save_loads_as_the_hub() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.rover_depth = ZoneDepth.DEPTH
+	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
+	var problem: String = gs.farm_dict_problem(data)
+	gs.free()
+	var back: GameStateScript = _state()
+	var loaded: String = back.farm_from_dict(data)
+	var depth: int = back.rover_depth
+	back.free()
+	if problem != "" or loaded != "":
+		return "A good save was refused: %s %s" % [problem, loaded]
+	if depth != ZoneDepth.DEPTH:
+		return "Loaded depth %d." % depth
+	var old: Dictionary = data.duplicate(true)
+	old.erase("rover_depth")
+	var later: GameStateScript = _state()
+	later.rover_depth = 1
+	var old_problem: String = later.farm_from_dict(old)
+	var old_depth: int = later.rover_depth
+	later.free()
+	if old_problem != "":
+		return "An old save was refused: " + old_problem
+	return "" if old_depth == 0 else "An old save loaded depth %d." % old_depth
+
+
+func test_a_save_with_a_bad_rover_depth_is_refused() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZoneDepth.ZONE
+	var data: Dictionary = gs.farm_to_dict()
+	var refused: Array[String] = []
+	for bad: Variant in [-1, ZoneDepth.DEPTH + 1, "1", 1.5, null]:
+		data["rover_depth"] = bad
+		refused.append(gs.farm_dict_problem(data))
+	# Below, with the rover somewhere that is not the Lava Tubes.
+	data["rover_depth"] = 1
+	data["rover_zone"] = ""
+	refused.append(gs.farm_dict_problem(data))
+	gs.free()
+	for i: int in refused.size():
+		if refused[i] == "":
+			return "Bad rover_depth number %d was accepted." % i
+	return ""
+
+
+func test_leaving_the_tubes_puts_the_rover_back_in_the_hub_depth() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.rover_depth = 1
+	gs.rover_zone = ""
+	var depth: int = gs.rover_depth
+	gs.free()
+	return "" if depth == 0 else "The rover kept depth %d outside the Lava Tubes." % depth
+
+
+func test_rover_depth_goes_to_guests_with_the_rover_zone() -> String:
+	var shown: Array = FarmSync.SHOWN_BY.get(&"rover_place_changed", [])
+	if not "rover_depth" in shown or not "rover_zone" in shown:
+		return "rover_place_changed shows %s." % [shown]
+	return ""
+
+
+func test_the_host_takes_the_rover_down_the_hatch_and_back_up() -> String:
+	if not &"change_depth" in CommandsScript.ACTIONS:
+		return "change_depth is not a command."
+	var gs: GameStateScript = _state()
+	_hub_rover(gs, ZoneDepth.descent_position())
+	var signals: Array[int] = [0]
+	gs.rover_place_changed.connect(func() -> void: signals[0] += 1)
+	var down: String = gs.change_depth(1, "")
+	var depth_down: int = gs.rover_depth
+	var start: Vector3 = gs.parked_rover_transform(gs.TUNNEL_ROVER).origin
+	var at_start: bool = start.distance_to(ZoneDepth.start_transform().origin) < 0.01
+	# From the start the way up is farther than the reach: refused.
+	var early: String = gs.change_depth(0, "")
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.ascent_position())
+	var up: String = gs.change_depth(0, "")
+	var depth_up: int = gs.rover_depth
+	var beside: bool = ZoneDepth.near_descent(gs.parked_rover_transform(gs.TUNNEL_ROVER).origin)
+	var emitted: int = signals[0]
+	gs.free()
+	if down != "":
+		return "Down the hatch was refused: " + down
+	if depth_down != 1 or not at_start:
+		return "Down left depth %d, at the start %s." % [depth_down, at_start]
+	if early == "" and not ZoneDepth.near_ascent(ZoneDepth.start_transform().origin):
+		return "Up from the start was accepted."
+	if up != "":
+		return "Up from the way up was refused: " + up
+	if depth_up != 0 or not beside:
+		return "Up left depth %d, beside the hatch %s." % [depth_up, beside]
+	return "" if emitted >= 2 else "The move was not announced (%d)." % emitted
+
+
+func test_the_host_refuses_a_bad_depth_change() -> String:
+	var gs: GameStateScript = _state()
+	var refused: Array[String] = []
+	# Not in the Lava Tubes.
+	gs.rover_zone = ""
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.descent_position())
+	refused.append(gs.change_depth(1, ""))
+	# Too far from the hatch.
+	_hub_rover(gs, ZoneDepth.descent_position() + Vector3(60.0, 0.0, 0.0))
+	refused.append(gs.change_depth(1, ""))
+	# Not known where the rover is.
+	_hub_rover(gs, ZoneDepth.descent_position())
+	gs.rover_transforms.erase(gs.TUNNEL_ROVER)
+	refused.append(gs.change_depth(1, ""))
+	# A depth that does not exist, or two steps, or the same one.
+	_hub_rover(gs, ZoneDepth.descent_position())
+	refused.append(gs.change_depth(2, ""))
+	refused.append(gs.change_depth(-1, ""))
+	refused.append(gs.change_depth(0, ""))
+	# A guest while nobody drives.
+	refused.append(gs.change_depth(1, GUEST))
+	var depth: int = gs.rover_depth
+	gs.free()
+	for i: int in refused.size():
+		if refused[i] == "":
+			return "Refusal %d was missing." % i
+	return "" if depth == 0 else "A refused change still moved the rover to depth %d." % depth
+
+
+func test_change_depth_is_a_checked_command() -> String:
+	var gs: GameStateScript = _state()
+	var commands: Node = _commander(gs)
+	_hub_rover(gs, ZoneDepth.descent_position())
+	var good: String = str(commands.problem(&"change_depth", [1]))
+	var bad: Array[String] = [str(commands.problem(&"change_depth", [])), str(commands.problem(&"change_depth", ["1"])), str(commands.problem(&"change_depth", [1, 2]))]
+	var ran: Variant = commands.execute(HOST, &"change_depth", [1])
+	var depth: int = gs.rover_depth
+	commands.free()
+	gs.free()
+	if good != "":
+		return "A good call was refused: " + good
+	for i: int in bad.size():
+		if bad[i] == "":
+			return "Bad arguments %d were accepted." % i
+	if ran != "":
+		return "The command was refused: %s" % [ran]
+	return "" if depth == 1 else "The command left depth %d." % depth
+
+
+func test_a_find_needs_the_rover_at_depth_one() -> String:
+	var gs: GameStateScript = _state()
+	var find: Dictionary = (_layout(_today())["finds"] as Array)[0]
+	_below(gs, find)
+	gs.rover_depth = 0
+	var up: String = gs.take_find(find["id"], _today(), HOST)
+	var nothing: bool = gs.finds_taken.is_empty() and gs.crystal_ore == 0 and gs.credits == 0
+	gs.free()
+	if up == "":
+		return "A find was taken with the rover in the hub."
+	return "" if nothing else "A refused take still changed the farm."
+
+
+func test_a_beacon_needs_the_rover_in_the_hub() -> String:
+	var gs: GameStateScript = _state()
+	gs.player_places[HOST] = [ZoneDepth.ZONE, 0]
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.rover_depth = 1
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, LavaHub.spot_position("spot_west"))
+	var refused: String = gs.place_beacon("spot_west", HOST)
+	gs.free()
+	return "" if refused != "" else "A beacon was set down while the rover was below."
+
+
+func test_yesterdays_layout_never_takes_a_different_find_today() -> String:
+	var gs: GameStateScript = _state()
+	var today: int = _today()
+	var finds: Array = _layout(today)["finds"]
+	_below(gs, finds[0])
+	# A screen that drew yesterday's floor says d1_f0 of yesterday.
+	var stale: String = gs.take_find("d1_f0", today - 1, HOST)
+	var nothing: bool = gs.finds_taken.is_empty() and gs.crystal_ore == 0 and gs.credits == 0
+	var fresh: String = gs.take_find("d1_f0", today, HOST)
+	gs.free()
+	# The case is real: some days d1_f0 is another kind of find than the day after.
+	var differs: bool = false
+	for day: int in range(0, 60):
+		var a: Array = _layout(day)["finds"]
+		var b: Array = _layout(day + 1)["finds"]
+		if str(a[0]["kind"]) != str(b[0]["kind"]):
+			differs = true
+	if stale == "":
+		return "A pickup from yesterday's layout was accepted."
+	if not nothing:
+		return "A stale pickup still changed the farm."
+	if fresh != "":
+		return "Today's d1_f0 was refused: " + fresh
+	return "" if differs else "The generator never changes d1_f0 from one day to the next."
+
+
+func test_only_today_is_kept_and_a_future_day_is_dropped() -> String:
+	var day: int = _today()
+	var future: Dictionary = { "lava_tubes": { "day": day + 1, "ids": ["d1_f0"] } }
+	var kept: Dictionary = ZoneDepth.prune(future, day)
+	var gs: GameStateScript = _state()
+	var data: Dictionary = gs.farm_to_dict()
+	data["finds_taken"] = future
+	var back: GameStateScript = _state()
+	var loaded: String = back.farm_from_dict(data)
+	var after: Dictionary = back.finds_taken.duplicate()
+	gs.free()
+	back.free()
+	if not kept.is_empty():
+		return "A future day was kept by prune: %s" % [kept]
+	if loaded != "":
+		return "A save with a future record was refused: " + loaded
+	return "" if after.is_empty() else "A future record was loaded: %s" % [after]
+
+
+func test_a_save_names_only_real_zones_and_real_find_ids() -> String:
+	var gs: GameStateScript = _state()
+	var data: Dictionary = gs.farm_to_dict()
+	var refused: Array[String] = []
+	var bad_records: Array = [
+		{ "not_a_zone": { "day": 1, "ids": [] } },
+		{ "lava_tubes": { "day": 1, "ids": ["d1_f99"] } },
+		{ "lava_tubes": { "day": 1, "ids": ["d2_f0"] } },
+		{ "lava_tubes": { "day": 1, "ids": ["d1_f+1"] } },
+		{ "lava_tubes": { "day": 1, "ids": ["d1_f-0"] } },
+	]
+	for bad: Variant in bad_records:
+		data["finds_taken"] = bad
+		refused.append(gs.farm_dict_problem(data))
+	data["finds_taken"] = { "lava_tubes": { "day": 1, "ids": ["d1_f0", "d1_f%d" % (ZoneDepth.find_count(1) - 1)] } }
+	var good: String = gs.farm_dict_problem(data)
+	gs.free()
+	for i: int in refused.size():
+		if refused[i] == "":
+			return "Bad record number %d was accepted." % i
+	return good
+
+
+func test_a_rover_below_that_is_not_on_floor_starts_again() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.rover_depth = 1
+	var far: Vector3 = Vector3(-500.0, 0.0, -500.0)
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, far)
+	var moved: bool = gs.settle_rover_depth()
+	var at: Vector3 = gs.parked_rover_transform(gs.TUNNEL_ROVER).origin
+	var again: bool = gs.settle_rover_depth()
+	var new_day: bool = gs.settle_rover_depth(true)
+	gs.rover_depth = 0
+	var hub: bool = gs.settle_rover_depth(true)
+	gs.free()
+	if not moved or at.distance_to(ZoneDepth.start_transform().origin) > 0.01:
+		return "A rover off the floor was not put back at the start."
+	if again:
+		return "A rover on the floor was moved."
+	if not new_day:
+		return "A new morning did not start the depth again."
+	return "" if not hub else "The hub was settled as if it were below."
+
+
+func test_the_hub_never_takes_a_pose_from_below_or_the_reverse() -> String:
+	var depth_one: PackedStringArray = ZoneDepth.grid_for(1, SEED, _today())
+	var hub: PackedStringArray = ZoneDepth.grid_for(0, SEED, _today())
+	if hub != TunnelRock.MAP:
+		return "Depth 0 is not the hub map."
+	if depth_one != (_layout(_today())["grid"] as PackedStringArray):
+		return "Depth 1 is not today's layout."
+	if ZoneDepth.pose_for_depth(1).origin == ZoneDepth.pose_for_depth(0).origin:
+		return "The same arrival pose for both depths."
+	return ""

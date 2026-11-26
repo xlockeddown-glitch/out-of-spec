@@ -39,7 +39,7 @@ const SHOWN_BY: Dictionary = {
 	&"blocks_changed": ["found_blocks"],
 	&"pockets_changed": ["found_pockets", "new_pockets", "pocket_pending"],
 	&"stone_changed": ["stone", "stone_pieces"],
-	&"rover_place_changed": ["rover_zone"],
+	&"rover_place_changed": ["rover_zone", "rover_depth"],
 	&"sentinel_changed": ["sentinel_out", "sentinel_days_unseen"],
 	&"rover_lights_changed": ["rover_lights"],
 	&"beacons_changed": ["beacons_placed"],

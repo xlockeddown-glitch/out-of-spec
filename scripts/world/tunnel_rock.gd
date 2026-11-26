@@ -121,9 +121,23 @@ static func in_deep(place: Vector3) -> bool:
 	return Rect2(SUMP.x - CELL_M * 0.5, SUMP.z - CELL_M * 0.5, CELL_M, CELL_M).grow(0.7).has_point(Vector2(place.x, place.z))
 
 
+## True if the rover can be at this place on a given map (the host holds the rover
+## to the map of the rover's own depth, whichever scene the host is in).
+static func holds_in(map: PackedStringArray, place: Vector3) -> bool:
+	var cell := Vector2i(roundi(place.x / CELL_M + (map[0].length() - 1) * 0.5), roundi(place.z / CELL_M + (map.size() - 1) * 0.5))
+	if cell.y < 0 or cell.y >= map.size() or cell.x < 0 or cell.x >= map[cell.y].length():
+		return false
+	return map[cell.y][cell.x] in ".AB" and absf(place.y) < ROCK_M
+
+
 ## The middle of a cell.
 static func at(cell: Vector2i) -> Vector3:
 	return Vector3((cell.x - (grid()[0].length() - 1) * 0.5) * CELL_M, 0.0, (cell.y - (grid().size() - 1) * 0.5) * CELL_M)
+
+
+## The middle of a cell of a given map, whichever map this screen is on.
+static func at_in(map: PackedStringArray, cell: Vector2i) -> Vector3:
+	return Vector3((cell.x - (map[0].length() - 1) * 0.5) * CELL_M, 0.0, (cell.y - (map.size() - 1) * 0.5) * CELL_M)
 
 
 static func cell_of(place: Vector3) -> Vector2i:
@@ -145,6 +159,11 @@ static func ground_m(place: Vector2) -> float:
 static func drawn_ground_m(place: Vector2) -> float:
 	var block: Vector2 = ((place / POOL_BLOCK_M).floor() + Vector2.ONE * 0.5) * POOL_BLOCK_M
 	return snappedf(ground_m(block), POOL_STEP_M)
+
+
+func _enter_tree() -> void:
+	# Before any child's _ready: the map is the one the rover is at.
+	ZoneDepth.follow(GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
 
 
 func _ready() -> void:

@@ -30,6 +30,10 @@ var _holding_beacon: bool = false
 var _props: LavaHubProps
 ## This player is below, in the first depth (ZoneDepth), not in the hub.
 var _below: bool = false
+## The depth and the day this scene was built for. The rover's depth, or the day,
+## changing means the scene is built again.
+var _built_depth: int = 0
+var _built_day: int = 0
 var _depth_props: ZoneDepthProps
 
 @onready var _rover: RoverController = %Rover
@@ -45,7 +49,13 @@ func _ready() -> void:
 	_rover.dig_rejected.connect(_on_dig_rejected)
 	_rover.fill_rejected.connect(_on_fill_rejected)
 	_exit_pad.rover_entered.connect(_on_rover_entered_exit)
+	if ZoneDepth.arrive_pending:
+		_rover.global_transform = ZoneDepth.arrive_at
+		ZoneDepth.arrive_pending = false
 	_below = ZoneDepth.local_depth > 0 and not ZoneDepth.local_layout.is_empty()
+	_built_depth = ZoneDepth.local_depth if _below else 0
+	_built_day = GameClock.get_day_index()
+	GameClock.day_started.connect(_on_new_day)
 	_depth_props = ZoneDepthProps.new()
 	_rover.get_parent().add_child(_depth_props)
 	if _below:
@@ -133,6 +143,9 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"interact") and SceneSwitcher.is_busy():
+		get_viewport().set_input_as_handled()
+		return  # a swap is under way; a second one would be dropped
 	var away: bool = _rover.away_text() != ""
 	if away and event.is_action_pressed(&"interact"):
 		get_viewport().set_input_as_handled()
@@ -265,7 +278,8 @@ func _nearest_find() -> Dictionary:
 
 
 func _use_find(find_id: String) -> void:
-	var problem: String = await FarmCommands.request(&"take_find", [find_id])
+	# The day the finds on this screen were drawn from: the host refuses another.
+	var problem: String = await FarmCommands.request(&"take_find", [find_id, int(ZoneDepth.local_layout.get("day", 0))])
 	if not is_inside_tree():
 		return
 	if problem != "":
@@ -275,26 +289,52 @@ func _use_find(find_id: String) -> void:
 	_hud.push_log("FIND: " + ZoneDepth.reward_text(str(find.get("kind", ""))))
 
 
-## Down the hatch: the layout for today comes from the farm's seed, the same one
-## on every screen. The rover goes down with its driver, to the start below.
+## Down the hatch: the host takes the one rover down (to the start below, with its
+## driver). Nothing here changes until the host says yes; then every screen in the
+## tunnels builds the depth from the rover's (_on_rover_place_changed).
 func _go_down() -> void:
-	if _moving:
-		return
-	_moving = true
-	var layout: Dictionary = ZoneDepth.layout(GameState.world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, GameClock.get_day_index())
-	ZoneDepth.set_local(ZoneDepth.DEPTH, layout)
-	_rover.global_transform = GameState.TUNNEL_START
-	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+	_change_depth(ZoneDepth.DEPTH)
 
 
-## Up again: the rover comes out by the hatch in the hub.
+## Up again: the host brings the rover out by the hatch in the hub.
 func _go_up() -> void:
-	if _moving:
+	_change_depth(0)
+
+
+func _change_depth(target: int) -> void:
+	if _moving or SceneSwitcher.is_busy():
 		return
 	_moving = true
-	ZoneDepth.set_local(0, {})
-	_rover.global_transform = Transform3D(Basis.IDENTITY, ZoneDepth.descent_position() + Vector3(0.0, 0.05, TunnelRock.CELL_M))
+	var problem: String = await FarmCommands.request(&"change_depth", [target])
+	if not is_inside_tree():
+		return
+	if problem != "":
+		_moving = false
+		_hud.push_log(("WAY DOWN: " if target > 0 else "WAY UP: ") + problem)
+		return
+	# A guest's copy of the farm may come after the host's yes.
+	_on_rover_place_changed()
+
+
+## The rover's depth is not the one this scene was built for: it is built again, with
+## the rover put where the new depth starts it (the same on every screen).
+func _rebuild_for_depth() -> void:
+	if SceneSwitcher.is_busy():
+		return
+	_moving = true
+	# The old rover node reports its pose as it leaves; make it the new one, and have
+	# the next scene's rover start there too.
+	_rover.global_transform = ZoneDepth.pose_for_depth(GameState.rover_depth)
+	ZoneDepth.arrive_at = _rover.global_transform
+	ZoneDepth.arrive_pending = true
 	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+
+
+## 06:00: the floor below is another one. A screen below builds it again, so its
+## finds are today's (the host has put the rover on it).
+func _on_new_day(_day: int) -> void:
+	if _built_depth > 0 and _built_day != GameClock.get_day_index() and not _moving:
+		_rebuild_for_depth()
 
 
 func _can_catch() -> bool:
@@ -447,7 +487,9 @@ func _leave_tunnels() -> void:
 
 ## A guest's copy of the farm may come after the host's yes.
 func _on_rover_place_changed() -> void:
-	if _move_granted and _rover.away_text() != "":
+	if GameState.rover_zone == GameState.TUNNELS_ZONE and GameState.rover_depth != _built_depth and _rover.away_text() == "":
+		_rebuild_for_depth()
+	elif _move_granted and _rover.away_text() != "":
 		_move_granted = false
 		SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE)
 	elif not _moving:

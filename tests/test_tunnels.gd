@@ -545,3 +545,67 @@ func test_a_walker_fits_through_every_arch_opening() -> String:
 		problem = "Arch pieces missing: %d courses, %d pillars, %d drawn" % [courses, pillar_boxes, pillar_meshes]
 	rock.free()
 	return problem
+
+
+## Review fix 1: the host holds a guest's rover to the floor at the rover's own
+## depth, whichever scene the host is in.
+func test_a_guest_below_is_held_to_the_floor_of_the_rovers_depth() -> String:
+	var host: Node = _host()
+	var mine: Node = RoversScript.new()
+	mine.start(host, host.commands.state)
+	var guest: Node = _guest(host)
+	var state: Node = host.commands.state
+	var id: String = GameState.TUNNEL_ROVER
+	var day: int = GameClock.get_day_index()
+	state.rover_zone = ZoneDepth.ZONE
+	state.rover_depth = ZoneDepth.DEPTH
+	var grid: PackedStringArray = ZoneDepth.grid_for(ZoneDepth.DEPTH, state.world_seed, day)
+	# A floor cell of the layout, with a neighbour that is rock below and floor in
+	# the hub (what the old check, on the host's own map, would have allowed), and one
+	# that is floor below and rock in the hub.
+	var from := Vector3.ZERO
+	var rock_here_floor_hub := Vector3.ZERO
+	var floor_here_rock_hub := Vector3.ZERO
+	var found: Array[bool] = [false, false]
+	for y: int in range(1, grid.size() - 1):
+		for x: int in range(1, grid[y].length() - 1):
+			if grid[y][x] != ".":
+				continue
+			var here: Vector3 = TunnelRock.at_in(grid, Vector2i(x, y))
+			for side: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+				var to: Vector3 = here + Vector3(side.x, 0.0, side.y) * 2.0
+				var below: bool = TunnelRock.holds_in(grid, to)
+				var hub: bool = TunnelRock.holds_in(TunnelRock.MAP, to)
+				if not below and hub and not found[0]:
+					found[0] = true
+					from = here
+					rock_here_floor_hub = to
+				if below and not hub and not found[1]:
+					found[1] = true
+					floor_here_rock_hub = to
+	state.rover_transforms[id] = Transform3D(Basis.IDENTITY, from)
+	var now: int = 1000
+	if found[0]:
+		mine._on_driven("player_2", id, [rock_here_floor_hub.x, 0.0, rock_here_floor_hub.z, 0.0, 0.0, true], now)
+	var forged: bool = found[0] and not mine.place(id).origin.is_equal_approx(from)
+	# A floor cell below that is rock in the hub is accepted (from a cell next to it).
+	var took: bool = true
+	if found[1]:
+		var next_to: Vector3 = floor_here_rock_hub
+		for side: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var back: Vector3 = floor_here_rock_hub + Vector3(side.x, 0.0, side.y) * 2.0
+			if TunnelRock.holds_in(grid, back):
+				next_to = back
+		state.rover_transforms[id] = Transform3D(Basis.IDENTITY, next_to)
+		mine._forget()
+		mine._on_driven("player_2", id, [floor_here_rock_hub.x, 0.0, floor_here_rock_hub.z, 0.0, 0.0, true], now + 100000)
+		took = mine.place(id).origin.is_equal_approx(floor_here_rock_hub)
+	mine.free()
+	var problem: String = ""
+	if not found[0] and not found[1]:
+		problem = "No cell tells the layout from the hub today (the test needs one)."
+	elif forged:
+		problem = "The host took a rover into the rock below because the hub's map had floor there."
+	elif not took:
+		problem = "The host refused a rover on the floor below because the hub's map has rock there."
+	return _finish(problem)
