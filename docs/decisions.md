@@ -1923,3 +1923,26 @@ Ryan's answers: a one-use reward is spent on its own on the next action it is fo
 - Is the grow step (a grow under way counts) fine, is P1's lab level 5 gate right, and is the stricter on-time count (traceable, not too soon) fine?
 - Are the numbers right: Field Ops 100 XP for P1, a 100 XP certificate for P2, 500 lab XP for L4?
 - Should a real favor system come later, and what should P1's first favor be?
+
+## 2026-11-26: Zones, level-banded areas away from the farm (design `docs/design/zones.md`)
+
+### Ryan chose
+
+Ryan's idea: stage areas almost level specific. Underground for lab levels about 5 to 20; about 21 to 50 on another body (Phobos or Deimos), searching for rare tarantulas and overcoming obstacles, while still coming home to tend the lab. In co-op one can stay and one can go, like mining in Stardew. More than one area may cover the same or overlapping levels; "not one way to do it". His twelve answers:
+
+1. **Getting there:** both. A real entrance the first visit (walk or drive to it), then fast travel from a terminal.
+2. **Night away:** you are rescued with a small cost, like passing out in Stardew. Certain quest lines can have camp-out spots where staying the night makes sense.
+3. **Co-op split:** anyone, anywhere. Any player, host or guest, may be in any zone. No "host stays home" rule.
+4. **Danger:** no death. Hazards cost time, items and instrument wear.
+5. **Layout:** fixed hubs (hand-made entry areas with NPCs and landmarks) with changing depths (generated or shuffled deeper sections).
+6. **Going early:** a soft gate. You can enter with a warning; some deep parts or the shuttle license need a lab level.
+7. **Finds:** all of rare tarantulas, ore and minerals, lost gear and gauge blocks (toward the 81-piece set) and robot parts, and samples and data for OIRM.
+8. **Underground areas:** all four: lava tubes, a flooded aquifer, an abandoned colony mine and polar ice caves. The bands overlap.
+9. **Moon tarantula hook** (tarantulas cannot live wild on a moon): all three, in different areas: escaped stock from an abandoned research station adapted in warm service tunnels; smuggler caches; terraform test pods.
+10. **Shuttle:** both. Day trips with a fee normally (Phobos orbits Mars about three times a day, so launch windows can matter), and longer multi-day expeditions for certain quest lines.
+11. **The lab while away:** it drifts as it does now (instruments drift, plants need water). Robots, sprinklers or a friend at home cover it, plus a quest reward or the ability to pay an NPC to tend the lab for a day.
+12. **Lab levels 50 to 99:** far Mars sites (Valles Marineris, Olympus Mons caves, the polar caps), the asteroid belt and the outer moons (Europa and Ganymede style ice), all three, sketched lightly.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- The design PR changes no code and no data. Every band, fee, time and name in it is a [PLACEHOLDER] or [ASSUMPTION]; the ten open questions are at the end of the design.
