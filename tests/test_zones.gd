@@ -10,6 +10,11 @@ const BANDS: Dictionary = {
 	&"ice_caves": Vector2i(18, 35),
 	&"phobos": Vector2i(21, 40),
 	&"deimos": Vector2i(26, 50),
+	&"valles_marineris": Vector2i(50, 62),
+	&"olympus_caves": Vector2i(55, 70),
+	&"polar_caps": Vector2i(60, 72),
+	&"asteroid_belt": Vector2i(70, 85),
+	&"outer_moons": Vector2i(85, 99),
 }
 
 
@@ -42,6 +47,9 @@ func test_the_checker_catches_bad_rows() -> String:
 		"unknown hazard": ["hazards", ["lava_monster"]],
 		"unknown find": ["finds", ["gold"]],
 		"missing scene": ["hub_scene", "res://scenes/no_such_zone.tscn"],
+		"hub not a scene": ["hub_scene", "res://scripts/world/zone_data.gd"],
+		"repeated word": ["hazards", ["heat", "heat"]],
+		"empty finds": ["finds", []],
 		"unknown area": ["area", "orbit"],
 		"name not a string": ["name", 7],
 	}
@@ -67,7 +75,7 @@ func test_bands_match_the_doc() -> String:
 	var far_hi: int = 0
 	var far: int = 0
 	for row: Dictionary in ZoneData.rows():
-		if row["area"] != "far":
+		if row.get("area", "") != "far":
 			continue
 		far += 1
 		var b: Vector2i = ZoneData.band_of(row)

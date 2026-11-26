@@ -31,7 +31,8 @@ const HAZARDS: Array[String] = [
 	"heat", "loose_basalt", "dark", "water_depth", "pressure_drop", "collapse",
 	"bad_air", "old_charges", "cold", "slick_ice", "white_out", "low_gravity",
 	"dust", "launch_window", "locked_crates", "wind", "long_drives", "thin_air",
-	"getting_lost", "vacuum", "debris", "radiation", "long_trip",
+	"getting_lost", "vacuum", "debris", "radiation", "long_trip", "slow_wading",
+	"scale", "drift",
 ]
 
 ## Find words (section 4 and section 11) [PLACEHOLDER].
@@ -45,10 +46,7 @@ const FINDS: Array[String] = [
 
 ## Zone ids in table order.
 static func ids() -> Array[StringName]:
-	var out: Array[StringName] = []
-	for row: Dictionary in rows():
-		out.append(StringName(str(row.get("id", ""))))
-	return out
+	return DataManager.get_ids(TABLE, SECTION)
 
 
 static func rows() -> Array[Dictionary]:
@@ -120,8 +118,9 @@ static func problems(table: Array) -> Array[String]:
 		out.append_array(_words_problems(label, "hazards", row.get("hazards"), HAZARDS))
 		out.append_array(_words_problems(label, "finds", row.get("finds"), FINDS))
 		var scene: Variant = row.get("hub_scene")
-		if scene is String and not (scene as String).is_empty() and not ResourceLoader.exists(scene):
-			out.append("%s: hub_scene %s does not exist" % [label, scene])
+		if scene is String and not (scene as String).is_empty():
+			if not (scene as String).begins_with("res://") or not (scene as String).ends_with(".tscn") or not ResourceLoader.exists(scene, "PackedScene"):
+				out.append("%s: hub_scene %s is not an existing scene" % [label, scene])
 	return out
 
 
@@ -151,7 +150,13 @@ static func _words_problems(label: String, field: String, raw: Variant, allowed:
 	var out: Array[String] = []
 	if not raw is Array:
 		return out
+	if (raw as Array).is_empty():
+		out.append("%s: %s is empty" % [label, field])
+	var seen: Dictionary = {}
 	for word: Variant in raw as Array:
 		if not word is String or not allowed.has(word as String):
 			out.append("%s: %s has %s, which is not an allowed word" % [label, field, word])
+		elif seen.has(word):
+			out.append("%s: %s repeats %s" % [label, field, word])
+		seen[word] = true
 	return out

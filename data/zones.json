@@ -1,5 +1,5 @@
 {
-  "_note": "Zones (docs/design/zones.md, build step 2). One row per zone. band is the lab level the content is tuned for, [min, max]; bands overlap on purpose and are not gates. Ryan's anchors: underground about 5 to 20, the moons about 21 to 50, far sites 50 to 99; every other band edge, every id and every name here is [PLACEHOLDER] (the ids are invented for code, not from the doc). hazards and finds are words from ZoneData.HAZARDS and ZoneData.FINDS (section 5 and section 4 of the doc; far sites use the one-line ideas of section 11). hub_scene is the res:// path of the zone's hub scene, or an empty string while it has none; only the basalt tunnels have a scene today. entrance is how the first visit gets there (section 2, section 8). area is underground, moon or far. tarantula_hook is a short string, empty when the zone has none. notes holds Ryan's answers from section 14.1 as short strings. No hazard or find has any rule or number yet; this table is data only.",
+  "_note": "Zones (docs/design/zones.md, build step 2). One row per zone. band is the lab level the content is tuned for, [min, max]; bands overlap on purpose and are not gates. Ryan's anchors: underground about 5 to 20, the moons about 21 to 50, far sites 50 to 99; every other band edge is [PLACEHOLDER]. Names come from the doc; the ids, the word lists and the far-site entrances are [PLACEHOLDER] (invented for code). hazards and finds are words from ZoneData.HAZARDS and ZoneData.FINDS (section 5 and section 4 of the doc; far sites use the one-line ideas of section 11). hub_scene is the res:// path of the zone's hub scene, or an empty string while it has none; only the basalt tunnels have a scene today. entrance is how the first visit gets there (section 2, section 8). area is underground, moon or far. tarantula_hook is a short string, empty when the zone has none. notes holds Ryan's answers from section 14.1 as short strings. No hazard or find has any rule or number yet; this table is data only.",
   "zones": [
     {
       "id": "lava_tubes",
@@ -18,7 +18,7 @@
       "name": "Flooded Aquifer",
       "area": "underground",
       "band": [8, 24],
-      "hazards": ["water_depth", "pressure_drop"],
+      "hazards": ["water_depth", "pressure_drop", "slow_wading"],
       "finds": ["water_samples", "drowned_gear", "gauge_blocks"],
       "hub_scene": "",
       "entrance": "A sinkhole south of the plateau, reached by rover.",
@@ -70,8 +70,8 @@
       "finds": ["smuggled_crates", "lost_standards", "tarantulas", "gauge_blocks"],
       "hub_scene": "",
       "entrance": "Shuttle from the pad; needs the shuttle license.",
-      "tarantula_hook": "Smuggler caches in warm crates: a new moon-adapted form with a wider climate band.",
-      "notes": "Caches and test pods; exotic low-expansion gauge blocks (Ryan, 14.1 answer 11)."
+      "tarantula_hook": "Smuggler caches in warm crates, and the terraform test pod [ASSUMPTION]: a new moon-adapted form with a wider climate band.",
+      "notes": "Caches and test pods [ASSUMPTION: the test pod is also on the Ice Caves row, as section 2 puts it there and sections 10.3 and 13 put it on Deimos; both kept]; exotic low-expansion gauge blocks (Ryan, 14.1 answer 11)."
     },
     {
       "id": "valles_marineris",
@@ -90,7 +90,7 @@
       "name": "Olympus Mons caves",
       "area": "far",
       "band": [55, 70],
-      "hazards": ["heat", "getting_lost"],
+      "hazards": ["heat", "scale", "getting_lost"],
       "finds": ["minerals", "ore"],
       "hub_scene": "",
       "entrance": "Not designed yet (section 11).",
@@ -114,7 +114,7 @@
       "name": "Asteroid belt",
       "area": "far",
       "band": [70, 85],
-      "hazards": ["vacuum", "debris"],
+      "hazards": ["vacuum", "drift", "debris"],
       "finds": ["metal_samples", "tarantulas"],
       "hub_scene": "",
       "entrance": "Not designed yet (an expedition; section 11).",
