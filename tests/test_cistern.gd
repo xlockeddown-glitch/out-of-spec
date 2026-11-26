@@ -194,7 +194,7 @@ func test_a_guest_gets_the_hosts_level_in_plain_data() -> String:
 	return problem
 
 
-func test_an_empty_cistern_changes_no_crop_or_money() -> String:
+func test_an_empty_cistern_changes_nothing_until_the_morning() -> String:
 	var full: GameStateScript = _make_state(5)
 	var dry: GameStateScript = _make_state(5)
 	for gs: GameStateScript in [full, dry]:
@@ -313,7 +313,7 @@ func test_a_full_plot_for_a_day_does_not_empty_it_on_current_numbers() -> String
 	var gs: GameStateScript = _make_state(0)
 	gs.credits = 1000000
 	for i: int in 144:
-		var cell := Vector3i(i % 12 - 6, 0, i / 12 - 6)
+		var cell := Vector3i(i % 12 - 6, 0, int(floorf(i / 12.0)) - 6)
 		gs.till(cell)
 		gs.plant_crop(cell)
 	var growing: int = gs.growing_plots()
