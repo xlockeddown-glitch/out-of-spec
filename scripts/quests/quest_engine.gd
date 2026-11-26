@@ -11,7 +11,9 @@ extends RefCounted
 ## A farm's entry in quest_state, by quest id:
 ##   accepted    the day it was accepted
 ##   steps_done  ids of the steps that are done
-##   base        step id -> what a counting check read on that day
+##   base        step id -> what a counting check read when its step opened: on
+##               that day, or, in a quest done in order, when the step before
+##               it was done
 ##   shown       step id -> the highest count a counting step has reached; the
 ##               phone is told when it grows, and it never goes back
 ##   players     who was on the farm when any step was done (they took part)
@@ -101,13 +103,21 @@ static func _update_one(farm: Node, quest: Dictionary, present: Array[String], o
 	var done: Array = entry["steps_done"]
 	var moved: bool = is_new
 	var finished: Array[String] = []
+	var in_order: bool = not bool(quest.get("any_order", false))
+	# The step before this one was done in this look.
+	var opened: bool = false
 	for step: Variant in steps:
 		var step_id: String = str(step.get("id", ""))
 		if step_id in done:
 			continue
+		var counts: bool = str(step.get("check", "")) in COUNTING
+		# In order, a step counts from when it opened: what was done while an
+		# earlier step was still open is not this step's.
+		if opened and in_order and counts and not bool(step.get("ever", false)):
+			entry["base"][step_id] = check_value(farm, step, present)
+		opened = false
 		var have: int = step_count(farm, step, entry, present)
 		var need: int = step_need(step)
-		var counts: bool = str(step.get("check", "")) in COUNTING
 		var grew: bool = counts and have > int(entry["shown"].get(step_id, 0))
 		if grew:
 			entry["shown"][step_id] = have
@@ -119,11 +129,12 @@ static func _update_one(farm: Node, quest: Dictionary, present: Array[String], o
 				if not player in entry["players"]:
 					(entry["players"] as Array).append(player)
 			moved = true
+			opened = true
 			continue
 		# A count that grew is told once; a contract's run has its own line.
 		if need > 1 and grew:
 			farm.post_phone("QUEST %s: %d of %d. %s" % [title, have, need, str(step.get("text", ""))])
-		if not bool(quest.get("any_order", false)):
+		if in_order:
 			break
 	if done.size() >= steps.size():
 		_finish(farm, quest, entry, present)
@@ -357,8 +368,8 @@ static func step_need(step: Dictionary) -> int:
 	return maxi(int(step.get("at_least", 1)), 1)
 
 
-## What a step has: its check's reading, less what it read on the day the quest
-## was accepted for a counting check that is not `ever`. A count never goes
+## What a step has: its check's reading, less what it read when the step opened
+## (`base`) for a counting check that is not `ever`. A count never goes
 ## back: the highest it has reached is kept (a forgotten guest's actions leave
 ## the farm's counters).
 static func step_count(farm: Node, step: Dictionary, entry: Dictionary, present: Array[String]) -> int:

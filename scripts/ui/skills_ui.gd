@@ -39,6 +39,7 @@ func _ready() -> void:
 	GameState.xp_certificates_changed.connect(_on_xp_changed.bind("", ""))
 	_picker = XpCertificateUI.new()
 	add_child(_picker)
+	_picker.visibility_changed.connect(_on_picker_shown_or_hidden)
 	hide()
 
 
@@ -51,10 +52,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			open()
 		return
 	if toggled or event.is_action_pressed(&"ui_cancel"):
-		# Esc or K steps back from the picker first.
+		# Esc or K steps back in the picker first: from its question, then out.
 		if _picker.visible:
-			_picker.hide()
-			_close_button.grab_focus()
+			_picker.step_back()
 		else:
 			hide()
 	# No key press reaches the farm or the scene swap behind the view. Driving
@@ -75,6 +75,14 @@ func _on_xp_changed(_player_id: String, _skill_id: String) -> void:
 		_refresh()
 
 
+## While the picker is open the buttons under it take no focus, so no key or
+## pad reaches them. When it closes, by Esc or its BACK, focus comes back here.
+func _on_picker_shown_or_hidden() -> void:
+	_refresh()
+	if visible and not _picker.visible:
+		_close_button.grab_focus()
+
+
 func _refresh() -> void:
 	for child: Node in _rows.get_children():
 		_rows.remove_child(child)
@@ -84,9 +92,12 @@ func _refresh() -> void:
 	for id: String in GameState.skill_ids():
 		_rows.add_child(PlanBoardUI._label(GameState.skill_text(id), TEXT, 20))
 		_rows.add_child(PlanBoardUI._label("    " + GameState.skill_effects_text(id), DIM, 16))
-	var held: int = GameState.held_xp_certificates().size()
+	var under: Control.FocusMode = Control.FOCUS_NONE if _picker.visible else Control.FOCUS_ALL
+	_close_button.focus_mode = under
+	var held: int = _picker.spendable().size()
 	if held > 0:
 		var spend: Button = PlanBoardUI._button("SPEND AN XP CERTIFICATE  (%s held)" % SP811.integer(held))
 		spend.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+		spend.focus_mode = under
 		spend.pressed.connect(_picker.open)
 		_rows.add_child(spend)

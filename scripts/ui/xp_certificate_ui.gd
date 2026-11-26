@@ -3,7 +3,9 @@ extends Control
 ## The XP certificate picker (docs/design/quests_levels_story.md section 4.4):
 ## the certificates the player holds and, for the one picked, each skill of their
 ## own with the level it is at and the level the certificate would take it to.
-## One click spends it. The skills view (K) opens it; it has no key of its own.
+## A click on a skill asks "Spend on <Skill>?", and a second click on that row
+## spends it; Esc or BACK takes the question back. The skills view (K) opens it;
+## it has no key of its own.
 
 const TEAL: Color = Color("38E1C6")
 const TEXT: Color = Color(0.85, 0.95, 0.88)
@@ -14,6 +16,14 @@ var _note: Label
 var _close_button: Button
 ## The certificate whose skills are listed; "" picks the first held.
 var _picked: String = ""
+## The skill the player has clicked once and not yet confirmed, or "".
+var _asked: String = ""
+## Certificates this screen has spent that the farm's copy here may still list:
+## a guest's copy is the host's, and it comes a moment after the host's answer.
+## An id is never used again, so one stays out for good.
+var _spent: Array[String] = []
+## A spend has been asked of the host and its answer has not come.
+var _waiting: bool = false
 
 
 ## What the picker lists for one of `player_id`'s certificates ("" = the local
@@ -42,9 +52,14 @@ static func choices(farm: Node, certificate_id: String, player_id: String = "") 
 
 ## "The Thirsty Probe (200 XP)": a certificate by the quest that gave it.
 static func certificate_text(certificate_id: String, xp: int) -> String:
-	var source: String = certificate_id.get_slice("#", 0)
+	var source: String = GameState.xp_certificate_source(certificate_id)
 	var title: String = str(DataManager.get_record(QuestEngine.TABLE, source, QuestEngine.SECTION).get("title", source))
 	return "%s (%s XP)" % [title, SP811.integer(xp)]
+
+
+## "Spend on Calibration?  CONFIRM": the row the player has clicked once.
+static func confirm_text(row: Dictionary) -> String:
+	return "Spend on %s?  CONFIRM" % row["name"]
 
 
 ## "Calibration: level 1, to level 4" for one row of choices().
@@ -75,7 +90,7 @@ func _ready() -> void:
 	column.add_child(_note)
 	_close_button = PlanBoardUI._button("BACK  (Esc)")
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-	_close_button.pressed.connect(hide)
+	_close_button.pressed.connect(step_back)
 	column.add_child(_close_button)
 	GameState.xp_certificates_changed.connect(_on_changed)
 	hide()
@@ -83,10 +98,31 @@ func _ready() -> void:
 
 func open() -> void:
 	_picked = ""
+	_asked = ""
 	_note.text = ""
 	_refresh()
 	show()
 	_close_button.grab_focus()
+
+
+## Esc and BACK: takes back a spend that waits for its second click, else
+## closes the picker.
+func step_back() -> void:
+	if _asked != "":
+		_asked = ""
+		_note.text = ""
+		_refresh()
+		_close_button.grab_focus()
+	else:
+		hide()
+
+
+## The local player's certificates that can still be spent here: id -> XP.
+func spendable() -> Dictionary:
+	var out: Dictionary = GameState.held_xp_certificates()
+	for id: String in _spent:
+		out.erase(id)
+	return out
 
 
 func _on_changed() -> void:
@@ -98,12 +134,14 @@ func _refresh() -> void:
 	for child: Node in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
-	var held: Dictionary = GameState.held_xp_certificates()
+	var held: Dictionary = spendable()
 	if held.is_empty():
+		_asked = ""
 		_rows.add_child(PlanBoardUI._label("You hold no XP certificate.", TEXT, 20))
 		return
 	if not held.has(_picked):
 		_picked = str(held.keys()[0])
+		_asked = ""
 	# More than one held: pick which to spend.
 	if held.size() > 1:
 		for id: String in held:
@@ -112,19 +150,46 @@ func _refresh() -> void:
 			_rows.add_child(pick)
 	_rows.add_child(PlanBoardUI._label("Spend %s on one skill:" % certificate_text(_picked, int(held[_picked])), TEXT, 20))
 	for row: Dictionary in choices(GameState, _picked):
-		var spend: Button = PlanBoardUI._button(choice_text(row))
+		var skill: String = str(row["skill"])
+		var asked: bool = skill == _asked and row["problem"] == ""
+		var spend: Button = PlanBoardUI._button(confirm_text(row) if asked else choice_text(row))
 		spend.disabled = row["problem"] != ""
-		spend.pressed.connect(_spend.bind(_picked, str(row["skill"])))
+		if asked:
+			spend.pressed.connect(_spend.bind(_picked, skill))
+		else:
+			spend.pressed.connect(_ask.bind(skill))
 		_rows.add_child(spend)
+		if asked and visible:
+			spend.grab_focus()
 
 
 func _pick(certificate_id: String) -> void:
 	_picked = certificate_id
+	_asked = ""
+	_note.text = ""
+	_refresh()
+
+
+## The first click on a skill: nothing is spent until the second.
+func _ask(skill_id: String) -> void:
+	_asked = skill_id
+	_note.text = "Click again to spend it there. A spent certificate can't be taken back."
 	_refresh()
 
 
 func _spend(certificate_id: String, skill_id: String) -> void:
+	if _waiting:
+		return
+	_waiting = true
+	_asked = ""
 	var problem: Variant = await FarmCommands.request(&"spend_xp_certificate", [certificate_id, skill_id])
-	_note.text = str(problem)
+	_waiting = false
+	if str(problem) == "":
+		# Out of the list now, not when the host's farm next arrives.
+		if not certificate_id in _spent:
+			_spent.append(certificate_id)
+		_note.text = "Spent."
+	else:
+		_note.text = str(problem)
 	_refresh()
 	_close_button.grab_focus()

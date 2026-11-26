@@ -13,6 +13,8 @@ const ACTIONS: Array[StringName] = [
 	&"sell_harvest_to_lin", &"send_to_oirm", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay", &"spend_xp_certificate",
 	&"start_lab_grow", &"survey_ore", &"till", &"zero_steering",
 ]
+## What a player in bed may do and stay in bed: going to bed, and paperwork.
+const NO_WAKE: Array[StringName] = [&"go_to_bed", &"spend_xp_certificate"]
 ## What is done at a cell of the farm's ground: the cell in front of the rover, or
 ## under it. The cell's middle is within this far of the rover [PLACEHOLDER]: the
 ## 2 m it digs ahead, half a cell's corner and what the host's word of the
@@ -64,8 +66,8 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 		CoopSession.note_refusal(player_id, "refused %s: too far from the rover" % action)
 	if reason != "":
 		return refusal(action, reason)
-	# Whoever does something is up.
-	if action != &"go_to_bed":
+	# Whoever does something is up, but for what can be done from bed.
+	if not action in NO_WAKE:
 		CoopBeds.get_up(player_id)
 	var passed: Array = arguments.duplicate()
 	if _player_index(action) >= 0:

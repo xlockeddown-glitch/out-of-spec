@@ -105,9 +105,9 @@ func test_shipped_quests_are_readable() -> String:
 		for step: Dictionary in quest["steps"]:
 			if str(step.get("id", "")) == "" or str(step.get("text", "")) == "" or not str(step.get("check", "")) in known:
 				return "%s has a step with no id, no text or a check this build can't read." % quest["id"]
-		var line: String = str(quest.get("rewards", {}).get("phone", ""))
-		if line.contains("/") and QuestEngine.phone_line(line) == line:
-			return "%s's phone line is a path with no text at it." % quest["id"]
+		for line: String in [str(quest.get("rewards", {}).get("phone", "")), str(quest.get("offer_line", ""))]:
+			if line.contains("/") and QuestEngine.phone_line(line) == line:
+				return "%s's phone line or offer line is a path with no text at it." % quest["id"]
 	return "" if L1 in ids and L3 in ids else "L1 and L3 must ship: %s" % [ids]
 
 

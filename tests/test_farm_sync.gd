@@ -9,7 +9,7 @@ const NO_SIGNAL: Array[String] = [
 	"offence_counts", "_drop_pod_departure_at", "audit_grace_used", "_cal_index_at_last_audit",
 	"_dispatch_deck", "rover_transforms", "_next_job_number", "_board_band", "_board_taken",
 	"seed_crop_id", "planting_offset_steps", "rover_uplinks", "next_player_number", "guest_ids", "cistern_liters",
-	"skill_effect_floor", "skill_curve", "action_counts", "dug_paid", "crops_sold_in_spec",
+	"skill_effect_floor", "skill_curve", "action_counts", "dug_paid", "crops_sold_in_spec", "xp_certificates_given",
 ]
 ## Saved variables _show_changes() or _show_news() shows.
 const NEWS: Array[String] = ["cal_log", "phone_log", "phone_count", "audit_log", "tilled_cells", "player_skill_xp", "farm_skill_xp"]
