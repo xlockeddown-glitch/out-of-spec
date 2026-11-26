@@ -326,3 +326,138 @@ func test_the_keepsakes_held_follow_the_quests_done() -> String:
 			problem = "A keepsake reads its name, then its text: '%s'" % KeepsakeShelf._text_of("pocket_watch")
 		_done(gs)
 		return problem)
+
+
+# --- Review fixes ----------------------------------------------------------------------
+
+func test_a_zero_cost_refit_keeps_the_token() -> String:
+	var gs: GameStateScript = _state()
+	var discipline: String = str(gs.job_disciplines().keys()[0])
+	var lab: Dictionary = DataManager._raw[&"economy"]["lab"]
+	var saved: Array = [lab["refit_credits"], lab["refit_ore"]]
+	lab["refit_credits"] = 0
+	lab["refit_ore"] = 0
+	var problem: String = ""
+	gs.give_one_use(gs.ONE_USE_REFIT, gs.FARM_HOLDER)
+	if gs.lab_refit_text().contains("free refit"):
+		problem = "A refit that costs nothing already must not offer the token: '%s'" % gs.lab_refit_text()
+	if problem == "" and gs.clear_lab_area(discipline) != "":
+		problem = "The area must be cleared: %s" % gs.lab_clear_problem(discipline)
+	if problem == "" and gs.one_use_count(gs.ONE_USE_REFIT) != 1:
+		problem = "A zero-cost refit keeps the token."
+	if problem == "" and _lines(gs, "The refit was free") != 0:
+		problem = "No 'free' line for a refit that was free anyway."
+	lab["refit_credits"] = saved[0]
+	lab["refit_ore"] = saved[1]
+	_done(gs)
+	return problem
+
+
+func test_a_guests_purchase_through_the_commands_spends_the_guests_discount() -> String:
+	var gs: GameStateScript = _state()
+	var commands: Node = preload("res://scripts/autoload/FarmCommands.gd").new()
+	commands.state = gs
+	FarmCommands.guest = false
+	var full: int = gs.standard_price_credits(FM3)
+	gs.give_one_use(gs.ONE_USE_DISCOUNT, HOST)
+	gs.give_one_use(gs.ONE_USE_DISCOUNT, GUEST)
+	var shown: int = gs.standard_price_credits(FM3, GUEST)
+	var credits: int = gs.credits
+	var problem: String = ""
+	if shown != full * 90 / 100:
+		problem = "Setup: the guest is shown the discounted price: %d" % shown
+	var refused: String = str(commands.execute(GUEST, &"buy_standard", [FM3]))
+	if problem == "" and gs.owned_standards.get(FM3, -1) == -1:
+		problem = "The guest's purchase must go through: '%s'" % refused
+	if problem == "" and (gs.one_use_count(gs.ONE_USE_DISCOUNT, GUEST) != 0 or gs.one_use_count(gs.ONE_USE_DISCOUNT, HOST) != 1):
+		problem = "It spends the guest's discount, not the host's: %s" % [gs.one_use_held]
+	if problem == "" and credits - gs.credits != shown:
+		problem = "The guest pays the price shown: %d, not %d" % [credits - gs.credits, shown]
+	commands.free()
+	_done(gs)
+	return problem
+
+
+func test_the_contract_discount_and_the_token_stack_to_the_price_shown() -> String:
+	var gs: GameStateScript = _state()
+	var standard: String = gs.contract_standard_id()
+	gs.contract_state = "complete"
+	var list: int = gs.get_sensor(standard).price_credits
+	var after_contract: int = list * (100 - gs.contract_discount_pct()) / 100
+	gs.give_one_use(gs.ONE_USE_DISCOUNT, GUEST)
+	var shown: int = gs.standard_price_credits(standard, GUEST)
+	var problem: String = ""
+	if shown != after_contract * 90 / 100 or shown >= after_contract:
+		problem = "Contract then 10 %% off: list %d, contract %d, shown %d" % [list, after_contract, shown]
+	var credits: int = gs.credits
+	if problem == "":
+		gs._take_standard(standard, GUEST)  # what buy_standard charges; its gates are not this test's
+	if problem == "" and credits - gs.credits != shown:
+		problem = "The stacked charge is the price shown: %d, not %d" % [credits - gs.credits, shown]
+	_done(gs)
+	return problem
+
+
+func test_the_contract_line_shows_the_list_price_to_everyone() -> String:
+	var gs: GameStateScript = _state()
+	var standard: String = gs.contract_standard_id()
+	gs.contract_state = "complete"
+	gs.give_one_use(gs.ONE_USE_DISCOUNT, HOST)
+	var host_price: String = gs.standard_price_text(standard, HOST)
+	var list: String = gs.standard_price_text(standard, gs.MANAGER_ID)
+	var problem: String = ""
+	if host_price == list:
+		problem = "Setup: the host's held discount must change the text: '%s'" % list
+	if problem == "" and list.contains("off"):
+		problem = "The farm-wide line prices at the list, not a player's discount: '%s'" % list
+	_done(gs)
+	return problem
+
+
+func test_the_shelf_clears_a_hover_before_its_items_go() -> String:
+	var shelf := KeepsakeShelf.new()
+	shelf.add_child(Node3D.new())
+	var item := Node3D.new()
+	item.add_to_group(&"keepsake_item")
+	var click := Clickable.new()
+	item.add_child(click)
+	shelf.add_child(item)
+	Clickable.hovered = click
+	shelf._shown = ["x"]
+	shelf._clear_items()
+	var problem: String = ""
+	if Clickable.hovered != null:
+		problem = "The hovered keepsake must be cleared when the shelf rebuilds."
+	if problem == "" and shelf.get_child_count() != 1:
+		problem = "Only the keepsakes go: %d children left" % shelf.get_child_count()
+	shelf.free()
+	return problem
+
+
+func test_a_full_shelf_notes_what_does_not_fit() -> String:
+	var shelf := KeepsakeShelf.new()
+	shelf._add_more_note(2)
+	var note: String = ""
+	for child: Node in shelf.get_children():
+		if child is Label3D:
+			note = (child as Label3D).text
+	var problem: String = "" if note == "+2" else "The overflow note reads +N: '%s'" % note
+	shelf._shown = ["a", "b", "c", "d", "e", "f", "g"]
+	if problem == "" and shelf.hidden_count() != 2:
+		problem = "Seven held, five shown, two hidden: %d" % shelf.hidden_count()
+	shelf.free()
+	return problem
+
+
+func test_a_forgotten_guest_loses_their_one_use_rewards() -> String:
+	var gs: GameStateScript = _state()
+	gs.give_one_use(gs.ONE_USE_DISCOUNT, GUEST)
+	gs.give_one_use(gs.ONE_USE_DISCOUNT, HOST)
+	gs.guest_ids["hash"] = GUEST
+	var here: Array[String] = [HOST]
+	gs._forget_a_guest(here)
+	var problem: String = ""
+	if gs.one_use_held.has(GUEST) or gs.one_use_count(gs.ONE_USE_DISCOUNT, HOST) != 1:
+		problem = "The guest's tokens go and the host's stay: %s" % [gs.one_use_held]
+	_done(gs)
+	return problem

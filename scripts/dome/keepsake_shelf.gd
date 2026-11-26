@@ -9,6 +9,8 @@ extends Node3D
 signal inspected(text: String)
 
 const SPACING: float = 0.3
+## The plank holds this many objects; the rest are a "+N" note.
+const MAX_SHOWN: int = 5
 const PLANK_SIZE: Vector3 = Vector3(1.6, 0.05, 0.3)
 const ITEM_SIZE: Vector3 = Vector3(0.2, 0.14, 0.14)
 ## Placeholder shapes by keepsake: "cylinder" for the watch, a box otherwise.
@@ -30,14 +32,30 @@ func refresh() -> void:
 	if held == _shown:
 		return
 	_shown = held
+	_clear_items()
+	var visible_count: int = mini(held.size(), MAX_SHOWN)
+	var x: float = -SPACING * (visible_count - 1) / 2.0
+	for i: int in visible_count:
+		_add_item(held[i], x)
+		x += SPACING
+	if held.size() > MAX_SHOWN:
+		_add_more_note(held.size() - MAX_SHOWN)
+
+
+## How many are held but not on the plank (0 when they all fit).
+func hidden_count() -> int:
+	return maxi(_shown.size() - MAX_SHOWN, 0)
+
+
+## Takes the objects off the plank. Hover is a static: drop it before its
+## Clickable goes, so nothing reads a freed one.
+func _clear_items() -> void:
+	if Clickable.hovered != null and (not is_instance_valid(Clickable.hovered) or is_ancestor_of(Clickable.hovered)):
+		Clickable.hovered = null
 	for child: Node in get_children():
 		if child.is_in_group(&"keepsake_item"):
-			child.queue_free()
 			remove_child(child)
-	var x: float = -SPACING * (held.size() - 1) / 2.0
-	for id: String in held:
-		_add_item(id, x)
-		x += SPACING
+			child.queue_free()
 
 
 func shown_ids() -> Array[String]:
@@ -83,6 +101,17 @@ func _add_item(id: String, x: float) -> void:
 	click.clicked.connect(func() -> void: inspected.emit(_text_of(id)))
 	item.add_child(click)
 	add_child(item)
+
+
+func _add_more_note(extra: int) -> void:
+	var note := Label3D.new()
+	note.name = "More"
+	note.text = "+%d" % extra
+	note.pixel_size = 0.004
+	note.font_size = 48
+	note.position = Vector3(PLANK_SIZE.x / 2.0 + 0.1, 0, 0)
+	note.add_to_group(&"keepsake_item")
+	add_child(note)
 
 
 static func _text_of(id: String) -> String:

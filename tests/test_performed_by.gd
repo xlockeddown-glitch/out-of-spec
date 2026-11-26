@@ -48,7 +48,9 @@ func test_callers_name_the_player() -> String:
 		var args: Array = method["args"].map(func(arg: Dictionary) -> String: return arg["name"])
 		if not "player_id" in args and not "performed_by" in args:
 			continue
-		# These only read, for the player at this screen.
+		# These only read, for the player at this screen. The standard_* price and
+		# discount readers take the player to price for: callers must pass the acting
+		# player (a guest's own discount), not leave it as "" (the host).
 		if not str(method["name"]) in ["performer_name", "calibration_budget", "skill_xp", "skill_level", "skill_factor",
 				"has_skill_unlock", "skill_text", "skill_effects_text", "robot_build_problem", "robot_card_slots",
 				"robot_job_gate", "robot_calibrate_targets", "robot_calibrate_gaps", "job_bench_problem",

@@ -195,6 +195,21 @@ func test_lost_traceability_is_shown() -> String:
 		return "")
 
 
+## A guest's one-use rewards come with the farm and redraw what shows them.
+func test_a_guest_snapshot_with_one_use_rewards_emits_one_use_changed() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		FarmSync.join(bytes, guest)
+		host.one_use_held = { "player_2": { "bram_discount_10": 1 }, "_farm": { "free_lab_refit": 1 } }
+		var counts: Dictionary = _count(guest)
+		var problem: String = FarmSync.update(FarmSync.capture(host), guest)
+		problem += FarmSync.update(FarmSync.capture(host), guest)
+		if problem == "" and counts != { "one_use_changed": 1 }:
+			problem = "Expected one one_use_changed, got %s" % [counts]
+		if problem == "" and guest.one_use_held != host.one_use_held:
+			problem = "The guest must hold what the host's farm does: %s" % [guest.one_use_held]
+		return problem)
+
+
 func test_news_keeps_the_hosts_order_and_repeats() -> String:
 	return _as_guest(func(host: GameStateScript, guest: GameStateScript, _bytes: PackedByteArray) -> String:
 		for i: int in host.PHONE_LOG_MAX:

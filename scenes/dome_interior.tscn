@@ -902,5 +902,6 @@ model_scale = 0.1
 greybox = [NodePath("../Body"), NodePath("../Screen")]
 
 [node name="KeepsakeShelf" type="Node3D" parent="."]
-position = Vector3(-5, 1.8, -3.7)
+position = Vector3(-6.7, 1.8, 1.5)
+rotation = Vector3(0, 1.5707964, 0)
 script = ExtResource("41_shelf")

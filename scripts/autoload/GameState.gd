@@ -4822,7 +4822,7 @@ func _credibility_after_calibration(record: Dictionary) -> void:
 			contract_state = "complete"
 			var standard: String = contract_standard_id()
 			post_phone("OIRM CONTRACT complete: %d on-time calibrations in a row. Bram can sell you the %s for %s (%d %% off)." % [
-				needed, instrument_name(standard), standard_price_text(standard), contract_discount_pct()])
+				needed, instrument_name(standard), standard_price_text(standard, MANAGER_ID), contract_discount_pct()])
 			upgrades_changed.emit()
 		else:
 			post_phone("OIRM CONTRACT: %d of %d on-time calibrations in a row." % [contract_run, needed])
@@ -5536,11 +5536,19 @@ func fit_lab_area(discipline: String, player_id: String = "") -> String:
 	return ""
 
 
-## Nothing while the farm holds a free refit (one_use_held).
-func _lab_refit_cost() -> Vector2i:
-	if one_use_count(ONE_USE_REFIT) > 0:
-		return Vector2i.ZERO
+## The refit's credits and ore from the lab numbers, before any one-use token.
+func _lab_refit_base_cost() -> Vector2i:
 	return Vector2i(maxi(int(_lab_number("refit_credits", 0.0)), 0), maxi(int(_lab_number("refit_ore", 0.0)), 0))
+
+
+## True when the farm holds a free refit and the refit would cost something.
+func _lab_refit_is_free() -> bool:
+	return one_use_count(ONE_USE_REFIT) > 0 and _lab_refit_base_cost() != Vector2i.ZERO
+
+
+## Nothing while the farm holds a free refit (one_use_held) to use up.
+func _lab_refit_cost() -> Vector2i:
+	return Vector2i.ZERO if _lab_refit_is_free() else _lab_refit_base_cost()
 
 
 func _lab_refit_days() -> int:
@@ -5552,7 +5560,7 @@ func lab_refit_text() -> String:
 	var cost: Vector2i = _lab_refit_cost()
 	var days: int = _lab_refit_days()
 	return "%s, %s day%s%s" % [lab_cost_text(cost.x, cost.y), SP811.integer(days), "" if days == 1 else "s",
-		" (one-use free refit)" if one_use_count(ONE_USE_REFIT) > 0 else ""]
+		" (one-use free refit)" if _lab_refit_is_free() else ""]
 
 
 ## Why a space of `discipline` can't be cleared now, or "".
@@ -5577,8 +5585,9 @@ func clear_lab_area(discipline: String) -> String:
 	if problem != "":
 		return problem
 	var cost: Vector2i = _lab_refit_cost()
+	var free: bool = _lab_refit_is_free()
 	_lab_pay(cost.x, cost.y)
-	if cost == Vector2i.ZERO and _spend_one_use(ONE_USE_REFIT):
+	if free and _spend_one_use(ONE_USE_REFIT):
 		post_phone(QuestEngine.one_use_used_line(ONE_USE_REFIT))
 	_sync_lab_layout()
 	var at: int = lab_layout.rfind(discipline)
