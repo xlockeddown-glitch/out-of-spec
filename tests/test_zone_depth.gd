@@ -637,20 +637,81 @@ func test_a_rover_below_that_is_not_on_floor_starts_again() -> String:
 	gs.rover_depth = 1
 	var far: Vector3 = Vector3(-500.0, 0.0, -500.0)
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, far)
+	var epoch: int = gs.rover_epoch
 	var moved: bool = gs.settle_rover_depth()
 	var at: Vector3 = gs.parked_rover_transform(gs.TUNNEL_ROVER).origin
+	var bumped: bool = gs.rover_epoch == epoch + 1
 	var again: bool = gs.settle_rover_depth()
-	var new_day: bool = gs.settle_rover_depth(true)
 	gs.rover_depth = 0
-	var hub: bool = gs.settle_rover_depth(true)
+	var hub: bool = gs.settle_rover_depth()
 	gs.free()
 	if not moved or at.distance_to(ZoneDepth.start_transform().origin) > 0.01:
 		return "A rover off the floor was not put back at the start."
+	if not bumped:
+		return "A re-park did not start a new epoch."
 	if again:
 		return "A rover on the floor was moved."
-	if not new_day:
-		return "A new morning did not start the depth again."
 	return "" if not hub else "The hub was settled as if it were below."
+
+
+func test_the_morning_leaves_a_rover_on_floor_and_judges_its_whole_body() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.rover_depth = 1
+	var grid: PackedStringArray = ZoneDepth.grid_for(1, SEED, _today())
+	# A rover standing on a floor cell, a long way from the start.
+	var spot := Vector3.ZERO
+	var edge := Vector3.ZERO
+	var have_spot: bool = false
+	var have_edge: bool = false
+	for y: int in range(1, grid.size() - 1):
+		for x: int in range(1, grid[y].length() - 1):
+			if grid[y][x] != ".":
+				continue
+			var here: Vector3 = TunnelRock.at_in(grid, Vector2i(x, y))
+			if not have_spot and here.distance_to(ZoneDepth.start_transform().origin) > 6.0 and grid[y][x + 1] == "." and grid[y][x - 1] == "." and grid[y + 1][x] == "." and grid[y - 1][x] == ".":
+				spot = here
+				have_spot = true
+			# A floor cell with rock to its right: the middle stays on floor 1.4 m out
+			# but a corner of the body is in the rock.
+			if not have_edge and grid[y][x + 1] != "." and grid[y][x + 1] != "A" and grid[y][x + 1] != "B":
+				edge = here + Vector3(1.4, 0.0, 0.0)
+				have_edge = true
+	if not have_spot or not have_edge:
+		gs.free()
+		return "Today's layout has no open cell or no wall (the test needs both)."
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, spot)
+	var epoch: int = gs.rover_epoch
+	var left: bool = not gs.settle_rover_depth()
+	var same: bool = gs.parked_rover_transform(gs.TUNNEL_ROVER).origin.is_equal_approx(spot) and gs.rover_epoch == epoch
+	var middle_on_floor: bool = TunnelRock.holds_in(grid, edge)
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, edge)
+	var moved: bool = gs.settle_rover_depth()
+	gs.free()
+	if not left or not same:
+		return "The morning moved a rover that was on floor."
+	if not middle_on_floor:
+		return "The test spot is not on floor in the middle."
+	return "" if moved else "A rover with a corner in the rock was left there."
+
+
+func test_a_rover_someone_drives_is_not_re_parked_until_they_stop() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.rover_depth = 1
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3(-500.0, 0.0, -500.0))
+	CoopRovers._drivers[gs.TUNNEL_ROVER] = [GUEST, Time.get_ticks_msec() + 60000]
+	var held: bool = not gs.settle_rover_depth()
+	var due: bool = gs.settle_due
+	var kept: bool = gs.parked_rover_transform(gs.TUNNEL_ROVER).origin.x < -400.0
+	CoopRovers._drivers.erase(gs.TUNNEL_ROVER)
+	var later: bool = gs.settle_rover_depth()
+	var cleared: bool = not gs.settle_due
+	gs.free()
+	if not held or not due or not kept:
+		return "A rover that is driven was re-parked (or the check was not kept)."
+	return "" if later and cleared else "The check was not made once the driver stopped."
+
 
 
 func test_the_hub_never_takes_a_pose_from_below_or_the_reverse() -> String:
@@ -662,4 +723,152 @@ func test_the_hub_never_takes_a_pose_from_below_or_the_reverse() -> String:
 		return "Depth 1 is not today's layout."
 	if ZoneDepth.pose_for_depth(1).origin == ZoneDepth.pose_for_depth(0).origin:
 		return "The same arrival pose for both depths."
+	return ""
+
+
+# --- Round two of the review ----------------------------------------------------
+
+func test_every_move_of_the_rover_is_a_new_epoch_that_guests_are_sent() -> String:
+	var shown: Array = FarmSync.SHOWN_BY.get(&"rover_place_changed", [])
+	if not "rover_epoch" in shown:
+		return "rover_epoch is not sent with rover_depth: %s" % [shown]
+	var gs: GameStateScript = _state()
+	_hub_rover(gs, ZoneDepth.descent_position())
+	var start: int = gs.rover_epoch
+	gs.change_depth(1, "")
+	var down: int = gs.rover_epoch
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.ascent_position())
+	gs.change_depth(0, "")
+	var up: int = gs.rover_epoch
+	gs.change_depth(0, "")  # refused: nothing moves, no new epoch
+	var refused: int = gs.rover_epoch
+	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
+	var problem: String = gs.farm_dict_problem(data)
+	data["rover_epoch"] = -1
+	var bad: String = gs.farm_dict_problem(data)
+	gs.free()
+	var back: GameStateScript = _state()
+	back.farm_from_dict(bytes_to_var(var_to_bytes(_state_dict(up))))
+	var loaded: int = back.rover_epoch
+	back.free()
+	if down != start + 1 or up != start + 2 or refused != up:
+		return "Epochs %d, %d, %d, %d." % [start, down, up, refused]
+	if problem != "" or bad == "":
+		return "The epoch check is wrong: '%s' / '%s'" % [problem, bad]
+	return "" if loaded == up else "A saved epoch loaded as %d." % loaded
+
+
+func _state_dict(epoch: int) -> Dictionary:
+	var gs: GameStateScript = _state()
+	gs.rover_epoch = epoch
+	var data: Dictionary = gs.farm_to_dict()
+	gs.free()
+	return data
+
+
+func test_a_pose_wire_may_carry_an_epoch_and_only_an_integer() -> String:
+	var plain: Array = [1.0, 0.0, 2.0, 0.0, 0.0, true]
+	if not CoopRovers.is_shape(plain) or not CoopRovers.is_shape(plain + [3]):
+		return "A pose with or without an epoch was refused."
+	if CoopRovers.is_shape(plain + ["3"]) or CoopRovers.is_shape(plain + [3, 4]) or CoopRovers.is_shape(plain + [3.0]):
+		return "A pose with a bad epoch was accepted."
+	return ""
+
+
+func test_a_rebuild_is_due_whenever_the_scene_is_at_another_depth_or_day() -> String:
+	var day: int = _today()
+	if ZoneDepth.needs_rebuild(0, day, 0, day) or ZoneDepth.needs_rebuild(1, day, 1, day):
+		return "A scene that matches was rebuilt."
+	if not ZoneDepth.needs_rebuild(0, day, 1, day) or not ZoneDepth.needs_rebuild(1, day, 0, day):
+		return "A scene at another depth was kept (a missed signal would stay missed)."
+	if not ZoneDepth.needs_rebuild(1, day - 1, 1, day):
+		return "A scene below drawn for yesterday was kept."
+	return "" if not ZoneDepth.needs_rebuild(0, day - 1, 0, day) else "The hub was rebuilt for a new day."
+
+
+func test_a_player_with_the_rover_may_use_the_pad_after_the_lease_ends() -> String:
+	var gs: GameStateScript = _state()
+	_hub_rover(gs, ZoneDepth.descent_position())
+	# Nobody drives. The guest is in the tunnels at the rover's depth.
+	gs.player_places[GUEST] = [ZoneDepth.ZONE, 0]
+	var near: String = gs.change_depth(1, GUEST)
+	# Below, still at the hub depth in presence, so no.
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.ascent_position())
+	var stale: String = gs.change_depth(0, GUEST)
+	var depth: int = gs.rover_depth
+	# A guest in the dome, or on the farm, is not.
+	gs.player_places[GUEST] = ["farm", 0]
+	var farm: String = gs.change_depth(0, GUEST)
+	# In the tunnels, at the rover's depth, but too far from the pad: the reach still holds.
+	gs.player_places[GUEST] = [ZoneDepth.ZONE, 1]
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.start_transform().origin)
+	var far: String = gs.change_depth(0, GUEST)
+	gs.free()
+	if near != "":
+		return "A guest with the rover was refused: " + near
+	if depth != 1 or stale == "":
+		return "A guest at another depth than the rover was let through (depth %d)." % depth
+	if farm == "":
+		return "A guest on the farm took the rover up."
+	return "" if far != "" or ZoneDepth.near_ascent(ZoneDepth.start_transform().origin) else "The reach check was skipped."
+
+
+func test_continuing_a_save_keeps_the_depth_and_only_leaving_the_tubes_resets_it() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.rover_depth = 1
+	gs.rover_zone = ZoneDepth.ZONE
+	var same_zone: int = gs.rover_depth
+	gs.rover_zone = ""
+	gs.rover_zone = ""
+	var left: int = gs.rover_depth
+	var data: Dictionary = bytes_to_var(var_to_bytes(_below_dict()))
+	gs.free()
+	# A farm already running (the rover on the farm) loads a save made below.
+	var running: GameStateScript = _state()
+	running.rover_zone = ""
+	var problem: String = running.farm_from_dict(data)
+	var loaded_zone: String = running.rover_zone
+	var loaded_depth: int = running.rover_depth
+	# And one that is in the tubes at depth 1 already loads it again.
+	var again: String = running.farm_from_dict(data)
+	var again_depth: int = running.rover_depth
+	running.free()
+	if same_zone != 1:
+		return "Setting the same zone reset the depth."
+	if left != 0:
+		return "Leaving the tubes kept depth %d." % left
+	if problem != "" or again != "":
+		return "A save made below was refused: %s %s" % [problem, again]
+	return "" if loaded_zone == ZoneDepth.ZONE and loaded_depth == 1 and again_depth == 1 else "Loaded %s at depth %d (then %d)." % [loaded_zone, loaded_depth, again_depth]
+
+
+func _below_dict() -> Dictionary:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.rover_depth = 1
+	gs.rover_transforms[gs.TUNNEL_ROVER] = ZoneDepth.start_transform()
+	var data: Dictionary = gs.farm_to_dict()
+	gs.free()
+	return data
+
+
+func test_only_the_canonical_find_ids_pass_a_save() -> String:
+	var gs: GameStateScript = _state()
+	var data: Dictionary = gs.farm_to_dict()
+	var refused: Array[String] = []
+	for alias: String in ["d01_f00", "d1_f00", "d01_f0", "d1_f01", "D1_f0", "d1_F0", "d1_f 0", " d1_f0", "d1_f0 ", "d1_f1.0", "d1_f1e0", "d0001_f2"]:
+		data["finds_taken"] = { "lava_tubes": { "day": 1, "ids": [alias] } }
+		refused.append(gs.farm_dict_problem(data))
+	var allowed: Array[String] = []
+	for index: int in ZoneDepth.find_count(1):
+		data["finds_taken"] = { "lava_tubes": { "day": 1, "ids": [ZoneDepth.find_id(index)] } }
+		allowed.append(gs.farm_dict_problem(data))
+	gs.free()
+	for i: int in refused.size():
+		if refused[i] == "":
+			return "Alias number %d was accepted." % i
+	for i: int in allowed.size():
+		if allowed[i] != "":
+			return "Find %d was refused: %s" % [i, allowed[i]]
 	return ""

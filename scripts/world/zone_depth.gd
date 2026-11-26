@@ -223,6 +223,12 @@ static func find_count(depth: int) -> int:
 	return PER_ROOM * ROOM_SLOTS.size() + ON_LANDING if depth == DEPTH else 0
 
 
+## True if a scene built for `built_depth` on `built_day` no longer shows the rover's
+## depth, or (below) the day the finds were drawn for.
+static func needs_rebuild(built_depth: int, built_day: int, depth: int, day: int) -> bool:
+	return depth != built_depth or (built_depth > 0 and built_day != day)
+
+
 ## Where the rover starts when it goes down, and where it comes out by the hatch.
 static func start_transform() -> Transform3D:
 	return Transform3D(Basis.IDENTITY, TunnelRock.at_in(_blank(), START_CELL) + Vector3(0.0, 0.05, 0.0))
@@ -392,9 +398,8 @@ static func taken_problem(taken: Variant) -> String:
 
 
 static func _is_find_id(text: String) -> bool:
-	var parts: PackedStringArray = text.split("_f")
-	if not text.begins_with("d") or parts.size() != 2 or not parts[0].substr(1).is_valid_int() or not parts[1].is_valid_int():
-		return false
-	if parts[1].begins_with("-") or parts[1].begins_with("+"):
-		return false
-	return parts[1].to_int() < find_count(parts[0].substr(1).to_int())
+	# Only the canonical spelling: d01_f00 or d1_f+1 are not ids.
+	for index: int in find_count(DEPTH):
+		if text == find_id(index):
+			return true
+	return false

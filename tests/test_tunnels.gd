@@ -609,3 +609,48 @@ func test_a_guest_below_is_held_to_the_floor_of_the_rovers_depth() -> String:
 	elif not took:
 		problem = "The host refused a rover on the floor below because the hub's map has rock there."
 	return _finish(problem)
+
+
+## Round two, problem 1: a pose stamped with an older rover epoch (in flight when the
+## host moved the rover) is dropped; one stamped with the current epoch is taken.
+func test_a_pose_from_before_the_rover_was_moved_is_dropped() -> String:
+	var host: Node = _host()
+	var mine: Node = RoversScript.new()
+	mine.start(host, host.commands.state)
+	var guest: Node = _guest(host)
+	var state: Node = host.commands.state
+	var id: String = GameState.TUNNEL_ROVER
+	state.rover_zone = ZoneDepth.ZONE
+	state.rover_depth = ZoneDepth.DEPTH
+	state.rover_epoch = 5
+	var grid: PackedStringArray = ZoneDepth.grid_for(ZoneDepth.DEPTH, state.world_seed, GameClock.get_day_index())
+	var from := Vector3.ZERO
+	var to := Vector3.ZERO
+	var found: bool = false
+	for y: int in range(1, grid.size() - 1):
+		for x: int in range(1, grid[y].length() - 1):
+			if found or grid[y][x] != ".":
+				continue
+			var here: Vector3 = TunnelRock.at_in(grid, Vector2i(x, y))
+			var next: Vector3 = here + Vector3(2.0, 0.0, 0.0)
+			if TunnelRock.holds_in(grid, next):
+				from = here
+				to = next
+				found = true
+	state.rover_transforms[id] = Transform3D(Basis.IDENTITY, from)
+	var stale: bool = false
+	var fresh: bool = false
+	if found:
+		mine._on_driven("player_2", id, [to.x, 0.0, to.z, 0.0, 0.0, true, 4], 1000)
+		stale = mine.place(id).origin.is_equal_approx(from)
+		mine._on_driven("player_2", id, [to.x, 0.0, to.z, 0.0, 0.0, true, 5], 2000)
+		fresh = mine.place(id).origin.is_equal_approx(to)
+	mine.free()
+	var problem: String = ""
+	if not found:
+		problem = "No two neighbouring floor cells today (the test needs them)."
+	elif not stale:
+		problem = "A pose from an older epoch moved the rover."
+	elif not fresh:
+		problem = "A pose with the current epoch was refused."
+	return _finish(problem)

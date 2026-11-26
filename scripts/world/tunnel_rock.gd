@@ -130,6 +130,20 @@ static func holds_in(map: PackedStringArray, place: Vector3) -> bool:
 	return map[cell.y][cell.x] in ".AB" and absf(place.y) < ROCK_M
 
 
+## Half the rover's footprint, across and along [PLACEHOLDER].
+const ROVER_HALF_M := Vector2(0.9, 1.5)
+
+
+## True if the rover's body, not only its middle, is on floor on a given map: its
+## middle and the four corners of its footprint.
+static func holds_body_in(map: PackedStringArray, at: Transform3D) -> bool:
+	for corner: Vector2 in [Vector2.ZERO, ROVER_HALF_M, -ROVER_HALF_M, Vector2(ROVER_HALF_M.x, -ROVER_HALF_M.y), Vector2(-ROVER_HALF_M.x, ROVER_HALF_M.y)]:
+		var p: Vector3 = at.origin + at.basis * Vector3(corner.x, 0.0, corner.y)
+		if not holds_in(map, Vector3(p.x, at.origin.y, p.z)):
+			return false
+	return true
+
+
 ## The middle of a cell.
 static func at(cell: Vector2i) -> Vector3:
 	return Vector3((cell.x - (grid()[0].length() - 1) * 0.5) * CELL_M, 0.0, (cell.y - (grid().size() - 1) * 0.5) * CELL_M)

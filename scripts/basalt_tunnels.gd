@@ -114,6 +114,7 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	_resync_depth()
 	_hud.set_clock(GameClock.format_now())
 	_hud.set_molt(GameState.molt_text() if GameState.has_skill_unlock("molt_on_phone") else "")
 	var reach: bool = _can_catch()
@@ -322,19 +323,30 @@ func _rebuild_for_depth() -> void:
 	if SceneSwitcher.is_busy():
 		return
 	_moving = true
-	# The old rover node reports its pose as it leaves; make it the new one, and have
-	# the next scene's rover start there too.
-	_rover.global_transform = ZoneDepth.pose_for_depth(GameState.rover_depth)
-	ZoneDepth.arrive_at = _rover.global_transform
-	ZoneDepth.arrive_pending = true
+	if GameState.rover_depth != _built_depth:
+		# The old rover node reports its pose as it leaves; make it the new one, and
+		# have the next scene's rover start there too. (A new day on the same depth
+		# keeps the rover where it is.)
+		_rover.global_transform = ZoneDepth.pose_for_depth(GameState.rover_depth)
+		ZoneDepth.arrive_at = _rover.global_transform
+		ZoneDepth.arrive_pending = true
 	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+
+
+## Not left to a signal, which a busy swap can swallow and a later snapshot with the
+## same depth does not send again: if this scene is not the rover's depth, or the day
+## its finds were drawn for, it is built again. Each frame, and when a swap is done.
+func _resync_depth() -> void:
+	if SceneSwitcher.is_busy() or GameState.rover_zone != GameState.TUNNELS_ZONE or _rover.away_text() != "":
+		return
+	if ZoneDepth.needs_rebuild(_built_depth, _built_day, GameState.rover_depth, GameClock.get_day_index()):
+		_rebuild_for_depth()
 
 
 ## 06:00: the floor below is another one. A screen below builds it again, so its
 ## finds are today's (the host has put the rover on it).
 func _on_new_day(_day: int) -> void:
-	if _built_depth > 0 and _built_day != GameClock.get_day_index() and not _moving:
-		_rebuild_for_depth()
+	_resync_depth()
 
 
 func _can_catch() -> bool:
