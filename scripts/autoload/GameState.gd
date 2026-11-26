@@ -318,12 +318,14 @@ var farm_skill_xp: Dictionary = {}
 ## ordered_by }. Assembled robots' sensors are in `sensors` as "sensor@robot".
 var robots: Dictionary = {}
 ## The farm's water cistern. It runs down as growing plots are irrigated and is
-## refilled at each morning. Nothing else reads it: an empty cistern changes no
-## crop yet (open with Ryan). Both numbers are [PLACEHOLDER]: 36 growing
+## refilled at each morning. A cistern that is empty at the morning means the
+## crops went dry that day and do not grow (see _grow_crops); they carry on
+## the next morning, after the refill. Both numbers are [PLACEHOLDER]: 36 growing
 ## plots use about 140 L a day, all 144 about 550 L.
 const CISTERN_CAPACITY_L: float = 600.0
 const CISTERN_DRAW_L_PER_PLOT_HOUR: float = 0.16
 var cistern_liters: float = CISTERN_CAPACITY_L
+const CISTERN_DRY_HINT: String = "Crops will not grow until it refills at the morning."
 ## Passed as plant_crop's offset to mean "use planting_offset_steps now".
 const OFFSET_CURRENT: int = -2147483648
 
@@ -2189,6 +2191,9 @@ func add_credits(amount: int) -> void:
 
 
 func _on_day_started(day: int) -> void:
+	# Judged before the refill: the level only falls during the day, so empty
+	# now means it ran dry and the crops had no water.
+	var watered: bool = cistern_liters > 0.0
 	cistern_liters = CISTERN_CAPACITY_L
 	_post_morning_dispatch(day)
 	# Courier returns land in the morning, before an audit that day.
@@ -2200,7 +2205,7 @@ func _on_day_started(day: int) -> void:
 	_morning = true
 	_charge_overdue_credibility(day)
 	_expire_jobs(day)
-	_grow_crops()
+	_grow_crops(watered)
 	_run_robot_cards()
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
@@ -4625,7 +4630,9 @@ func _note_soil_excursions(notify: bool = true) -> void:
 ## band at any time since the last morning, then grows a day once at least
 ## GROWTH_DAY_MIN of that day has passed since planting. A crop is ready within
 ## half a day of its stated growth time, however late in the day it went in.
-func _grow_crops() -> void:
+## With no `water` (the cistern ran dry) no crop grows that day; nothing is lost,
+## and each grows again from the next morning.
+func _grow_crops(water: bool = true) -> void:
 	if plantings.is_empty():
 		return
 	_note_soil_excursions()
@@ -4638,7 +4645,7 @@ func _grow_crops() -> void:
 			planting["out_today"] = false
 		var morning: float = floorf(GameClock.elapsed_days)
 		var age: float = morning - float(planting.get("planted_at", morning))
-		if age >= float(planting["days_grown"]) + 1.0 - GROWTH_DAY_MIN:
+		if water and age >= float(planting["days_grown"]) + 1.0 - GROWTH_DAY_MIN:
 			planting["days_grown"] = int(planting["days_grown"]) + 1
 	# Soil out of band at 06:00 also counts against the new day, even if it
 	# drifts back in before anything checks again.
@@ -4668,7 +4675,7 @@ func _draw_cistern(delta_days: float) -> void:
 func cistern_text() -> String:
 	# Rounded up, so only an empty one reads 0 L.
 	var text: String = "Cistern: %s L of %s L." % [SP811.integer(ceili(cistern_liters)), SP811.integer(roundi(CISTERN_CAPACITY_L))]
-	return text + " Empty." if cistern_liters <= 0.0 else text
+	return text + " Empty. " + CISTERN_DRY_HINT if cistern_liters <= 0.0 else text
 
 
 ## Moves the irrigation offset new plantings start with by `steps` × 1 %.
@@ -4762,6 +4769,8 @@ func crop_status_text(cell: Vector3i) -> String:
 	var spec: Dictionary = crop(planting["crop_id"])
 	var stage: String = ("ready to harvest" if is_crop_ready(cell)
 		else "day %s of %s" % [SP811.integer(int(planting["days_grown"])), SP811.integer(int(spec.get("growth_days", 1)))])
+	if cistern_liters <= 0.0 and not is_crop_ready(cell):
+		stage += ", not growing: the cistern is empty"
 	return "%s, %s. Irrigation set point %s %%, target %s %%" % [
 		crop_name(planting["crop_id"]), stage,
 		SP811.number(float(planting["setpoint"]) * 100.0, 0),

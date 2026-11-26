@@ -1,6 +1,6 @@
 extends RefCounted
 ## The farm's water cistern: it runs down as growing plots are irrigated and
-## refills at each morning. An empty one changes nothing else yet.
+## refills at each morning. A dry day grows no crops.
 
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 
@@ -226,7 +226,7 @@ func test_the_text() -> String:
 	if problem == "" and gs.cistern_text() != "Cistern: 1 L of 600 L.":
 		problem = "A little got '%s'." % gs.cistern_text()
 	gs.cistern_liters = 0.0
-	if problem == "" and gs.cistern_text() != "Cistern: 0 L of 600 L. Empty.":
+	if problem == "" and gs.cistern_text() != "Cistern: 0 L of 600 L. Empty. " + GameStateScript.CISTERN_DRY_HINT:
 		problem = "Empty got '%s'." % gs.cistern_text()
 	gs.free()
 	return problem
@@ -252,3 +252,58 @@ func test_the_farm_scene_has_the_gauge_on_the_cistern() -> String:
 	var ok: bool = gauge is CisternGauge and gauge.get_parent().name == "WaterCisternModel"
 	root.free()
 	return "" if ok else "The cistern needs its gauge in the farm scene."
+
+
+func _days_grown(gs: GameStateScript) -> int:
+	return int(gs.plantings[Vector3i(0, 0, 0)]["days_grown"])
+
+
+func test_an_empty_cistern_pauses_growth_and_refilling_resumes_it() -> String:
+	var gs: GameStateScript = _make_state(2)
+	var problem: String = ""
+	GameClock.elapsed_days = 3.0
+	gs._on_day_started(4)
+	var before: int = _days_grown(gs)
+	if before != 1:
+		problem = "A watered morning must grow a day, got %d." % before
+	# It ran dry during day 4: the morning of day 5 grows nothing, then refills.
+	gs.cistern_liters = 0.0
+	GameClock.elapsed_days = 4.0
+	gs._on_day_started(5)
+	if problem == "" and (_days_grown(gs) != before or gs.cistern_liters != GameStateScript.CISTERN_CAPACITY_L):
+		problem = "A dry day must not grow crops, and the morning must still refill: %d" % _days_grown(gs)
+	# Refilled, so the next morning grows again; nothing was lost.
+	GameClock.elapsed_days = 5.0
+	gs._on_day_started(6)
+	if problem == "" and _days_grown(gs) != before + 1:
+		problem = "Growth must resume after the refill, got %d." % _days_grown(gs)
+	gs.free()
+	return problem
+
+
+func test_the_dry_day_costs_nothing_else() -> String:
+	var gs: GameStateScript = _make_state(1)
+	gs.plantings[Vector3i(0, 0, 0)]["days_grown"] = 2
+	gs.cistern_liters = 0.0
+	GameClock.elapsed_days = 9.0
+	gs._on_day_started(10)
+	var planting: Dictionary = gs.plantings[Vector3i(0, 0, 0)]
+	var problem: String = "" if gs.plantings.has(Vector3i(0, 0, 0)) and int(planting["days_grown"]) == 2 else "The crop must keep its growth."
+	gs.free()
+	return problem
+
+
+func test_the_player_is_told_why_nothing_grows() -> String:
+	var gs: GameStateScript = _make_state(1)
+	var full: String = gs.crop_status_text(Vector3i(0, 0, 0))
+	gs.cistern_liters = 0.0
+	var dry: String = gs.crop_status_text(Vector3i(0, 0, 0))
+	_ripen(gs, Vector3i(0, 0, 0))
+	var ripe: String = gs.crop_status_text(Vector3i(0, 0, 0))
+	var problem: String = ""
+	if "not growing" in full or not "not growing: the cistern is empty" in dry:
+		problem = "A growing crop must say the cistern is why it waits: '%s' / '%s'" % [full, dry]
+	if problem == "" and "not growing" in ripe:
+		problem = "A ripe crop is not waiting for water."
+	gs.free()
+	return problem
