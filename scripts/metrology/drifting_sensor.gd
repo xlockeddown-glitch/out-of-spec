@@ -97,6 +97,10 @@ var observed_error: float:
 	get:
 		return error - reference_offset
 
+## One more factor on the next zero's as-left residual, then 1.0 again: the
+## score of a mini-game played for that zero (MinigameScore). Not saved.
+var next_residual_scale: float = 1.0
+
 var _sign: float = 1.0
 var _rng := RandomNumberGenerator.new()
 
@@ -260,10 +264,12 @@ func add_usage(amount: float) -> void:
 ## After adjustment the true error is reference_error + residual, so a standard
 ## that is off moves the unit by the same amount without showing it.
 ## `residual_scale` shrinks the as-left residual (the Calibration skill).
+## `next_residual_scale` shrinks it once more, for this zero only.
 func zero(reference_error: float = 0.0, residual_scale: float = 1.0) -> Dictionary:
 	var as_found: float = error - reference_error
 	_sign = _random_sign()
-	var residual: float = _rng.randf_range(-as_left_residual, as_left_residual) * residual_scale
+	var residual: float = _rng.randf_range(-as_left_residual, as_left_residual) * residual_scale * next_residual_scale
+	next_residual_scale = 1.0
 	# Set before error so error_changed listeners read the new observed value.
 	reference_offset = reference_error
 	var before: float = error

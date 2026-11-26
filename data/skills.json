@@ -70,6 +70,7 @@
   ],
   "unlocks": [
     { "id": "molt_on_phone", "display_name": "Molt progress on the field phone", "skill": "husbandry", "level": 3 },
-    { "id": "budget_view", "display_name": "Uncertainty budget on the bench", "skill": "uncertainty", "level": 5 }
+    { "id": "budget_view", "display_name": "Uncertainty budget on the bench", "skill": "uncertainty", "level": 5 },
+    { "id": "careful_bench", "display_name": "CAREFUL switch on the bench", "skill": "calibration", "level": 5 }
   ]
 }
