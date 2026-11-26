@@ -116,7 +116,7 @@ func _check_new(gs: GameStateScript) -> String:
 	if not gs.lab_text().begins_with("Lab level 1  (0 XP, 50 for level 2)") or not "× 1" in gs.lab_effects_text():
 		return "The skills view's lines: %s / %s" % [gs.lab_text(), gs.lab_effects_text()]
 	var data: Dictionary = gs.farm_to_dict()
-	if data.get("lab_xp") != 0 or data.get("skill_curve") != GameStateScript.SKILL_CURVE or GameStateScript.SKILL_CURVE != 3:
+	if data.get("lab_xp") != 0 or data.get("skill_curve") != GameStateScript.SKILL_CURVE or GameStateScript.SKILL_CURVE != 4:
 		return "A new save has no lab XP and the newest marker."
 	if gs.farm_from_dict(data) != "" or gs.lab_xp != 0 or gs.lab_level() != 1:
 		return "A new save loads at lab level 1: %d" % gs.lab_xp
@@ -347,11 +347,12 @@ func _check_stage_1(gs: GameStateScript) -> String:
 		return "A save from before the lab level must load: %s" % gs.farm_from_dict(data)
 	if gs.lab_xp != 400 + worth:
 		return "Instrumentation's 400 one for one, and %d for the logs at the small lab's rate: %d" % [worth, gs.lab_xp]
-	if gs.farm_skill_xp != { "husbandry": 60 } or gs.skill_xp("calibration", GUEST) != calibration or gs.skill_curve != 3:
-		return "Instrumentation goes and nothing else changes: %s" % [gs.farm_skill_xp]
+	if not gs.farm_skill_xp.is_empty() or gs.skill_xp("husbandry") != 60 or gs.skill_xp("husbandry", GUEST) != 60 \
+			or gs.skill_xp("calibration", GUEST) != calibration or gs.skill_curve != GameStateScript.SKILL_CURVE:
+		return "Instrumentation goes, Husbandry is each player's, and nothing else changes: %s %s" % [gs.farm_skill_xp, gs.player_skill_xp]
 	# Saved again it is a new save: nothing is credited twice.
 	var again: Dictionary = gs.farm_to_dict()
-	if again.get("skill_curve") != 3 or again.get("lab_xp") != 400 + worth or again["farm_skill_xp"].has("instrumentation"):
+	if again.get("skill_curve") != GameStateScript.SKILL_CURVE or again.get("lab_xp") != 400 + worth or again["farm_skill_xp"].has("instrumentation"):
 		return "It is saved with its lab XP and the newest marker."
 	for i: int in 2:
 		if gs.farm_from_dict(again) != "" or gs.lab_xp != 400 + worth:

@@ -54,9 +54,9 @@ func test_skills_come_with_the_guest() -> String:
 	farm.let_in_guest(key, { "calibration": 150, "field_ops": 10 }, players)
 	var later: Dictionary = farm.player_skill_xp[id]
 	var problem: String = ""
-	if got != { "calibration": 130, "uncertainty": top } or farm.skill_xp("robotics", id) != 0:
+	if got != { "calibration": 130, "uncertainty": top, "robotics": 500 } or not farm.farm_skill_xp.is_empty():
 		problem = "Got %s" % [got]
-	elif later != { "calibration": 200, "uncertainty": top, "field_ops": 10 }:
+	elif later != { "calibration": 200, "uncertainty": top, "robotics": 500, "field_ops": 10 }:
 		problem = "Then got %s" % [later]
 	elif key in str(farm.farm_to_dict()):
 		problem = "The key itself must not be on the farm: every guest gets the farm"
@@ -93,8 +93,7 @@ func test_the_file_keeps_a_guest_s_skills() -> String:
 	guest.join(LOCAL, host.port())
 	_until(func() -> bool: return guest.is_guest())
 	var key: String = profile.card()["key"]
-	farm.player_skill_xp["player_2"] = { "calibration": 60 }
-	farm.farm_skill_xp["robotics"] = 70
+	farm.player_skill_xp["player_2"] = { "calibration": 60, "robotics": 70 }
 	farm.skill_xp_changed.emit("player_3", "calibration")
 	var early: Dictionary = profile.card()["skills"]
 	farm.skill_xp_changed.emit("player_2", "calibration")
@@ -107,7 +106,7 @@ func test_the_file_keeps_a_guest_s_skills() -> String:
 	read.path = FILE
 	var card: Dictionary = read.card()
 	read.free()
-	if not early.is_empty() or card != { "key": key, "skills": { "calibration": 60 } }:
+	if not early.is_empty() or card != { "key": key, "skills": { "calibration": 60, "robotics": 70 } }:
 		return _end("Got %s, then %s" % [early, card])
 	return _end("")
 

@@ -39,7 +39,7 @@ func _run(body: Callable) -> String:
 	gs.get_sensor("soil_probe").error = 0.0
 	gs.plantings[CELL]["setpoint"] = _target(gs)
 	var problem: String = gs.release_robot(ROBOT)
-	gs.farm_skill_xp["robotics"] = 0
+	(gs.player_skill_xp.get_or_add("player_1", {}) as Dictionary)["robotics"] = 0
 	if problem == "":
 		problem = body.call(gs)
 	gs.free()
@@ -83,10 +83,10 @@ func _check_gates(gs: GameStateScript) -> String:
 		return "A good card must be taken."
 	if gs.add_robot_card(ROBOT, "soil") == "":
 		return "Robotics 1 has one slot."
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(2)
+	(gs.player_skill_xp.get_or_add("player_1", {}) as Dictionary)["robotics"] = gs.xp_for_level(2)
 	if gs.add_robot_card(ROBOT, "soil") != "" or gs.add_robot_card(ROBOT, "soil") == "":
 		return "Robotics 2 has two slots."
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(9)
+	(gs.player_skill_xp.get_or_add("player_1", {}) as Dictionary)["robotics"] = gs.xp_for_level(9)
 	if gs.robot_card_slots() != 2:
 		return "Levels past the table keep its last count."
 	if gs.remove_robot_card(ROBOT, 2) == "" or gs.remove_robot_card(ROBOT, -1) == "":
@@ -187,7 +187,7 @@ func test_ready_crops_and_order() -> String:
 
 
 func _check_ready(gs: GameStateScript) -> String:
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(2)
+	(gs.player_skill_xp.get_or_add("player_1", {}) as Dictionary)["robotics"] = gs.xp_for_level(2)
 	gs.add_robot_card(ROBOT, "soil")
 	gs.add_robot_card(ROBOT, "clock", 12)
 	gs.get_sensor("soil_probe").error = 8.0

@@ -72,10 +72,16 @@ const CROPS_TABLE: StringName = &"crops"
 const SKILLS_TABLE: StringName = &"skills"
 ## What a save's skills are counted on (docs/design/quests_levels_story.md).
 ## 2 is the 99-level geometric curve (section 2). 3 is that curve with the lab
-## level (section 3): Instrumentation is gone and the lab has its XP.
-const SKILL_CURVE: int = 3
-## The curves a save may say: one without the lab level is given it as it loads.
-const KNOWN_CURVES: Array[int] = [2, 3]
+## level (section 3): Instrumentation is gone and the lab has its XP. 4 is that
+## with every skill a player's own (section 9, step 4): Robotics and Husbandry
+## are no longer the farm's, and crop XP is Agronomy's.
+const SKILL_CURVE: int = 4
+## The curves a save may say. An earlier one is brought up to SKILL_CURVE as it
+## loads, one stage after another.
+const KNOWN_CURVES: Array[int] = [2, 3, 4]
+## The skill crop work feeds, and the one it fed before there was Agronomy.
+const CROP_SKILL: String = "agronomy"
+const OLD_CROP_SKILL: String = "field_ops"
 ## The farm skill that became the lab level.
 const OLD_LAB_SKILL: String = "instrumentation"
 ## The most XP a converted skill holds: CoopProfile.MOST_XP.
@@ -255,6 +261,9 @@ const TUNNEL_START := Transform3D(Basis.IDENTITY, Vector3(-1.5, 0.05, 22.5))
 var tilled_cells: Dictionary = {}
 ## How deep each dug cell of Terrain is, in steps.
 var dug: Dictionary[Vector2i, int] = {}
+## The deepest each cell has been dug that a player has had Earthworks XP for
+## (dig). A cell filled and dug again gives none.
+var dug_paid: Dictionary[Vector2i, int] = {}
 ## How often each boulder was hit; BOULDER_HITS is broken. None is 0.
 var boulder_hits: Dictionary[StringName, int] = {}
 ## The cells whose reference block was dug up, for good: filling and digging
@@ -330,22 +339,26 @@ var next_player_number: int = 2
 ## A guest's key, hashed (each guest gets the whole farm) -> player id, so a
 ## friend who comes back is the same player.
 var guest_ids: Dictionary = {}
-## Skill id -> XP, for the skills the whole farm shares.
+## Skill id -> XP, for the skills the whole farm shares. No skill is the farm's
+## now (data/skills.json), so only a save from before holds any, until it loads.
 var farm_skill_xp: Dictionary = {}
 ## Owner ("" for the farm, else a player id) -> { skill id: share, 0 to 1 }: how
 ## much of its effects' full cut a skill had in a save from the 10-level curve.
 ## An effect uses the larger of this and its level's share. Only converting an
-## old save writes it, so a new farm has none and it never rises.
+## older save writes it, so a new farm has none and it never rises in play. A
+## save whose crop XP moved out of Field Ops keeps here the share Field Ops had.
 var skill_effect_floor: Dictionary = {}
 ## Player id -> { XP source id (data/skills.json): { "count": times, "xp": XP } }:
 ## what each player has done that earned XP, and how much it gave, farm skills
 ## included. _award_xp is the only writer. It is how the XP crops gave Field
-## Ops can move to Agronomy when that skill arrives (crop_xp), and what a quest
+## Ops moved to Agronomy when that skill arrived (crop_xp), and what a quest
 ## will count (docs/design/quests_levels_story.md section 5.3).
 var action_counts: Dictionary = {}
 ## The curve the XP above is counted on. A save without it is from the 10-level
 ## curve, and is converted as it loads (_convert_old_skills). One that says 2 is
 ## from before the lab level, and is given it as it loads (_credit_lab_from_logs).
+## One that says 3 or less is from before every skill was a player's own
+## (_make_skills_personal).
 var skill_curve: int = SKILL_CURVE
 ## The lab's XP, on the skills' curve: the whole farm's, earned by work done in
 ## the lab (lab_xp_sources in data/skills.json). It never goes down.
@@ -538,7 +551,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
-	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid"]
+	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -603,6 +616,12 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var dug_problem: String = Terrain.dug_problem(data.get("dug", {}))
 	if dug_problem != "":
 		return "'dug' %s" % dug_problem
+	if not data.get("dug_paid", {}) is Dictionary:
+		return "'dug_paid' is not a dictionary."
+	for cell: Variant in data.get("dug_paid", {}):
+		var paid: Variant = data["dug_paid"][cell]
+		if not cell is Vector2i or not paid is int or not Terrain.can_dig(cell) or paid < 1 or paid > Terrain.MAX_DIG_STEPS:
+			return "'dug_paid' has a cell that can't be dug like that."
 	for cell: Variant in data.get("found_blocks", {}):
 		if not cell is Vector2i or not data["found_blocks"][cell] is bool or not data["found_blocks"][cell] \
 				or ReferenceBlock.at(data["world_seed"], cell).is_empty():
@@ -870,15 +889,24 @@ func put_farm(data: Dictionary) -> void:
 		pocket_pending.clear()
 		for cell: Vector2i in found_pockets:
 			pocket_pending[cell] = GameClock.get_day_index() + OrePocket.REGROW_DAYS
-	if not data.has("skill_curve"):
+	# A guest's copy is the host's farm as it is: only the host converts skills.
+	if not data.has("skill_curve") and not FarmCommands.guest:
 		# From the 10-level curve.
 		_convert_old_skills()
 	if not data.has("lab_areas_paid"):
 		# From before areas were marked: the spaces it has are not paid for again.
 		lab_areas_paid = lab_areas.duplicate()
-	if skill_curve != SKILL_CURVE or not data.has("skill_curve"):
+	if not data.has("dug_paid"):
+		# From before digging gave XP: the holes it has are not paid for.
+		dug_paid.assign(dug)
+	# 1 is the 10-level curve, which no save says.
+	var from_curve: int = int(data["skill_curve"]) if data.has("skill_curve") else 1
+	if from_curve < 3 and not FarmCommands.guest:
 		# From before the lab level.
 		_credit_lab_from_logs()
+	if from_curve < 4 and not FarmCommands.guest:
+		# From when Robotics and Husbandry were the farm's and crops fed Field Ops.
+		_make_skills_personal()
 	skill_curve = SKILL_CURVE
 	_seep_days = 0.0
 	_seep_full = false
@@ -1416,6 +1444,25 @@ func skill_factor(effect_id: String, player_id: String = "") -> float:
 	return maxf(float(effect.get("floor", 0.0)), 1.0 - float(effect["full"]) * share)
 
 
+## The smallest skill_factor() of any player the farm knows, for what belongs to
+## the whole farm and no one player does.
+func best_skill_factor(effect_id: String) -> float:
+	var best: float = skill_factor(effect_id)
+	for player: String in _known_players():
+		best = minf(best, skill_factor(effect_id, player))
+	return best
+
+
+## Every player this farm holds anything for: the local one, and whoever has XP,
+## a floor, a count or a guest's place here.
+func _known_players() -> Array[String]:
+	var out: Array[String] = [local_player_id]
+	for id: Variant in player_skill_xp.keys() + guest_ids.values() + action_counts.keys() + skill_effect_floor.keys():
+		if id is String and id != "" and not id in out:
+			out.append(id)
+	return out
+
+
 ## The share (0 to 1) of an effect's full cut that `level` has: straight lines
 ## between the rows of level_curve/effect_share, which start at level 1.
 func effect_share(level: int) -> float:
@@ -1680,6 +1727,67 @@ func _credit_lab_from_logs() -> void:
 			skill_effect_floor.erase("")
 
 
+## A save from before every skill was a player's own (section 9, step 4), once.
+## Each player the save knows gets the farm's Robotics and Husbandry XP, and the
+## share of their effects the farm kept, so nobody loses a level or an effect.
+## Then each player's crop XP so far leaves Field Ops for Agronomy, by the
+## counter (crop_xp). Field Ops keeps the share of its effects it had, and stays
+## at any level that opened something. A player who comes later starts at 1.
+func _make_skills_personal() -> void:
+	var players: Array[String] = _known_players()
+	var farm_floor: Dictionary = skill_effect_floor.get("", {})
+	for skill: String in skill_ids():
+		if is_farm_skill(skill) or not farm_skill_xp.has(skill):
+			continue
+		var xp: int = clampi(int(farm_skill_xp[skill]), 0, MOST_SKILL_XP)
+		var share: float = clampf(float(farm_floor.get(skill, 0.0)), 0.0, 1.0)
+		for player: String in players:
+			var own: Dictionary = player_skill_xp.get_or_add(player, {})
+			own[skill] = maxi(int(own.get(skill, 0)), xp)
+			if share > effect_floor(skill, player):
+				(skill_effect_floor.get_or_add(player, {}) as Dictionary)[skill] = share
+		farm_skill_xp.erase(skill)
+		farm_floor.erase(skill)
+	if farm_floor.is_empty():
+		skill_effect_floor.erase("")
+	if is_farm_skill(CROP_SKILL) or is_farm_skill(OLD_CROP_SKILL) or not CROP_SKILL in skill_ids():
+		return
+	for player: String in players:
+		var own: Dictionary = player_skill_xp.get(player, {})
+		var had: int = int(own.get(OLD_CROP_SKILL, 0))
+		var moved: int = mini(crop_xp(player), had)
+		if moved <= 0:
+			continue
+		var level: int = _level_for_xp(had)
+		var share: float = maxf(effect_share(level), effect_floor(OLD_CROP_SKILL, player))
+		var left: int = had - mini(moved, had - xp_for_level(_gate_reached(OLD_CROP_SKILL, level)))
+		own[OLD_CROP_SKILL] = left
+		own[CROP_SKILL] = mini(int(own.get(CROP_SKILL, 0)) + moved, MOST_SKILL_XP)
+		if _has_effect(OLD_CROP_SKILL) and share > effect_share(_level_for_xp(left)) and share > effect_floor(OLD_CROP_SKILL, player):
+			(skill_effect_floor.get_or_add(player, {}) as Dictionary)[OLD_CROP_SKILL] = share
+
+
+## The highest level, up to `level`, at which `skill_id` opens something: an
+## unlock of data/skills.json or a robot job's card (data/robots.json). 1 if none.
+func _gate_reached(skill_id: String, level: int) -> int:
+	var reached: int = 1
+	for unlock: Dictionary in DataManager.get_records(SKILLS_TABLE, "unlocks"):
+		if unlock["skill"] == skill_id and int(unlock["level"]) <= level:
+			reached = maxi(reached, int(unlock["level"]))
+	for job: Dictionary in DataManager.get_records(ROBOTS_TABLE, "jobs"):
+		var gate: Dictionary = job.get("skill_gate", {})
+		if gate.has(skill_id) and int(gate[skill_id]) <= level:
+			reached = maxi(reached, int(gate[skill_id]))
+	return reached
+
+
+func _has_effect(skill_id: String) -> bool:
+	for effect: Dictionary in DataManager.get_records(SKILLS_TABLE, "effects"):
+		if effect["skill"] == skill_id:
+			return true
+	return false
+
+
 ## Gives the XP of one source in data/skills.json, times `scale`, to the acting
 ## player, or to the farm for a farm skill, and counts it for that player
 ## (action_counts). The manager earns none.
@@ -1727,7 +1835,8 @@ func _action(source_id: String, player_id: String) -> Dictionary:
 
 
 ## The XP a player has had from the crop sources (those marked "crop" in
-## data/skills.json). It went to Field Ops, and is Agronomy's when that arrives.
+## data/skills.json). It is Agronomy's. What a save from before Agronomy had
+## given Field Ops moved as the save loaded (_make_skills_personal).
 func crop_xp(player_id: String = "") -> int:
 	var total: int = 0
 	for source: Dictionary in DataManager.get_records(SKILLS_TABLE, "xp_sources"):
@@ -3498,9 +3607,10 @@ func is_exuvia_visible() -> bool:
 	return molt_stage == MoltStage.MOLTED or GameClock.get_day_index() < exuvia_until_day
 
 
-## One molt's length. The farm's Husbandry skill shortens it.
+## One molt's length. The spiders are the farm's, so the best Husbandry of any
+## player the farm knows shortens it [ASSUMPTION], on the host and a guest alike.
 func molt_days() -> float:
-	return PLAYTEST_MOLT_DAYS * skill_factor("molt_time")
+	return PLAYTEST_MOLT_DAYS * best_skill_factor("molt_time")
 
 
 ## "MOLT  40 %", what pauses it, or that the spool is ready.
@@ -4808,8 +4918,8 @@ func till(cell: Vector3i, player_id: String = "") -> bool:
 
 
 ## Digs a cell of Terrain (y = 0) one step deeper. Returns "" or why not. It costs
-## nothing [ASSUMPTION]. A block or an ore pocket there comes up once.
-@warning_ignore("unused_parameter")
+## nothing [ASSUMPTION]. A block or an ore pocket there comes up once. The digger
+## gets Earthworks XP for a step deeper than the cell has been, and for a block.
 func dig(cell: Vector3i, player_id: String = "") -> String:
 	var at := Vector2i(cell.x, cell.z)
 	var problem: String = Terrain.dig_problem(at, dug) if cell.y == 0 else "This ground can't be dug."
@@ -4819,12 +4929,16 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 		problem = StonePieces.dig_beside_pad_problem(at, dug)
 	if problem == "":
 		dug[at] = dug.get(at, 0) + 1
+		if dug[at] > dug_paid.get(at, 0):
+			dug_paid[at] = dug[at]
+			_award_xp("dig", player_id)
 		_set_seep(PitWater.seep(pit_seep, dug, 0.0), true)
 		# The digging may have changed where the water ends, so look at it next step.
 		_seep_full = false
 		terrain_changed.emit()
 		if not found_blocks.has(at) and not ReferenceBlock.at(world_seed, at).is_empty():
 			found_blocks[at] = true
+			_award_xp("find_block", player_id)
 			blocks_changed.emit()
 		if not found_pockets.has(at) and (at in OrePocket.cells(world_seed) or at in new_pockets):
 			found_pockets[at] = true
@@ -5201,19 +5315,27 @@ func crop_sale_price(entry: Dictionary) -> int:
 	return roundi(base * (1.0 - float(spec.get("out_of_spec_penalty_pct", 0)) / 100.0))
 
 
-func harvest_bin_value() -> int:
+## What Lin pays `player_id` ("" = the local player) for one bin entry: its
+## price, and more with the seller's Agronomy (the lin_price effect).
+func lin_pays(entry: Dictionary, player_id: String = "") -> int:
+	return roundi(crop_sale_price(entry) * skill_factor("lin_price", player_id))
+
+
+## What the bin brings if `player_id` ("" = the local player) sells it.
+func harvest_bin_value(player_id: String = "") -> int:
 	var total: int = 0
 	for entry: Dictionary in harvest_bin:
-		total += maxi(0, crop_sale_price(entry) - int(entry.get("advance", 0)))
+		total += maxi(0, lin_pays(entry, player_id) - int(entry.get("advance", 0)))
 	return total
 
 
 ## Lin buys the whole bin. Returns the credits paid (0 if the bin was empty).
-## The seller gets XP by the crops' price, before any fronted seed comes out.
+## The seller gets XP by the crops' price, before any fronted seed comes out
+## and without what their Agronomy adds.
 func sell_harvest_to_lin(player_id: String = "") -> int:
 	if harvest_bin.is_empty():
 		return 0
-	var total: int = harvest_bin_value()
+	var total: int = harvest_bin_value(player_id)
 	var count: int = harvest_bin.size()
 	var off_spec: int = 0
 	var advanced: int = 0
@@ -5222,7 +5344,7 @@ func sell_harvest_to_lin(player_id: String = "") -> int:
 		priced += crop_sale_price(entry)
 		if not entry.get("in_spec", false):
 			off_spec += 1
-		advanced += mini(int(entry.get("advance", 0)), crop_sale_price(entry))
+		advanced += mini(int(entry.get("advance", 0)), lin_pays(entry, player_id))
 	harvest_bin.clear()
 	add_credits(total)
 	_award_xp("sell_crop", player_id, priced)

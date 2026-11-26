@@ -16,8 +16,7 @@ func _run(body: Callable) -> String:
 	return JobsTest.new()._run(func(gs: GameStateScript) -> String:
 		for id: String in gs.robot_sensor_ids(ROBOT):
 			gs.get_sensor(id).error = 0.0
-		gs.farm_skill_xp["robotics"] = gs.xp_for_level(15)
-		gs.player_skill_xp[gs.local_player_id] = { "calibration": gs.xp_for_level(10) }
+		gs.player_skill_xp[gs.local_player_id] = { "robotics": gs.xp_for_level(15), "calibration": gs.xp_for_level(10) }
 		for id: String in gs.unit_ids():
 			gs.get_sensor(id).cal_due_day = 1000
 		return body.call(gs))
@@ -41,10 +40,10 @@ func _check_gates(gs: GameStateScript) -> String:
 		return "Each job has its own triggers."
 	if gs.robot_calibrate_targets(ROBOT).is_empty():
 		return "There must be something to calibrate."
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(15) - 1
+	gs.player_skill_xp[gs.local_player_id]["robotics"] = gs.xp_for_level(15) - 1
 	if not gs.add_robot_calibrate_card(ROBOT, TARGET).contains("Robotics level 15"):
 		return "It needs Robotics 15: %s %d" % [gs.robot_job_gate(gs.JOB_CALIBRATE), gs.skill_level("robotics")]
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(15)
+	gs.player_skill_xp[gs.local_player_id]["robotics"] = gs.xp_for_level(15)
 	gs.player_skill_xp[gs.local_player_id]["calibration"] = gs.xp_for_level(10) - 1
 	if not gs.add_robot_calibrate_card(ROBOT, TARGET).contains("Calibration level 10"):
 		return "It needs Calibration 10."
