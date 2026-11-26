@@ -56,6 +56,8 @@ signal skill_xp_changed(player_id: String, skill_id: String)
 signal skill_leveled(player_id: String, skill_id: String, level: int)
 ## The lab's XP changed (lab_xp).
 signal lab_xp_changed
+## A quest was offered, moved on or finished (quest_state, quest_points).
+signal quests_changed
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -367,6 +369,13 @@ var lab_xp: int = 0
 ## Discipline -> the most spaces its lab area has had that the lab has its XP
 ## for (lab_area). A space cleared and fitted again gives none.
 var lab_areas_paid: Dictionary = {}
+## The farm's quests (data/quests.json): quest id -> what QuestEngine keeps for
+## it (the day accepted, the steps done, counts, who took part, the day done).
+## Only update_quests() writes it, on the host.
+var quest_state: Dictionary = {}
+## Player id -> quest id -> the quest points that quest paid them. Kept here for
+## every player, guests too; a guest's own file gets them at build step 8.
+var quest_points: Dictionary = {}
 ## Robot id ("TR-1") -> { frame, name, state (ROBOT_STATES), done_day,
 ## ordered_by }. Assembled robots' sensors are in `sensors` as "sensor@robot".
 var robots: Dictionary = {}
@@ -551,7 +560,8 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
-	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid"]
+	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
+	"quest_state", "quest_points"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -727,6 +737,11 @@ func farm_dict_problem(data: Dictionary) -> String:
 			if not source is String or typeof(done) != TYPE_DICTIONARY or done.size() != 2 \
 					or not done.get("count") is int or not done.get("xp") is int or done["count"] < 0 or done["xp"] < 0:
 				return "'action_counts' has a count that is not whole numbers."
+	var quest_problem: String = QuestEngine.state_problem(data.get("quest_state", {}))
+	if quest_problem == "":
+		quest_problem = QuestEngine.points_problem(data.get("quest_points", {}))
+	if quest_problem != "":
+		return quest_problem
 	var robot_problem: String = _robots_dict_problem(data.get("robots", {}))
 	if robot_problem != "":
 		return robot_problem
@@ -815,6 +830,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	sentinel_sighted = false
 	farm_loaded.emit()
 	lab_xp_changed.emit()
+	quests_changed.emit()
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
 	silk_changed.emit(optical_silk_spools)
@@ -1557,6 +1573,10 @@ func _forget_a_guest(players: Array[String]) -> void:
 			player_skill_xp.erase(player_id)
 			skill_effect_floor.erase(player_id)
 			action_counts.erase(player_id)
+			quest_points.erase(player_id)
+			for entry: Variant in quest_state.values():
+				if entry is Dictionary and entry.get("players") is Array:
+					(entry["players"] as Array).erase(player_id)
 			return
 
 
@@ -1671,8 +1691,16 @@ func _award_lab_xp(source_id: String, player_id: String = "", scale: float = 1.0
 		var done: Dictionary = (action_counts.get_or_add(player_id, {}) as Dictionary).get_or_add(source_id, { "count": 0, "xp": 0 })
 		done["count"] = int(done["count"]) + 1
 		done["xp"] = int(done["xp"]) + gained
+	give_lab_xp(gained)
+
+
+## Lab XP as it is written, with no multiplier: a quest's lump (section 3.2.1),
+## and the end of _award_lab_xp.
+func give_lab_xp(amount: int) -> void:
+	if amount <= 0:
+		return
 	var before: int = lab_level()
-	lab_xp = mini(lab_xp + gained, MOST_SKILL_XP)
+	lab_xp = mini(lab_xp + amount, MOST_SKILL_XP)
 	lab_xp_changed.emit()
 	if lab_level() > before:
 		post_phone("LAB LEVEL UP: %s." % lab_phone_text())
@@ -1804,6 +1832,14 @@ func _award_xp(source_id: String, player_id: String = "", scale: float = 1.0) ->
 	var done: Dictionary = (action_counts.get_or_add(player_id, {}) as Dictionary).get_or_add(source_id, { "count": 0, "xp": 0 })
 	done["count"] = int(done["count"]) + 1
 	done["xp"] = int(done["xp"]) + gained
+	give_skill_xp(skill, gained, player_id)
+
+
+## XP in one skill for one player, counted for no source: a quest's lump, and
+## the end of _award_xp.
+func give_skill_xp(skill: String, gained: int, player_id: String) -> void:
+	if gained <= 0 or player_id == MANAGER_ID or DataManager.get_record(SKILLS_TABLE, skill, "skills").is_empty():
+		return
 	var farm: bool = is_farm_skill(skill)
 	var before: int = skill_xp(skill, player_id)
 	if farm:
@@ -1817,6 +1853,34 @@ func _award_xp(source_id: String, player_id: String = "", scale: float = 1.0) ->
 	var level: int = _level_for_xp(before + gained)
 	if level > _level_for_xp(before):
 		skill_leveled.emit(owner_id, skill, level)
+
+
+# --- Quests (docs/design/quests_levels_story.md section 5) ----------------------
+
+## Looks at the farm's quests: ticks the steps that now hold and pays a finished
+## quest, once. With `offers` it also offers those whose gates hold: each morning
+## and when a farm is started or opened (SaveGame), not after a command
+## (FarmCommands.execute), so an offer never lands on what the command said. On
+## the host only: a guest's copy is the host's. `present` is who is on the farm;
+## left empty, the session says.
+func update_quests(present: Array[String] = [], offers: bool = true) -> void:
+	if FarmCommands.guest:
+		return
+	if QuestEngine.update(self, players_present() if present.is_empty() else present, offers):
+		quests_changed.emit()
+
+
+## Who is on the farm now: the session's players, or the local one alone.
+func players_present() -> Array[String]:
+	var out: Array[String] = CoopSession.players.duplicate()
+	if not local_player_id in out:
+		out.append(local_player_id)
+	return out
+
+
+## A player's quest points on this farm ("" = the local player).
+func quest_point_total(player_id: String = "") -> int:
+	return QuestEngine.points_of(self, _player(player_id))
 
 
 ## How many times `player_id` ("" = the local player) earned XP from a source.
@@ -2720,6 +2784,7 @@ func _on_day_started(day: int) -> void:
 	_morning = false
 	# After the audit, so the board matches the band the lab ends the morning in.
 	refresh_job_board(day)
+	update_quests()
 	# The morning's cancellations go last, as one line, so neither the audit's
 	# lines nor the board's are newer and one cancellation can't hide another.
 	if not _morning_notes.is_empty():

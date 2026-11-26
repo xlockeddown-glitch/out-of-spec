@@ -255,6 +255,8 @@ func _new_farm() -> String:
 		return problem
 	var expected: GameStateScript = GameStateScript.new()
 	expected._set_up_farm(GameState.world_seed)
+	# A new farm is offered its first quests before its first save.
+	expected.update_quests()
 	problem = _differs(expected.farm_to_dict(), GameState.farm_to_dict(), "in a new farm")
 	expected.free()
 	if problem != "":
