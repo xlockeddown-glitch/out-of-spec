@@ -81,6 +81,19 @@ func go_to_bed(player_id: String) -> String:
 	return ""
 
 
+## Host: the tunnels' recall carries a player out. It is an auto-bed (zones doc
+## 12.4): alone the day ends at once, with friends in they count as in bed.
+func recall_to_bed(player_id: String) -> void:
+	if session.is_guest() or joining():
+		return
+	if not together():
+		_sleep_alone()
+	elif player_id in session.players:
+		if not player_id in in_bed:
+			in_bed.append(player_id)
+		_look()
+
+
 func get_up(player_id: String) -> void:
 	in_bed.erase(player_id)
 

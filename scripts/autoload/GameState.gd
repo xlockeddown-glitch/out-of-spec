@@ -620,6 +620,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
+	"_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels",
 ]
 
 
@@ -1457,6 +1458,7 @@ func _on_time_advanced(delta_days: float) -> void:
 		drop_pod_present = false
 		drop_pod_changed.emit(false)
 		post_phone("AUD-1T: Departing. Please remain compliant in our absence.")
+	_tick_recall()
 
 
 # --- Kestrel (section 1.7) ----------------------------------------------------
@@ -3324,6 +3326,9 @@ func _on_day_started(day: int) -> void:
 	if not _morning_notes.is_empty():
 		post_phone(" ".join(_morning_notes))
 		_morning_notes.clear()
+	for note: String in _rescue_notes:
+		post_phone(note)
+	_rescue_notes.clear()
 	_roll_sentinel()
 
 
@@ -4015,6 +4020,92 @@ func move_rover(into_tunnels: bool, player_id: String = "") -> String:
 	rover_in_tunnels = into_tunnels
 	rover_place_changed.emit()
 	return ""
+
+
+# --- The recall (zones doc section 6.1) ---------------------------------------
+
+## The day the warning, and the rescue, were last given for. Not saved: a farm
+## that loads in the tunnels late in the night is warned, or rescued, once more.
+var _recall_warned_day: int = 0
+var _recall_rescued_day: int = 0
+## What the last rescues cost, said on the phone in the morning.
+var _rescue_notes: Array[String] = []
+## Only tests set it: where the local player is (true: in the tunnels).
+var recall_in_tunnels: Callable = Callable()
+
+
+## The local player stands in the basalt tunnels. The host cannot see where a
+## guest is (the scene is the guest's own), so a guest is not looked at here.
+func _local_in_tunnels() -> bool:
+	if recall_in_tunnels.is_valid():
+		return bool(recall_in_tunnels.call())
+	var scene: Node = get_tree().current_scene if is_inside_tree() else null
+	return scene != null and scene.scene_file_path == SceneSwitcher.TUNNELS_SCENE
+
+
+## Host: warns the player in the tunnels at the warning hour and has them
+## carried out at the rescue hour, once each a day. Guests never run this.
+func _tick_recall() -> void:
+	if FarmCommands.guest or not _local_in_tunnels():
+		return
+	var day: int = GameClock.get_day_index()
+	match TunnelRecall.phase(GameClock.elapsed_days, _recall_warned_day, _recall_rescued_day):
+		TunnelRecall.WARN:
+			_recall_warned_day = day
+			post_phone(TunnelRecall.text("warn_text"))
+		TunnelRecall.RESCUE:
+			_recall_warned_day = day
+			_recall_rescued_day = day
+			# Not inside the clock's own signal: the day may end and the scene change.
+			_carry_out.call_deferred(local_player_id)
+
+
+## The crew carries `player_id` out of the tunnels: the cost is paid, the rover
+## comes home, the player is in bed (so the all-in-bed rule counts them) and, if
+## they are the local player, the farm scene opens.
+func _carry_out(player_id: String) -> void:
+	rescue_from_tunnels(player_id)
+	CoopBeds.recall_to_bed(player_id)
+	if is_inside_tree() and player_id == local_player_id:
+		SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE)
+
+
+## Host: pays for a rescue and brings the rover home. Returns the cost
+## ({ credits, ore, waived }, see TunnelRecall.cost). The wallet and the ore are
+## the farm's, shared (there is no pack of one's own yet) [ASSUMPTION]. What a
+## player found (tarantulas, blocks, parts, samples) is not touched, and nothing
+## drifts for it. The morning's phone line says what it cost.
+func rescue_from_tunnels(player_id: String = "") -> Dictionary:
+	var who: String = performer_name(_player(player_id))
+	var bill: Dictionary = TunnelRecall.cost(credits, crystal_ore)
+	if bill["credits"] > 0:
+		add_credits(-int(bill["credits"]))
+	if bill["ore"] > 0:
+		crystal_ore -= int(bill["ore"])
+		ore_changed.emit(crystal_ore)
+	bring_rover_home()
+	post_phone(TunnelRecall.text("rescue_text") % who.to_lower())
+	var line: String = TunnelRecall.text("cost_text") % [
+		SP811.integer(int(bill["credits"])), SP811.integer(int(bill["ore"]))]
+	if bill["waived"] > 0:
+		line += " " + TunnelRecall.text("cost_waived_text") % SP811.integer(int(bill["credits"]))
+	_rescue_notes.append(line)
+	return bill
+
+
+## The rover is on the farm pad where it went in, whatever it was doing in the
+## tunnels (a rescue never strands it).
+func bring_rover_home() -> void:
+	if FarmCommands.guest:
+		return
+	var home: Transform3D = parked_rover_transform(ROVER, Transform3D(Basis.IDENTITY, TUNNEL_PAD))
+	if home.origin.distance_to(TUNNEL_PAD) > TUNNEL_PAD_REACH_M:
+		home = Transform3D(Basis.IDENTITY, TUNNEL_PAD)
+	rover_transforms[ROVER] = home
+	rover_transforms.erase(TUNNEL_ROVER)
+	if rover_in_tunnels:
+		rover_in_tunnels = false
+		rover_place_changed.emit()
 
 
 ## Remembers where a rover is parked, so it is still there when the farm scene

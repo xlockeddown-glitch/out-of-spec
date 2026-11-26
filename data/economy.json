@@ -71,5 +71,16 @@
     "refit_days": 1,
     "_note": "Upgradeable lab (Ryan, 2026-11-22). The lab has a number of spaces for its size; each space is given to a discipline at the dome plan board. A discipline's spaces are its area: it can have that many jobs in progress at once, and its size (area_sizes, by spaces) decides which jobs fit. Growing to the next size costs credits and crystal ore and finishes build_days later, in the morning; the new spaces are then fitted out for free. Clearing a space for another discipline costs refit_credits and refit_ore and the space is down for refit_days. The lab starts small with a space for each discipline the founding standards cover. Every number here is [PLACEHOLDER]."
   },
+  "tunnel_recall": {
+    "warn_hour": 0.0,
+    "rescue_hour": 2.0,
+    "fee_credits": 50,
+    "ore_share": [1, 3],
+    "warn_text": "[Odalys Brandt, BNH Dispatch] Recall in 2 hours. Get to the tunnel mouth. Warmly, Dispatch.",
+    "rescue_text": "[Odalys Brandt, BNH Dispatch] A recovery crew has carried %s out of the tunnels and brought the rover home. You are in bed until 06:00.",
+    "cost_text": "[Odalys Brandt, BNH Dispatch] Recovery fee: %s CR from the shared wallet and %s crystal ore left in the tunnels. Finds are kept. Warmly, Dispatch.",
+    "cost_waived_text": "The crew took the last %s CR there was; the rest of the fee is waived.",
+    "_note": "Zones doc section 6.1, build step 1 (Ryan, 2026-11-26: 50 CR plus some carried ore, finds kept, no extra drift, the crew brings the rover home). A player in the basalt tunnels is warned at warn_hour and rescued at rescue_hour (hours on the 24 h clock; the day runs 06:00 to 06:00, so 00:00 and 02:00 are late in the day). The fee comes from the shared wallet and never takes it below 0: the crew takes what there is and waives the rest. ore_share is [numerator, denominator] of the crystal ore carried, rounded down. Every number and every word here is [PLACEHOLDER]."
+  },
   "_note": "Starting balance [PLACEHOLDER]. Crops sold to Lin add credits; audit fines, OIRM fees and purchases take them away."
 }
