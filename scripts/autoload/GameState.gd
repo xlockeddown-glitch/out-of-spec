@@ -1574,6 +1574,9 @@ func _forget_a_guest(players: Array[String]) -> void:
 			skill_effect_floor.erase(player_id)
 			action_counts.erase(player_id)
 			quest_points.erase(player_id)
+			for entry: Variant in quest_state.values():
+				if entry is Dictionary and entry.get("players") is Array:
+					(entry["players"] as Array).erase(player_id)
 			return
 
 
@@ -1854,14 +1857,16 @@ func give_skill_xp(skill: String, gained: int, player_id: String) -> void:
 
 # --- Quests (docs/design/quests_levels_story.md section 5) ----------------------
 
-## Looks at the farm's quests: offers those whose gates hold, ticks the steps
-## that now hold and pays a finished quest, once. Called after every command
-## (FarmCommands.execute) and each morning, on the host only: a guest's copy is
-## the host's. `present` is who is on the farm; left empty, the session says.
-func update_quests(present: Array[String] = []) -> void:
+## Looks at the farm's quests: ticks the steps that now hold and pays a finished
+## quest, once. With `offers` it also offers those whose gates hold: each morning
+## and when a farm is started or opened (SaveGame), not after a command
+## (FarmCommands.execute), so an offer never lands on what the command said. On
+## the host only: a guest's copy is the host's. `present` is who is on the farm;
+## left empty, the session says.
+func update_quests(present: Array[String] = [], offers: bool = true) -> void:
 	if FarmCommands.guest:
 		return
-	if QuestEngine.update(self, players_present() if present.is_empty() else present):
+	if QuestEngine.update(self, players_present() if present.is_empty() else present, offers):
 		quests_changed.emit()
 
 

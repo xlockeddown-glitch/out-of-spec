@@ -12,9 +12,14 @@ extends RefCounted
 ##   accepted    the day it was accepted
 ##   steps_done  ids of the steps that are done
 ##   base        step id -> what a counting check read on that day
-##   shown       step id -> the last count the phone was told
+##   shown       step id -> the highest count a counting step has reached; the
+##               phone is told when it grows, and it never goes back
 ##   players     who was on the farm when any step was done (they took part)
 ##   done        the day it was finished and paid, or -1
+##
+## Quests are offered only on an offering look (each morning, and when a farm is
+## started or opened), so an offer never lands on top of what a command said.
+## Steps are ticked and a finished quest is paid on every look.
 ##
 ## Not built yet: accept and turn-in by the player (the quest log, build step 7;
 ## until then an offered quest is accepted at once and paid when its last step
@@ -42,16 +47,20 @@ static func quests() -> Array[Dictionary]:
 	return DataManager.get_records(TABLE, SECTION)
 
 
-## Offers, moves on and pays the farm's quests. `present` is who is on the farm
-## now. True if anything changed. Host only: the caller sees to that.
-static func update(farm: Node, present: Array[String]) -> bool:
+## Moves on and pays the farm's quests, and offers new ones if `offers`.
+## `present` is who is on the farm now. True if anything changed. Host only: the
+## caller sees to that. A quest whose data is wrong (data_problem) is left alone.
+static func update(farm: Node, present: Array[String], offers: bool = true) -> bool:
 	var changed: bool = false
-	var all: Array[Dictionary] = quests()
+	var all: Array[Dictionary] = []
+	for quest: Dictionary in quests():
+		if data_problem(quest) == "":
+			all.append(quest)
 	# A quest finished here can open one listed before it, so go round again.
 	for _round: int in all.size() + 1:
 		var moved: bool = false
 		for quest: Dictionary in all:
-			if _update_one(farm, quest, present):
+			if _update_one(farm, quest, present, offers):
 				moved = true
 		if not moved:
 			break
@@ -59,7 +68,7 @@ static func update(farm: Node, present: Array[String]) -> bool:
 	return changed
 
 
-static func _update_one(farm: Node, quest: Dictionary, present: Array[String]) -> bool:
+static func _update_one(farm: Node, quest: Dictionary, present: Array[String], offers: bool) -> bool:
 	var id: String = str(quest["id"])
 	# A player's own quests wait for build step 8.
 	if str(quest.get("scope", "farm")) != "farm":
@@ -67,7 +76,15 @@ static func _update_one(farm: Node, quest: Dictionary, present: Array[String]) -
 	var state: Dictionary = farm.quest_state
 	var is_new: bool = not state.has(id)
 	if is_new:
+		if not offers:
+			return false
 		if not is_offered(farm, quest, present):
+			# What it waits for can no longer come: closed, and nothing is paid.
+			if _closed(farm, quest, present):
+				var closed: Dictionary = _accepted(farm, quest, present)
+				closed["done"] = closed["accepted"]
+				state[id] = closed
+				return true
 			return false
 		state[id] = _accepted(farm, quest, present)
 	var entry: Dictionary = state[id]
@@ -84,6 +101,11 @@ static func _update_one(farm: Node, quest: Dictionary, present: Array[String]) -
 			continue
 		var have: int = step_count(farm, step, entry, present)
 		var need: int = step_need(step)
+		var counts: bool = str(step.get("check", "")) in COUNTING
+		var grew: bool = counts and have > int(entry["shown"].get(step_id, 0))
+		if grew:
+			entry["shown"][step_id] = have
+			moved = true
 		if have >= need:
 			done.append(step_id)
 			finished.append(str(step.get("text", "")))
@@ -93,14 +115,12 @@ static func _update_one(farm: Node, quest: Dictionary, present: Array[String]) -
 			moved = true
 			continue
 		# A count that grew is told once; a contract's run has its own line.
-		if need > 1 and str(step.get("check", "")) in COUNTING and have > int(entry["shown"].get(step_id, 0)):
-			entry["shown"][step_id] = have
+		if need > 1 and grew:
 			farm.post_phone("QUEST %s: %d of %d. %s" % [title, have, need, str(step.get("text", ""))])
-			moved = true
 		if not bool(quest.get("any_order", false)):
 			break
 	if done.size() >= steps.size():
-		_finish(farm, quest, entry)
+		_finish(farm, quest, entry, present)
 		return true
 	var next: String = current_step_text(quest, entry)
 	if is_new:
@@ -119,25 +139,36 @@ static func _accepted(farm: Node, quest: Dictionary, present: Array[String]) -> 
 
 
 ## Marks it done and pays it, once: update() never comes back to a done quest.
-static func _finish(farm: Node, quest: Dictionary, entry: Dictionary) -> void:
+static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: Array[String]) -> void:
 	entry["done"] = GameClock.get_day_index()
 	var reward: String = reward_text(quest)
 	farm.post_phone("QUEST DONE: %s.%s" % [str(quest["title"]), "" if reward == "" else " Reward: %s." % reward])
 	var rewards: Dictionary = quest.get("rewards", {})
-	var players: Array = entry["players"]
+	# Those who took part and are still known here: a guest the farm has
+	# forgotten is not given a place again.
+	var known: Array[String] = farm._known_players()
+	var players: Array[String] = []
+	for player: Variant in entry["players"]:
+		if player in known or player in present:
+			players.append(str(player))
 	if int(rewards.get("credits", 0)) > 0:
 		farm.add_credits(int(rewards["credits"]))
 	# The amount written on the quest, in any lab (section 3.2.1).
 	farm.give_lab_xp(int(rewards.get("lab_xp", 0)))
 	for key: Variant in rewards:
 		var skill: String = _reward_skill(str(key))
-		if skill != "":
-			for player: Variant in players:
-				farm.give_skill_xp(skill, int(rewards[key]), str(player))
+		if skill == "":
+			continue
+		# A skill the whole farm shares is paid once, not once for each player.
+		if farm.is_farm_skill(skill):
+			farm.give_skill_xp(skill, int(rewards[key]), farm.local_player_id)
+			continue
+		for player: String in players:
+			farm.give_skill_xp(skill, int(rewards[key]), player)
 	# By quest id, so no player can hold one quest's points twice.
 	if int(rewards.get("quest_points", 0)) > 0:
-		for player: Variant in players:
-			(farm.quest_points.get_or_add(str(player), {}) as Dictionary)[str(quest["id"])] = int(rewards["quest_points"])
+		for player: String in players:
+			(farm.quest_points.get_or_add(player, {}) as Dictionary)[str(quest["id"])] = int(rewards["quest_points"])
 	var line: String = phone_line(str(rewards.get("phone", "")))
 	if line != "":
 		farm.post_phone("%s: %s" % [giver_name(quest), line])
@@ -184,6 +215,26 @@ static func giver_name(quest: Dictionary) -> String:
 	return str(quest.get("giver", "quest")).to_upper()
 
 
+## "" or what is wrong with a quest as the data file has it. update() leaves
+## such a quest alone, and tests/test_quests.gd holds the shipped file to this.
+static func data_problem(quest: Dictionary) -> String:
+	var steps: Variant = quest.get("steps")
+	if not steps is Array or (steps as Array).is_empty():
+		return "it has no steps."
+	var ids: Array[String] = []
+	for step: Variant in steps:
+		if not step is Dictionary:
+			return "a step is not a dictionary."
+		var id: Variant = step.get("id", "")
+		if not id is String or id == "" or id in ids:
+			return "a step has no id, or two steps have the same id."
+		ids.append(id)
+	for key: String in ["gates", "offer", "closed_when", "rewards"]:
+		if quest.has(key) and not quest[key] is Dictionary:
+			return "'%s' is not a dictionary." % key
+	return ""
+
+
 # --- Offering -----------------------------------------------------------------
 
 ## Whether the quest's own gates and its offer hold.
@@ -220,6 +271,18 @@ static func gates_hold(farm: Node, gates: Dictionary, present: Array[String]) ->
 			_:
 				return false
 	return true
+
+
+## `closed_when` (a step check): true when it holds for a quest that was never
+## offered. The quest is then marked done with nothing paid, so nothing gated on
+## it is stuck behind an offer that can't come.
+static func _closed(farm: Node, quest: Dictionary, present: Array[String]) -> bool:
+	var closed: Dictionary = quest.get("closed_when", {})
+	if closed.is_empty():
+		return false
+	var as_step: Dictionary = closed.duplicate()
+	as_step["check"] = str(closed.get("when", ""))
+	return check_value(farm, as_step, present) >= step_need(as_step)
 
 
 ## `offer`: always (or nothing), a day, or any step check that holds now.
@@ -279,12 +342,17 @@ static func step_need(step: Dictionary) -> int:
 
 
 ## What a step has: its check's reading, less what it read on the day the quest
-## was accepted for a counting check that is not `ever`.
+## was accepted for a counting check that is not `ever`. A count never goes
+## back: the highest it has reached is kept (a forgotten guest's actions leave
+## the farm's counters).
 static func step_count(farm: Node, step: Dictionary, entry: Dictionary, present: Array[String]) -> int:
 	var value: int = check_value(farm, step, present)
-	if str(step.get("check", "")) in COUNTING and not bool(step.get("ever", false)):
-		value -= int((entry.get("base", {}) as Dictionary).get(str(step.get("id", "")), 0))
-	return maxi(value, 0)
+	if not str(step.get("check", "")) in COUNTING:
+		return maxi(value, 0)
+	var id: String = str(step.get("id", ""))
+	if not bool(step.get("ever", false)):
+		value -= int((entry.get("base", {}) as Dictionary).get(id, 0))
+	return maxi(value, int((entry.get("shown", {}) as Dictionary).get(id, 0)))
 
 
 ## The first step not done, as the phone says it: its text, with "3 of 5" when it

@@ -71,8 +71,10 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	if _player_index(action) >= 0:
 		passed.append(player_id)
 	var result: Variant = _farm().callv(action, passed)
-	# The quests only watch: after anything a player did, they look again.
-	_farm().update_quests()
+	# The quests only watch: after anything a player did, they look again. New
+	# ones are offered in the morning, not on top of this command's own line.
+	var none: Array[String] = []
+	_farm().update_quests(none, false)
 	return result
 
 

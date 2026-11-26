@@ -66,6 +66,8 @@ func start_new(path: String = DEFAULT_PATH) -> String:
 	farm_open = false
 	GameClock.elapsed_days = 0.0
 	GameState.new_farm()
+	# The first quests are offered before the first save.
+	GameState.update_quests()
 	open_scene = SceneSwitcher.FARM_SCENE
 	# Written whole before anything is moved, so a full disk costs nothing.
 	var fresh: String = path + ".new"
@@ -103,6 +105,9 @@ func start_new(path: String = DEFAULT_PATH) -> String:
 func continue_farm(path: String = DEFAULT_PATH) -> String:
 	var problem: String = read(path)
 	farm_open = problem == ""
+	# A farm from before a quest existed is offered it now, not at a command.
+	if farm_open:
+		GameState.update_quests()
 	# A farm that opens on the farm has its rover there, where it went in.
 	if farm_open and open_scene == SceneSwitcher.FARM_SCENE and GameState.rover_in_tunnels:
 		GameState.rover_in_tunnels = false
