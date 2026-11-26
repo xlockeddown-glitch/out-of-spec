@@ -576,7 +576,7 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if not cell is Vector2i or not data["found_pockets"][cell] is bool or not data["found_pockets"][cell] \
 				or not Terrain.can_dig(cell):
 			return "'found_pockets' has a cell that can't be dug."
-	var regrow: String = OrePocket.regrow_problem(data.get("new_pockets", []), data.get("pocket_pending", {}), data.get("found_pockets", {}))
+	var regrow: String = OrePocket.regrow_problem(data.get("new_pockets", []), data.get("pocket_pending", {}), data.get("found_pockets", {}), data.get("world_seed", 0))
 	if regrow != "":
 		return regrow
 	if data.get("stone", 0) < 0 or data.get("stone", 0) > StonePieces.MAX_STONE:
@@ -807,6 +807,11 @@ func put_farm(data: Dictionary) -> void:
 	if not data.has("pit_seep"):
 		# From before the seep: its pits were full.
 		pit_seep.assign(PitWater.work_out(dug, stone_pieces)["levels"])
+	if not data.has("pocket_pending"):
+		# From before new pockets: every dug pocket grows its replacement.
+		pocket_pending.clear()
+		for cell: Vector2i in found_pockets:
+			pocket_pending[cell] = GameClock.get_day_index() + OrePocket.REGROW_DAYS
 	_seep_days = 0.0
 	_seep_full = false
 	_morning = false
@@ -2253,7 +2258,7 @@ func add_credits(amount: int) -> void:
 ## Grows the pocket that replaces each dug one whose day has come: the host's
 ## clock only, and a guest is told. Oldest first; a draw that finds no room waits.
 func _grow_pockets(day: int) -> void:
-	if FarmCommands.guest or pocket_pending.is_empty():
+	if FarmCommands.guest or pocket_pending.is_empty() or new_pockets.size() >= OrePocket.MAX_NEW:
 		return
 	var due: Array[Vector2i] = []
 	for cell: Vector2i in pocket_pending:
@@ -2263,7 +2268,9 @@ func _grow_pockets(day: int) -> void:
 		return [pocket_pending[a], a.x, a.y] < [pocket_pending[b], b.x, b.y])
 	var changed: bool = false
 	for cell: Vector2i in due:
-		var grown: Vector2i = OrePocket.replacement(world_seed, cell, dug, found_pockets, new_pockets)
+		if new_pockets.size() >= OrePocket.MAX_NEW:
+			break  # the farm's cap: the rest stay pending
+		var grown: Vector2i = OrePocket.replacement(world_seed, cell, dug, found_pockets, new_pockets, stone_pieces)
 		if grown != OrePocket.NONE:
 			new_pockets.append(grown)
 			pocket_pending.erase(cell)

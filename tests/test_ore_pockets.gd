@@ -360,7 +360,8 @@ func test_a_save_is_refused_if_its_new_pockets_cant_be_there() -> String:
 	var cell: Vector2i = OrePocket.cells(SEED)[0]
 	var problems: PackedStringArray = []
 	var good: Dictionary = gs.farm_to_dict()
-	good["found_pockets"] = { cell: true }
+	var other: Vector2i = OrePocket.cells(SEED)[1]
+	good["found_pockets"] = { cell: true, other: true }
 	good["pocket_pending"] = { cell: 3 }
 	var fine: Vector2i = OrePocket.cells(SEED + 1)[0]
 	good["new_pockets"] = [fine]
@@ -370,6 +371,8 @@ func test_a_save_is_refused_if_its_new_pockets_cant_be_there() -> String:
 		["new_pockets", [Vector2i(9999, 0)]], ["new_pockets", [fine, fine]], ["new_pockets", ["x"]],
 		["new_pockets", {}], ["pocket_pending", { Vector2i(6, 6): 3 }], ["pocket_pending", { cell: -1 }],
 		["pocket_pending", { cell: "3" }], ["pocket_pending", []],
+		["new_pockets", [OrePocket.cells(SEED)[2]]],
+		["pocket_pending", { cell: 3, other: 3 }],
 	]
 	for bad: Array in bads:
 		var data: Dictionary = good.duplicate(true)
@@ -383,3 +386,122 @@ func test_a_save_is_refused_if_its_new_pockets_cant_be_there() -> String:
 		problems.append("A save from before new pockets must load with none.")
 	gs.free()
 	return "\n".join(problems)
+
+
+func test_an_old_save_regrows_its_dug_pockets() -> String:
+	var gs: Node = _make()
+	var cell: Vector2i = OrePocket.cells(SEED)[0]
+	var old: Dictionary = gs.farm_to_dict()
+	old["found_pockets"] = { cell: true }
+	old.erase("new_pockets")
+	old.erase("pocket_pending")
+	var loaded: Node = _make(SEED + 3)
+	if loaded.farm_from_dict(old) != "":
+		return "An old save with dug pockets must load: %s" % loaded.farm_dict_problem(old)
+	var due: int = GameClock.get_day_index() + OrePocket.REGROW_DAYS
+	if loaded.pocket_pending != { cell: due }:
+		return "An old save's dug pocket must wait REGROW_DAYS: %s" % loaded.pocket_pending
+	var day: int = GameClock.get_day_index()
+	for _morning: int in OrePocket.REGROW_DAYS:
+		day += 1
+		loaded._grow_pockets(day)
+	if loaded.new_pockets.size() != 1 or not loaded.pocket_pending.is_empty():
+		return "An old save's pocket must regrow after REGROW_DAYS mornings: %s %s" % [loaded.new_pockets, loaded.pocket_pending]
+	gs.free()
+	loaded.free()
+	return ""
+
+
+func test_a_farm_stops_growing_at_max_new() -> String:
+	var gs: Node = _make()
+	var cell: Vector2i = OrePocket.cells(SEED)[0]
+	gs.dig(Vector3i(cell.x, 0, cell.y))
+	for i: int in OrePocket.MAX_NEW:
+		gs.new_pockets.append(Vector2i(1000 + i, 0))
+	gs._grow_pockets(gs.pocket_pending[cell] + 10)
+	var problem: String = ""
+	if gs.new_pockets.size() != OrePocket.MAX_NEW or not gs.pocket_pending.has(cell):
+		problem = "A full farm must grow nothing and keep the entry pending."
+	gs.free()
+	return problem
+
+
+func test_the_morning_grows_pockets_and_a_guest_does_not() -> String:
+	var gs: Node = _make()
+	var cell: Vector2i = OrePocket.cells(SEED)[0]
+	gs.dig(Vector3i(cell.x, 0, cell.y))
+	var due: int = gs.pocket_pending[cell]
+	var held: bool = FarmCommands.guest
+	FarmCommands.guest = true
+	gs._on_day_started(due)
+	gs._grow_pockets(due)
+	FarmCommands.guest = held
+	if not gs.new_pockets.is_empty() or not gs.pocket_pending.has(cell):
+		return "A guest must not grow pockets."
+	var told: Array[int] = [0]
+	gs.pockets_changed.connect(func() -> void: told[0] += 1)
+	gs._on_day_started(due)
+	var problem: String = ""
+	if gs.new_pockets.size() != 1 or not gs.pocket_pending.is_empty() or told[0] != 1:
+		problem = "The morning must grow the pocket and say so: %s %s %d" % [gs.new_pockets, gs.pocket_pending, told[0]]
+	gs.free()
+	return problem
+
+
+func test_no_room_leaves_the_pocket_pending() -> String:
+	var gs: Node = _make()
+	var cell: Vector2i = OrePocket.cells(SEED)[0]
+	gs.dig(Vector3i(cell.x, 0, cell.y))
+	var room: Vector2i = OrePocket.replacement(SEED, cell, gs.dug, gs.found_pockets, gs.new_pockets)
+	if room == OrePocket.NONE:
+		return "The farm must have room for a pocket."
+	@warning_ignore("integer_division")
+	var limit: int = Terrain.HALF_M / Terrain.CELL_M
+	var built: Dictionary[Vector2i, int] = {}
+	for x: int in range(-limit, limit):
+		for z: int in range(-limit, limit):
+			built[Vector2i(x, z)] = 0
+	if OrePocket.replacement(SEED, cell, gs.dug, gs.found_pockets, gs.new_pockets, built) != OrePocket.NONE:
+		return "A cell under a stone piece must not get a pocket."
+	gs.stone_pieces = built
+	var due: int = gs.pocket_pending[cell]
+	gs._grow_pockets(due)
+	var problem: String = ""
+	if not gs.new_pockets.is_empty() or not gs.pocket_pending.has(cell):
+		problem = "A draw with no room must leave the pocket pending."
+	gs.free()
+	return problem
+
+
+func test_a_guest_is_told_when_only_pockets_change() -> String:
+	var host: Node = _make()
+	var cell: Vector2i = OrePocket.cells(SEED)[0]
+	host.dig(Vector3i(cell.x, 0, cell.y))
+	var guest: Node = _make()
+	var bytes: PackedByteArray = FarmSync.capture(host)
+	var held: bool = FarmCommands.guest
+	var elapsed: float = GameClock.elapsed_days
+	var open: bool = SaveGame.farm_open
+	FarmCommands.guest = true
+	var problem: String = FarmSync.update(bytes, guest)
+	FarmCommands.guest = held
+	GameClock.elapsed_days = elapsed
+	SaveGame.farm_open = open
+	if problem != "":
+		return problem
+	for field: String in ["new_pockets", "pocket_pending"]:
+		var before: Dictionary = guest.farm_to_dict()
+		var told: Array[int] = [0]
+		var listener: Callable = func() -> void: told[0] += 1
+		guest.pockets_changed.connect(listener)
+		if field == "new_pockets":
+			guest.new_pockets.append(Vector2i(50, 50))
+		else:
+			guest.pocket_pending[cell] += 1
+		FarmSync._show_changes(guest, before, false)
+		guest.pockets_changed.disconnect(listener)
+		if told[0] != 1:
+			problem += "A change to '%s' alone must emit pockets_changed. " % field
+	host.free()
+	guest.free()
+	return problem
