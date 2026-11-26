@@ -889,7 +889,8 @@ func put_farm(data: Dictionary) -> void:
 		pocket_pending.clear()
 		for cell: Vector2i in found_pockets:
 			pocket_pending[cell] = GameClock.get_day_index() + OrePocket.REGROW_DAYS
-	if not data.has("skill_curve"):
+	# A guest's copy is the host's farm as it is: only the host converts skills.
+	if not data.has("skill_curve") and not FarmCommands.guest:
 		# From the 10-level curve.
 		_convert_old_skills()
 	if not data.has("lab_areas_paid"):
@@ -900,10 +901,10 @@ func put_farm(data: Dictionary) -> void:
 		dug_paid.assign(dug)
 	# 1 is the 10-level curve, which no save says.
 	var from_curve: int = int(data["skill_curve"]) if data.has("skill_curve") else 1
-	if from_curve < 3:
+	if from_curve < 3 and not FarmCommands.guest:
 		# From before the lab level.
 		_credit_lab_from_logs()
-	if from_curve < 4:
+	if from_curve < 4 and not FarmCommands.guest:
 		# From when Robotics and Husbandry were the farm's and crops fed Field Ops.
 		_make_skills_personal()
 	skill_curve = SKILL_CURVE

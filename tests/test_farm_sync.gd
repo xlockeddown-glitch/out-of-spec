@@ -496,3 +496,30 @@ func test_a_guest_sees_the_caught_tarantula_and_old_farms_have_none() -> String:
 		if guest.farm_from_dict(loaded) != "" or not guest.enclosures.is_empty() or counts["enclosures_changed"] != 4:
 			return "A farm from before this must load with an empty tank, and be shown."
 		return "")
+
+
+func test_a_guest_refuses_a_host_on_another_skill_curve() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		if FarmSync.join(bytes, guest) != "":
+			return "A host on this build's curve must be taken."
+		var before: Dictionary = guest.farm_to_dict()
+		var mine: Dictionary = guest.player_skill_xp.duplicate(true)
+		var older: Dictionary = host.farm_to_dict()
+		older["skill_curve"] = GameStateScript.SKILL_CURVE - 1
+		older["farm_skill_xp"] = { "robotics": 5000 }
+		var none: Dictionary = host.farm_to_dict()
+		none.erase("skill_curve")
+		var newer: Dictionary = host.farm_to_dict()
+		newer["skill_curve"] = GameStateScript.SKILL_CURVE + 1
+		# A curve this build does not know is refused sooner, as a farm that can't load.
+		var unknown: PackedByteArray = SaveGame.to_bytes({ "clock": FarmSync.clock(), "farm": newer })
+		if FarmSync.join(unknown, guest) == "" or FarmSync.update(unknown, guest) == "":
+			return "A host on a curve this build does not know must be refused."
+		for farm: Dictionary in [older, none]:
+			var sent: PackedByteArray = SaveGame.to_bytes({ "clock": FarmSync.clock(), "farm": farm })
+			for answer: String in [FarmSync.join(sent, guest), FarmSync.update(sent, guest)]:
+				if answer != CoopSession.REASONS["version"] or not "another version" in answer:
+					return "A host on curve %s must be refused as another version: '%s'" % [farm.get("skill_curve"), answer]
+		if guest.player_skill_xp != mine:
+			return "A refused farm gives no XP: %s" % [guest.player_skill_xp]
+		return _differs(before, guest.farm_to_dict(), "after a refused farm"))

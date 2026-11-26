@@ -137,6 +137,10 @@ static func _read(bytes: PackedByteArray) -> Dictionary:
 	var got: Dictionary = SaveGame.from_bytes(bytes, SENDER)
 	if got.has("problem"):
 		return got
+	# The guest converts nothing (GameState.put_farm), so a farm on another skill
+	# curve would be read wrongly. The protocol number stops this first.
+	if (got["data"]["farm"] as Dictionary).get("skill_curve") != GameState.SKILL_CURVE:
+		return { "problem": CoopSession.REASONS["version"] }
 	var problem: String = _clock_problem(got["data"]["clock"])
 	return got if problem == "" else { "problem": problem }
 

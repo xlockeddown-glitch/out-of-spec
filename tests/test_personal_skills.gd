@@ -10,6 +10,9 @@ const ProfileScript: GDScript = preload("res://scripts/autoload/CoopProfile.gd")
 const GUEST: String = "player_2"
 const LATER: String = "player_3"
 const EPS: float = 1.0e-9
+## A fixture unlock on Field Ops; nothing in the data is gated on it.
+const GATE_ID: StringName = &"test_field_ops_gate"
+const GATE_LEVEL: int = 5
 
 
 func _run(body: Callable) -> String:
@@ -101,7 +104,13 @@ func _check_farm_xp(gs: GameStateScript) -> String:
 		return "A converted save must not convert again: %s" % [gs.player_skill_xp]
 	# A new save that somehow held farm XP is not a save from before.
 	again["farm_skill_xp"] = { "robotics": 99999 }
-	return "" if gs.farm_from_dict(again) == "" and gs.skill_xp("robotics") == robotics else "Only a save from before gives farm XP out."
+	if gs.farm_from_dict(again) != "" or gs.skill_xp("robotics") != robotics or gs.skill_xp("robotics", GUEST) != robotics + 500:
+		return "Only a save from before gives farm XP out."
+	# It is carried as it came, and given to nobody; the test leaves none behind.
+	if gs.farm_skill_xp != { "robotics": 99999 }:
+		return "Farm XP in a new save stays where it is: %s" % [gs.farm_skill_xp]
+	gs.farm_skill_xp.clear()
+	return "" if not (gs.farm_to_dict().get("farm_skill_xp", {}) as Dictionary).has("robotics") else "The farm XP must be gone."
 
 
 func test_a_player_keeps_the_better_xp() -> String:
@@ -172,6 +181,70 @@ func _check_gate(gs: GameStateScript) -> String:
 		return "An unlock of data/skills.json is a level to stay at."
 	if gs._gate_reached("robotics", 14) != 2 or gs._gate_reached("calibration", 99) != 10:
 		return "A robot job's card is a level to stay at."
+	# With a gate on Field Ops (a fixture, taken out after), the crop move stops there.
+	var unlocks: Dictionary = DataManager._records[&"skills"]["unlocks"]
+	unlocks[GATE_ID] = { "id": String(GATE_ID), "display_name": "Test gate", "skill": "field_ops", "level": GATE_LEVEL }
+	var out: Variant = _crop_move_at_a_gate(gs)
+	unlocks.erase(GATE_ID)
+	if DataManager.has_record(&"skills", GATE_ID, "unlocks") or gs._gate_reached("field_ops", 99) != 1:
+		return "The fixture gate must be gone."
+	return out if out is String else "The test stopped early or did not return a String."
+
+
+func _crop_move_at_a_gate(gs: GameStateScript) -> String:
+	if gs._gate_reached("field_ops", GATE_LEVEL - 1) != 1 or gs._gate_reached("field_ops", 99) != GATE_LEVEL:
+		return "The fixture gate must be read."
+	var gate: int = gs.xp_for_level(GATE_LEVEL)
+	var over: int = gs.xp_for_level(GATE_LEVEL + 3)
+	var under: int = gs.xp_for_level(GATE_LEVEL - 1)
+	# All of it is crop XP: one player is past the gate, one never reached it.
+	gs.player_skill_xp = { "player_1": { "field_ops": over }, GUEST: { "field_ops": under } }
+	gs.farm_skill_xp = {}
+	gs.action_counts = {
+		"player_1": { "sell_crop": { "count": 3, "xp": over } },
+		GUEST: { "sell_crop": { "count": 1, "xp": under } },
+	}
+	if gs.farm_from_dict(_save_at(gs, 3)) != "":
+		return "A save from before must load."
+	if gs.skill_xp("field_ops") != gate or gs.skill_level("field_ops") != GATE_LEVEL or not gs.has_skill_unlock(String(GATE_ID)):
+		return "Field Ops stops at the gate it had reached: %d XP, level %d" % [gs.skill_xp("field_ops"), gs.skill_level("field_ops")]
+	if gs.skill_xp("agronomy") != over:
+		return "Agronomy still gets all the crop XP: %d" % gs.skill_xp("agronomy")
+	if gs.skill_xp("field_ops", GUEST) != 0 or gs.skill_xp("agronomy", GUEST) != under:
+		return "Below the gate, all of it moves: %s" % [gs.player_skill_xp]
+	return ""
+
+
+func test_a_guests_copy_converts_nothing() -> String:
+	return _run(_check_guest_copy)
+
+
+func _check_guest_copy(gs: GameStateScript) -> String:
+	# A host on an older build would send this. The guest refuses it before here
+	# (FarmSync, test_farm_sync); if one got through, it must still give nothing.
+	gs.player_skill_xp = { "player_1": { "field_ops": 500 }, GUEST: { "robotics": 10 } }
+	gs.farm_skill_xp = { "robotics": 400, "instrumentation": 200 }
+	gs.action_counts = { "player_1": { "plant_crop": { "count": 9, "xp": 45 } } }
+	var lab: int = gs.lab_xp
+	var players: Dictionary = gs.player_skill_xp.duplicate(true)
+	var farm: Dictionary = gs.farm_skill_xp.duplicate(true)
+	for curve: int in [2, 3]:
+		var old: Dictionary = _save_at(gs, curve)
+		FarmCommands.guest = true
+		gs.put_farm(old)
+		FarmCommands.guest = false
+		if gs.player_skill_xp != players or gs.farm_skill_xp != farm or gs.lab_xp != lab or gs.skill_effect_floor.has(GUEST):
+			return "A guest's copy of a curve %d farm must convert nothing: %s %s" % [curve, gs.player_skill_xp, gs.farm_skill_xp]
+	var oldest: Dictionary = _save_at(gs, 3)
+	oldest.erase("skill_curve")
+	FarmCommands.guest = true
+	gs.put_farm(oldest)
+	FarmCommands.guest = false
+	if gs.player_skill_xp != players or gs.farm_skill_xp != farm:
+		return "A guest's copy of a 10-level farm must convert nothing: %s" % [gs.player_skill_xp]
+	# The host, or a solo player, does convert the same farm.
+	if gs.farm_from_dict(_save_at(gs, 3)) != "" or gs.skill_xp("robotics", GUEST) != 400 or gs.skill_xp("agronomy") != 45:
+		return "The host converts it: %s" % [gs.player_skill_xp]
 	return ""
 
 

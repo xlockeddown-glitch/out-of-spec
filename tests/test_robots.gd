@@ -3,6 +3,7 @@ extends RefCounted
 ## GameClock.elapsed_days is saved and restored; every GameState is freed.
 
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
+const CommandsScript: GDScript = preload("res://scripts/autoload/FarmCommands.gd")
 const STANDARD: String = "torque_standard"
 const SENSORS: Array[String] = ["robot_joint_encoder@TR-1", "robot_grip_torque@TR-1",
 	"robot_tank_pressure@TR-1", "robot_soil_probe@TR-1"]
@@ -99,6 +100,33 @@ func _check_gates(gs: GameStateScript) -> String:
 		return "A second robot needs more Robotics."
 	(gs.player_skill_xp.get_or_add("player_1", {}) as Dictionary)["robotics"] = gs.xp_for_level(10)
 	return gs.robot_build_problem("trellis")
+
+
+func test_a_guests_build_reads_the_guests_robotics() -> String:
+	return _run(_check_guest_build)
+
+
+func _check_guest_build(gs: GameStateScript) -> String:
+	var guest: String = "player_2"
+	var frame: Dictionary = gs.robot_frame("trellis")
+	var needs: int = int(frame["robotics_level"]) + int(frame["extra_robot_levels"])
+	_built(gs)
+	# The host could build the second robot; the guest, at level 1, could not.
+	gs.player_skill_xp = { "player_1": { "robotics": gs.xp_for_level(needs) }, guest: {} }
+	if needs < 3 or gs.robot_build_problem("trellis") != "" or gs.skill_level("robotics", guest) != 1:
+		return "The host must have the level a second robot needs: %s" % gs.robot_build_problem("trellis")
+	var commands: Node = CommandsScript.new()
+	commands.state = gs
+	var refused: Variant = commands.execute(guest, &"build_robot", ["trellis"])
+	var problem: String = ""
+	if not refused is String or not "Robotics" in refused or gs.robots.size() != 1:
+		problem = "The host's Robotics must not build for a guest at level 1: '%s'" % [refused]
+	# The other way: the guest's level builds, whatever the host's is.
+	gs.player_skill_xp = { "player_1": {}, guest: { "robotics": gs.xp_for_level(needs) } }
+	if problem == "" and (commands.execute(guest, &"build_robot", ["trellis"]) != "" or gs.robots.size() != 2):
+		problem = "A guest with the level builds, though the host has none."
+	commands.free()
+	return problem
 
 
 func test_assembly() -> String:
