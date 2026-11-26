@@ -2,6 +2,18 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-26: The recall (zones step 1)
+
+Built zones.md section 6.1 in the existing basalt tunnels. Everything below is a [PLACEHOLDER] number or an [ASSUMPTION] unless Ryan says otherwise.
+
+- **Times:** warning at 00:00, rescue at 02:00 [PLACEHOLDER]. Numbers, fee and texts are in `data/economy.json` under `tunnel_recall`; the pure cost function is `TunnelRecall.cost`.
+- **Cost:** 50 CR from the shared wallet [PLACEHOLDER] plus a third of the crystal ore gained since the rover went into the tunnels, rounded down [ASSUMPTION]. The farm has one shared pile and no ore can be gathered in the tunnels yet, so today the ore part costs nothing; ore already in the pile is never taken. It starts to bite when a zone has ore. If the wallet is short the crew takes what there is, never below 0, and the rest of the fee is waived (the morning line says so) [ASSUMPTION]. Finds that are not ore are kept. No extra drift hit.
+- **Rover:** the crew brings it to the farm pad, so a rescue never strands it. If the rover is not in the tunnels (a guest drove it out), no recall happens: the player walks out with E as today [ASSUMPTION]. The tunnels are closed to the rover from 02:00 to 06:00 with a Dispatch line, so nobody drives in to be charged at once [PLACEHOLDER].
+- **Day's end:** the rescued player counts as in bed (`CoopBeds.recall_to_bed`). Alone, the day ends at once and you wake at 06:00 as after sleeping. With friends, the day ends when everyone is in bed. Farm players are unaffected.
+- **Morning line:** a Dispatch phone line says what it cost, posted at the 06:00 rollover.
+- **Host-authoritative; guest gap [ASSUMPTION]:** the host cannot see a guest's scene (scenes are local, there is no per-player presence), so the rule runs for the host and for solo play only. If the host is rescued while a guest is in the tunnels, the guest presses E to leave and is not rescued (needs the zones step-4 presence model). A guest in the tunnels at 02:00 is not rescued and the day waits for them as it does today. Closing it needs a presence message (a PROTOCOL bump), left for Ryan to decide.
+- **Saves:** recall state is runtime-only (NOT_SAVED). SaveGame.VERSION and CoopSession.PROTOCOL are unchanged.
+
 ## 2026-11-22: Story path ("The Silk Standard")
 
 Four models drafted a story arc from the same brief without seeing each other's drafts (Claude Opus, Claude Sonnet, Fable, Gemini Hydrogen; GPT skipped under the usage limit to 2026-11-24). The drafts, the brief and the comparison are in [`story/`](story/). Ryan picked one fork at a time over six rounds. The merged story is [`story/story.md`](story/story.md).

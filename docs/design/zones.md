@@ -420,6 +420,8 @@ The all-in-bed rule stands (`CoopBeds`): the day ends when everyone is in bed, a
 Each PR logs its decisions in `docs/decisions.md` and names its placeholders.
 
 1. **The recall.** The 02:00 rescue (50 CR plus some carried ore, finds kept, rover brought home) and a 00:00 warning, working in the **existing tunnels**. A phone line; the player wakes in bed. Tests for the cost and the day's end. No new area. (The whole first rule of Ryan's decision 2; it works today.)
+
+   *Built 2026-11-26 (feat/tunnel-rescue):* `TunnelRecall` plus `GameState` hooks and `CoopBeds.recall_to_bed`; numbers in `economy.json` `tunnel_recall` [PLACEHOLDER]. Host and solo only: the host cannot see which scene a guest is in, so a guest left in the tunnels is not rescued yet (needs a presence message). See decisions.md, 2026-11-26.
 2. **Zone data.** `data/zones.json`: id, name, band, hazards, finds, hub scene, entrance. A data check. No scene. The tunnels get a row.
 3. **Soft-gate warning.** The terminal and lift line from §7.1, and the lab-level rows of §7.2 in `lab_gates`. Works on the tunnels.
 4. **Zone address and presence model.** The host tracks each player's place (`farm`, `dome`, `zone_id`, depth); the phone shows it; `rover_in_tunnels` becomes a zone id (a save and protocol change). Pure rules, no new scene. **Needs a second reviewer.** Everything below depends on it.
