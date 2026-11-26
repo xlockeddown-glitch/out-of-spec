@@ -1016,6 +1016,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	player_places.clear()
 	_recall_warned_day = 0
 	_recall_rescued_day = 0
+	_console_arrivals.clear()
 	_rescue_notes.clear()
 	_ore_at_entry = -1
 	farm_loaded.emit()
@@ -4283,7 +4284,7 @@ func move_rover(into_tunnels: bool, player_id: String = "") -> String:
 	if not into_tunnels and rover_depth > 0:
 		return "The rover must come up first."
 	if into_tunnels:
-		_console_arrivals.erase(player_id)  # the mouth's baseline is theirs
+		_console_arrivals.clear()  # a mouth entry starts a trip: the baseline is the mouth's
 		if rover_zone != "":
 			# Every refusal is behind us. Nobody is with the field rover: it goes, and the mouth is free.
 			_release_field_rover()
@@ -4293,6 +4294,8 @@ func move_rover(into_tunnels: bool, player_id: String = "") -> String:
 		if not zones_unlocked.has(TUNNELS_ZONE):
 			zones_unlocked.append(TUNNELS_ZONE)  # the first real visit opens it to the console
 	rover_in_tunnels = into_tunnels  # sets rover_lent with it
+	if not into_tunnels:
+		_console_arrivals.clear()  # the trip is over
 	rover_place_changed.emit()
 	return ""
 
@@ -4409,6 +4412,7 @@ func _release_field_rover() -> void:
 	rover_transforms.erase(TUNNEL_ROVER)
 	rover_zone = ""
 	_ore_at_entry = -1
+	_console_arrivals.clear()  # the trip is over
 	rover_epoch += 1
 
 
@@ -4496,11 +4500,13 @@ func rescue_from_tunnels(player_id: String = "") -> Dictionary:
 	if bill["ore"] > 0:
 		crystal_ore -= int(bill["ore"])
 		ore_changed.emit(crystal_ore)
-	# Only the farm's lent rover comes home, and only with nobody recorded below. A field
-	# rover is never released here: a guest fading back in may not be reported yet; the
-	# mouth, the settle and the next console arrival clean up an empty one.
-	if rover_lent and _places_in(rover_zone).is_empty():
-		bring_rover_home()  # [KNOWN LIMIT] a guest still fading in to a lent rover is a race
+	# With nobody else recorded below, the rover goes: the farm's lent one comes home, a
+	# field one is released (else the farm keeps rover_in_tunnels, and a save would send
+	# Continue and a second rescue back down). While someone is still recorded there it stays.
+	# [KNOWN LIMIT] a guest still fading in is not recorded yet: the unacknowledged
+	# airlock race (a follow-up needs host-acknowledged arrivals).
+	if rover_zone != "" and _places_in(rover_zone).is_empty():
+		bring_rover_home()  # lent: home; field: released with its scoped emit
 	post_phone(TunnelRecall.text("rescue_text") % who.to_lower())
 	var line: String
 	if bill["credits"] == 0 and bill["ore"] == 0:
@@ -4537,6 +4543,7 @@ func bring_rover_home() -> void:
 	rover_transforms.erase(TUNNEL_ROVER)
 	rover_in_tunnels = false
 	_ore_at_entry = -1
+	_console_arrivals.clear()  # the trip is over
 	rover_place_changed.emit()
 
 

@@ -339,8 +339,8 @@ func test_the_host_in_a_zone_by_fast_travel_is_carried_to_bed_at_two() -> String
 	var problems: Array[String] = []
 	if beds.put_to_bed != [me]:
 		problems.append("The host is put to bed: %s" % [beds.put_to_bed])
-	if gs.rover_zone != ZONE or not gs.rover_transforms.has(gs.TUNNEL_ROVER) or not _home_unmoved(gs):
-		problems.append("The recall never releases a console field rover; the farm rover is where it was")
+	if gs.rover_zone != "" or gs.rover_in_tunnels or gs.rover_transforms.has(gs.TUNNEL_ROVER) or not _home_unmoved(gs):
+		problems.append("A host rescued from a zone with nobody else below releases the field rover; the farm rover is where it was")
 	gs.free()
 	return "\n".join(problems)
 
@@ -965,17 +965,21 @@ func test_the_recall_charges_a_console_joiner_credits_only() -> String:
 ".join(problems)
 
 
-func test_the_recall_leaves_a_field_rover_and_brings_a_lent_one_home_only_when_empty() -> String:
+func test_the_recall_keeps_a_field_rover_for_those_below_and_brings_a_lent_one_home_only_when_empty() -> String:
 	var gs: GameStateScript = _state()
 	var me: String = _in_dome(gs)
 	_at(12.0, func() -> String:
 		gs.fast_travel(ZONE, me)
 		return "")
-	gs.player_places["player_2"] = [ZonePresence.DOME, 0]  # a guest fading back in: not reported yet
+	gs.player_places["player_2"] = [ZONE, 0]  # a guest is recorded below too
 	gs.rescue_from_tunnels(me)
 	var problems: Array[String] = []
 	if gs.rover_zone != ZONE or not gs.rover_transforms.has(gs.TUNNEL_ROVER):
-		problems.append("A field rover is not released by a recall")
+		problems.append("A field rover stays while someone else is recorded below")
+	gs.player_places["player_2"] = [ZonePresence.DOME, 0]
+	gs.rescue_from_tunnels(me)
+	if gs.rover_zone != "" or gs.rover_transforms.has(gs.TUNNEL_ROVER):
+		problems.append("A field rover is released when nobody is recorded below")
 	var lent: GameStateScript = _state()
 	lent.rover_transforms[lent.ROVER] = Transform3D(Basis.IDENTITY, lent.TUNNEL_PAD)
 	lent.move_rover(true)
@@ -1031,6 +1035,75 @@ func test_a_save_whose_trip_ended_in_a_rescue_keeps_its_unlock() -> String:
 		problems.append("A saved rescue message is a visit: %s" % [_unlocked_after_loading(old)])
 	if _unlocked_after_loading(cost) != [ZONE]:
 		problems.append("A saved recovery fee is a visit")
+	gs.free()
+	return "
+".join(problems)
+
+
+func test_stale_console_arrivals_do_not_waive_a_later_mouth_trips_ore_charge() -> String:
+	var gs: GameStateScript = _state()
+	var host: String = gs.local_player_id
+	# Trip 1: a guest lends the rover in by the mouth, the host joins by console, they drive out.
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD)
+	gs.move_rover(true, "player_2")
+	_in_dome(gs, host)
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, host)
+		return "")
+	var problems: Array[String] = []
+	if not gs._console_arrivals.has(host):
+		problems.append("The console join is noted")
+	gs.player_places.clear()
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)
+	gs.move_rover(false)
+	if not gs._console_arrivals.is_empty():
+		problems.append("Driving out ends the trip and clears the notes")
+	# Trip 2: the guest lends it in again; the host follows from the farm, no console.
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD)
+	gs.crystal_ore = 50
+	gs.move_rover(true, "player_2")
+	gs.player_places["player_2"] = [ZONE, 0]
+	gs.player_places[host] = [ZONE, 0]
+	gs.crystal_ore = 80
+	var bill: Dictionary = gs.rescue_from_tunnels(host)
+	if int(bill["ore"]) == 0:
+		problems.append("The host's rescue charges ore by the mouth baseline, not a stale console note")
+	# Every other end of a trip clears the notes too.
+	gs._console_arrivals["x"] = true
+	gs._release_field_rover()
+	if not gs._console_arrivals.is_empty():
+		problems.append("Releasing the field rover clears the notes")
+	gs._console_arrivals["x"] = true
+	gs.rover_zone = ZONE
+	gs.rover_lent = true
+	gs.bring_rover_home()
+	if not gs._console_arrivals.is_empty():
+		problems.append("Bringing the rover home clears the notes")
+	gs.free()
+	return "
+".join(problems)
+
+
+func test_solo_fast_travel_rescued_at_two_leaves_nothing_for_continue_to_send_back() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = _in_dome(gs)
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, me)
+		return "")
+	gs.recall_in_tunnels = func() -> bool: return true
+	gs.recall_beds = _NoBeds.new()
+	_at(2.0, func() -> String:
+		gs._tick_recall()
+		return "")
+	var problems: Array[String] = []
+	if gs.rover_in_tunnels:
+		problems.append("After the rescue the rover is not in the tunnels")
+	var data: Dictionary = gs.farm_to_dict()
+	var back: GameStateScript = _state()
+	back.farm_from_dict(data)
+	if back.rover_in_tunnels:
+		problems.append("A save after the rescue loads with the rover on the farm")
+	back.free()
 	gs.free()
 	return "
 ".join(problems)
