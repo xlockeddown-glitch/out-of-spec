@@ -50,6 +50,7 @@ func _ready() -> void:
 	_plan_board.clicked.connect(_plan_board_ui.open)
 	_kestrel_click.clicked.connect(_kestrel_ui.open)
 	$UI.add_child(SkillsUI.new())
+	$UI.add_child(QuestsUI.new())
 	$UI.add_child(CoopUI.new())
 	_airlock.clicked.connect(func() -> void: SceneSwitcher.swap_to(SceneSwitcher.outside))
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)

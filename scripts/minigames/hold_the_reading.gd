@@ -134,6 +134,7 @@ static func frame_step(real_seconds: float) -> float:
 
 
 func _ready() -> void:
+	add_to_group(QuestsUI.MODAL_GROUP)
 	hide()
 	set_process(false)
 	_chart.draw.connect(_draw_chart)

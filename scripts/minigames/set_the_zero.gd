@@ -105,6 +105,7 @@ static func score(coarse_stop: float, fine_stop: float, sweet_half: float) -> in
 
 
 func _ready() -> void:
+	add_to_group(QuestsUI.MODAL_GROUP)
 	hide()
 	set_process(false)
 	_scale.draw.connect(_draw_scale)

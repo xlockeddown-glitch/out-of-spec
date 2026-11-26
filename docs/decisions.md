@@ -1844,3 +1844,28 @@ Ryan decided to turn on the section 3.4 table with its numbers as they are (all 
 1. Is it right that the contract's HB-700 now waits for Tier 3 on a new farm (about 20 hours in), a long wait for a prize earned at 15?
 2. The first contract is offered by its old rule (Trusted credibility) even below level 15, as the provisional way. Or should it wait for 15?
 3. Robot 2 and the COLLECT SPOOL card need Robotics too; the lab levels 35 and 30 now sit beside the Robotics level. Keep both?
+
+## 2026-11-26: Quest log on the phone (build order step 7 of `docs/design/quests_levels_story.md`)
+
+Built from Ryan's decision of 2026-11-26: a QUESTS view opened by a key, the same way the SKILLS view opens, in the phone's current look.
+
+- **The key is O, not Q**: Ryan asked for Q, but on the farm Q is already the check with a block (`main_farm.gd`). O was free everywhere (so were I, M, P, U, X and Z). [ASSUMPTION: a free key is better than moving the block check.] It is one constant, `QuestsUI.KEY`.
+- **The look**: `QuestsUI` copies `SkillsUI`: the same panel, label and button helpers, and the same three colours, read from `SkillsUI`. No colour, font or frame was added. Like the SKILLS view it is added on the farm, in the dome and in the tunnels, closes with its key or Esc, and lets no key through while open. It does not open over the SKILLS view.
+- **What it lists**: the open quests of the player at the keyboard: the farm's (`quest_state`) and their own (`player_quest_state`), with today's daily ask. Each has a line "GIVER: Title  (kind)" and under it the first step not done, in the words `data/quests.json` already had. No word was added to the data. A daily ask says "(today)". Then DONE and the done quests, grey.
+- **One list, ordered by kind**: story, lab, personal, daily, then the file's order. Section 5.5 asks for four headed lists; with thirteen quests one list reads well enough. [ASSUMPTION]
+- **Counts**: a step that counts to more than one says "2 of 3". The count is the one the host last wrote in the quest's entry (`shown`), the same number the phone line said. The OIRM contract's step shows the farm's `contract_run`. Other steps show no count.
+- **Guests**: the list is the pure function `QuestLog.build`, which reads the quests' data, the two quest dictionaries and the contract's run, and no check. A guest has all of those from the host (`quests_changed`, `credibility_changed`), so a guest sees their own list and never runs the quest engine. A test joins a guest, empties what a check would read on the guest's copy, and compares the lists.
+- **Closed quests are left out**: a farm quest the engine closed with nothing paid (`closed_when`) was never told to the player, so it is in neither list. [ASSUMPTION] A player's quest that was done on another farm is listed as done.
+- **A daily ask of another day** is not listed, done or not.
+- **Words** [PLACEHOLDER]: "QUESTS", "DONE", "No open quests. A new one comes with the morning.", "(today)", "2 of 3".
+- **Not built**: the pin, the reward in the DONE list, a scroll bar for a long list, and any accepting or handing in from the view. No gates, no reward changes.
+- **No save or protocol change**: the save version is still 1 and the protocol still 16.
+
+### Questions for Ryan
+
+1. Q was taken by the block check, so the view is on O. Keep O, or move the block check to another key and give Q to quests?
+2. One list ordered by kind, or the four headed lists of section 5.5 (STORY, LAB, PERSONAL, TODAY)?
+3. Should the DONE list say what each quest gave (section 5.5)?
+4. Do you want the pin (one quest's next step kept on the phone, section 5.5) as its own small job?
+5. A quest the game closed without pay (its offer went stale) is hidden. Or should it show as closed?
+6. The DONE list will grow. Scroll it, or show only the last few?
