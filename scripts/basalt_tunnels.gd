@@ -327,10 +327,24 @@ func _rebuild_for_depth() -> void:
 		# The old rover node reports its pose as it leaves; make it the new one, and
 		# have the next scene's rover start there too. (A new day on the same depth
 		# keeps the rover where it is.)
-		_rover.global_transform = ZoneDepth.pose_for_depth(GameState.rover_depth)
+		_rover.global_transform = _rover_pose_for_rebuild()
 		ZoneDepth.arrive_at = _rover.global_transform
 		ZoneDepth.arrive_pending = true
 	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+
+
+## Where the rebuilt scene's rover starts: where the host says it is, if this is a
+## guest and the host has told a pose that is inside this depth's rock (so a trip
+## through the airlock that raced a console re-park does not put the rover by the
+## hatch while it is at the hub start); else where a depth starts it.
+func _rover_pose_for_rebuild() -> Transform3D:
+	var fallback: Transform3D = ZoneDepth.pose_for_depth(GameState.rover_depth)
+	if not FarmCommands.guest:
+		return fallback
+	var told: Variant = CoopRovers.told_pose(GameState.TUNNEL_ROVER)
+	if told is Transform3D and TunnelRock.holds_in(ZoneDepth.grid_for(GameState.rover_depth, GameState.world_seed, GameClock.get_day_index()), (told as Transform3D).origin):
+		return told
+	return fallback
 
 
 ## Not left to a signal, which a busy swap can swallow and a later snapshot with the

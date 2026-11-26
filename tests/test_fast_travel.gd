@@ -569,3 +569,180 @@ func test_the_airlock_does_not_lead_to_a_zone_in_the_closed_hours() -> String:
 func test_the_airlock_waits_while_a_trip_is_pending() -> String:
 	FastTravel.pending = false
 	return "" if not FastTravel.pending else "No request is out by default"
+
+
+# --- Review round two -----------------------------------------------------------------------
+
+func _old_save(gs: GameStateScript) -> Dictionary:
+	var old: Dictionary = gs.farm_to_dict()
+	old.erase("zones_unlocked")
+	return old
+
+
+func _unlocked_after_loading(data: Dictionary) -> Array:
+	var loaded: GameStateScript = GameStateScript.new()
+	loaded.build_registry()
+	var problem: String = loaded.farm_from_dict(bytes_to_var(var_to_bytes(data)))
+	var got: Array = loaded.zones_unlocked.duplicate()
+	loaded.free()
+	return got if problem == "" else ["problem: " + problem]
+
+
+func test_an_older_save_that_came_home_from_the_tubes_keeps_its_unlock() -> String:
+	var gs: GameStateScript = _state()
+	var problems: Array[String] = []
+	if not _unlocked_after_loading(_old_save(gs)).is_empty():
+		problems.append("A farm that never went has nothing unlocked")
+	var with_pose: Dictionary = _old_save(gs)
+	(with_pose["rover_transforms"] as Dictionary)[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)  # the old way home kept it
+	if _unlocked_after_loading(with_pose) != [ZONE]:
+		problems.append("A kept tunnel-rover pose is a visit: %s" % [_unlocked_after_loading(with_pose)])
+	var found: Dictionary = _old_save(gs)
+	found["finds_taken"] = ZoneDepth.with_taken({}, ZONE, 1, ZoneDepth.find_id(0))
+	if _unlocked_after_loading(found) != [ZONE]:
+		problems.append("A find taken there is a visit: %s" % [_unlocked_after_loading(found)])
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_a_guest_clears_only_the_rover_that_changed() -> String:
+	var gs: GameStateScript = _state()
+	var scopes: Array[String] = []
+	var listener: Callable = func() -> void: scopes.append(gs.rover_place_scope)
+	gs.rover_place_changed.connect(listener)
+	var before: Dictionary = gs.farm_to_dict()
+	gs.rover_zone = ZONE
+	gs.rover_epoch += 1
+	FarmSync._show_changes(gs, before, false)
+	before = gs.farm_to_dict()
+	gs.zones_unlocked.clear()
+	FarmSync._show_changes(gs, before, false)
+	before = gs.farm_to_dict()
+	gs.rover_in_tunnels = true  # the farm's own rover goes out
+	FarmSync._show_changes(gs, before, false)
+	gs.rover_place_changed.disconnect(listener)
+	var problems: Array[String] = []
+	if scopes != [gs.TUNNEL_ROVER, "unlock", ""]:
+		problems.append("A field rover starting touches its own; an unlock touches none; the farm rover going touches all: %s" % [scopes])
+	if gs.rover_place_scope != "":
+		problems.append("The scope is not left set")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_another_rover_s_change_does_not_reset_a_controller() -> String:
+	var source: String = FileAccess.get_file_as_string("res://scripts/rover/rover_controller.gd")
+	return "" if "only != rover_id" in source else "A rover's controller ignores another rover's scoped change"
+
+
+func test_leaving_the_zone_reads_the_rover_where_it_is_now() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = _in_dome(gs)
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, me)
+		return "")
+	# Continued from a save made off the pad: the parked pose is old, the rover's is live.
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3(-1.5, 0.05, 10.0))
+	var live: Callable = func() -> void:
+		gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)  # what the controller parks
+	SaveGame.saving.connect(live)
+	var problem: String = gs.leave_zone(me)
+	SaveGame.saving.disconnect(live)
+	var bad: bool = problem != "" or gs.place_of(me) != ZonePresence.DOME
+	gs.free()
+	return "Driven onto the pad, E leaves (%s)" % problem if bad else ""
+
+
+func test_nothing_leaves_the_dome_while_a_trip_is_pending() -> String:
+	var problems: Array[String] = []
+	FastTravel.pending = true
+	if not SceneSwitcher.trip_holds_dome(SceneSwitcher.DOME_SCENE):
+		problems.append("Tab, the airlock and every swap out of the dome wait")
+	if SceneSwitcher.trip_holds_dome(SceneSwitcher.FARM_SCENE):
+		problems.append("Only the dome is held")
+	FastTravel.pending = false
+	if SceneSwitcher.trip_holds_dome(SceneSwitcher.DOME_SCENE):
+		problems.append("Free once answered")
+	return "\n".join(problems)
+
+
+func test_a_joiner_does_not_inherit_the_lender_s_ore_baseline() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = _in_dome(gs)
+	gs.crystal_ore = 7
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD)
+	gs.move_rover(true, "player_2")  # a guest lends the farm rover in
+	gs.player_places["player_2"] = [ZONE, 0]
+	gs.crystal_ore = 90
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, me)  # the host joins it by the console
+		return "")
+	var carried: int = gs.ore_carried_in()
+	gs.free()
+	return "" if carried == 0 else "A console rescue takes no ore (%d)" % carried
+
+
+func test_a_refused_mouth_entry_leaves_the_field_rover_and_a_good_one_says_it_went() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZONE  # live, nobody with it
+	gs.rover_transforms[gs.TUNNEL_ROVER] = gs.TUNNEL_START
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD)
+	var epoch: int = gs.rover_epoch
+	var refused: Array[String] = []
+	_at(3.0, func() -> String:
+		refused.append(gs.move_rover(true))
+		return "")
+	var problems: Array[String] = []
+	if refused[0] == "" or gs.rover_zone != ZONE or gs.rover_epoch != epoch or not gs.rover_transforms.has(gs.TUNNEL_ROVER):
+		problems.append("At 03:00 the refusal changes nothing")
+	var scopes: Array[String] = []
+	var listener: Callable = func() -> void: scopes.append(gs.rover_place_scope)
+	gs.rover_place_changed.connect(listener)
+	_at(12.0, func() -> String:
+		gs.move_rover(true)
+		return "")
+	gs.rover_place_changed.disconnect(listener)
+	if scopes.size() < 2 or scopes[0] != gs.TUNNEL_ROVER:
+		problems.append("Freeing the field rover says so, scoped: %s" % [scopes])
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_the_host_s_told_pose_is_what_a_rebuilt_scene_uses() -> String:
+	var session: Node = _session()
+	var gs: GameStateScript = session.commands.state
+	var rovers: Node = RoversScript.new()
+	rovers.start(session, gs)
+	var problems: Array[String] = []
+	if rovers.told_pose(gs.TUNNEL_ROVER) != null:
+		problems.append("Nothing told yet")
+	rovers._poses[gs.TUNNEL_ROVER] = [[1.0, 0.05, 2.0, 0.0, 0.0, true], 0]
+	var told: Variant = rovers.told_pose(gs.TUNNEL_ROVER)
+	if not told is Transform3D or (told as Transform3D).origin.x != 1.0:
+		problems.append("The pose is given")
+	rovers._forget()
+	if rovers.told_pose(gs.TUNNEL_ROVER) != null:
+		problems.append("A change of place forgets it")
+	var source: String = FileAccess.get_file_as_string("res://scripts/basalt_tunnels.gd")
+	if not "_rover_pose_for_rebuild()" in source or not "told_pose" in source:
+		problems.append("The rebuild asks for it")
+	rovers.free()
+	return _finish("\n".join(problems))
+
+
+func test_an_open_console_lists_a_zone_unlocked_while_it_is_open() -> String:
+	var held: Array[String] = GameState.zones_unlocked.duplicate()
+	GameState.zones_unlocked.clear()
+	var ui := FastTravelUI.new()
+	(Engine.get_main_loop() as SceneTree).root.add_child(ui)
+	ui.open()
+	GameState.zones_unlocked.append(ZONE)
+	GameState.rover_place_changed.emit()
+	var rows: int = 0
+	for row: Node in ui._rows.get_children():
+		if row is HBoxContainer and not row.is_queued_for_deletion():
+			rows += 1
+	ui.get_parent().remove_child(ui)
+	ui.free()
+	GameState.zones_unlocked.assign(held)
+	return "" if rows == 1 else "The unlock appears without reopening (%d rows)" % rows

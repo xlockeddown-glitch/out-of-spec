@@ -50,6 +50,12 @@ func exit_path() -> String:
 	return outside
 
 
+## True if `scene_path` is the dome and a console request is out: nothing leaves the
+## dome until it is answered, whatever the way (Tab, the airlock, the phone).
+func trip_holds_dome(scene_path: String) -> bool:
+	return FastTravel.pending and scene_path == DOME_SCENE
+
+
 ## Like swap_to, but after a swap in progress instead of not at all.
 func go_to(path: String) -> void:
 	while _busy:
@@ -65,6 +71,9 @@ func is_busy() -> bool:
 func swap_to(path: String) -> void:
 	if _busy:
 		return
+	var current: Node = get_tree().current_scene
+	if trip_holds_dome(current.scene_file_path if current != null else ""):
+		return  # a console trip the host may have agreed to has not got its answer: the dome stays
 	_busy = true
 	if path != TUNNELS_SCENE:
 		# Anywhere but the tunnels, no screen is below them.

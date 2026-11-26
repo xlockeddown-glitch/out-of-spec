@@ -46,7 +46,14 @@ func _ready() -> void:
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_close_button.pressed.connect(close)
 	column.add_child(_close_button)
+	GameState.rover_place_changed.connect(_on_place_changed)
 	hide()
+
+
+## The unlock list may arrive while the panel is open (a teammate's first visit).
+func _on_place_changed() -> void:
+	if visible and not _going:
+		_refresh()
 
 
 func _unhandled_input(event: InputEvent) -> void:

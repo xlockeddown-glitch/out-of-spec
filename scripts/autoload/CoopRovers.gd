@@ -146,6 +146,12 @@ func place(rover_id: String, lead_s: float = 0.0, now: int = Time.get_ticks_msec
 	return at
 
 
+## The pose the host last told for a rover, or null. A change of place forgets
+## these, so one that is here is from the rover's present epoch.
+func told_pose(rover_id: String) -> Variant:
+	return place(rover_id) if _poses.has(rover_id) else null
+
+
 func has_place(rover_id: String) -> bool:
 	return _poses.has(rover_id) or farm.rover_transforms.has(rover_id)
 

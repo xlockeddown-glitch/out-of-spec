@@ -194,7 +194,25 @@ static func _show_changes(farm: Node, before: Dictionary, new_day: bool) -> void
 		for field: String in SHOWN_BY[shown]:
 			changed = changed or farm.get(field) != before[field]
 		if changed:
-			_emit(farm, shown)
+			if shown == &"rover_place_changed":
+				farm.rover_place_scope = _place_scope(farm, before)  # as the host's own emit says it
+				_emit(farm, shown)
+				farm.rover_place_scope = ""
+			else:
+				_emit(farm, shown)
+
+
+## Which rover a rover_place_changed is about, worked out from what moved: the farm
+## rover going out or coming home touches every rover (""); a zone's field rover
+## starting, going or changing depth touches the zone's alone; only a new unlock
+## touches none (a name no rover has).
+static func _place_scope(farm: Node, before: Dictionary) -> String:
+	if farm.rover_lent != before["rover_lent"]:
+		return ""
+	for field: String in ["rover_zone", "rover_depth", "rover_epoch"]:
+		if farm.get(field) != before[field]:
+			return farm.TUNNEL_ROVER
+	return "unlock"
 
 
 ## True if the pads level the ground differently than they did: the ground is not

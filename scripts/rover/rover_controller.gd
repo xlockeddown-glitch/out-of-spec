@@ -358,6 +358,11 @@ func away_text() -> String:
 
 ## The one rover is on the farm or in the tunnels. In the other scene it is gone.
 func _show_place() -> void:
+	# A change that is another rover's alone (a field rover starting or going) leaves
+	# this one, and whoever is driving it, as it is.
+	var only: String = GameState.rover_place_scope
+	if only != "" and only != rover_id:
+		return
 	var away: bool = GameState.rover_is_away(rover_id)
 	visible = not away
 	process_mode = Node.PROCESS_MODE_DISABLED if away else Node.PROCESS_MODE_INHERIT
