@@ -17,8 +17,9 @@ var _move_granted: bool = false
 ## The cup can reach the Cobalt Sentinel.
 var _in_reach: bool = false
 var _told_reach: bool = false
-## What _hub_near calls the way down and a find below.
+## What _hub_near calls a way down, a lift station and a find below.
 const HATCH: String = "hatch"
+const LIFT: String = "lift"
 const FIND: String = "find"
 
 ## The rack, the board or a beacon spot the rover is by (LavaHub.nearest), or {}.
@@ -28,7 +29,7 @@ var _told_hub: String = ""
 ## it is not kept if they leave the tunnels].
 var _holding_beacon: bool = false
 var _props: LavaHubProps
-## This player is below, in the first depth (ZoneDepth), not in the hub.
+## This player is below, in one of the depths (ZoneDepth), not in the hub.
 var _below: bool = false
 ## The depth and the day this scene was built for. The rover's depth, or the day,
 ## changing means the scene is built again.
@@ -66,8 +67,10 @@ func _ready() -> void:
 	if _below:
 		# The depth has its own finds, and none of the hub's rack, board or beacons.
 		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
-		_vents = ZoneHazards.vents_for(GameState.world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, _built_day)
+		_vents = ZoneHazards.vents_for(GameState.world_seed, ZoneDepth.ZONE, _built_depth, _built_day)
 		_depth_props.build_vents(_vents)
+		if ZoneDepth.has_way_down(_built_depth):
+			_depth_props.build_hatch(_built_depth)
 		GameState.finds_changed.connect(_on_finds_changed)
 		var wild: Node = get_node_or_null("WorldView/WorldViewport/World/WildSentinel")
 		if wild != null:
@@ -77,6 +80,10 @@ func _ready() -> void:
 		_props = LavaHubProps.new()
 		_rover.get_parent().add_child(_props)
 		GameState.beacons_changed.connect(_on_beacons_changed)
+	# The lift station: at the hub, and at the depth that has one. Broken until repaired.
+	if ZoneDepth.is_lift_depth(_built_depth) or _built_depth == 0:
+		_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth()))
+		GameState.lifts_changed.connect(_on_lifts_changed)
 	_hud.set_lights(GameState.rover_lights)
 	GameState.rover_lights_changed.connect(_show_lights)
 	var pause := PauseUI.new()
@@ -145,8 +152,8 @@ func _process(_delta: float) -> void:
 		_hub_near = _nearest_find() if rover_free else {}
 	else:
 		_hub_near = LavaHub.nearest(_rover.global_position, GameState.beacons_placed, spot_wins) if rover_free and not catching else {}
-		if _hub_near.is_empty() and rover_free and not catching and ZoneDepth.near_descent(_rover.global_position):
-			_hub_near = { "kind": HATCH, "id": "" }
+	if _hub_near.is_empty() and rover_free and not catching:
+		_hub_near = _station_near()
 	_tell_hub()
 	if _below:
 		_watch_vents(rover_free)
@@ -243,6 +250,8 @@ func _tell_hub() -> void:
 			_hud.push_log("BEACON SPOT: press E to set a beacon down.")
 		HATCH:
 			_hud.push_log("WAY DOWN: press E to go down.")
+		LIFT:
+			_hud.push_log(_lift_prompt())
 		FIND:
 			_hud.push_log("FIND: press E to take it.")
 
@@ -259,6 +268,8 @@ func _use_hub(target: Dictionary) -> void:
 			_use_spot(str(target["id"]))
 		HATCH:
 			_go_down()
+		LIFT:
+			_use_lift()
 		FIND:
 			_use_find(str(target["id"]))
 
@@ -337,16 +348,60 @@ func _use_find(find_id: String) -> void:
 	_hud.push_log("FIND: " + ZoneDepth.reward_text(str(find.get("kind", ""))))
 
 
-## Down the hatch: the host takes the one rover down (to the start below, with its
+## The depth whose lift this screen shows: the hub's (0) goes to the deepest repaired
+## one; below, the depth's own.
+func _lift_depth() -> int:
+	return GameState.repaired_lift_depth(ZoneDepth.ZONE) if _built_depth == 0 else _built_depth
+
+
+## The way down or the lift the rover is by (below: only if the depth has one), or {}.
+func _station_near() -> Dictionary:
+	var at: Vector3 = _rover.global_position
+	if ZoneDepth.has_way_down(_built_depth) and ZoneDepth.near_descent(at, _built_depth):
+		return { "kind": HATCH, "id": "" }
+	if (_built_depth == 0 or ZoneDepth.is_lift_depth(_built_depth)) and ZoneDepth.near_lift(at, _built_depth):
+		return { "kind": LIFT, "id": "repaired" if GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth()) else "broken" }
+	return {}
+
+
+func _lift_prompt() -> String:
+	var repaired: bool = GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth())
+	if repaired:
+		return "LIFT: press E to ride it %s." % ("up to the hub" if _built_depth > 0 else "down to depth %d" % _lift_depth())
+	if _built_depth > 0:
+		return "LIFT: broken. Press E to repair it. %s" % ZoneDepth.repair_cost_text()
+	return "LIFT: broken. It is repaired from its far end, at depth %d." % ZoneDepth.MAX_DEPTH
+
+
+## E at a lift: repair it where it is broken (below), or ride it. The host decides.
+func _use_lift() -> void:
+	if _built_depth > 0 and not GameState.is_lift_repaired(ZoneDepth.ZONE, _built_depth):
+		var problem: String = await FarmCommands.request(&"repair_lift", [])
+		if not is_inside_tree():
+			return
+		if problem != "":
+			_hud.push_log("LIFT: " + problem)
+		return  # the phone says it was repaired; lifts_changed redraws the lift
+	_ride_lift()
+
+
+## The lift was repaired, here or by a friend: draw it so.
+func _on_lifts_changed() -> void:
+	_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth()))
+	_told_hub = ""  # the prompt changed
+	_hud.set_credibility(GameState.credibility_text(), GameState.contract_phone_text(), GameState.lab_phone_text())  # the deepest depth
+
+
+## Down a hatch: the host takes the one rover down (to the start below, with its
 ## driver). Nothing here changes until the host says yes; then every screen in the
 ## tunnels builds the depth from the rover's (_on_rover_place_changed).
 func _go_down() -> void:
-	_change_depth(ZoneDepth.DEPTH)
+	_change_depth(_built_depth + 1)
 
 
-## Up again: the host brings the rover out by the hatch in the hub.
+## Up again: the host brings the rover out by the hatch above, or in the hub.
 func _go_up() -> void:
-	_change_depth(0)
+	_change_depth(_built_depth - 1)
 
 
 func _change_depth(target: int) -> void:
@@ -354,14 +409,31 @@ func _change_depth(target: int) -> void:
 		return
 	_moving = true
 	var problem: String = await FarmCommands.request(&"change_depth", [target])
+	_finish_move(problem, "WAY DOWN: " if target > _built_depth else "WAY UP: ")
+
+
+## The lift's ride, asked of the host the same way.
+func _ride_lift() -> void:
+	if _moving or SceneSwitcher.is_busy():
+		return
+	_moving = true
+	var target: int = 0 if _built_depth > 0 else _lift_depth()  # where this screen means to go
+	var problem: String = await FarmCommands.request(&"use_lift", [target])
+	_finish_move(problem, "LIFT: ")
+
+
+## The host's answer to a move of the rover between depths.
+func _finish_move(problem: String, prefix: String) -> void:
 	if not is_inside_tree():
 		return
 	if problem != "":
 		_moving = false
-		_hud.push_log(("WAY DOWN: " if target > 0 else "WAY UP: ") + problem)
+		_hud.push_log(prefix + problem)
 		return
 	# A guest's copy of the farm may come after the host's yes.
 	_on_rover_place_changed()
+	if not SceneSwitcher.is_busy():
+		_moving = false  # no rebuild or swap began (the rover is at this depth already)
 
 
 ## The rover's depth is not the one this scene was built for: it is built again, with
@@ -381,16 +453,15 @@ func _rebuild_for_depth() -> void:
 
 
 ## Where the rebuilt scene's rover starts: where the rover is, if that is inside
-## this depth's rock. A guest has the host's told pose; the host has its parked one,
+## this depth's rock. A guest has the host's told pose, or else (a depth change clears
+## it) the pose the host's snapshot parked; the host has its parked one,
 ## which counts only if the rover has a pose at all, and it lies inside this depth's
 ## rock (so a trip through the airlock that raced a console re-park does not put the
 ## rover by the hatch while it is at the hub start; a depth change parks a pose of
 ## its own, so the hatch is for when none is valid); else where a depth starts it.
 func _rover_pose_for_rebuild() -> Transform3D:
-	var known: Variant = null
-	if FarmCommands.guest:
-		known = CoopRovers.told_pose(GameState.TUNNEL_ROVER)
-	elif GameState.rover_transforms.has(GameState.TUNNEL_ROVER):
+	var known: Variant = CoopRovers.told_pose(GameState.TUNNEL_ROVER) if FarmCommands.guest else null
+	if known == null and GameState.rover_transforms.has(GameState.TUNNEL_ROVER):
 		known = GameState.parked_rover_transform(GameState.TUNNEL_ROVER)
 	return ZoneDepth.rebuild_pose(known, GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
 
@@ -506,7 +577,7 @@ func _on_fill_rejected(reason: String) -> void:
 
 
 func _on_credibility_changed(_points: int) -> void:
-	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text(), GameState.lab_phone_text())
+	_hud.set_credibility(GameState.credibility_text(), GameState.contract_phone_text(), GameState.lab_phone_text())
 	_refresh_jobs_hud()
 
 

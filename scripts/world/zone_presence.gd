@@ -7,9 +7,8 @@ extends RefCounted
 
 const FARM: String = "farm"
 const DOME: String = "dome"
-## The deepest a report may say [PLACEHOLDER]. Depth 1 is the first generated one
-## (ZoneDepth); a later depth PR raises this.
-const MAX_DEPTH: int = 1
+## The deepest a report may say [PLACEHOLDER]: the deepest ZoneDepth generates.
+const MAX_DEPTH: int = ZoneDepth.MAX_DEPTH
 ## The place of someone the host has not heard from: everyone starts on the farm.
 const DEFAULT_PLACE: String = FARM
 const NOT_YOURS: String = "A place is reported by the player who is there."

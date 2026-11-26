@@ -16,6 +16,8 @@ signal rover_lights_changed
 signal beacons_changed
 ## A find was taken below the Lava Tubes.
 signal finds_changed
+## A lift was repaired, or the deepest depth reached in a zone grew.
+signal lifts_changed
 signal relay_changed(slotted: bool)
 signal calibration_recorded(record: Dictionary)
 signal phone_message(text: String)
@@ -189,6 +191,12 @@ var beacons_placed: Array[String] = []
 ## The finds taken below the Lava Tubes: zone id -> { "day", "ids" } (ZoneDepth).
 ## Only today's count; a record of a past day is dropped. Shared by the farm.
 var finds_taken: Dictionary = {}
+## The lift stations repaired, for good: zone id -> Array of the depths (ZoneDepth).
+## Never reset, never expires. Shared by the farm.
+var lifts_repaired: Dictionary = {}
+## The deepest depth the farm's rover has reached in each zone: zone id -> depth.
+## Only ever grows. Shown on the phone. Shared by the farm.
+var deepest_depth: Dictionary = {}
 var optical_silk_spools: int = 0
 var relay_slotted: bool = false
 ## Species that spun the spool now in the relay (its lag_reduction_pct stacks).
@@ -687,7 +695,8 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
-	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked"]
+	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
+	"lifts_repaired", "deepest_depth"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -742,6 +751,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return LavaHub.placed_problem(data["beacons_placed"])
 	if data.has("finds_taken") and ZoneDepth.taken_problem(data["finds_taken"]) != "":
 		return ZoneDepth.taken_problem(data["finds_taken"])
+	if data.has("lifts_repaired") and ZoneDepth.lifts_problem(data["lifts_repaired"]) != "":
+		return ZoneDepth.lifts_problem(data["lifts_repaired"])
+	if data.has("deepest_depth") and ZoneDepth.deepest_problem(data["deepest_depth"]) != "":
+		return ZoneDepth.deepest_problem(data["deepest_depth"])
 	var beacon_steps: String = LavaHub.steps_problem(QuestEngine.quests(), data.get("quest_state", {}), (data.get("beacons_placed", []) as Array).size())
 	if beacon_steps != "":
 		return beacon_steps
@@ -803,7 +816,7 @@ func farm_dict_problem(data: Dictionary) -> String:
 	if data.has("rover_epoch") and data["rover_epoch"] is int and data["rover_epoch"] < 0:
 		return "'rover_epoch' is out of range."
 	var depth: Variant = data.get("rover_depth", 0)
-	if depth is int and (depth < 0 or depth > ZoneDepth.DEPTH):
+	if depth is int and (depth < 0 or depth > ZoneDepth.MAX_DEPTH):
 		return "'rover_depth' is out of range."
 	if depth is int and depth > 0 and data.get("rover_zone", "") != TUNNELS_ZONE:
 		return "'rover_depth' is set for a rover that is not in the Lava Tubes."
@@ -1058,6 +1071,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	rover_place_changed.emit()
 	sentinel_changed.emit()
 	rover_lights_changed.emit()
+	lifts_changed.emit()
 	return ""
 
 
@@ -1102,6 +1116,8 @@ func put_farm(data: Dictionary) -> void:
 		rover_lent = rover_zone != ""
 	if not data.has("zones_unlocked") and _has_been_to_tunnels(data) and not zones_unlocked.has(TUNNELS_ZONE):
 		zones_unlocked.append(TUNNELS_ZONE)  # it has been in there
+	if not data.has("deepest_depth") and rover_zone != "" and rover_depth > 0:
+		deepest_depth[rover_zone] = rover_depth  # a save from before the record: where the rover is counts
 	_level_pads()
 	if not data.has("stone"):
 		# From before stone, so its broken boulders gave none.
@@ -4203,38 +4219,141 @@ func settle_rover_depth(refresh: bool = true) -> bool:
 	return true
 
 
-## Host: the rover goes down the hatch (to 1) or up the way up (to 0), for the
-## player who drives it, or for the host or solo player when nobody does. `player_id`
-## is filled in from the connection (FarmCommands). Returns "" or why not. The rover
-## is in the Lava Tubes and, going down, within reach of the hatch in the hub or,
-## going up, of the way up below (today's layout); the depth is one that exists and
-## one step away. The rover then starts at the new depth (below: the start cell; up:
-## beside the hatch), and every screen rebuilds the tunnels from rover_depth.
+## Host: the rover goes down a hatch (to the next depth) or up the way up (to the one
+## above), for the player who drives it, or for the host or solo player when nobody
+## does. `player_id` is filled in from the connection (FarmCommands). Returns "" or why
+## not. The rover is in the Lava Tubes and, going down, within reach of the hatch (the
+## hub's at depth 0, the trunk's at depths 1 and 2) or, going up, of the way up below
+## (today's layout); the depth is one that exists and one step away (depth 3 has no way
+## down). The rover then starts at the new depth (down: the start cell; up: beside the
+## hatch it comes up by), and every screen rebuilds the tunnels from rover_depth.
 func change_depth(target_depth: int, player_id: String = "") -> String:
+	var reason: String = _rover_trip_problem(player_id)
+	if reason != "":
+		return reason
+	if target_depth < 0 or target_depth > ZoneDepth.MAX_DEPTH or absi(target_depth - rover_depth) != 1:
+		return "There is no way there from here."
+	var going_down: bool = target_depth > rover_depth
+	var there: Vector3 = ZoneDepth.descent_position(rover_depth) if going_down else ZoneDepth.ascent_position()
+	reason = _rover_reach_problem(there)
+	if reason != "":
+		return reason
+	_move_rover_to(target_depth, ZoneDepth.arrival_pose(target_depth, going_down, false))
+	return ""
+
+
+## Host: the checks every move of the rover between depths has to pass: it is in the
+## Lava Tubes, and `player_id` may take it. Nobody holds the lease (it ends half a
+## second after the rover stops): the host and solo player, or a player who is in the
+## tunnels at the rover's depth; or, while someone drives, that player. Returns "" or why.
+func _rover_trip_problem(player_id: String) -> String:
 	if rover_zone != TUNNELS_ZONE:
 		return "The rover is not in the Lava Tubes."
 	var driver: String = CoopRovers.driver(TUNNEL_ROVER)
 	if driver == "":
-		# Nobody holds the lease (it ends half a second after the rover stops): the
-		# host and solo player, or a player who is in the tunnels at the rover's depth.
 		var here: bool = place_of(player_id) == TUNNELS_ZONE and depth_of(player_id) == rover_depth
 		if not player_id in ["", local_player_id] and not here:
 			return "Only someone with the rover can take it up or down."
 	elif driver != player_id:
 		return "Someone else is driving the rover."
-	if target_depth < 0 or target_depth > ZoneDepth.DEPTH or absi(target_depth - rover_depth) != 1:
-		return "There is no way there from here."
-	SaveGame.saving.emit()  # the rover on this screen says where it is
-	var known: bool = rover_transforms.has(TUNNEL_ROVER)
-	var at: Vector3 = parked_rover_transform(TUNNEL_ROVER).origin
-	var there: Vector3 = ZoneDepth.descent_position() if target_depth > rover_depth else ZoneDepth.ascent_position()
-	var reason: String = ZoneDepth.reach_problem(there, rover_zone, known, at)
+	return ""
+
+
+## Host: why the tunnel rover is not within reach of `there` (where the rover is now:
+## what a guest's driver told, this screen's own live rover, or the kept pose), or "".
+## No SaveGame.saving here: it would make a screen whose rover has not caught up yet
+## overwrite the pose a guest has driven to.
+func _rover_reach_problem(there: Vector3) -> String:
+	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+	return ZoneDepth.reach_problem(there, rover_zone, at != null, at if at != null else Vector3.ZERO)
+
+
+## Host: puts the rover at `target_depth` at `pose` and tells everyone.
+func _move_rover_to(target_depth: int, pose: Transform3D) -> void:
+	rover_depth = target_depth
+	rover_transforms[TUNNEL_ROVER] = pose
+	rover_epoch += 1
+	_note_depth(rover_zone, target_depth)
+	_emit_field_rover_changed()
+
+
+## The deepest depth reached in `zone` grows to `depth` if it is deeper than before.
+func _note_depth(zone: String, depth: int) -> void:
+	if zone == "" or depth <= int(deepest_depth.get(zone, 0)):
+		return
+	deepest_depth[zone] = depth
+	lifts_changed.emit()
+
+
+## True if the lift at `depth` of `zone` has been repaired.
+func is_lift_repaired(zone: String, depth: int) -> bool:
+	var depths: Variant = lifts_repaired.get(zone, [])
+	return depths is Array and depth in (depths as Array)
+
+
+## The deepest repaired lift of `zone` (the one the hub's lift goes to), or 0 if none.
+func repaired_lift_depth(zone: String) -> int:
+	var best: int = 0
+	for depth: int in ZoneDepth.lift_depths():
+		if is_lift_repaired(zone, depth):
+			best = maxi(best, depth)
+	return best
+
+
+## Host: the farm's players fix the broken lift where the rover is: one time, for the
+## whole farm, for good. `player_id` is filled in from the connection. Returns "" or why
+## not. The player is in the Lava Tubes at a depth with a lift, the rover is there and
+## within reach of the lift, the lift is not repaired yet, and the shared wallet and
+## stock hold the cost (ZoneDepth.LIFT_COST_CREDITS and LIFT_COST_ORE, taken once).
+func repair_lift(player_id: String = "") -> String:
+	var depth: int = depth_of(player_id) if player_id != "" else rover_depth
+	if player_id != "" and place_of(player_id) != TUNNELS_ZONE:
+		return "The lift is below the Lava Tubes."
+	if not ZoneDepth.is_lift_depth(depth) or rover_zone != TUNNELS_ZONE or rover_depth != depth:
+		return "There is no lift to repair here."
+	if is_lift_repaired(TUNNELS_ZONE, depth):
+		return "The lift is repaired already."
+	var reason: String = _rover_reach_problem(ZoneDepth.lift_position(depth))
 	if reason != "":
 		return reason
-	rover_depth = target_depth
-	rover_transforms[TUNNEL_ROVER] = ZoneDepth.pose_for_depth(target_depth)
-	rover_epoch += 1
-	_emit_field_rover_changed()
+	if credits < ZoneDepth.LIFT_COST_CREDITS or crystal_ore < ZoneDepth.LIFT_COST_ORE:
+		return ZoneDepth.repair_cost_text() + " The farm does not have it yet."
+	add_credits(-ZoneDepth.LIFT_COST_CREDITS)
+	crystal_ore -= ZoneDepth.LIFT_COST_ORE
+	ore_changed.emit(crystal_ore)
+	var depths: Array = (lifts_repaired.get(TUNNELS_ZONE, []) as Array).duplicate()
+	depths.append(depth)
+	lifts_repaired[TUNNELS_ZONE] = depths
+	lifts_changed.emit()
+	post_phone("LIFT: repaired for good (depth %d). The hub's lift now comes here." % depth)
+	return ""
+
+
+## Host: the rover (and whoever is in the tunnels) takes the lift: from the hub down
+## to the deepest repaired lift's entrance, or from a depth with a repaired lift up
+## to the hub. Free once repaired. Same checks as change_depth (`_rover_trip_problem`),
+## then the rover is within reach of the lift it takes. `target_depth` is where the
+## screen means to go: a request that was raced by another move (the lift would take the
+## rover somewhere else now) is refused rather than undone. Returns "" or why not.
+func use_lift(target_depth: int, player_id: String = "") -> String:
+	var reason: String = _rover_trip_problem(player_id)
+	if reason != "":
+		return reason
+	var target: int = 0
+	if rover_depth == 0:
+		target = repaired_lift_depth(TUNNELS_ZONE)
+		if target == 0:
+			return "The lift is broken. Repair it from its far end first."
+	elif not ZoneDepth.is_lift_depth(rover_depth):
+		return "There is no lift here."
+	elif not is_lift_repaired(TUNNELS_ZONE, rover_depth):
+		return "The lift is broken."
+	if target != target_depth:
+		return "The rover has moved: look again."
+	reason = _rover_reach_problem(ZoneDepth.lift_position(rover_depth))
+	if reason != "":
+		return reason
+	_move_rover_to(target, ZoneDepth.arrival_pose(target, target > 0, true))
 	return ""
 
 
@@ -5049,11 +5168,13 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 	if layout_day != day:
 		return "That was yesterday's floor. Look again."
 	finds_taken = ZoneDepth.prune(finds_taken, day)
-	var today: Dictionary = ZoneDepth.layout(world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, day)
+	var today: Dictionary = ZoneDepth.layout(world_seed, ZoneDepth.ZONE, rover_depth, day)
 	var taken: Array = ZoneDepth.taken_today(finds_taken, ZoneDepth.ZONE, day)
 	var reason: String = ""
-	if rover_depth != ZoneDepth.DEPTH:
+	if rover_depth < ZoneDepth.DEPTH or rover_depth > ZoneDepth.MAX_DEPTH:
 		reason = "The rover is not down there."
+	if reason == "" and depth_of(player_id) != rover_depth:
+		reason = "Finds lie where the rover is."
 	if reason == "":
 		reason = ZoneDepth.take_problem(find_id, today.get("finds", []), taken, place_of(player_id), depth_of(player_id))
 	if reason == "":
@@ -5470,6 +5591,15 @@ func _credibility_after_calibration(record: Dictionary) -> void:
 		post_phone("OIRM CONTRACT: run restarted (%s). 0 of %d." % [
 			"late calibration" if not record.get("on_time", false) else "not traceable", needed])
 		credibility_changed.emit(credibility)
+
+
+## The phone's contract row with the deepest depth reached under it (a line of its own
+## once the rover has been below, ZoneDepth.deepest_text).
+func contract_phone_text() -> String:
+	var deepest: String = ZoneDepth.deepest_text(deepest_depth, TUNNELS_ZONE)
+	var contract: String = contract_text()
+	return contract if deepest == "" else (deepest if contract == "" else contract + "
+" + deepest)
 
 
 ## The open contract objective for the phone, "" when there is none.

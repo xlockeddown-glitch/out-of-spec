@@ -55,6 +55,8 @@ const WORDS: Dictionary = {
 ## (Vector2i of the depth's grid), "phase" (minutes into the cycle at minute 0) }.
 ## Only the Lava Tubes' depth 1 has any: anything else asks for [].
 static func vents_for(world_seed: int, zone: String, depth: int, day: int) -> Array:
+	if depth != DEPTH:
+		return []  # vents stay on depth 1 [PLACEHOLDER]: depths 2 and 3 have none
 	var layout: Dictionary = ZoneDepth.layout(world_seed, zone, depth, day)
 	if layout.is_empty():
 		return []
