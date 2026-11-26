@@ -4253,7 +4253,11 @@ func can_slot_spool() -> bool:
 	return false
 
 
-func slot_spool_into_relay(player_id: String = "") -> bool:
+## `score` is Thread the Spool's (MinigameScore.SKIPPED with no game). It is
+## read in one place: the seat's own XP and the lab's XP for it are times
+## MinigameScore.xp_factor(score), which is 1.0 for a skip and a poor try. Which
+## spool is taken, the lag and the relay do not see it.
+func slot_spool_into_relay(player_id: String = "", score: int = MinigameScore.SKIPPED) -> bool:
 	if not can_slot_spool():
 		return false
 	var taken: Array = _take_spool(false)
@@ -4262,8 +4266,9 @@ func slot_spool_into_relay(player_id: String = "") -> bool:
 	slotted_spool_species = taken[0]
 	slotted_spool_damaged = taken[1]
 	relay_slotted = true
-	_award_xp("slot_spool", player_id)
-	_award_lab_xp("lab_spool", player_id)
+	var xp_scale: float = MinigameScore.xp_factor(score)
+	_award_xp("slot_spool", player_id, xp_scale)
+	_award_lab_xp("lab_spool", player_id, xp_scale)
 	silk_changed.emit(optical_silk_spools)
 	relay_changed.emit(relay_slotted)
 	return true

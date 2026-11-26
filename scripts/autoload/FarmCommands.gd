@@ -24,9 +24,10 @@ const CELL_REACH_M: float = 6.0
 const FAR_REFUSAL: String = "Too far from the rover."
 const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
 ## Actions that may carry a mini-game's score after their own arguments: a whole
-## number. The host cuts it to what it allows (MinigameScore.allowed); with none,
+## number. The host cuts it to what it allows (MinigameScore.allowed, or
+## seat_allowed for the relay); with none,
 ## or one it does not allow, the action is as it always was.
-const SCORED: Array[StringName] = [&"calibrate_at_bench"]
+const SCORED: Array[StringName] = [&"calibrate_at_bench", &"slot_spool_into_relay"]
 
 ## True while a guest: nothing is done here, only asked for.
 var guest: bool = false
@@ -75,11 +76,16 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 		CoopBeds.get_up(player_id)
 	var passed: Array = arguments.duplicate()
 	var scored: bool = action in SCORED
+	# The bench's score works on the instrument's next calibration; the relay's
+	# is handed to the farm with the seat.
+	var bench: bool = action == &"calibrate_at_bench"
+	var seat: bool = action == &"slot_spool_into_relay"
 	var score: int = MinigameScore.SKIPPED
 	var sent: bool = scored and passed.size() > _own_count(action)
 	if sent:
 		# Never the sender's number as it came: the host's cut of it.
-		score = MinigameScore.allowed(_farm(), str(passed[0]), player_id, passed.pop_back())
+		var given: int = passed.pop_back()
+		score = MinigameScore.allowed(_farm(), str(passed[0]), player_id, given) if bench else MinigameScore.seat_allowed(_farm(), player_id, given)
 	if action == &"build_block_stack" and not QuestEngine.has_minigame_step(_farm(), MinigameScore.WRING_THE_BLOCKS, "", player_id):
 		# Wring the Blocks' score is the sender's own number: the host does not
 		# play the game again, and does not see the blocks picked on the screen
@@ -89,10 +95,14 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 		passed[1] = MinigameScore.SKIPPED
 	if _player_index(action) >= 0:
 		passed.append(player_id)
-	if scored:
+	if seat:
+		# Thread the Spool: SKIPPED unless this player has an open step that
+		# carries the game (MinigameScore.seat_allowed).
+		passed.append(score)
+	if bench:
 		MinigameScore.arm(_farm(), str(passed[0]), score)
 	var result: Variant = _farm().callv(action, passed)
-	if scored:
+	if bench:
 		# A refusal zeroes nothing, so the factor is taken back here.
 		MinigameScore.disarm(_farm(), str(passed[0]))
 		if sent and result is Dictionary and result.has("as_left"):
@@ -105,7 +115,7 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	# A score the host counted for a calibration that happened is told to that
 	# look, for a quest step that carries the game (section 7.2's quest grade).
 	var played: Dictionary = {}
-	if scored and score != MinigameScore.SKIPPED and result is Dictionary and result.has("as_left"):
+	if bench and score != MinigameScore.SKIPPED and result is Dictionary and result.has("as_left"):
 		played = QuestEngine.played_game(MinigameScore.game_for(_farm(), str(passed[0])), str(passed[0]), player_id, score)
 	# Wring the Blocks: the stack's score is the action's own argument, and the
 	# farm's answer holds it cut to 0 to 100, or as a skip where the player has
@@ -113,6 +123,9 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	# (or a refusal) tells nothing.
 	if action == &"build_block_stack" and result is Dictionary and int(result.get("score", MinigameScore.SKIPPED)) >= 0:
 		played = QuestEngine.played_game(MinigameScore.WRING_THE_BLOCKS, "", player_id, int(result["score"]))
+	# Thread the Spool: a score the host counted, for a spool that went in.
+	if seat and score != MinigameScore.SKIPPED and result is bool and result:
+		played = QuestEngine.played_game(MinigameScore.THREAD_THE_SPOOL, "", player_id, score)
 	var none: Array[String] = []
 	_farm().update_quests(none, false, played)
 	return result

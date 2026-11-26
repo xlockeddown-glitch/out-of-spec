@@ -116,8 +116,10 @@ const SOLD_IN_SPEC: String = "crops_sold_in_spec"
 ## (GameState.BLOCK_STACK_COUNT): the game is the build itself. A Hold the
 ## Reading step has a Set the Zero step's shape; the bench plays the game the
 ## instrument has that day (MinigameScore.game_for), whichever of the two the
-## step names, and that play grades the step.
-const MINIGAMES: Array[String] = ["set_the_zero", "hold_the_reading", "wring_the_blocks"]
+## step names, and that play grades the step. A Thread the Spool step is a
+## `counter` of spools seated in the relay (the `slot_spool` source): the game
+## is played as the spool goes in.
+const MINIGAMES: Array[String] = ["set_the_zero", "hold_the_reading", "wring_the_blocks", "thread_the_spool"]
 ## A `counter` that is not a source of data/skills.json: the reference blocks the
 ## farm has dug up. As a counter it counts from when its step opened, so it is
 ## "find three more".
@@ -589,6 +591,9 @@ static func data_problem(quest: Dictionary) -> String:
 			if step["minigame"] == MinigameScore.WRING_THE_BLOCKS:
 				if not is_stack_step(step):
 					return "step '%s' has Wring the Blocks and is not a counter of built stacks." % id
+			elif step["minigame"] == MinigameScore.THREAD_THE_SPOOL:
+				if not is_seat_step(step):
+					return "step '%s' has Thread the Spool and is not a counter of seated spools." % id
 			elif step_instrument(step) == "":
 				return "step '%s' has a mini-game and is not a count of one instrument's cal_log rows." % id
 			else:
@@ -945,6 +950,24 @@ static func is_stack_step(step: Dictionary) -> bool:
 	return str(step.get("check", "")) == "counter" and str(step.get("counter", "")) == "build_block_stack"
 
 
+## True for a step that counts spools seated in the relay: the one kind of step
+## Thread the Spool may be carried by.
+static func is_seat_step(step: Dictionary) -> bool:
+	return str(step.get("check", "")) == "counter" and str(step.get("counter", "")) == "slot_spool"
+
+
+## True where `step` is the kind a game with no instrument is carried by: a
+## counter of built stacks for Wring the Blocks, of seated spools for Thread
+## the Spool. False for a bench game.
+static func is_bare_step(step: Dictionary, minigame: String) -> bool:
+	match minigame:
+		MinigameScore.WRING_THE_BLOCKS:
+			return is_stack_step(step)
+		MinigameScore.THREAD_THE_SPOOL:
+			return is_seat_step(step)
+	return false
+
+
 ## True while an accepted quest that is not done has an open step carrying
 ## `minigame` for this instrument: a key moment, however often the lab has
 ## calibrated that kind before (a standard's own calibration is left to
@@ -952,11 +975,11 @@ static func is_stack_step(step: Dictionary) -> bool:
 ## player's own quests for that player. It only reads quest_state and
 ## player_quest_state, which a guest has as the host's copy, so it answers the
 ## same on a guest. In a quest done in order only the first step not done is open.
-## Wring the Blocks has no instrument: its step is one that counts built stacks,
-## and `instrument_id` is "" for it.
+## Wring the Blocks and Thread the Spool have no instrument: their step is one
+## that counts built stacks or seated spools, and `instrument_id` is "" for them.
 static func has_minigame_step(farm: Node, minigame: String, instrument_id: String, player_id: String) -> bool:
-	var stack: bool = minigame == MinigameScore.WRING_THE_BLOCKS
-	if instrument_id == "" and not stack:
+	var bare: bool = minigame in [MinigameScore.WRING_THE_BLOCKS, MinigameScore.THREAD_THE_SPOOL]
+	if instrument_id == "" and not bare:
 		return false
 	for quest: Dictionary in quests():
 		if data_problem(quest) != "":
@@ -971,7 +994,7 @@ static func has_minigame_step(farm: Node, minigame: String, instrument_id: Strin
 		for step: Variant in quest["steps"]:
 			if str(step.get("id", "")) in entry.get("steps_done", []):
 				continue
-			if str(step.get("minigame", "")) == minigame and (is_stack_step(step) if stack else step_instrument(step) == instrument_id):
+			if str(step.get("minigame", "")) == minigame and (is_bare_step(step, minigame) if bare else step_instrument(step) == instrument_id):
 				return true
 			if in_order:
 				break
@@ -1001,10 +1024,11 @@ static func _keep_score(farm: Node, entry: Dictionary, step: Dictionary, played:
 	var score: int = mini(int(played.get("score", MinigameScore.SKIPPED)), MinigameScore.MAX_SCORE)
 	if not MinigameScore.is_graded(score):
 		return
-	if is_stack_step(step):
+	if is_stack_step(step) or is_seat_step(step):
 		# Wring the Blocks: the build that did the step is the game itself, and
-		# only a player's build is counted (GameState.build_block_stack).
-		if str(played.get("minigame", "")) != MinigameScore.WRING_THE_BLOCKS:
+		# only a player's build is counted (GameState.build_block_stack). Thread
+		# the Spool: the seat that did the step is the one the game was played for.
+		if not is_bare_step(step, str(played.get("minigame", ""))):
 			return
 		(entry.get_or_add(SCORES, {}) as Dictionary)[str(step.get("id", ""))] = score
 		played.clear()

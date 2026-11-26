@@ -1747,3 +1747,27 @@ A second model (Sonnet) reviewed the PR. What changed:
 6. A quest step must name a game its instrument plays, or the quest does not load. The dome pressure sensor may name either bench game and is graded by the one played, because buying the pressure controller changes its game. Right?
 7. No practice swing here either. Add one?
 8. In co-op the host cannot know a guest played the game; it checks only that a game could have been due and holds the score to 0 to 100 (the same as Set the Zero). Accepted among friends, or should the host replay the guest's presses to check a score (a larger change, and a new protocol)?
+
+## 2026-11-26: Thread the Spool (build order step 16 of `docs/design/quests_levels_story.md`, mini-game 5)
+
+Built from section 7 of the design (7.1 row 5, 7.2 to 7.6). Every number is a placeholder and is a named constant in `scripts/minigames/thread_the_spool.gd` or a row of `MinigameScore.GRADES`.
+
+- **The game**: the spool hangs from the player's hand and sways. The sway is a sum of three slow waves whose starting points come from a seed, so the same seed gives the same sway in a test or a replay. Left and Right push the hand; the first press starts an 8 s lowering. Nothing moves before that press. The game moves in whole steps of 1/60 s, so the frame rate does not change a score.
+- **The score**: 0 to 100 from the spool's mean distance from the slot over the last 1.5 s of the lowering. Inside the slot is 95 to 100; it falls in a line to 0 at eight slot half-widths. [ASSUMPTION: the design says "centering at the moment of seating"; one instant would make the score a matter of one frame, so the last 1.5 s is read.]
+- **Husbandry** (section 7.3): slows the sway's clock, to half speed at level 99, by `MinigameScore.sweet_share`, the same front-loaded curve the other games use. [ASSUMPTION: the design gives no size.] The difficulty setting widens or narrows the slot and speeds the sway as it does the other games' marks.
+- **When it plays** (section 7.4): only while this player has an open quest step that carries `thread_the_spool`. Such a step must be a counter of `slot_spool`, or the quest does not load. The farm screen's relay button opens the game then; Skip, the game switched off, and a farm with no such step all seat the spool as before.
+- **The quest**: no quest counted seated spools, so one small quest was added to make the game reachable: `a_clean_line` (Odalys, kind lab, farm-wide), offered on a morning with a spool in stock; one step, seat a spool; 60 CR and 100 lab XP. Its words and pay are placeholders.
+- **What a score does**: the host hands its cut of the score to `GameState.slot_spool_into_relay(player_id, score)`, which reads it in one place: the seat's Husbandry XP and lab XP are times 1.15 (Good), 1.3 (Fine) or 1.5 (Reference), as section 7.2's table says. The score is also kept with the quest step, so the quest pays its Fine or Reference bonus and Odalys has a Reference line. Which spool is taken, whether it is damaged, the lag multiplier, the stock and the relay are the same at every score. There is no wear mechanic.
+- **Skip and a poor try**: a score under 60 leaves the farm exactly as a skip leaves it. A test compares the whole saved farm.
+- **The host's cut**: the score rides as the last argument of `slot_spool_into_relay`, as it does for `calibrate_at_bench`, so the protocol is still 16 and the save version still 1. No farm field was added. With no open step for the sender the score becomes SKIPPED; otherwise it is held to 0 to 100.
+- **Not built**: the practice swing (section 7.5). The tunnels' relay button seats a spool with one click and does not open the game.
+
+### Questions for Ryan
+
+1. Should a good seat last longer, once spools wear? Spools do not wear today and no wear was added; the design's "seated spool takes less wear" is waiting on that.
+2. This is the first score that is worth XP: times 1.15, 1.3 or 1.5 on one seat's 25 Husbandry XP and its lab XP, and only while the quest step is open. Hold the Reading's review took XP away from a score, because in co-op the score is the sender's word. Keep the multiplier here (at most 13 more Husbandry XP per quest), and should the other games get it?
+3. The new quest "A Clean Line": is Odalys the right giver, and are 60 CR, 100 lab XP and her three lines all right? Should it repeat, so the game comes back?
+4. The score reads the last 1.5 s of the lowering, not the last instant. Right?
+5. The numbers: an 8 s lowering, half-speed sway at Husbandry 99, a slot 4 % of the reach wide each side, a 2.5 s hold cap. A spool nobody steers earned no more than Fine in testing and usually no grade. Say if any feels wrong when played.
+6. Three edges: on a farm whose best spool is already seated, the step waits for a better or a replacement spool; a spool collected and seated on the same day never sees the ask; the tunnels' relay button does not open the game. Change any of these?
+7. No practice swing here either. Add one?

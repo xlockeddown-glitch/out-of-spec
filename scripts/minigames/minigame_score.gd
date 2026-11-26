@@ -23,6 +23,9 @@ const WRING_SKILL: String = "earthworks"
 ## Mini-game 3 (section 7.1), and the skill that slows its wander (section 7.3).
 const HOLD_THE_READING: String = "hold_the_reading"
 const HOLD_SKILL: String = "uncertainty"
+## Mini-game 5 (section 7.1), and the skill that slows its sway (section 7.3).
+const THREAD_THE_SPOOL: String = "thread_the_spool"
+const THREAD_SKILL: String = "husbandry"
 ## The games played at the bench before ZERO / CALIBRATE. Which one an
 ## instrument gets is game_for(); a quest step may name either.
 const BENCH_GAMES: Array[String] = [SET_THE_ZERO, HOLD_THE_READING]
@@ -35,11 +38,13 @@ const SETTLING_STANDARDS: Array[String] = ["humidity_generator", "pressure_contr
 ## `residual`. Under the last row a try is Standard, the same as a skip.
 ## `quest_bonus` is the quest grade's "bonus": that share of the quest's credits
 ## more [ASSUMPTION: the design gives no size; these are its paid-job bonus,
-## 10 % and 20 %]. `giver_line`: the giver has a line for it.
+## 10 % and 20 %]. `giver_line`: the giver has a line for it. `xp` is section
+## 7.2's XP multiplier for the action; only Thread the Spool uses it so far
+## (xp_factor).
 const GRADES: Array[Dictionary] = [
-	{ "from": 95, "name": "Reference", "residual": 0.4, "quest_bonus": 0.2, "giver_line": true },
-	{ "from": 80, "name": "Fine", "residual": 0.6, "quest_bonus": 0.1, "giver_line": false },
-	{ "from": 60, "name": "Good", "residual": 0.8, "quest_bonus": 0.0, "giver_line": false },
+	{ "from": 95, "name": "Reference", "residual": 0.4, "xp": 1.5, "quest_bonus": 0.2, "giver_line": true },
+	{ "from": 80, "name": "Fine", "residual": 0.6, "xp": 1.3, "quest_bonus": 0.1, "giver_line": false },
+	{ "from": 60, "name": "Good", "residual": 0.8, "xp": 1.15, "quest_bonus": 0.0, "giver_line": false },
 ]
 const STANDARD_GRADE: String = "Standard"
 
@@ -49,6 +54,15 @@ static func residual_factor(score: int) -> float:
 	for grade: Dictionary in GRADES:
 		if score >= int(grade["from"]):
 			return float(grade["residual"])
+	return 1.0
+
+
+## Section 7.2's XP multiplier at this score: 1.0 for a skip or a poor try.
+## Section 7.6: it is on the player's own XP and the lab's XP for that action.
+static func xp_factor(score: int) -> float:
+	for grade: Dictionary in GRADES:
+		if score >= int(grade["from"]):
+			return float(grade["xp"])
 	return 1.0
 
 
@@ -206,6 +220,18 @@ static func allowed(farm: Node, instrument_id: String, player_id: String, score:
 	return clampi(score, 0, MAX_SCORE)
 
 
+## The host's cut of a score that came with a spool's seating (Thread the
+## Spool): SKIPPED unless this player has an open quest step that carries the
+## game (section 7.4), else held to 0 to MAX_SCORE. As above, the number is the
+## sender's word. Here it is worth XP, which the bench games' is not: at most
+## the seat's own XP times the table's best `xp`, and only while that step is
+## open (the seat that counts closes it).
+static func seat_allowed(farm: Node, player_id: String, score: int) -> int:
+	if not QuestEngine.has_minigame_step(farm, THREAD_THE_SPOOL, "", player_id):
+		return SKIPPED
+	return clampi(score, 0, MAX_SCORE)
+
+
 ## Sets the factor the instrument's next calibration takes: on its as-left
 ## residual for Set the Zero, on the operator's uncertainty term for Hold the
 ## Reading, never both. A skip sets 1.0.
@@ -237,3 +263,15 @@ static func grade_text(game_name: String, score: int) -> String:
 	if score < 0:
 		return ""
 	return "%s score %d of %d: %s." % [game_name, score, MAX_SCORE, grade_name(score).to_upper()]
+
+
+## "Seat score 97 of 100: REFERENCE, 50 % more XP for the seat." A poor try:
+## "..., standard result."
+static func seat_text(score: int) -> String:
+	if score < 0:
+		return ""
+	var factor: float = xp_factor(score)
+	var gain: String = ", standard result"
+	if factor > 1.0:
+		gain = ", %d %% more XP for the seat" % roundi((factor - 1.0) * 100.0)
+	return "Seat score %d of %d: %s%s." % [score, MAX_SCORE, grade_name(score).to_upper(), gain]
