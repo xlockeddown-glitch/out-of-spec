@@ -50,6 +50,7 @@ func _ready() -> void:
 	GameState.credits_changed.connect(_hud.set_credits)
 	GameState.ore_changed.connect(_hud.set_ore)
 	GameState.credibility_changed.connect(_on_credibility_changed)
+	GameState.lab_xp_changed.connect(_on_credibility_changed.bind(0))
 	GameState.jobs_changed.connect(_refresh_jobs_hud)
 	GameState.upgrades_changed.connect(_refresh_jobs_hud)
 	GameState.oirm_changed.connect(_refresh_jobs_hud)
@@ -210,7 +211,7 @@ func _on_fill_rejected(reason: String) -> void:
 
 
 func _on_credibility_changed(_points: int) -> void:
-	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text())
+	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text(), GameState.lab_phone_text())
 	_refresh_jobs_hud()
 
 

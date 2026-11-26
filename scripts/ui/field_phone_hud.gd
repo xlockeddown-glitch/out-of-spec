@@ -158,8 +158,9 @@ func set_credits(credits: int) -> void:
 
 ## e.g. "TRUSTED, 40 % to ACCREDITED" from GameState.credibility_text(), and
 ## the open contract objective (GameState.contract_text()) on a second line.
-func set_credibility(text: String, contract: String = "") -> void:
-	_credibility_label.text = "CRED: %s" % text + ("" if contract == "" else "\n" + contract)
+## `lab` is the lab's level (GameState.lab_phone_text()), on a line between them.
+func set_credibility(text: String, contract: String = "", lab: String = "") -> void:
+	_credibility_label.text = "CRED: %s" % text + ("" if lab == "" else "\nLAB: " + lab) + ("" if contract == "" else "\n" + contract)
 
 
 ## The gauge set's progress (GaugeSet.text), "" to hide the row.

@@ -158,7 +158,8 @@ func _check_old(gs: GameStateScript) -> String:
 	if gs.farm_from_dict(old) != "" or gs.skill_curve != GameStateScript.SKILL_CURVE:
 		return "An old save must load: %s" % gs.farm_from_dict(old)
 	if gs.skill_xp("calibration") != OLD_TOP_XP * factor or gs.skill_xp("husbandry") != OLD_TOP_XP * 4 * factor \
-			or gs.skill_xp("calibration", "player_2") != _old_xp(4) * factor or gs.skill_xp("instrumentation") != _old_xp(6) * factor:
+			or gs.skill_xp("calibration", "player_2") != _old_xp(4) * factor or gs.lab_xp != _old_xp(6) * factor \
+			or gs.farm_skill_xp.has("instrumentation"):
 		return "Old XP is multiplied by %d, the farm's too: %s %s" % [factor, gs.player_skill_xp, gs.farm_skill_xp]
 	for old_level: int in range(1, 11):
 		if gs._old_level(_old_xp(old_level)) != old_level or gs._level_for_xp(_old_xp(old_level) * factor) < old_level:
@@ -216,7 +217,7 @@ func test_bad_floor_is_refused() -> String:
 
 func _check_bad(gs: GameStateScript) -> String:
 	var good: Dictionary = gs.farm_to_dict()
-	for change: Array in [["skill_curve", 1], ["skill_curve", 3], ["skill_curve", "2"], ["skill_effect_floor", []],
+	for change: Array in [["skill_curve", 1], ["skill_curve", 4], ["lab_xp", -1], ["lab_xp", 2000000000], ["lab_xp", 1.5], ["skill_curve", "2"], ["skill_effect_floor", []],
 			["skill_effect_floor", { "": 1.0 }], ["skill_effect_floor", { 4: {} }], ["skill_effect_floor", { "": { "husbandry": 1.5 } }],
 			["skill_effect_floor", { "": { "husbandry": -0.1 } }], ["skill_effect_floor", { "": { "husbandry": NAN } }],
 			["skill_effect_floor", { "player_1": { "calibration": "all" } }], ["skill_effect_floor", { "player_1": { 3: 0.5 } }]]:

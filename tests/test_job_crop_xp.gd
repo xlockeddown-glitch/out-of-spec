@@ -200,10 +200,14 @@ func _check_count(gs: GameStateScript) -> String:
 	gs.credits = 100000
 	gs.tier1_unlocked = true
 	gs.crystal_ore = 100
+	var lab_before: int = gs.lab_xp
 	var refusal: String = gs.buy_standard(FM3)
 	if refusal != "":
 		return "The standard must be bought: %s" % refusal
-	if gs.action_count("buy_standard") != 1 or gs.action_xp("buy_standard") != gs.skill_xp("instrumentation"):
+	if gs.action_count("buy_standard") != 1 or gs.action_xp("buy_standard") != gs.lab_xp - lab_before or gs.lab_xp == lab_before:
+		return "The lab's XP is counted for the player who did the work."
+	gs._award_xp("slot_spool")
+	if gs.action_count("slot_spool") != 1 or gs.action_xp("slot_spool") != gs.skill_xp("husbandry"):
 		return "A farm skill's XP is counted for the player who did it."
 	return "" if gs.action_count("no_such_source") == 0 and gs.action_xp("till", "player_9") == 0 else "Nothing done reads as 0."
 

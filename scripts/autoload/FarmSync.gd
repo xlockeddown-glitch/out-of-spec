@@ -14,6 +14,7 @@ const SENDER: String = "The host's farm"
 
 ## Each signal is emitted when one of these variables changed.
 const SHOWN_BY: Dictionary = {
+	&"lab_xp_changed": ["lab_xp"],
 	&"molt_changed": ["dome_species_id", "molt_progress", "molt_stage", "exuvia_until_day"],
 	&"enclosures_changed": ["enclosures"],
 	&"silk_changed": ["optical_silk_spools", "_spool_species", "_spool_damaged"],
