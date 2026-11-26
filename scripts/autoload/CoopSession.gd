@@ -59,9 +59,13 @@ const RATE: float = 10.0
 ## And its rover poses, which come on their own, maybe late, bunched or not at all.
 const DRIVE_BURST: int = 100
 const DRIVE_RATE: float = 40.0
+## A guest's refused position or command is logged this often [PLACEHOLDER].
+const NOTE_MS: int = 5000
 
 var players: Array[String] = []
 var protocol: int = PROTOCOL
+## Host: peer's player -> when a refusal of it was last logged.
+var _noted_at: Dictionary = {}
 ## A connection gets this long to be let in, and a command to be answered.
 var join_timeout_ms: int = 10000
 var answer_timeout_ms: int = 10000
@@ -314,12 +318,13 @@ func _host_read(from: int, packet: PackedByteArray, now: int, reliable: bool) ->
 		_let_in(from, message[2], message[3])
 		return true
 	if not reliable and _is_shape(message, [WALK, TYPE_ARRAY]):
-		if not CoopWalkers.is_pose(message[1]):
+		# The shape is the sender's to get right; where it says it is, is judged later.
+		if not CoopWalkers.is_shape(message[1]):
 			return false
 		walked.emit(link["player"], message[1])
 		return true
 	if not reliable:
-		if not _is_shape(message, [DRIVE, TYPE_STRING, TYPE_ARRAY]) or message[1].length() > MAX_TEXT or not CoopRovers.is_pose(message[2]):
+		if not _is_shape(message, [DRIVE, TYPE_STRING, TYPE_ARRAY]) or message[1].length() > MAX_TEXT or not CoopRovers.is_shape(message[2]):
 			return false
 		rover_driven.emit(link["player"], message[1], message[2])
 		return true
@@ -678,6 +683,15 @@ func _is_player_id(value: Variant) -> bool:
 
 func _local_id() -> String:
 	return _farm_commands()._farm().local_player_id
+
+
+## Host: says in the log that a guest's word was not taken, at most once every
+## NOTE_MS for each guest.
+func note_refusal(player_id: String, what: String, now: int = Time.get_ticks_msec()) -> void:
+	if now - _noted_at.get(player_id, -NOTE_MS) < NOTE_MS:
+		return
+	_noted_at[player_id] = now
+	print("Co-op: %s: %s" % [player_id, what])
 
 
 func _farm_commands() -> Node:

@@ -13,12 +13,13 @@ const REACH_M: float = 6.0
 const MOVING_MS: int = 50
 const STILL_MS: int = 1000
 ## A guest may go this far at once, and this fast after that: above the walker's
-## 4 m/s, for a late message [PLACEHOLDER].
-const BURST_M: float = 12.0
+## 4 m/s, for a late message [PLACEHOLDER]. At once is past the 16 m a dig that
+## floods the spot sends a walker (the rover's PIT_SEARCH_M).
+const BURST_M: float = 18.0
 const BURST_MPS: float = 5.0
 ## A guest farther than this from where the host has it goes there. Below
 ## BURST_M, so the host can always take what is left [PLACEHOLDER].
-const SNAP_M: float = 10.0
+const SNAP_M: float = 17.0
 ## No walker is this far above or below the ground [PLACEHOLDER].
 const HEIGHT_M: float = 5.0
 ## A guest silent this long is back in the rover [PLACEHOLDER].
@@ -74,13 +75,30 @@ func _process(_delta: float) -> void:
 	tick(Time.get_ticks_msec())
 
 
-func is_pose(pose: Variant) -> bool:
+## Five numbers: what the sender must get right, or be dropped.
+func is_shape(pose: Variant) -> bool:
 	if not pose is Array or pose.size() != 5:
 		return false
 	for part: Variant in pose:
-		if typeof(part) != TYPE_FLOAT or not is_finite(part) or absf(part) > FARTHEST_M:
+		if typeof(part) != TYPE_FLOAT:
 			return false
 	return true
+
+
+## Numbers that are real and on the map.
+func is_pose(pose: Variant) -> bool:
+	if not is_shape(pose):
+		return false
+	for part: float in pose:
+		if not is_finite(part) or absf(part) > FARTHEST_M:
+			return false
+	return true
+
+
+## Host: a guest's pose that it may say, which is a pose that does not claim to
+## go faster than it can. A pose that is not is refused, not the guest.
+func is_sane(pose: Array) -> bool:
+	return is_pose(pose) and absf(pose[4]) <= BURST_MPS
 
 
 func spot(pose: Array) -> Vector3:
@@ -179,14 +197,25 @@ func _on_walked(player_id: String, pose: Array, now: int = Time.get_ticks_msec()
 	if not is_out(player_id) or _is_guest():
 		return
 	_heard_at[player_id] = now
+	if not is_sane(pose):
+		_refuse(player_id, "a walker at %s" % [pose], now)
+		return
 	var to: Vector3 = spot(pose)
 	var reach: Array = _reach.get(player_id, [BURST_M, now])
 	var left: float = minf(BURST_M, reach[0] + (now - reach[1]) * BURST_MPS / 1000.0)
 	var distance: float = spot(out[player_id]).distance_to(to)
 	if distance > left or not _on_land(to) or absf(to.y - Terrain.height(Vector2(to.x, to.z), farm.dug)) > HEIGHT_M:
+		_refuse(player_id, "a walker %.1f m away, %.1f m allowed" % [distance, left], now)
 		return
 	_reach[player_id] = [left - distance, now]
 	out[player_id] = pose
+
+
+## Host: keeps the guest where it was, logs it now and then, and tells the guest
+## where it is at the next tick, so it goes back.
+func _refuse(player_id: String, what: String, now: int) -> void:
+	session.note_refusal(player_id, "refused " + what, now)
+	_sent_at = -STILL_MS
 
 
 ## Guest: the host says who is out and where.
