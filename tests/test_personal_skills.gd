@@ -427,7 +427,7 @@ func _check_guest(gs: GameStateScript) -> String:
 		return "The guest file holds the new skills and says curve 3; curve 2 is still read."
 	# A file from before Agronomy is read as it is: its Field Ops stays whole.
 	var before: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"field_ops":900,"calibration":10},"curve":2}' % key).to_utf8_buffer())
-	if before != { "key": key, "skills": { "field_ops": 900, "calibration": 10 } }:
+	if before != { "key": key, "skills": { "field_ops": 900, "calibration": 10 } }.merged(ProfileScript.no_record()):
 		return "A curve 2 guest file is read as it is: %s" % [before]
 	var now: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"agronomy":5,"earthworks":6,"robotics":7,"husbandry":8},"curve":3}' % key).to_utf8_buffer())
 	if now.get("skills") != { "agronomy": 5, "earthworks": 6, "robotics": 7, "husbandry": 8 }:

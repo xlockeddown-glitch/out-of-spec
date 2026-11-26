@@ -404,11 +404,11 @@ func _check_guest_file(gs: GameStateScript) -> String:
 	var key: String = "0".repeat(32)
 	var got: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"calibration":60,"instrumentation":900},"curve":%d}' % [
 		key, ProfileScript.CURVE]).to_utf8_buffer())
-	if got != { "key": key, "skills": { "calibration": 60 } }:
+	if got != { "key": key, "skills": { "calibration": 60 } }.merged(ProfileScript.no_record()):
 		return "A guest file with Instrumentation loads without it: %s" % [got]
 	var factor: int = int(DataManager.get_number(&"skills", "old_curve/xp_factor", 0.0))
 	got = ProfileScript._parse(('{"key":"%s","skills":{"instrumentation":900,"field_ops":7}}' % key).to_utf8_buffer())
-	if got != { "key": key, "skills": { "field_ops": 7 * factor } }:
+	if got != { "key": key, "skills": { "field_ops": 7 * factor } }.merged(ProfileScript.no_record()):
 		return "One from the 10-level curve too: %s" % [got]
 	# A host is not moved by a guest who sends it anyway.
 	var players: Array[String] = ["player_1"]

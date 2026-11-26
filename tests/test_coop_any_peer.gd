@@ -45,7 +45,7 @@ func _raw_peer(host: Node, hello: bool) -> MultiplayerPeerExtension:
 
 
 func _hello() -> PackedByteArray:
-	return var_to_bytes([SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}])
+	return var_to_bytes([SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}, ProfileScript.no_record()])
 
 
 func _dropped(host: Node, peer: MultiplayerPeerExtension) -> bool:

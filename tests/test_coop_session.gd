@@ -182,7 +182,11 @@ func test_strangers_and_forgeries_are_dropped() -> String:
 	var bench: Array = [SessionScript.COMMAND, 1, "calibrate_at_bench", [GameStateScript.HYGROMETER_ID]]
 	var too_long: String = "x".repeat(SessionScript.MAX_TEXT + 1)
 	var typed: Array[String] = [GameStateScript.HYGROMETER_ID]
-	var hello: Callable = func(key: String, skills: Dictionary) -> Array: return [SessionScript.HELLO, SessionScript.PROTOCOL, key, skills]
+	var hello: Callable = func(key: String, skills: Dictionary) -> Array: return [SessionScript.HELLO, SessionScript.PROTOCOL, key, skills, ProfileScript.no_record()]
+	var with: Callable = func(part: String, value: Variant) -> Array:
+		var record: Dictionary = ProfileScript.no_record()
+		record[part] = value
+		return [SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}, record]
 	var bad: Array = [
 		# Not let in yet.
 		[false, bench], [false, [SessionScript.HELLO, "1"]], [false, [SessionScript.HELLO, SessionScript.PROTOCOL]],
@@ -190,6 +194,19 @@ func test_strangers_and_forgeries_are_dropped() -> String:
 		[false, hello.call("0".repeat(32), { "calibration": -1 })], [false, hello.call("0".repeat(32), { "calibration": 1.5 })],
 		[false, hello.call("-" + "0".repeat(31), {})], [false, hello.call("0".repeat(32), {}) + [1]],
 		 [false, [SessionScript.WELCOME, "player_1", []]],
+		# A hello from before the record, and records that are not one.
+		[false, [SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}]],
+		[false, [SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}, {}]],
+		[false, with.call("quest_points", { "q": -1 })], [false, with.call("quest_points", { "q": 1.5 })], [false, with.call("quest_points", { 1: 1 })],
+		[false, with.call("quest_points", { too_long: 1 })], [false, with.call("xp_certificates", { "q": 0 })],
+		[false, with.call("xp_certificates", { "q": ProfileScript.MOST_XP + 1 })],
+		[false, with.call("xp_certificates_spent", ["q", "q"])], [false, with.call("xp_certificates_spent", [1])], [false, with.call("xp_certificates_spent", {})],
+		[false, with.call("quests", { "q": {} })], [false, with.call("quests", { "q": { "done": 1, "steps": [], "counts": {} } })],
+		[false, with.call("quests", { "q": { "done": true, "steps": [""], "counts": {} } })],
+		[false, with.call("quests", { "q": { "done": true, "steps": [], "counts": { "s": -1 } } })],
+		[false, with.call("quests", { "q": { "done": true, "steps": [], "counts": {}, "more": 1 } })],
+		[false, with.call("more", 1)],
+		[false, hello.call("0".repeat(32), {}) + ["x".repeat(SessionScript.MAX_HELLO_BYTES)]],
 		# The host's messages, from a guest.
 		[true, [SessionScript.WELCOME, "player_1", []]], [true, [SessionScript.STATE, {}]], [true, [SessionScript.ANSWER, 1, ""]],
 		[true, [SessionScript.LEFT, "player_1"]], [true, [SessionScript.HELLO, SessionScript.PROTOCOL]],
@@ -199,6 +216,8 @@ func test_strangers_and_forgeries_are_dropped() -> String:
 		[true, [SessionScript.COMMAND, 1, "till", [Vector3.ZERO]]], [true, [SessionScript.COMMAND, 1, "start_lab_grow", [{}]]],
 		[true, [SessionScript.COMMAND, 1, "start_lab_grow", range(SessionScript.MAX_ARGUMENTS + 1)]],
 		[true, [SessionScript.COMMAND, 1, "x".repeat(SessionScript.MAX_GUEST_BYTES), []]],
+		# A hello's room is for a hello: once let in, a guest has 2048 bytes.
+		[true, with.call("xp_certificates_spent", range(40).map(func(i: int) -> String: return ("%d" % i).rpad(SessionScript.MAX_TEXT, "s")))],
 		[true, [SessionScript.COMMAND, 1, "calibrate_at_bench", typed]],
 		[true, [SessionScript.COMMAND, 1, "start_lab_grow", [RefCounted.new()]]],
 	]
@@ -213,6 +232,38 @@ func test_strangers_and_forgeries_are_dropped() -> String:
 			return _finish("Must be dropped and do nothing: %s" % str(attempt).left(200))
 		_finish("")
 	return ""
+
+
+func test_a_hello_refused_can_be_said_again() -> String:
+	var host: Node = _host()
+	var peer: ENetMultiplayerPeer = _stranger(host, false)
+	var record: Dictionary = ProfileScript.no_record().merged({ "quest_points": { "first_contract": 1 } }, true)
+	var good: Array = [SessionScript.HELLO, SessionScript.PROTOCOL, "0".repeat(32), {}, record]
+	var answers: Array = []
+	var answered: Callable = func() -> bool:
+		while peer.get_available_packet_count() > 0:
+			answers.append(bytes_to_var(peer.get_packet()))
+		return not answers.is_empty()
+	# Another version: told so, not let in, and the record is not looked at.
+	peer.put_packet(var_to_bytes([SessionScript.HELLO, SessionScript.PROTOCOL + 1, "0".repeat(32), {}, record]))
+	_until(answered)
+	if answers != [[SessionScript.REFUSED, "version"]] or host._links.size() != 1 or host.players != ["player_1"]:
+		return _finish("Another version is refused and nothing more: %s, %s" % [answers, host.players])
+	if not host.commands.state.quest_points.is_empty() or not host.commands.state.guest_ids.is_empty():
+		return _finish("A refused hello leaves nothing on the farm.")
+	# The same link says a good hello: let in once, with the record taken once.
+	answers.clear()
+	peer.put_packet(var_to_bytes(good))
+	_until(func() -> bool: return answered.call() and host.players.size() == 2)
+	if host.players != ["player_1", "player_2"] or answers.is_empty() or answers[0] != [SessionScript.WELCOME, "player_2", ["player_1"]]:
+		return _finish("A good hello after a refused one is let in: %s, %s" % [answers, host.players])
+	var points: Dictionary = host.commands.state.quest_points.duplicate(true)
+	# And a third hello, from a guest now, is a forgery like any other.
+	peer.put_packet(var_to_bytes(good))
+	_until(func() -> bool: return host._links.is_empty())
+	if not host._links.is_empty() or host.players != ["player_1"] or host.commands.state.quest_points != points:
+		return _finish("A hello from a guest already in is dropped, and takes nothing: %s" % [host.players])
+	return _finish("")
 
 
 func test_naming_another_player_does_nothing() -> String:
