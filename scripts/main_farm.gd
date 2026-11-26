@@ -225,7 +225,10 @@ func _on_steering_zeroed(record: Dictionary) -> void:
 ## Seats a spool in the relay. While an open quest step carries Thread the
 ## Spool for this player (quests design section 7.4), the game is played first.
 ## The host seats the same spool whatever the score: a skip, the game switched
-## off and a poor try all send the same seat.
+## off and a poor try all send the same seat. The host refuses a seat for a
+## player on foot or with no spool to seat, and both are checked here before
+## the game opens. Unlike a block stack, it seats a spool with the rover away
+## or moving, so the plain seat asks for neither.
 func _on_slot_spool_pressed() -> void:
 	if _refuse_on_foot():
 		return
@@ -235,6 +238,11 @@ func _on_slot_spool_pressed() -> void:
 	var seat: String = ""
 	var due: bool = QuestEngine.has_minigame_step(GameState, MinigameScore.THREAD_THE_SPOOL, "", GameState.local_player_id)
 	if due and GameState.can_slot_spool() and MinigameSettings.mode() != MinigameSettings.Mode.OFF:
+		# The game takes the rover's controls for its 8 s: a rover that is here
+		# and rolling is stopped first, as for Wring the Blocks.
+		if _rover.away_text() == "" and not _rover.is_stopped():
+			_hud.push_log("SILK SPOOL: stop the rover first.")
+			return
 		if _spool_game == null:
 			_spool_game = SPOOL_SCENE.instantiate()
 			_hud.get_parent().add_child(_spool_game)

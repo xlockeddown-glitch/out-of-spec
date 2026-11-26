@@ -84,8 +84,12 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	var sent: bool = scored and passed.size() > _own_count(action)
 	if sent:
 		# Never the sender's number as it came: the host's cut of it.
-		var given: int = passed.pop_back()
-		score = MinigameScore.allowed(_farm(), str(passed[0]), player_id, given) if bench else MinigameScore.seat_allowed(_farm(), player_id, given)
+		# problem() has let only a whole number through. If this is ever reached
+		# without that check, anything else is no score at all.
+		var last: Variant = passed.pop_back()
+		if last is int or last is float:
+			var given: int = int(last)
+			score = MinigameScore.allowed(_farm(), str(passed[0]), player_id, given) if bench else MinigameScore.seat_allowed(_farm(), player_id, given)
 	if action == &"build_block_stack" and not QuestEngine.has_minigame_step(_farm(), MinigameScore.WRING_THE_BLOCKS, "", player_id):
 		# Wring the Blocks' score is the sender's own number: the host does not
 		# play the game again, and does not see the blocks picked on the screen
