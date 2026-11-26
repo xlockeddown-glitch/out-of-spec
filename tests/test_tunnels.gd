@@ -675,10 +675,21 @@ func test_a_guest_drops_a_host_pose_from_before_the_rover_was_moved() -> String:
 	var kept: bool = theirs.place(id).origin.is_equal_approx(parked)
 	theirs._on_told(id, "", [stale.x, 0.0, stale.z, 0.0, 0.0, true, 5], 2000)
 	var took: bool = theirs.place(id).origin.is_equal_approx(stale)
+	# Round four: a pose with no epoch (protocol 19 shape), and one from an epoch the
+	# guest has not been told yet (the depth may not be loaded), are not applied.
+	theirs._forget()
+	theirs._on_told(id, "", [stale.x, 0.0, stale.z, 0.0, 0.0, true], 3000)
+	var bare: bool = theirs.place(id).origin.is_equal_approx(parked)
+	theirs._on_told(id, "", [stale.x, 0.0, stale.z, 0.0, 0.0, true, 6], 4000)
+	var early: bool = theirs.place(id).origin.is_equal_approx(parked)
 	theirs.free()
 	var problem: String = ""
 	if not kept:
 		problem = "A host pose from an older epoch refilled the guest's cache."
 	elif not took:
 		problem = "A host pose with the current epoch was dropped."
+	elif not bare:
+		problem = "A host pose with no epoch was applied to the tunnel rover."
+	elif not early:
+		problem = "A host pose from a newer epoch than the guest knows was applied."
 	return _finish(problem)

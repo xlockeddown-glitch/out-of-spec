@@ -139,6 +139,11 @@ const ROVER_HALF_M := Vector2(0.9, 1.5)
 ## of rock), judged as holds_in judges a cell's middle.
 static func holds_body_in(map: PackedStringArray, at: Transform3D) -> bool:
 	var centre := Vector2(at.origin.x, at.origin.z)
+	# Off the map (or not a number): not on floor, before any cell arithmetic that
+	# could wrap.
+	var span: float = maxf(map[0].length(), map.size()) * CELL_M
+	if not (is_finite(centre.x) and is_finite(centre.y)) or absf(centre.x) > span + ROVER_HALF_M.length() * 2.0 or absf(centre.y) > span + ROVER_HALF_M.length() * 2.0:
+		return false
 	var u := Vector2(at.basis.x.x, at.basis.x.z).normalized()
 	var v := Vector2(at.basis.z.x, at.basis.z.z).normalized()
 	if u == Vector2.ZERO or v == Vector2.ZERO:

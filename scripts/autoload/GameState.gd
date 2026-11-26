@@ -4829,8 +4829,8 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 ## The rover's place and speed, from whoever drives it. Lit, fast or on top of it,
 ## it scares the Sentinel.
 func watch_sentinel(rover_id: String, at: Vector3, speed_mps: float) -> void:
-	if FarmCommands.guest or not sentinel_out or rover_id != TUNNEL_ROVER or not rover_in_tunnels:
-		return
+	if FarmCommands.guest or not sentinel_out or rover_id != TUNNEL_ROVER or not rover_in_tunnels or rover_depth != 0:
+		return  # the Sentinel is in the hub; below, its coordinates mean nothing
 	var away: float = at.distance_to(SENTINEL_AT)
 	if away > SENTINEL_SEES_M:
 		return
@@ -6223,6 +6223,8 @@ func _lift_to_ground() -> void:
 	for id: Variant in rover_transforms:
 		if rover_is_away(id):
 			continue  # a pose in the tunnels is not on the farm
+		if id == TUNNEL_ROVER:
+			continue  # never lifted by the farm's ground, wherever it is
 		var pose: Transform3D = rover_transforms[id]
 		var ground_m: float = Terrain.height(Vector2(pose.origin.x, pose.origin.z), dug)
 		if pose.origin.y < ground_m:

@@ -238,7 +238,10 @@ func _on_told(rover_id: String, driver_id: String, pose: Array, now: int = Time.
 		return
 	# A pose the host sent before it moved the rover (a late hub pose after the descent)
 	# is old news: it must not refill the cache and beat the new parking spot.
-	if pose.size() == 7 and rover_id == farm.TUNNEL_ROVER and pose[6] < farm.rover_epoch:
+	# Under protocol 20 a tunnel-rover pose has an epoch; one without, or from an epoch
+	# this guest has not been told yet (it may be for a depth it has not loaded), is
+	# not applied: the next pose replaces it.
+	if rover_id == farm.TUNNEL_ROVER and (pose.size() != 7 or pose[6] != farm.rover_epoch):
 		return
 	if pose.size() == 7:
 		pose = pose.slice(0, 6)

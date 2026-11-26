@@ -904,6 +904,11 @@ func test_the_footprint_check_sees_rock_between_its_corners() -> String:
 				missed += 1
 			if dense and not held and not five:
 				return "Day %d, %d degrees: the check saw rock the sweep did not." % [day, degrees]
+	# GPT's exact case: seed 424242, day 9.
+	var day9: PackedStringArray = ZoneDepth.grid_for(1, SEED, 9)
+	var turned := Transform3D(Basis(Vector3.UP, deg_to_rad(45.0)), Vector3(-11.4, 0.05, -2.4))
+	if TunnelRock.holds_body_in(day9, turned):
+		return "Day 9: the rover with rock under its side was called on floor."
 	if gaps == 0:
 		return "No day and turn shows the gap between the five old points (the test needs one)."
 	return "" if missed == 0 else "%d rovers with rock under them were called on floor." % missed
@@ -933,3 +938,42 @@ func test_a_save_made_below_keeps_the_depth_through_continue() -> String:
 	SaveGame.restore(held)
 	SaveGame.farm_open = held_open
 	return problem
+
+
+# --- Round four of the review -----------------------------------------------------
+
+func test_a_pose_off_the_map_is_not_on_floor() -> String:
+	var grid: PackedStringArray = ZoneDepth.grid_for(1, SEED, _today())
+	for x: float in [1e10, -1e10, 9.0e18, INF, -INF, NAN]:
+		for z: float in [22.5, 1e10, NAN]:
+			if TunnelRock.holds_body_in(grid, Transform3D(Basis.IDENTITY, Vector3(x, 0.05, z))):
+				return "A pose at (%s, %s) was called on floor." % [x, z]
+	return "" if TunnelRock.holds_body_in(grid, ZoneDepth.start_transform()) else "The start is no longer on floor."
+
+
+func test_the_sentinel_is_not_watched_from_below() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.sentinel_out = true
+	gs.rover_lights = false
+	gs.rover_depth = 1
+	gs.watch_sentinel(gs.TUNNEL_ROVER, gs.SENTINEL_AT + Vector3(gs.SENTINEL_SEES_M * 0.95, 0.0, 0.0), 0.0)
+	var below: bool = gs.sentinel_sighted
+	gs.rover_depth = 0
+	gs.watch_sentinel(gs.TUNNEL_ROVER, gs.SENTINEL_AT + Vector3(gs.SENTINEL_SEES_M * 0.95, 0.0, 0.0), 0.0)
+	var hub: bool = gs.sentinel_sighted
+	gs.free()
+	if below:
+		return "The Sentinel saw a rover at depth 1 by hub coordinates."
+	return "" if hub else "The Sentinel is no longer watched in the hub."
+
+
+func test_the_farms_ground_does_not_lift_the_tunnel_rover() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZoneDepth.ZONE
+	gs.rover_depth = 1
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3(0.0, -50.0, 0.0))
+	gs._lift_to_ground()
+	var y: float = gs.parked_rover_transform(gs.TUNNEL_ROVER).origin.y
+	gs.free()
+	return "" if is_equal_approx(y, -50.0) else "The farm's ground lifted the tunnel rover to %f." % y
