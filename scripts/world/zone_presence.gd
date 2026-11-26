@@ -73,6 +73,8 @@ static var _sending: bool = false
 ## Bumped when a session starts or ends: a sender from before stops at its next
 ## step, so it never writes into the next session or the solo farm.
 static var _session: int = 0
+## Counts every scene report, so a repeat of the same place is still news.
+static var _reports: int = 0
 
 
 ## A session started or ended: forget what the host took and what was waiting,
@@ -104,7 +106,7 @@ static func acknowledged_after(sent: Array, answer: Variant) -> Array:
 ## sender runs at a time on its own wait flag (never the gameplay command's), and
 ## it keeps going until the newest place is acknowledged; a swap while it waits
 ## only replaces what it will send next. `tries` and `wait_s` bound the retries
-## of one place the host did not answer; a new place starts its own count. A place
+## of one place the host did not answer; each new report starts its own count. A place
 ## counts as taken only when the host answered, so after a lost answer the next
 ## place is sent whatever it is. The sender stops when the session changes.
 static func report_scene(path: String, tree: SceneTree, tries: int, wait_s: float) -> void:
@@ -112,6 +114,7 @@ static func report_scene(path: String, tree: SceneTree, tries: int, wait_s: floa
 	if at.is_empty():
 		return
 	_latest = at
+	_reports += 1
 	if _sending:
 		return
 	_sending = true
@@ -125,14 +128,18 @@ static func report_scene(path: String, tree: SceneTree, tries: int, wait_s: floa
 		if now != failing:
 			failing = now
 			failed = 0
+		var seen: int = _reports
 		var answer: Variant = await FarmCommands.request(&"report_place", now)
 		if session != _session or answer == NOT_CONNECTED:
 			break
 		_acknowledged = acknowledged_after(now, answer)
 		if answer != NO_ANSWER:
 			continue
-		if _latest != now:
-			continue  # a newer place came while this one waited: send it
+		if _reports != seen:
+			# A new report came while this one waited (even the same place again,
+			# after a trip there and back): it gets its own tries.
+			failed = 0
+			continue
 		if failed >= tries:
 			# Given up on this place; the next swap sends again.
 			_latest = []
