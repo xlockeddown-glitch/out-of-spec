@@ -203,7 +203,10 @@
       ],
       "quests": {
         "daily_ore_offer": "Two ore, if you are out that way.",
-        "daily_ore_done": "Two ore. So you were out that way."
+        "daily_ore_done": "Two ore. So you were out that way.",
+        "to_the_click_offer": "Your wheel nuts are due, Doc. Bring her into the bay and do them yourself this time. Five nuts, star order. Pull until the wrench clicks, then stop.",
+        "to_the_click_done": "Five nuts, and the wheel is still on. I have seen worse from people with certificates.",
+        "to_the_click_reference": "Every one of them right on the click. I checked. I always check. You can keep the wrench."
       }
     },
     "lin": {

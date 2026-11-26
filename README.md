@@ -82,7 +82,7 @@ Open `project.godot` in Godot 4.7 and press F5. The farm saves each morning and 
 | L (in Bram's bay) | Sell the harvest bin to Lin |
 | L (in the tunnels) | Rover lights on or low (the Sentinel bolts from lights on) |
 | T (in Bram's bay) | Robots panel |
-| Y (in Bram's bay) | Bram re-torques the rover's wheel nuts, once they are due |
+| Y (in Bram's bay) | Bram re-torques the rover's wheel nuts, once they are due. While his quest "To the Click" is open, Torque to Spec plays first: hold Space, let go at the click line, Esc skips |
 | K | Skills panel |
 | F7 | Co-op panel (host or see who is here) |
 | Esc | Close a panel |

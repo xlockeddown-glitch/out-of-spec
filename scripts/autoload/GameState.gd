@@ -3707,9 +3707,11 @@ func wheel_service_text() -> String:
 ## player's Robotics XP and the lab's XP; a quest step may count it (the
 ## `service_wheels` source). Where the rover stands is the screen's to check, as
 ## for his treads.
-## `score` is for Torque to Spec (docs/design/quests_levels_story.md section 7.1),
-## which is not built: nothing reads it yet, and FarmCommands never passes one.
-@warning_ignore("unused_parameter")
+## `score` is Torque to Spec's (docs/design/quests_levels_story.md section 7.1;
+## MinigameScore.SKIPPED with no game). It is read in one place: the service's
+## own XP and the lab's XP for it are times MinigameScore.xp_factor(score),
+## which is 1.0 for a skip and a poor try. The meters, when the nuts are next
+## due and the rover do not see it.
 func service_wheels(player_id: String = "", score: int = MinigameScore.SKIPPED) -> String:
 	if rover_in_tunnels:
 		return "The rover is in the tunnels. Bram's bay is up on the farm."
@@ -3717,8 +3719,9 @@ func service_wheels(player_id: String = "", score: int = MinigameScore.SKIPPED) 
 		return "The wheel nuts are not due: %s m driven of %s m." % [
 			SP811.integer(floori(wheel_meters)), SP811.integer(roundi(wheel_service_due_m()))]
 	wheel_meters = 0.0
-	_award_xp("service_wheels", player_id)
-	_award_lab_xp("lab_wheels", player_id)
+	var xp_scale: float = MinigameScore.xp_factor(score)
+	_award_xp("service_wheels", player_id, xp_scale)
+	_award_lab_xp("lab_wheels", player_id, xp_scale)
 	wheels_changed.emit()
 	return ""
 

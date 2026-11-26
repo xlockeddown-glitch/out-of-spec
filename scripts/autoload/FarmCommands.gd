@@ -25,11 +25,9 @@ const FAR_REFUSAL: String = "Too far from the rover."
 const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
 ## Actions that may carry a mini-game's score after their own arguments: a whole
 ## number. The host cuts it to what it allows (MinigameScore.allowed, or
-## seat_allowed for the relay); with none,
-## or one it does not allow, the action is as it always was.
-## service_wheels has a score argument for Torque to Spec and is not here until
-## that game is: no player can send it one.
-const SCORED: Array[StringName] = [&"calibrate_at_bench", &"slot_spool_into_relay"]
+## seat_allowed for the relay, or service_allowed for the wheel nuts); with
+## none, or one it does not allow, the action is as it always was.
+const SCORED: Array[StringName] = [&"calibrate_at_bench", &"slot_spool_into_relay", &"service_wheels"]
 
 ## True while a guest: nothing is done here, only asked for.
 var guest: bool = false
@@ -79,9 +77,10 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	var passed: Array = arguments.duplicate()
 	var scored: bool = action in SCORED
 	# The bench's score works on the instrument's next calibration; the relay's
-	# is handed to the farm with the seat.
+	# is handed to the farm with the seat, and the wheel nuts' with the service.
 	var bench: bool = action == &"calibrate_at_bench"
 	var seat: bool = action == &"slot_spool_into_relay"
+	var service: bool = action == &"service_wheels"
 	var score: int = MinigameScore.SKIPPED
 	var sent: bool = scored and passed.size() > _own_count(action)
 	if sent:
@@ -91,7 +90,12 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 		var last: Variant = passed.pop_back()
 		if last is int or last is float:
 			var given: int = int(last)
-			score = MinigameScore.allowed(_farm(), str(passed[0]), player_id, given) if bench else MinigameScore.seat_allowed(_farm(), player_id, given)
+			if bench:
+				score = MinigameScore.allowed(_farm(), str(passed[0]), player_id, given)
+			elif seat:
+				score = MinigameScore.seat_allowed(_farm(), player_id, given)
+			elif service:
+				score = MinigameScore.service_allowed(_farm(), player_id, given)
 	if action == &"build_block_stack" and not QuestEngine.has_minigame_step(_farm(), MinigameScore.WRING_THE_BLOCKS, "", player_id):
 		# Wring the Blocks' score is the sender's own number: the host does not
 		# play the game again, and does not see the blocks picked on the screen
@@ -101,9 +105,10 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 		passed[1] = MinigameScore.SKIPPED
 	if _player_index(action) >= 0:
 		passed.append(player_id)
-	if seat:
-		# Thread the Spool: SKIPPED unless this player has an open step that
-		# carries the game (MinigameScore.seat_allowed).
+	if seat or service:
+		# Thread the Spool and Torque to Spec: SKIPPED unless this player has an
+		# open step that carries the game (MinigameScore.seat_allowed,
+		# service_allowed).
 		passed.append(score)
 	if bench:
 		MinigameScore.arm(_farm(), str(passed[0]), score)
@@ -132,6 +137,10 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	# Thread the Spool: a score the host counted, for a spool that went in.
 	if seat and score != MinigameScore.SKIPPED and result is bool and result:
 		played = QuestEngine.played_game(MinigameScore.THREAD_THE_SPOOL, "", player_id, score)
+	# Torque to Spec: a score the host counted, for a service that was done
+	# (the farm's answer is "" then, and why not otherwise).
+	if service and score != MinigameScore.SKIPPED and result is String and result == "":
+		played = QuestEngine.played_game(MinigameScore.TORQUE_TO_SPEC, "", player_id, score)
 	var none: Array[String] = []
 	_farm().update_quests(none, false, played)
 	return result
