@@ -2,6 +2,11 @@ class_name StonePieces
 ## What the farm can build from broken boulders: a low wall, a level pad and a
 ## water channel, one on a 2 m cell of Terrain. The rules only: GameState keeps
 ## the stock and the pieces (cell -> kind), StonePiecesView draws them.
+##
+## A pad levels the ground under it (Terrain.pad_levels). A wall stands on the
+## ground as it is, cell by cell, so on a hillside each one is lower than the
+## one uphill: its base is the lowest of its cell's points and its top is
+## WALL_M above its middle.
 
 enum { WALL, PAD, CHANNEL }
 ## Asks to take up what is on the cell, not to build.
@@ -18,6 +23,9 @@ const MAX_STONE: int = 100000
 ## this wide and long when seeing whether it is in the way [PLACEHOLDER].
 const WALL_M: float = 1.1
 const ROVER_HALF := Vector2(0.8, 1.2)
+## A wall is refused on ground that rises or falls more than this across its
+## cell [PLACEHOLDER]. Hills alone come to 0.5 m; a dug side or a pad's edge adds.
+const WALL_RANGE_M: float = 1.5
 
 
 static func is_kind(kind: int) -> bool:
@@ -38,8 +46,8 @@ static func next_kind(kind: int) -> int:
 
 
 ## Why a piece can't be built on a cell, or "". `rovers` are where the rovers on
-## the farm stand. Not about the stock.
-static func problem(cell: Vector2i, kind: int, pieces: Dictionary[Vector2i, int], rovers: Array[Transform3D]) -> String:
+## the farm stand, and `dug` is the farm's digging (cell -> steps). Not about the stock.
+static func problem(cell: Vector2i, kind: int, pieces: Dictionary[Vector2i, int], rovers: Array[Transform3D], dug: Dictionary = {}) -> String:
 	if not is_kind(kind):
 		return "There is no such piece."
 	# Level ground holds the plot, the pads, the gates, the props, the relay and
@@ -48,6 +56,17 @@ static func problem(cell: Vector2i, kind: int, pieces: Dictionary[Vector2i, int]
 		return "Nothing can be built on this ground."
 	if pieces.has(cell):
 		return "Something is built here."
+	if kind != CHANNEL and Terrain.is_near_water(cell):
+		return "Too near the water to build."
+	if kind == PAD:
+		if dug.get(cell, 0) > 0:
+			return "Fill it in first."
+		var with_pad: Array[Vector2i] = pad_cells(pieces)
+		with_pad.append(cell)
+		if Terrain.pad_shift_m(Terrain.pad_levels(with_pad)) > Terrain.PAD_SHIFT_M:
+			return "Too steep to level."
+	if kind == WALL and cell_range_m(cell, dug) > WALL_RANGE_M:
+		return "Too steep for a wall."
 	# A rover drives over a pad or a channel, so only a wall needs the room.
 	if kind == WALL:
 		for pose: Transform3D in rovers:
@@ -102,6 +121,29 @@ static func channel_cells(pieces: Dictionary[Vector2i, int]) -> Array[Vector2i]:
 		if pieces[cell] == CHANNEL:
 			cells.append(cell)
 	return cells
+
+
+## The cells that hold a pad.
+static func pad_cells(pieces: Dictionary[Vector2i, int]) -> Array[Vector2i]:
+	var cells: Array[Vector2i] = []
+	for cell: Vector2i in pieces:
+		if pieces[cell] == PAD:
+			cells.append(cell)
+	return cells
+
+
+## How far the ground's highest point on a cell is above its lowest.
+static func cell_range_m(cell: Vector2i, dug: Dictionary) -> float:
+	var typed: Dictionary[Vector2i, int] = {}
+	typed.assign(dug)
+	var low: float = INF
+	var high: float = -INF
+	for x: int in Terrain.CELL_M + 1:
+		for z: int in Terrain.CELL_M + 1:
+			var height_m: float = Terrain.point_height(cell * Terrain.CELL_M + Vector2i(x, z), typed)
+			low = minf(low, height_m)
+			high = maxf(high, height_m)
+	return high - low
 
 
 ## The rough box a wall fills on its cell, in the world.

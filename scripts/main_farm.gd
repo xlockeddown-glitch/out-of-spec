@@ -74,6 +74,8 @@ func _ready() -> void:
 	_rover.dig_rejected.connect(_on_dig_rejected)
 	_rover.fill_rejected.connect(_on_fill_rejected)
 	GameState.terrain_changed.connect(_show_dug)
+	# A guest is told of a pad as a piece, and the ground under it moves with it.
+	GameState.stone_changed.connect(_show_dug)
 	GameState.terrain_changed.connect(_say_dug)
 	_dug_depth = _total_dug()
 	_blocks_told.assign(GameState.found_blocks.keys())

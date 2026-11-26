@@ -792,6 +792,7 @@ func put_farm(data: Dictionary) -> void:
 		else:
 			set(field, value)
 	fresh.free()
+	_level_pads()
 	if not data.has("stone"):
 		# From before stone, so its broken boulders gave none.
 		for boulder: StringName in BOULDERS:
@@ -4489,8 +4490,10 @@ func place_stone(cell: Vector3i, kind: int, player_id: String = "") -> String:
 	if kind == StonePieces.TAKE_UP:
 		if not stone_pieces.has(at):
 			return "Nothing is built here."
+		var was_pad: bool = stone_pieces[at] == StonePieces.PAD
 		stone = mini(stone + StonePieces.cost(stone_pieces[at]), StonePieces.MAX_STONE)
 		stone_pieces.erase(at)
+		_level_pads(was_pad)
 		stone_changed.emit()
 		return ""
 	SaveGame.saving.emit()  # rovers say where they are
@@ -4500,15 +4503,28 @@ func place_stone(cell: Vector3i, kind: int, player_id: String = "") -> String:
 			rovers.append(rover_transforms[id])
 	if rover_in_tunnels:
 		rovers.clear()  # its place is in there
-	var problem: String = StonePieces.problem(at, kind, stone_pieces, rovers)
+	var problem: String = StonePieces.problem(at, kind, stone_pieces, rovers, dug)
 	if problem != "":
 		return problem
 	if stone < StonePieces.cost(kind):
 		return "Needs %d stone; carrying %d." % [StonePieces.cost(kind), stone]
 	stone -= StonePieces.cost(kind)
 	stone_pieces[at] = kind
+	_level_pads(kind == StonePieces.PAD)
 	stone_changed.emit()
 	return ""
+
+
+## Levels the ground under the pads (Terrain.use_pads), in the autoload only: the
+## ground is one for the whole game, a copy of a farm made for a check leaves it
+## alone. `moved` is true when a pad was built or taken up, so the ground changed.
+func _level_pads(moved: bool = false) -> void:
+	if not is_inside_tree():
+		return
+	Terrain.use_pads(StonePieces.pad_cells(stone_pieces))
+	if moved:
+		_seep_full = false
+		terrain_changed.emit()
 
 
 ## The cells that hold a channel, for water to run in.

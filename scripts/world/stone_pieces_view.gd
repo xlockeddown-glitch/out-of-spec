@@ -29,6 +29,10 @@ func _ready() -> void:
 
 ## Draws what changed.
 func _refresh() -> void:
+	# A pad moves the ground its neighbors stand on, so they are drawn again.
+	if _pads_moved():
+		for cell: Vector2i in _pieces.keys():
+			_remove(cell)
 	for cell: Vector2i in _pieces.keys():
 		if GameState.stone_pieces.get(cell, -1) != _shown.get(cell, -1) or _next_to_channel_change(cell):
 			_remove(cell)
@@ -36,6 +40,17 @@ func _refresh() -> void:
 		if not _pieces.has(cell):
 			_add(cell)
 	_shown = GameState.stone_pieces.duplicate()
+
+
+## True if a pad was built or taken up since the pieces were last drawn.
+func _pads_moved() -> bool:
+	for cell: Vector2i in GameState.stone_pieces:
+		if GameState.stone_pieces[cell] == StonePieces.PAD and _shown.get(cell, -1) != StonePieces.PAD:
+			return true
+	for cell: Vector2i in _shown:
+		if _shown[cell] == StonePieces.PAD and GameState.stone_pieces.get(cell, -1) != StonePieces.PAD:
+			return true
+	return false
 
 
 ## A channel's lips depend on its neighbors.

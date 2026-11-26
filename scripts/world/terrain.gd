@@ -77,6 +77,15 @@ const WASH_NEAR_M: float = 1.0
 const ROVER_HALF_WIDTH_M: float = 0.8
 const ROVER_REACH_M: float = 1.45
 
+## A stone pad levels the ground under it (StonePieces). Pads that touch, corners
+## too, are one flat top; no point of it may be this far from the natural ground
+## [PLACEHOLDER].
+const PAD_SHIFT_M: float = 0.75
+
+## Where pads level the ground now: point -> its height. Set by use_pads(), from
+## the farm's pieces, so every PC has the same.
+static var level_points: Dictionary[Vector2i, float] = {}
+
 ## What natural() found before, by point.
 static var _natural: PackedFloat32Array = PackedFloat32Array()
 
@@ -304,6 +313,8 @@ static func neighbors(cell: Vector2i) -> Array[Vector2i]:
 ## between cells are as deep as the shallowest of those that meet there, so a
 ## hole's sides slope.
 static func point_height(point: Vector2i, dug: Dictionary[Vector2i, int]) -> float:
+	if not level_points.is_empty() and level_points.has(point):
+		return level_points[point]
 	var ground_m: float = natural(point)
 	if dug.is_empty():
 		return ground_m
@@ -314,6 +325,55 @@ static func point_height(point: Vector2i, dug: Dictionary[Vector2i, int]) -> flo
 		for z: int in range(first.y, last.y + 1):
 			steps = mini(steps, _dug_steps(Vector2i(x, z), dug))
 	return ground_m - steps * DIG_STEP_M
+
+
+## The height of every point under these pad cells: each group of pads that touch
+## is flat at the mean of the natural ground under all of it, to a 1/HEIGHT_PARTS
+## of a meter. Only the pads decide it, so it can be worked out again from a save.
+static func pad_levels(pads: Array[Vector2i]) -> Dictionary[Vector2i, float]:
+	var levels: Dictionary[Vector2i, float] = {}
+	var is_pad: Dictionary[Vector2i, bool] = {}
+	for cell: Vector2i in pads:
+		is_pad[cell] = true
+	var seen: Dictionary[Vector2i, bool] = {}
+	for start: Vector2i in pads:
+		if seen.has(start):
+			continue
+		var group: Array[Vector2i] = [start]
+		seen[start] = true
+		var next: int = 0
+		while next < group.size():
+			for around: Vector2i in neighbors(group[next]):
+				if is_pad.has(around) and not seen.has(around):
+					seen[around] = true
+					group.append(around)
+			next += 1
+		var points: Dictionary[Vector2i, bool] = {}
+		for cell: Vector2i in group:
+			for x: int in CELL_M + 1:
+				for z: int in CELL_M + 1:
+					points[cell * CELL_M + Vector2i(x, z)] = true
+		# Natural heights are whole parts of HEIGHT_PARTS, so the sum is exact.
+		var total: float = 0.0
+		for point: Vector2i in points:
+			total += natural(point)
+		var level_m: float = roundf(total / points.size() * HEIGHT_PARTS) / HEIGHT_PARTS
+		for point: Vector2i in points:
+			levels[point] = level_m
+	return levels
+
+
+## The most a level point is from the natural ground.
+static func pad_shift_m(levels: Dictionary[Vector2i, float]) -> float:
+	var shift_m: float = 0.0
+	for point: Vector2i in levels:
+		shift_m = maxf(shift_m, absf(levels[point] - natural(point)))
+	return shift_m
+
+
+## Levels the ground under these pad cells from now on.
+static func use_pads(pads: Array[Vector2i]) -> void:
+	level_points = pad_levels(pads)
 
 
 ## A cell's digging. The water's bed is fixed, so an older save's digging in or by

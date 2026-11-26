@@ -164,15 +164,15 @@ func test_ground_under_a_piece_cannot_be_dug_or_filled() -> String:
 	var problems: PackedStringArray = []
 	gs.stone = 50
 	gs.dig(_at(cell))
-	gs.place_stone(_at(cell), StonePieces.PAD)
+	gs.place_stone(_at(cell), StonePieces.WALL)
 	if gs.dig(_at(cell)) != GameStateScript.STONE_IN_THE_WAY or gs.fill(_at(cell)) != GameStateScript.STONE_IN_THE_WAY:
-		problems.append("The ground under a pad was changed.")
+		problems.append("The ground under a wall was changed.")
 	if gs.dug.get(cell, 0) != 1:
-		problems.append("The dug depth under a pad moved: %d" % gs.dug.get(cell, 0))
+		problems.append("The dug depth under a wall moved: %d" % gs.dug.get(cell, 0))
 	gs.place_stone(_at(cell), StonePieces.TAKE_UP)
 	var problem: String = gs.fill(_at(cell))
 	if problem != "" or gs.dug.has(cell):
-		problems.append("The ground could not be filled once the pad was up: %s" % problem)
+		problems.append("The ground could not be filled once the wall was up: %s" % problem)
 	gs.free()
 	return "\n".join(problems)
 
