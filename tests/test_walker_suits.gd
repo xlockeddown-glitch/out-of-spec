@@ -169,3 +169,25 @@ func test_players_getting_out_together_try_different_spots() -> String:
 	CoopWalkers.out.clear()
 	CoopWalkers.out.merge(out)
 	return problem
+
+
+func test_boots_are_lighter_than_the_old_dark_ones() -> String:
+	var old_boots := Color("#1d222b")
+	if WalkerModel.BOOT.get_luminance() < old_boots.get_luminance() + 0.1:
+		return "The boots must be clearly lighter than #1d222b"
+	var boots: int = 0
+	var model := WalkerModel.new()
+	for mesh: MeshInstance3D in model.find_children("*", "MeshInstance3D", true, false):
+		if (mesh.mesh as BoxMesh).material.albedo_color == WalkerModel.BOOT:
+			boots += 1
+	model.free()
+	return "" if boots == 2 else "Two boots must be drawn in BOOT, found %d" % boots
+
+
+func test_two_players_are_told_apart_at_a_distance() -> String:
+	var roster: Array[String] = _roster(["player_1", "player_2"])
+	var host: Color = WalkerModel.suit_for("player_1", roster)
+	var guest: Color = WalkerModel.suit_for("player_2", roster)
+	if absf(host.h - guest.h) < 0.1 and absf(host.get_luminance() - guest.get_luminance()) < 0.1:
+		return "The host and the first guest look alike"
+	return ""

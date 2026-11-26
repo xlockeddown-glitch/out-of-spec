@@ -325,3 +325,11 @@ func test_a_full_plot_for_a_day_does_not_empty_it_on_current_numbers() -> String
 	var level: float = gs.cistern_liters
 	gs.free()
 	return "" if level > 0.0 else "With the current numbers a full plot must not empty it in a day (revisit the pause if they change)."
+
+
+func test_the_glass_is_big_enough_to_read() -> String:
+	if CisternGauge.SLOT_SIZE.x < 0.5 or CisternGauge.SLOT_SIZE.y < 1.2:
+		return "The glass must be at least 0.5 m wide and 1.2 m tall, got %s" % CisternGauge.SLOT_SIZE
+	if CisternGauge.FRAME_SIZE.x <= CisternGauge.SLOT_SIZE.x or CisternGauge.FRAME_SIZE.y <= CisternGauge.SLOT_SIZE.y:
+		return "The frame must surround the glass"
+	return ""
