@@ -23,6 +23,10 @@ const AT_CELL: Array[StringName] = [&"adjust_setpoint", &"dig", &"fill", &"harve
 const CELL_REACH_M: float = 6.0
 const FAR_REFUSAL: String = "Too far from the rover."
 const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
+## Actions that may carry a mini-game's score after their own arguments: a whole
+## number. The host cuts it to what it allows (MinigameScore.allowed); with none,
+## or one it does not allow, the action is as it always was.
+const SCORED: Array[StringName] = [&"calibrate_at_bench"]
 
 ## True while a guest: nothing is done here, only asked for.
 var guest: bool = false
@@ -70,9 +74,25 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	if not action in NO_WAKE:
 		CoopBeds.get_up(player_id)
 	var passed: Array = arguments.duplicate()
+	var scored: bool = action in SCORED
+	var score: int = MinigameScore.SKIPPED
+	var sent: bool = scored and passed.size() > _own_count(action)
+	if sent:
+		# Never the sender's number as it came: the host's cut of it.
+		score = MinigameScore.allowed(_farm(), str(passed[0]), player_id, passed.pop_back())
 	if _player_index(action) >= 0:
 		passed.append(player_id)
+	if scored:
+		MinigameScore.arm(_farm(), str(passed[0]), score)
 	var result: Variant = _farm().callv(action, passed)
+	if scored:
+		# A refusal zeroes nothing, so the factor is taken back here.
+		MinigameScore.disarm(_farm(), str(passed[0]))
+		if sent and result is Dictionary and result.has("as_left"):
+			# What the host counted, for the sender's screen. A copy: the farm's
+			# own record is kept as it is, with no new field.
+			result = (result as Dictionary).duplicate()
+			result[MinigameScore.RECORD_KEY] = score
 	# The quests only watch: after anything a player did, they look again. New
 	# ones are offered in the morning, not on top of this command's own line.
 	var none: Array[String] = []
@@ -102,7 +122,12 @@ func problem(action: StringName, arguments: Array) -> String:
 	var expected: Array = _method(action)["args"]
 	if _player_index(action) >= 0:
 		expected = expected.slice(0, _player_index(action))
-	if arguments.size() != expected.size():
+	var given: int = arguments.size()
+	if action in SCORED and given == expected.size() + 1:
+		if typeof(arguments[-1]) != TYPE_INT:
+			return "'%s' has a bad score." % action
+		given -= 1
+	if given != expected.size():
 		return "'%s' takes %d arguments, not %d." % [action, expected.size(), arguments.size()]
 	for i: int in expected.size():
 		if typeof(arguments[i]) != expected[i]["type"]:
@@ -155,6 +180,11 @@ func _player_index(action: StringName) -> int:
 		if args[i]["name"] in PLAYER_ARGUMENTS:
 			return i
 	return -1
+
+
+## How many arguments of its own the action takes, the player's left out.
+func _own_count(action: StringName) -> int:
+	return _player_index(action) if _player_index(action) >= 0 else (_method(action)["args"] as Array).size()
 
 
 func _method(action: StringName) -> Dictionary:

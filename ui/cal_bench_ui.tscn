@@ -1,7 +1,8 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/cal_bench_ui.gd" id="1_bench"]
 [ext_resource type="Script" path="res://scripts/ui/band_meter.gd" id="2_meter"]
+[ext_resource type="PackedScene" path="res://ui/minigames/set_the_zero.tscn" id="3_zero"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
 content_margin_left = 36.0
@@ -89,6 +90,25 @@ custom_minimum_size = Vector2(380, 44)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 20
+
+[node name="GameSpacer" type="Control" parent="Panel/Content/InstrumentRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="CarefulCheck" type="CheckButton" parent="Panel/Content/InstrumentRow"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+theme_override_font_sizes/font_size = 16
+text = "CAREFUL"
+
+[node name="GameOption" type="OptionButton" parent="Panel/Content/InstrumentRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+tooltip_text = "Set the Zero comes up at key moments. Rewards are the same on every setting. OFF: always one click."
+focus_mode = 0
+theme_override_font_sizes/font_size = 16
 
 [node name="ReadingsRow" type="HBoxContainer" parent="Panel/Content"]
 layout_mode = 2
@@ -205,3 +225,8 @@ layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 24
 text = "CLOSE  [Esc]"
+
+[node name="ZeroGame" parent="." instance=ExtResource("3_zero")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1

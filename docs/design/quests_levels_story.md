@@ -707,7 +707,7 @@ A guest who finishes a story quest on a friend's farm keeps the quest point. The
 8. **Co-op for quests.** Personal quest state and quest points also go into the guest's own file, so they travel. Until this step a guest's points live only on the host's save. Lab quests join the farm sync.
 9. **Lab-level gates.** Turn on the table in §3.4 and the provisional way through (§3.2.1), once Ryan sets the levels and the lab XP budget has been checked. Existing saves keep what they have.
 10. **One-use rewards and keepsakes.** The standard discount, the free refit, and keepsakes with a place to see them.
-11. **Mini-game 1: Set the Zero.** With skip, difficulty and the CAREFUL switch. Added to S1.
+11. **Mini-game 1: Set the Zero.** With skip, difficulty and the CAREFUL switch. Added to S1. **Built (part 1, 2026-11-26):** the game (`ui/minigames/set_the_zero.tscn`), its pure score, SKIP, the difficulty (Standard, Relaxed, Sharp, Off) and the CAREFUL switch at Calibration 5, both kept on the player's machine. The bench opens it before ZERO / CALIBRATE on the lab's first calibration by hand of a kind of instrument, or with CAREFUL on; the score sets the as-left residual by the table of §7.2, and a skip or a score under 60 is today's result. In co-op the score rides in the calibrate command and the host cuts it to 0 to 100 and to key moments. **Still to come (part 2):** the S1 step's `minigame` field opening it, the quest grade, and the XP and job bonuses of §7.2. Notes and questions are in `docs/decisions.md`.
 12. **More of the first slice.** S2 (with the mug ring prop), L2, L4, P1, P2.
 13. **Quest-issued jobs.** Chet's envelope, then S3.
 14. **Daily asks.** D2.

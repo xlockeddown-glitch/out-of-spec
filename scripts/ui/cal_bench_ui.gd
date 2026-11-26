@@ -10,6 +10,9 @@ extends Control
 ## that calibrates them. Each instrument shows its traceability chain under the standard line.
 ## Accepted customer jobs are listed too ("job:" ids): CALIBRATE FOR CUSTOMER
 ## runs GameState.complete_job() against the best standard for the job.
+## At a key moment (MinigameScore.is_due) ZERO / CALIBRATE opens Set the Zero
+## first, and its score goes with the command. The CAREFUL switch and the game's
+## difficulty are this player's own (MinigameSettings).
 
 signal closed
 
@@ -54,6 +57,9 @@ var _send_button := Button.new()
 @onready var _result_label: Label = %ResultLabel
 @onready var _calibrate_button: Button = %CalibrateButton
 @onready var _close_button: Button = %CloseButton
+@onready var _careful_check: CheckButton = %CarefulCheck
+@onready var _game_option: OptionButton = %GameOption
+@onready var _zero_game: SetTheZero = %ZeroGame
 
 
 func _ready() -> void:
@@ -67,6 +73,10 @@ func _ready() -> void:
 	_calibrate_button.add_sibling(_send_button)
 	_send_button.pressed.connect(_on_send_pressed)
 	_close_button.pressed.connect(close)
+	for mode: int in MinigameSettings.MODE_NAMES:
+		_game_option.add_item(MinigameSettings.MODE_NAMES[mode], mode)
+	_game_option.item_selected.connect(_on_game_mode_picked)
+	_careful_check.toggled.connect(MinigameSettings.set_careful)
 	GameState.drop_pod_changed.connect(_on_pod_or_oirm_changed.unbind(1))
 	GameState.oirm_changed.connect(_on_pod_or_oirm_changed)
 	GameState.jobs_changed.connect(_on_jobs_changed)
@@ -89,6 +99,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func open(instrument_id: String = "hygrometer") -> void:
 	_visit += 1
 	_rebuild_list()
+	_show_game_choices()
 	show()
 	var index: int = maxi(_ids.find(instrument_id), 0)
 	_instrument_option.select(index)
@@ -109,8 +120,31 @@ func _rebuild_list() -> void:
 
 func close() -> void:
 	_visit += 1
+	# A game left open ends with no score, and nothing is calibrated.
+	_zero_game.skip()
 	hide()
 	closed.emit()
+
+
+## The player's own switch and difficulty, as kept. CAREFUL is locked until the
+## Calibration level that opens it.
+func _show_game_choices() -> void:
+	var unlocked: bool = GameState.has_skill_unlock(MinigameScore.CAREFUL_UNLOCK)
+	var level: int = int(DataManager.get_record(GameState.SKILLS_TABLE, MinigameScore.CAREFUL_UNLOCK, "unlocks").get("level", 0))
+	_careful_check.disabled = not unlocked
+	_careful_check.set_pressed_no_signal(unlocked and MinigameSettings.careful())
+	_careful_check.text = "CAREFUL" if unlocked else "CAREFUL (Calibration %d)" % level
+	_careful_check.tooltip_text = "Play Set the Zero on every bench calibration, for a smaller as-left residual."
+	_game_option.select(_game_option.get_item_index(MinigameSettings.mode()))
+
+
+func _on_game_mode_picked(index: int) -> void:
+	MinigameSettings.set_mode(_game_option.get_item_id(index))
+
+
+## Whether ZERO / CALIBRATE opens Set the Zero for the instrument shown.
+func _zero_game_due(instrument_id: String) -> bool:
+	return MinigameSettings.mode() != MinigameSettings.Mode.OFF and not _budget.get("refused", false) 		and MinigameScore.is_due(GameState, instrument_id, GameState.local_player_id, MinigameSettings.careful())
 
 
 ## The pod landing or leaving changes whether a standard can be sent, and a
@@ -365,7 +399,20 @@ func _on_calibrate_pressed() -> void:
 		# Done: keep the pay and credibility shown, not "no longer active".
 		_current_id = ""
 		return
-	var record: Dictionary = await FarmCommands.request(&"calibrate_at_bench", [id])
+	var arguments: Array = [id]
+	if _zero_game_due(id):
+		_calibrate_button.disabled = true
+		_zero_game.play(MinigameScore.sweet_share(GameState, GameState.local_player_id), MinigameSettings.mode(),
+			hash([id, GameState.cal_log.size()]), GameState.instrument_name(id, true))
+		var score: int = await _zero_game.finished
+		# Closed with the game open: nothing is calibrated.
+		if _visit != visit:
+			return
+		_calibrate_button.disabled = false
+		# A skip sends no score: the command as it always was.
+		if score != MinigameScore.SKIPPED:
+			arguments.append(score)
+	var record: Dictionary = await FarmCommands.request(&"calibrate_at_bench", arguments)
 	if record.is_empty() or _visit != visit:
 		return
 	if record.get("no_answer", false):
@@ -424,6 +471,10 @@ func _on_calibrate_pressed() -> void:
 	else:
 		_result_label.text = "AS-FOUND WITHIN ACCEPTANCE LIMIT, LATE: PASS. Interval unchanged. " + interval_note
 	_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
+	# The score the host counted, if a game was played and it counted one.
+	var zero_text: String = MinigameScore.result_text(int(record.get(MinigameScore.RECORD_KEY, MinigameScore.SKIPPED)))
+	if zero_text != "":
+		_result_label.text += " " + zero_text
 	_finished_text = _result_label.text
 	_finished_color = DriftingSensor.band_color(band)
 	_finished_budget = _recorded_budget(record)

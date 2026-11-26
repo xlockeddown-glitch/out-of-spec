@@ -1,0 +1,112 @@
+class_name MinigameScore
+extends RefCounted
+## What a mini-game's score is worth, and when one is played
+## (docs/design/quests_levels_story.md section 7). A score is a whole number
+## from 0 to 100. A skip, and any try under the first grade, give exactly the
+## plain result: a mini-game can only add (Q10).
+
+## No game was played, or its score did not count.
+const SKIPPED: int = -1
+const MAX_SCORE: int = 100
+## The field a scored command's answer gains: the score the host counted.
+const RECORD_KEY: String = "zero_score"
+## The Calibration unlock (data/skills.json) that opens the CAREFUL switch.
+const CAREFUL_UNLOCK: String = "careful_bench"
+const SKILL: String = "calibration"
+## GameState.MANAGER_ID: the grace-night calibrations are not a player's.
+const MANAGER: String = "Manager"
+
+## Section 7.2, best first: at `from` and over, the as-left residual is times
+## `residual`. Under the last row a try is Standard, the same as a skip.
+const GRADES: Array[Dictionary] = [
+	{ "from": 95, "name": "Reference", "residual": 0.4 },
+	{ "from": 80, "name": "Fine", "residual": 0.6 },
+	{ "from": 60, "name": "Good", "residual": 0.8 },
+]
+const STANDARD_GRADE: String = "Standard"
+
+
+## What is left of the as-left residual at this score: 1.0 for a skip or a poor try.
+static func residual_factor(score: int) -> float:
+	for grade: Dictionary in GRADES:
+		if score >= int(grade["from"]):
+			return float(grade["residual"])
+	return 1.0
+
+
+static func grade_name(score: int) -> String:
+	for grade: Dictionary in GRADES:
+		if score >= int(grade["from"]):
+			return str(grade["name"])
+	return STANDARD_GRADE
+
+
+## "Zero score 97 of 100: REFERENCE, as-left residual 40 % of standard."
+static func result_text(score: int) -> String:
+	if score < 0:
+		return ""
+	var factor: float = residual_factor(score)
+	return "Zero score %d of %d: %s%s." % [score, MAX_SCORE, grade_name(score).to_upper(),
+		", as-left residual %d %% of standard" % roundi(factor * 100.0) if factor < 1.0 else ", standard result"]
+
+
+## The kind of instrument: a robot's sensor ("laser@TR-1") is its sensor's kind.
+static func instrument_type(instrument_id: String) -> String:
+	return instrument_id.get_slice("@", 0)
+
+
+## True until the lab has calibrated an instrument of this kind against a
+## standard by a player's own hand. A robot's and the manager's do not count.
+static func is_first_of_type(cal_log: Array, instrument_id: String) -> bool:
+	var type: String = instrument_type(instrument_id)
+	for record: Variant in cal_log:
+		if record is Dictionary and str(record.get("standard_id", "")) != "" 				and str(record.get("programmed_by", "")) == "" 				and str(record.get("performed_by", "")) != MANAGER 				and instrument_type(str(record.get("instrument_id", ""))) == type:
+			return false
+	return true
+
+
+## Whether a score from `player_id` (never "") may count for this instrument:
+## is_due() with the switch on. The host asks this of a score that came with a
+## command. It can't see a guest's switch, only the level the switch needs.
+static func may_count(farm: Node, instrument_id: String, player_id: String) -> bool:
+	return is_due(farm, instrument_id, player_id, true)
+
+
+## Whether the game opens for this player (never "") at the bench: a key moment
+## of section 7.4. With the CAREFUL unlock and `careful`, the player's own
+## switch, any bench calibration is one, a standard's too. Without, only a
+## unit's first calibration of its kind.
+static func is_due(farm: Node, instrument_id: String, player_id: String, careful: bool) -> bool:
+	var sensor: DriftingSensor = farm.get_sensor(instrument_id)
+	if sensor == null:
+		return false
+	if careful and farm.has_skill_unlock(CAREFUL_UNLOCK, player_id):
+		return true
+	return sensor.role != "standard" and is_first_of_type(farm.cal_log, instrument_id)
+
+
+## The host's cut of a score that came with a command: SKIPPED where no game
+## could have been due, else held to 0 to MAX_SCORE.
+static func allowed(farm: Node, instrument_id: String, player_id: String, score: int) -> int:
+	if not may_count(farm, instrument_id, player_id):
+		return SKIPPED
+	return clampi(score, 0, MAX_SCORE)
+
+
+## Sets the factor the instrument's next zero takes. A skip sets 1.0.
+static func arm(farm: Node, instrument_id: String, score: int) -> void:
+	var sensor: DriftingSensor = farm.get_sensor(instrument_id)
+	if sensor != null:
+		sensor.next_residual_scale = residual_factor(score)
+
+
+static func disarm(farm: Node, instrument_id: String) -> void:
+	var sensor: DriftingSensor = farm.get_sensor(instrument_id)
+	if sensor != null:
+		sensor.next_residual_scale = 1.0
+
+
+## How much of the sweet spot's widening (section 7.3) this player's Calibration
+## has, 0 to 1: the same front-loaded share as a skill's effects.
+static func sweet_share(farm: Node, player_id: String) -> float:
+	return maxf(farm.effect_share(farm.skill_level(SKILL, player_id)), farm.effect_floor(SKILL, player_id))
