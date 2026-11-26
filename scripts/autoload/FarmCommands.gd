@@ -10,7 +10,7 @@ const ACTIONS: Array[StringName] = [
 	&"adjust_setpoint", &"build_block_stack", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
 	&"calibrate_at_bench", &"catch_sentinel", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
 	&"harvest_crop", &"hit_boulder", &"mine_fissure", &"move_rover", &"place_stone", &"plant_crop", &"release_robot", &"remove_robot_card",
-	&"sell_harvest_to_lin", &"send_to_oirm", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay", &"spend_xp_certificate",
+	&"sell_harvest_to_lin", &"send_to_oirm", &"service_wheels", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay", &"spend_xp_certificate",
 	&"start_lab_grow", &"survey_ore", &"till", &"zero_steering",
 ]
 ## What a player in bed may do and stay in bed: going to bed, and paperwork.
@@ -27,6 +27,8 @@ const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
 ## number. The host cuts it to what it allows (MinigameScore.allowed, or
 ## seat_allowed for the relay); with none,
 ## or one it does not allow, the action is as it always was.
+## service_wheels has a score argument for Torque to Spec and is not here until
+## that game is: no player can send it one.
 const SCORED: Array[StringName] = [&"calibrate_at_bench", &"slot_spool_into_relay"]
 
 ## True while a guest: nothing is done here, only asked for.

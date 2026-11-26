@@ -1771,3 +1771,28 @@ Built from section 7 of the design (7.1 row 5, 7.2 to 7.6). Every number is a pl
 5. The numbers: an 8 s lowering, half-speed sway at Husbandry 99, a slot 4 % of the reach wide each side, a 2.5 s hold cap. A spool nobody steers earned no more than Fine in testing and usually no grade. Say if any feels wrong when played.
 6. Three edges: on a farm whose best spool is already seated, the step waits for a better or a replacement spool; a spool collected and seated on the same day never sees the ask; the tunnels' relay button does not open the game. Change any of these?
 7. No practice swing here either. Add one?
+
+## 2026-11-26: Bram's wheel service (build order step 16 of `docs/design/quests_levels_story.md`, the repair action for mini-game 4)
+
+Torque to Spec (section 7.1 row 4) needs a rover repair action to plug into, and there was none. This is the smallest one. The game is not built.
+
+- **The action**: Bram re-torques the rover's five wheel nuts, in star order. In his bay, press Y or the new button under his trade. One press does it.
+- **When it is due**: after the rover has driven 1500 m since the last service [PLACEHOLDER, `wheel_service/due_m` in `data/items.json`]. The meters are counted where the steering encoder's are, in `GameState.add_rover_usage`, so in co-op the host counts everyone's driving. When they come due Bram posts one line to the phone, and the bay says so on the way in.
+- **No penalty**: nothing reads the meters but the service. An overdue rover drives, steers, wears and sells the same. A test compares the whole saved farm with and without overdue nuts.
+- **Why a plain odometer and not the tire gauge or the steering encoder**: those are calibrated sensors with due dates and drift. Tying the nuts to one of them would give a bay service a metrology consequence, which is a penalty by another name.
+- **What a service gives**: 25 Robotics XP to the player who asked (source `service_wheels`, sized like `slot_spool`) and 10 lab XP to the farm (source `lab_wheels`) [PLACEHOLDER, `data/skills.json`]. It is free. Because it is an XP source it is counted, so a quest step may be a counter of `service_wheels`.
+- **Refusals**: on foot (the usual line), the rover in the tunnels, and not due (with the meters driven and the distance). The host does not check that the rover stands in Bram's bay; the screen does, as it does for his wide treads.
+- **The score**: `service_wheels(player_id, score)` has the trailing score argument the other scored actions have. Nothing reads it, and `service_wheels` is not in `FarmCommands.SCORED`, so a guest cannot send one. What a good score is worth is left to the game's PR.
+- **Co-op and saves**: the action rides the command path, so the protocol is still 16. One farm field was added, `wheel_meters`, as a later field: the save version is still 1 and a save without it loads with nothing driven. A new signal, `wheels_changed`, tells a guest's screen.
+- **The phone**: the button is built in code inside Bram's panel. No scene and no look was changed.
+
+### Questions for Ryan
+
+1. Is 1500 m between services about right? It is a guess; say how often a visit to Bram should come up.
+2. Section 3.2 says driving does not feed the lab level, and the lab's source list is fixed by a test. A bay service is not driving, so it gives 10 lab XP and the list has one more row. Keep it, or should a service give Robotics XP only?
+3. Is 25 Robotics XP right (the same as seating a spool or calibrating a robot)?
+4. Should overdue nuts ever matter? Today they never do. Your call if a mild cost is wanted later.
+5. The service is free. Should Bram charge credits or ore?
+6. The host does not check the rover is in the bay, the same as for wide treads. Tighten both, or leave both?
+7. When Torque to Spec is built, what should a good score be worth: more XP on the service (as the spool does), a longer distance to the next one, or only a quest grade?
+8. The key is Y and Bram's words are placeholders. Change any?

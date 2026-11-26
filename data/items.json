@@ -17,5 +17,11 @@
     "ore_cost": 6,
     "usage_drift_multiplier": 0.5,
     "_note": "Bram: 'Bring me six crystal ore and I'll bolt wider treads onto your tractor. Cuts steering drift in half on loose dirt.' Halves usage (per-meter) drift only."
+  },
+  "wheel_service": {
+    "display_name": "Wheel Nut Re-torque",
+    "seller": "bram",
+    "due_m": 1500,
+    "_note": "Bram re-torques the rover's five wheel nuts, in star order, once it has driven due_m meters since the last time [PLACEHOLDER]. Free. Nothing gets worse when it is overdue. The XP is in skills.json (service_wheels, lab_wheels) [PLACEHOLDER]. Torque to Spec will plug in here."
   }
 }

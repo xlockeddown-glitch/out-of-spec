@@ -131,6 +131,8 @@ func _ready() -> void:
 	_cal_pad.rover_entered.connect(_on_rover_entered_cal_pad)
 	_tunnel_pad.rover_entered.connect(func() -> void: _hud.push_log("TUNNEL MOUTH: press E to enter."))
 	_hud.trade_pressed.connect(_try_trade)
+	_hud.wheel_service_pressed.connect(_try_wheel_service)
+	GameState.wheels_changed.connect(_on_wheels_changed)
 	_hud.buy_standard_pressed.connect(_try_buy_standard)
 	_hud.accept_job_pressed.connect(_try_accept_job)
 	GameState.jobs_changed.connect(_refresh_jobs_hud)
@@ -576,6 +578,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _is_key(event, KEY_L) and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_sell_to_lin()
+	elif _is_key(event, KEY_Y) and _bram_bay.rover_inside:
+		get_viewport().set_input_as_handled()
+		_try_wheel_service()
 	elif _is_key(event, KEY_T) and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_robots_ui.open()
@@ -784,11 +789,14 @@ func _on_rover_entered_bay() -> void:
 			SP811.integer(GameState.harvest_bin.size()), SP811.integer(GameState.harvest_bin_value())])
 	if GameState.owned_standards.has("torque_standard") or not GameState.robots.is_empty():
 		_hud.push_log("BRAM: robots are built here. Press T.")
+	if GameState.wheels_due():
+		_hud.push_log("BRAM: wheel nuts are due a re-torque. Press Y.")
 	_refresh_bram()
 
 
 func _refresh_bram() -> void:
 	_hud.show_bram(_bram_line, GameState.treads_ore_cost(), GameState.crystal_ore, GameState.has_wide_treads)
+	_hud.show_wheel_service(GameState.wheel_service_text(), GameState.wheels_due())
 	var offers: Array[Dictionary] = []
 	if GameState.tier1_unlocked:
 		var catalog: Array[String] = GameState.bram_catalog()
@@ -848,6 +856,29 @@ func _try_trade() -> void:
 		_bram_line = problem
 		_hud.push_log("BRAM: " + problem)
 	_refresh_bram()
+
+
+## Bram re-torques the wheel nuts: one press, and only when they are due.
+func _try_wheel_service() -> void:
+	if _refuse_on_foot():
+		return
+	if not _bram_bay.rover_inside:
+		return
+	_armed_standard = ""
+	var problem: String = await FarmCommands.request(&"service_wheels")
+	if not is_inside_tree() or not _bram_bay.rover_inside:
+		return
+	if problem.is_empty():
+		_bram_line = "Five nuts, star order, each to the click. You're good for another %s m." % SP811.integer(roundi(GameState.wheel_service_due_m()))
+	else:
+		_bram_line = problem
+		_hud.push_log("BRAM: " + problem)
+	_refresh_bram()
+
+
+func _on_wheels_changed() -> void:
+	if _bram_bay.rover_inside:
+		_refresh_bram()
 
 
 func _go_to_dome() -> void:

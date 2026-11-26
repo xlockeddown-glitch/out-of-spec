@@ -11,9 +11,9 @@ const WD1: String = "reference_gauge"
 const HB700: String = "pressure_controller"
 const JOB: String = "relay_inclinometer"
 const GUEST: String = "player_2"
-## Section 3.2 of the design.
+## Section 3.2 of the design, and the wheel service (docs/decisions.md).
 const DESIGN: Dictionary = { "lab_calibration": 25, "lab_robot_calibration": 10, "buy_standard": 75, "calibrate_standard": 100,
-	"lab_job": 0.5, "lab_clean_audit": 250, "lab_certificate": 200, "lab_spool": 25, "lab_robot": 250, "lab_area": 150, "lab_grown": 500 }
+	"lab_job": 0.5, "lab_clean_audit": 250, "lab_certificate": 200, "lab_spool": 25, "lab_wheels": 10, "lab_robot": 250, "lab_area": 150, "lab_grown": 500 }
 
 
 func _run(body: Callable) -> String:
