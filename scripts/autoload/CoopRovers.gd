@@ -16,11 +16,14 @@ const CLAIM_MS: int = 1500
 const MOVING_MS: int = 50
 const STILL_MS: int = 1000
 ## A guest's rover may go this far at once, and this fast after that: above the
-## rover's 6 m/s, for a late message [PLACEHOLDER].
-const REACH_M: float = 15.0
+## rover's 6 m/s, for a late message [PLACEHOLDER]. At once is past the 16 m a dig
+## that floods the spot sends a rover (PIT_SEARCH_M).
+const REACH_M: float = 18.0
 const REACH_MPS: float = 7.5
 ## No rover is farther out than this [PLACEHOLDER].
 const FARTHEST_M: float = 500.0
+## A rover on the farm may be this far past the land's edge [PLACEHOLDER].
+const EDGE_M: float = 2.0
 
 ## Only tests set others.
 var session: Node
@@ -64,13 +67,31 @@ func _process(_delta: float) -> void:
 	tick(Time.get_ticks_msec())
 
 
-func is_pose(pose: Array) -> bool:
+## Six values, the last whether it sees the relay: what the sender must get right,
+## or be dropped.
+func is_shape(pose: Array) -> bool:
 	if pose.size() != 6 or typeof(pose[5]) != TYPE_BOOL:
 		return false
 	for i: int in 5:
-		if typeof(pose[i]) != TYPE_FLOAT or not is_finite(pose[i]) or absf(pose[i]) > FARTHEST_M:
+		if typeof(pose[i]) != TYPE_FLOAT:
 			return false
 	return true
+
+
+## Numbers that are real and on the map.
+func is_pose(pose: Array) -> bool:
+	if not is_shape(pose):
+		return false
+	for i: int in 5:
+		if not is_finite(pose[i]) or absf(pose[i]) > FARTHEST_M:
+			return false
+	return true
+
+
+## Host: a guest's pose that it may say: not faster than a rover goes. A pose that
+## is not is refused, not the guest.
+func is_sane(pose: Array) -> bool:
+	return is_pose(pose) and absf(pose[4]) <= REACH_MPS
 
 
 ## There is someone to share a rover with, or a farm that is not ours.
@@ -162,16 +183,20 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 		return
 	if not driver(rover_id) in ["", player_id] or not together() or CoopWalkers.is_out(player_id):
 		return
+	if not is_sane(pose):
+		_refuse(player_id, rover_id, "a rover at %s" % [pose], now)
+		return
 	var to: Transform3D = _transform(pose)
 	var from: Transform3D = place(rover_id)
 	var reach: Array = _reach.get(rover_id, [REACH_M, now])
 	var left: float = minf(REACH_M, reach[0] + (now - reach[1]) * REACH_MPS / 1000.0)
 	var distance: float = from.origin.distance_to(to.origin)
+	if distance > left:
+		_refuse(player_id, rover_id, "a rover %.1f m away, %.1f m allowed" % [distance, left], now)
+		return
 	# In the rock nobody could get it out again.
-	if distance > left or (rover_id == farm.TUNNEL_ROVER and not TunnelRock.holds(to.origin)):
-		# It is told where the rover is, and drives on from there.
-		_drivers.erase(rover_id)
-		_sent_at.erase(rover_id)
+	if not _in_bounds(rover_id, to.origin) or (rover_id == farm.TUNNEL_ROVER and not TunnelRock.holds(to.origin)):
+		_refuse(player_id, rover_id, "a rover out of bounds at %s" % [to.origin], now)
 		return
 	_reach[rover_id] = [left - distance, now]
 	_drivers[rover_id] = [player_id, now + HOLD_MS]
@@ -182,6 +207,18 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 	# A rover in the host's own scene looks for the relay itself.
 	if now - _here_at.get(rover_id, -STILL_MS) >= STILL_MS:
 		farm.set_rover_uplink(rover_id, pose[5])
+
+
+## The farm's rover is on the land. The tunnels have their own bounds (the rock).
+func _in_bounds(rover_id: String, at: Vector3) -> bool:
+	return rover_id != farm.ROVER or maxf(absf(at.x), absf(at.z)) <= Terrain.HALF_M + EDGE_M
+
+
+func _refuse(player_id: String, rover_id: String, what: String, now: int) -> void:
+	session.note_refusal(player_id, "refused " + what, now)
+	# The guest is told where the rover is, and drives on from there.
+	_drivers.erase(rover_id)
+	_sent_at.erase(rover_id)
 
 
 ## Guest: the host says who drives and where the rover is.

@@ -13,6 +13,13 @@ const ACTIONS: Array[StringName] = [
 	&"sell_harvest_to_lin", &"send_to_oirm", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay",
 	&"start_lab_grow", &"survey_ore", &"till", &"zero_steering",
 ]
+## What is done at a cell of the farm's ground: the cell in front of the rover, or
+## under it. The cell's middle is within this far of the rover [PLACEHOLDER]: the
+## 2 m it digs ahead, half a cell's corner and what the host's word of the
+## rover lags.
+const AT_CELL: Array[StringName] = [&"adjust_setpoint", &"dig", &"fill", &"harvest_crop", &"place_stone", &"plant_crop", &"till"]
+const CELL_REACH_M: float = 6.0
+const FAR_REFUSAL: String = "Too far from the rover."
 const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
 
 ## True while a guest: nothing is done here, only asked for.
@@ -52,6 +59,9 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	var reason: String = "No player is named." if player_id == "" else problem(action, arguments)
 	if reason == "" and CoopWalkers.is_out(player_id) and not action in CoopWalkers.ON_FOOT:
 		reason = CoopWalkers.REFUSAL
+	if reason == "" and player_id != _farm().local_player_id and not is_within_reach(action, arguments):
+		reason = FAR_REFUSAL
+		CoopSession.note_refusal(player_id, "refused %s: too far from the rover" % action)
 	if reason != "":
 		return refusal(action, reason)
 	# Whoever does something is up.
@@ -61,6 +71,21 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	if _player_index(action) >= 0:
 		passed.append(player_id)
 	return _farm().callv(action, passed)
+
+
+## True unless `action` acts at a cell farther from the farm's rover than a player
+## in it reaches. Where the rover is not known or is in the tunnels, the ground is
+## not here to reach.
+func is_within_reach(action: StringName, arguments: Array) -> bool:
+	if not action in AT_CELL or arguments.is_empty() or not arguments[0] is Vector3i:
+		return true
+	var farm: Node = _farm()
+	if not farm.rover_transforms.has(farm.ROVER) or farm.rover_is_away(farm.ROVER):
+		return true
+	var cell: Vector3i = arguments[0]
+	var middle := Vector2((cell.x + 0.5) * Terrain.CELL_M, (cell.z + 0.5) * Terrain.CELL_M)
+	var rover: Vector3 = farm.parked_rover_transform(farm.ROVER).origin
+	return middle.distance_to(Vector2(rover.x, rover.z)) <= CELL_REACH_M
 
 
 ## Why these can't be asked for, or "". The values are GameState's to judge.

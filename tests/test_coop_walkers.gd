@@ -93,7 +93,7 @@ func test_bad_walking_is_not_taken() -> String:
 	if mine.is_out("player_2"):
 		return _end_with("Who is in the rover does not walk")
 	mine.get_out("player_2", 2.0, 0.0, 1000)
-	mine._on_walked("player_2", _pose(20.0), 1000)
+	mine._on_walked("player_2", _pose(25.0), 1000)
 	mine._on_walked("player_2", [3.0, 9.0, 0.0, 0.0, 4.0], 1000)
 	mine._on_walked("player_2", _pose(-Terrain.HALF_M - 1.0), 900000)
 	if mine.out["player_2"][0] != 2.0:
@@ -218,3 +218,47 @@ func test_a_guest_takes_no_bad_word_of_walkers() -> String:
 			return _end_with("The guest must leave a host that sends this: %s" % [bad])
 		_end_with("")
 	return _end_with("")
+
+
+func test_a_walker_that_is_not_real_or_too_fast_is_refused_and_the_guest_stays() -> String:
+	var all: Array = _pair()
+	var mine: Node = all[2]
+	mine.get_out("player_2", 2.0, 0.0, 1000)
+	for bad: Array in [[NAN, 0.0, 0.0, 0.0, 4.0], [INF, 0.0, 0.0, 0.0, 4.0], [0.0, 0.0, NAN, 0.0, 4.0], [0.0, 0.0, 0.0, 0.0, NAN],
+			[Terrain.HALF_M + 5.0, 0.0, 0.0, 0.0, 4.0], [9e9, 0.0, 0.0, 0.0, 4.0], [3.0, 0.0, 0.0, 0.0, 40.0], [30.0, 0.0, 0.0, 0.0, 4.0]]:
+		mine._on_walked("player_2", bad, 1000)
+		if mine.out["player_2"][0] != 2.0:
+			return _end_with("%s must be refused" % [bad])
+	# One refused packet does not end the connection.
+	all[1]._put(1, var_to_bytes([SessionScript.WALK, [NAN, 0.0, 0.0, 0.0, 0.0]]), false)
+	var polls: Array = [0]
+	_until(func() -> bool:
+		polls[0] += 1
+		return polls[0] > 100 or all[0].players.size() < 2)
+	return _end_with("" if all[0].players.size() == 2 else "A refused pose must not drop its sender")
+
+
+func test_walking_at_speed_is_taken_and_so_are_the_jumps_the_game_makes() -> String:
+	var all: Array = _pair()
+	var mine: Node = all[2]
+	mine.get_out("player_2", 2.0, 0.0, 1000)
+	# 4 m/s, a pose every 50 ms, for ten seconds.
+	for i: int in 200:
+		mine._on_walked("player_2", _pose(2.0 + 0.2 * (i + 1)), 1000 + 50 * (i + 1))
+	if absf(mine.out["player_2"][0] - 42.0) > 0.001:
+		return _end_with("Walking must be taken: %s" % [mine.out["player_2"]])
+	# A dig floods its place: the walker is put 16 m off at once.
+	mine._on_walked("player_2", _pose(58.0), 12000)
+	if mine.out["player_2"][0] != 58.0:
+		return _end_with("The pit rescue must be taken")
+	# Getting out is anywhere beside the rover, however far the last walk was.
+	mine._go_in("player_2")
+	mine.farm.rover_transforms[ID] = Transform3D(Basis.IDENTITY, Vector3(-40.0, 0.0, 0.0))
+	if mine.get_out("player_2", -38.0, 0.0, 13000) != "":
+		return _end_with("Out beside a rover that is elsewhere")
+	mine._on_walked("player_2", _pose(-37.0), 13100)
+	if mine.out["player_2"][0] != -37.0:
+		return _end_with("A walk from there must be taken")
+	# The rover goes into the tunnels: everyone is in, and starts again.
+	mine.farm.rover_place_changed.emit()
+	return _end_with("" if not mine.is_out("player_2") and mine._reach.is_empty() else "A new place starts again")
