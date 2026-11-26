@@ -96,7 +96,8 @@ func _process(_delta: float) -> void:
 	_in_reach = reach
 	if not reach:
 		_told_reach = false
-	_hub_near = LavaHub.nearest(_rover.global_position, GameState.beacons_placed) if _rover.away_text() == "" else {}
+	# One target for the prompt and for E: the Sentinel's catch comes first.
+	_hub_near = LavaHub.nearest(_rover.global_position, GameState.beacons_placed) if _rover.away_text() == "" and not reach else {}
 	_tell_hub()
 
 
@@ -169,6 +170,8 @@ func _use_rack() -> void:
 		_orin("rack_holding")
 	elif GameState.beacons_placed.size() >= LavaHub.SPOTS.size():
 		_orin("rack_empty")
+	elif LavaHub.job_problem(GameState.quest_state) != "":
+		_orin("rack_no_job")
 	else:
 		_holding_beacon = true
 		_orin("rack_take")

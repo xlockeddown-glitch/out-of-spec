@@ -683,6 +683,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 					return "'%s' has an entry of the wrong type." % field
 	if data.has("beacons_placed") and LavaHub.placed_problem(data["beacons_placed"]) != "":
 		return LavaHub.placed_problem(data["beacons_placed"])
+	var beacon_steps: String = LavaHub.steps_problem(QuestEngine.quests(), data.get("quest_state", {}), (data.get("beacons_placed", []) as Array).size())
+	if beacon_steps != "":
+		return beacon_steps
 	if data.has("_spool_damaged") and data["_spool_damaged"].size() > data["_spool_species"].size():
 		return "'_spool_damaged' has more entries than there are spools."
 	for needs: Array in [["at_oirm", TYPE_INT], ["suspect_units", TYPE_INT], ["mined_fissures", TYPE_INT], ["lab_areas", TYPE_INT], ["lab_areas_paid", TYPE_INT],
@@ -4662,9 +4665,17 @@ func set_rover_lights(on: bool, player_id: String = "") -> String:
 
 ## Host: a beacon goes down at one of the Lava Tubes spots, for the player in the
 ## tunnels. `player_id` is filled in from the connection (FarmCommands). Returns ""
-## or why not. How near the player is is their own screen's to see.
+## or why not. The player is in the tunnels, Beacon Run is taken and not done, and
+## the farm's tunnel rover is within reach of the spot. The host does not check that
+## the player took a beacon from the rack [PLACEHOLDER]: that is the player's own
+## screen's prompt.
 func place_beacon(spot_id: String, player_id: String = "") -> String:
 	var reason: String = LavaHub.place_problem(spot_id, beacons_placed, place_of(player_id))
+	if reason == "":
+		reason = LavaHub.job_problem(quest_state)
+	if reason == "":
+		SaveGame.saving.emit()  # the rover on this screen says where it is
+		reason = LavaHub.reach_problem(spot_id, rover_zone, rover_transforms.has(TUNNEL_ROVER), parked_rover_transform(TUNNEL_ROVER).origin)
 	if reason != "":
 		return reason
 	beacons_placed.append(spot_id)

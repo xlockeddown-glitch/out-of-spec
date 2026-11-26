@@ -20,6 +20,8 @@ const RACK_CELL := Vector2i(13, 18)
 const BOARD_CELL := Vector2i(8, 18)
 ## How near the rover must be to use one [PLACEHOLDER]. A cell is 3 m wide.
 const REACH_M: float = 4.0
+## The quest that hands out the beacons (data/quests.json).
+const QUEST: String = "beacon_run"
 ## What `nearest` calls what it found.
 const RACK: String = "rack"
 const BOARD: String = "board"
@@ -54,6 +56,47 @@ static func place_problem(spot_id: String, placed: Array, place: String) -> Stri
 		return "'%s' is not a beacon spot." % spot_id
 	if spot_id in placed:
 		return "There is a beacon at that spot already."
+	return ""
+
+
+## Why a beacon can't go down from where the farm's rover is, or "". `zone` is
+## GameState.rover_zone, `known` whether the host has the tunnel rover's place, and
+## `at` that place. The host's copy of the rover decides, not the player's word.
+static func reach_problem(spot_id: String, zone: String, known: bool, at: Vector3) -> String:
+	if zone != ZONE or not known:
+		return "The rover is not in the Lava Tubes."
+	var there: Vector3 = spot_position(spot_id)
+	if Vector2(there.x - at.x, there.z - at.z).length() > REACH_M:
+		return "The rover is too far from that spot."
+	return ""
+
+
+## Why Orin's beacons can't be set down yet, or "": the farm has not taken Beacon
+## Run, or it is done. `quest_state` is GameState.quest_state.
+static func job_problem(quest_state: Dictionary) -> String:
+	var entry: Variant = quest_state.get(QUEST)
+	if not entry is Dictionary or not entry.get("steps_done") is Array:
+		return "Take the job from the notice board first."
+	if int(entry.get("done", -1)) >= 0:
+		return "Orin has all the beacons he needs."
+	return ""
+
+
+## Why a saved farm's quest steps can't stand beside its beacons, or "": a quest
+## step that checks `beacons_placed` marked done with fewer beacons than it needs.
+static func steps_problem(quests: Array, quest_state: Variant, placed: int) -> String:
+	if not quest_state is Dictionary:
+		return ""
+	for quest: Variant in quests:
+		if not quest is Dictionary or not quest.get("steps") is Array:
+			continue
+		var entry: Variant = quest_state.get(str(quest.get("id", "")))
+		if not entry is Dictionary or not entry.get("steps_done") is Array:
+			continue
+		for step: Variant in quest["steps"]:
+			if step is Dictionary and str(step.get("check", "")) == "beacons_placed" \
+					and str(step.get("id", "")) in entry["steps_done"] and placed < QuestEngine.step_need(step):
+				return "'%s' says its beacons are placed and they are not." % str(quest.get("id", ""))
 	return ""
 
 

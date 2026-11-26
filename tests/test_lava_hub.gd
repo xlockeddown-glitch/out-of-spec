@@ -16,6 +16,15 @@ func _state() -> GameStateScript:
 	return gs
 
 
+## HOST in the tunnels with the farm's rover at `spot_id`, and Beacon Run taken.
+func _go(gs: GameStateScript, spot_id: String, taken: bool = true) -> void:
+	gs.player_places[HOST] = ["lava_tubes", 0]
+	gs.rover_zone = "lava_tubes"
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, LavaHub.spot_position(spot_id))
+	if taken and not gs.quest_state.has("beacon_run"):
+		gs.quest_state["beacon_run"] = { "accepted": 0, "steps_done": [], "base": {}, "shown": {}, "players": [], "done": -1 }
+
+
 func _beacon_run() -> Dictionary:
 	for quest: Dictionary in QuestEngine.quests():
 		if str(quest.get("id", "")) == "beacon_run":
@@ -63,13 +72,18 @@ func test_place_problem_rules() -> String:
 	return ""
 
 
-func test_the_command_places_for_a_player_in_the_tubes_only() -> String:
-	var gs: GameStateScript = _state()
+func _commander(gs: GameStateScript) -> Node:
 	var commands: Node = CommandsScript.new()
 	commands.state = gs
+	return commands
+
+
+func test_the_command_places_for_a_player_in_the_tubes_only() -> String:
+	var gs: GameStateScript = _state()
+	var commands: Node = _commander(gs)
 	var out: Variant = commands.execute(HOST, &"place_beacon", ["spot_west"])
 	var refused_home: bool = out != "" and gs.beacons_placed.is_empty()
-	gs.player_places[HOST] = ["lava_tubes", 0]
+	_go(gs, "spot_west")
 	var taken: Variant = commands.execute(HOST, &"place_beacon", ["spot_west"])
 	var twice: Variant = commands.execute(HOST, &"place_beacon", ["spot_west"])
 	var unknown: Variant = commands.execute(HOST, &"place_beacon", ["spot_nope"])
@@ -84,6 +98,43 @@ func test_the_command_places_for_a_player_in_the_tubes_only() -> String:
 	if twice == "" or unknown == "" or guest == "":
 		return "Refusals missing: twice '%s', unknown '%s', guest at home '%s'" % [twice, unknown, guest]
 	return ""
+
+
+func test_the_farms_rover_must_be_in_the_tubes_and_near_the_spot() -> String:
+	var gs: GameStateScript = _state()
+	_go(gs, "spot_west")
+	gs.rover_zone = ""
+	var home: String = gs.place_beacon("spot_west", HOST)
+	gs.rover_zone = "lava_tubes"
+	var far: String = ""
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, LavaHub.spot_position("spot_east"))
+	far = gs.place_beacon("spot_west", HOST)
+	gs.rover_transforms.erase(gs.TUNNEL_ROVER)
+	var lost: String = gs.place_beacon("spot_west", HOST)
+	var none: bool = gs.beacons_placed.is_empty()
+	_go(gs, "spot_west")
+	var near: String = gs.place_beacon("spot_west", HOST)
+	gs.free()
+	if home == "" or far == "" or lost == "" or not none:
+		return "Refusals missing: rover home '%s', far '%s', no rover '%s'" % [home, far, lost]
+	return near
+
+
+func test_beacons_wait_for_the_beacon_run_job() -> String:
+	var gs: GameStateScript = _state()
+	_go(gs, "spot_west", false)
+	var before: String = gs.place_beacon("spot_west", HOST)
+	_go(gs, "spot_west")
+	var open: String = gs.place_beacon("spot_west", HOST)
+	gs.quest_state["beacon_run"]["done"] = 3
+	_go(gs, "spot_east")
+	var after: String = gs.place_beacon("spot_east", HOST)
+	var placed: Array[String] = gs.beacons_placed.duplicate()
+	gs.free()
+	if before == "" or after == "":
+		return "A beacon went down with the job not taken ('%s') or done ('%s')." % [before, after]
+	return open if open != "" else ("" if placed == ["spot_west"] else "Placed %s" % [placed])
+
 
 
 func test_the_command_checks_its_arguments() -> String:
@@ -101,8 +152,9 @@ func test_the_command_checks_its_arguments() -> String:
 
 func test_placed_beacons_survive_a_save() -> String:
 	var gs: GameStateScript = _state()
-	gs.player_places[HOST] = ["lava_tubes", 0]
+	_go(gs, "spot_east")
 	gs.place_beacon("spot_east", HOST)
+	_go(gs, "spot_north")
 	gs.place_beacon("spot_north", HOST)
 	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
 	gs.free()
@@ -178,6 +230,7 @@ func test_the_check_counts_placed_beacons() -> String:
 	var counts: Array[int] = [QuestEngine.step_count(gs, step, entry, present)]
 	gs.player_places[HOST] = ["lava_tubes", 0]
 	for spot_id: String in LavaHub.spot_ids():
+		_go(gs, spot_id)
 		gs.place_beacon(spot_id, HOST)
 		counts.append(QuestEngine.step_count(gs, step, entry, present))
 	gs.free()
@@ -190,9 +243,12 @@ func test_the_quest_is_done_when_the_third_is_placed() -> String:
 	var quest: Dictionary = _beacon_run()
 	var step: Dictionary = (quest["steps"] as Array)[0]
 	gs.player_places[HOST] = ["lava_tubes", 0]
+	_go(gs, "spot_west")
 	gs.place_beacon("spot_west", HOST)
+	_go(gs, "spot_east")
 	gs.place_beacon("spot_east", HOST)
 	var two: int = QuestEngine.step_progress(gs, step, { "steps_done": [], "base": {} }, present)[0]
+	_go(gs, "spot_north")
 	gs.place_beacon("spot_north", HOST)
 	var three: Array[int] = QuestEngine.step_progress(gs, step, { "steps_done": [], "base": {} }, present)
 	gs.free()
@@ -224,7 +280,7 @@ func test_a_guest_is_shown_the_hosts_beacons() -> String:
 	if not FarmSync.SHOWN_BY.has(&"beacons_changed") or not "beacons_placed" in FarmSync.SHOWN_BY[&"beacons_changed"]:
 		return "FarmSync does not show beacons_placed on beacons_changed."
 	var host: GameStateScript = _state()
-	host.player_places[HOST] = ["lava_tubes", 0]
+	_go(host, "spot_north")
 	host.place_beacon("spot_north", HOST)
 	var data: Dictionary = bytes_to_var(var_to_bytes(host.farm_to_dict()))
 	host.free()
@@ -237,3 +293,23 @@ func test_a_guest_is_shown_the_hosts_beacons() -> String:
 	if problem != "":
 		return problem
 	return "" if got == ["spot_north"] else "The guest has %s" % [got]
+
+
+func test_a_save_with_the_beacon_step_done_but_too_few_beacons_is_refused() -> String:
+	var gs: GameStateScript = _state()
+	_go(gs, "spot_west")
+	gs.place_beacon("spot_west", HOST)
+	gs.quest_state["beacon_run"]["steps_done"] = ["place"]
+	var short: String = gs.farm_dict_problem(gs.farm_to_dict())
+	for spot_id: String in ["spot_east", "spot_north"]:
+		_go(gs, spot_id)
+		gs.place_beacon(spot_id, HOST)
+	var enough: String = gs.farm_dict_problem(gs.farm_to_dict())
+	gs.free()
+	if short == "":
+		return "A step done with one beacon placed was accepted."
+	return enough
+
+
+func test_the_protocol_moved_with_the_beacon_command_and_field() -> String:
+	return "" if CoopSession.PROTOCOL >= 18 else "place_beacon and beacons_placed are new on the wire: PROTOCOL must be 18 or more."

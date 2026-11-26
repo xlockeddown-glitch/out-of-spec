@@ -13,11 +13,14 @@ const LIGHT_ENERGY: float = 1.2
 
 ## Spot id -> the node that shows it.
 var _spots: Dictionary[String, Node3D] = {}
+## The rack's beacons, one for each not yet placed.
+var _rack_beacons: Node3D
 
 
 func _ready() -> void:
 	_build_rack()
 	_build_board()
+	_show_rack(GameState.beacons_placed.size())
 	for spot_id: String in LavaHub.spot_ids():
 		var spot := Node3D.new()
 		spot.name = "Spot_" + spot_id
@@ -29,6 +32,7 @@ func _ready() -> void:
 
 ## One pad for each spot without a beacon, a lit one for each with.
 func show_placed(placed: Array) -> void:
+	_show_rack(placed.size())
 	for spot_id: String in _spots:
 		var spot: Node3D = _spots[spot_id]
 		for child: Node in spot.get_children():
@@ -64,11 +68,22 @@ func _build_rack() -> void:
 	rack.add_child(_part(_box(Vector3(0.1, 1.3, 0.1)), Vector3(-0.85, 0.7, 0.0), _flat(STEEL)))
 	rack.add_child(_part(_box(Vector3(0.1, 1.3, 0.1)), Vector3(0.85, 0.7, 0.0), _flat(STEEL)))
 	rack.add_child(_part(_box(Vector3(1.8, 0.08, 0.08)), Vector3(0.0, 1.3, 0.0), _flat(STEEL)))
-	for i: int in LavaHub.SPOTS.size():
-		var x: float = -0.5 + 0.5 * i
-		rack.add_child(_part(_cylinder(0.05, 0.9), Vector3(x, 0.6, 0.0), _flat(STEEL)))
-		rack.add_child(_part(_sphere(0.12), Vector3(x, 1.1, 0.0), _glow(CYAN, 1.2)))
 	rack.add_child(_label("BEACON RACK", Vector3(0.0, 1.9, 0.0)))
+	_rack_beacons = Node3D.new()
+	_rack_beacons.name = "Beacons"
+	rack.add_child(_rack_beacons)
+
+
+## One beacon on the rack for each not yet placed.
+func _show_rack(placed: int) -> void:
+	if _rack_beacons == null:
+		return
+	for child: Node in _rack_beacons.get_children():
+		child.queue_free()
+	for i: int in maxi(LavaHub.SPOTS.size() - placed, 0):
+		var x: float = -0.5 + 0.5 * i
+		_rack_beacons.add_child(_part(_cylinder(0.05, 0.9), Vector3(x, 0.6, 0.0), _flat(STEEL)))
+		_rack_beacons.add_child(_part(_sphere(0.12), Vector3(x, 1.1, 0.0), _glow(CYAN, 1.2)))
 
 
 func _build_board() -> void:
