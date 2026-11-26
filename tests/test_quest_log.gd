@@ -37,12 +37,12 @@ func test_open_quests_are_listed_with_giver_title_and_next_step() -> String:
 	]
 	var farm_state: Dictionary = { "lab_q": _entry(), "story_q": _entry(["a"]), "own_q": _entry(["dig"], 2), "gone_from_data": _entry() }
 	var own_state: Dictionary = { "own_q": _entry([], -1, { "dig": 2 }) }
-	var lists: Dictionary = QuestLog.build(quests, farm_state, own_state, DAY)
+	var lists: Dictionary = QuestLog.build(quests, farm_state, own_state)
 	var open: Array = lists[QuestLog.OPEN]
 	# Story first, then lab, then the player's own: by kind, not by the file.
 	if _ids(open) != ["story_q", "lab_q", "own_q"] or not (lists[QuestLog.DONE] as Array).is_empty():
 		return "Got %s" % [lists]
-	if open[0] != { "id": "story_q", "kind": "story", "giver": "LIN", "title": "Title of story_q", "step": "Do b.", "have": 0, "need": 0 }:
+	if open[0] != { "id": "story_q", "kind": "story", "giver": "LIN", "title": "Title of story_q", "step": "Do b.", "have": 0, "need": 0, "day": -1 }:
 		return "The row is the giver, the title and the first step not done: %s" % [open[0]]
 	if QuestLog.title_text(open[0]) != "LIN: Title of story_q  (story)" or QuestLog.step_text(open[0]) != "Do b.":
 		return "Got '%s' and '%s'" % [QuestLog.title_text(open[0]), QuestLog.step_text(open[0])]
@@ -53,37 +53,90 @@ func test_open_quests_are_listed_with_giver_title_and_next_step() -> String:
 
 
 func test_done_quests_are_listed_apart() -> String:
+	var closed_q: Dictionary = _quest("closed_q", "lab", "farm", [_step("a")])
+	closed_q["closed_when"] = { "check": "flag" }
 	var quests: Array = [
 		_quest("done_q", "lab", "farm", [_step("a")]),
-		_quest("closed_q", "lab", "farm", [_step("a")]),
+		closed_q,
 		_quest("open_q", "lab", "farm", [_step("a")]),
 		_quest("brought_q", "personal", "player", [_step("a"), _step("b")]),
 	]
 	var farm_state: Dictionary = { "done_q": _entry(["a"], 3), "closed_q": _entry([], 1), "open_q": _entry() }
 	# Done on another farm: done here with no step ticked (QuestEngine.take_brought).
 	var own_state: Dictionary = { "brought_q": _entry([], 2) }
-	var lists: Dictionary = QuestLog.build(quests, farm_state, own_state, DAY)
+	var lists: Dictionary = QuestLog.build(quests, farm_state, own_state)
 	if _ids(lists[QuestLog.OPEN]) != ["open_q"] or _ids(lists[QuestLog.DONE]) != ["done_q", "brought_q"]:
 		return "A closed quest is in neither list; one done elsewhere is done: %s" % [lists]
 	var row: Dictionary = (lists[QuestLog.DONE] as Array)[0]
 	return "" if row["step"] == "" and row["need"] == 0 else "A done row has no step: %s" % [row]
 
 
-func test_only_the_ask_of_today_is_listed() -> String:
+func test_only_the_latest_ask_is_listed() -> String:
 	var quests: Array = [
 		_quest("ask_a", "daily", "player", [_step("till", "counter", { "counter": "till", "at_least": 6 })], "orin"),
 		_quest("ask_b", "daily", "player", [_step("mine", "counter", { "counter": "mine_fissure", "at_least": 2 })], "bram"),
 	]
 	var own_state: Dictionary = { "ask_a": _entry([], -1, { "till": 4 }, DAY), "ask_b": _entry(["mine"], DAY - 1, {}, DAY - 1) }
-	var lists: Dictionary = QuestLog.build(quests, {}, own_state, DAY)
+	var lists: Dictionary = QuestLog.build(quests, {}, own_state)
 	var open: Array = lists[QuestLog.OPEN]
 	if _ids(open) != ["ask_a"] or not (lists[QuestLog.DONE] as Array).is_empty():
-		return "The ask of the day before is gone, done or not: %s" % [lists]
+		return "The older ask is gone, done or not: %s" % [lists]
 	if QuestLog.title_text(open[0]) != "ORIN: Title of ask_a  (today)" or QuestLog.step_text(open[0]) != "Do till.  4 of 6":
 		return "Got '%s' and '%s'" % [QuestLog.title_text(open[0]), QuestLog.step_text(open[0])]
 	own_state["ask_a"] = _entry(["till"], DAY, { "till": 6 }, DAY)
-	lists = QuestLog.build(quests, {}, own_state, DAY)
+	lists = QuestLog.build(quests, {}, own_state)
 	return "" if _ids(lists[QuestLog.DONE]) == ["ask_a"] and (lists[QuestLog.OPEN] as Array).is_empty() else "The ask of today, done, is with the done: %s" % [lists]
+
+
+## A guest's clock may run behind or ahead of the host's: the ask listed is the
+## latest in the player's own entries, whatever day the guest thinks it is.
+func test_the_ask_does_not_depend_on_the_clock() -> String:
+	var quests: Array = [_quest("ask_a", "daily", "player", [_step("a")]), _quest("ask_b", "daily", "player", [_step("a")])]
+	var own_state: Dictionary = { "ask_a": _entry([], -1, {}, 7), "ask_b": _entry([], -1, {}, 8) }
+	var elapsed: float = GameClock.elapsed_days
+	for day: int in [6, 7, 8, 9]:
+		GameClock.elapsed_days = float(day)
+		if _ids(QuestLog.build(quests, {}, own_state)[QuestLog.OPEN]) != ["ask_b"]:
+			GameClock.elapsed_days = elapsed
+			return "On day %d the latest ask is listed." % day
+	GameClock.elapsed_days = elapsed
+	own_state.erase("ask_b")
+	return "" if _ids(QuestLog.build(quests, {}, own_state)[QuestLog.OPEN]) == ["ask_a"] else "With one ask, it is the one."
+
+
+## Closed with nothing paid is in neither list, a player's own quest as well as
+## the farm's; a player's quest done with a step ticked is done.
+func test_a_player_quest_closed_with_nothing_paid_is_not_done() -> String:
+	var shut: Dictionary = _quest("shut", "personal", "player", [_step("a")])
+	shut["closed_when"] = { "check": "flag" }
+	var paid: Dictionary = _quest("paid", "personal", "player", [_step("a")])
+	paid["closed_when"] = { "check": "flag" }
+	var lists: Dictionary = QuestLog.build([shut, paid], {}, { "shut": _entry([], 3, {}, 3), "paid": _entry(["a"], 3, {}, 3) })
+	if not (lists[QuestLog.OPEN] as Array).is_empty() or _ids(lists[QuestLog.DONE]) != ["paid"]:
+		return "Got %s" % [lists]
+	return ""
+
+
+## Done is the entry's word: a step added to the data later does not undo it.
+func test_a_finished_quest_stays_done_when_a_step_is_added() -> String:
+	var quest: Dictionary = _quest("q", "lab", "farm", [_step("a"), _step("b")])
+	var lists: Dictionary = QuestLog.build([quest], { "q": _entry(["a"], 3) }, {})
+	return "" if _ids(lists[QuestLog.DONE]) == ["q"] and (lists[QuestLog.OPEN] as Array).is_empty() else "Got %s" % [lists]
+
+
+func test_the_done_list_is_the_latest_few() -> String:
+	var quests: Array = []
+	var farm_state: Dictionary = {}
+	for index: int in 9:
+		var id: String = "q%d" % index
+		quests.append(_quest(id, "lab", "farm", [_step("a")]))
+		farm_state[id] = _entry(["a"], index)
+	var done: Array = QuestLog.build(quests, farm_state, {})[QuestLog.DONE]
+	var latest: Dictionary = QuestLog.latest_done(done)
+	if _ids(latest["rows"]) != ["q8", "q7", "q6", "q5", "q4", "q3"] or latest["more"] != 3:
+		return "Got %s" % [latest]
+	latest = QuestLog.latest_done(done.slice(0, 2))
+	return "" if latest["rows"].size() == 2 and latest["more"] == 0 else "Few done: %s" % [latest]
 
 
 func test_a_step_counts_only_when_it_has_a_count() -> String:
@@ -107,7 +160,7 @@ func test_odd_state_is_left_out() -> String:
 	var quests: Array = [_quest("q", "lab", "farm", [_step("a")]), "not a quest", { "id": "bare", "kind": "lab" },
 		_quest("odd_kind", "seasonal", "farm", [_step("a")]), _quest("all_ticked", "lab", "farm", [_step("a")])]
 	var farm_state: Dictionary = { "q": "not an entry", "bare": _entry(), "odd_kind": _entry(), "all_ticked": _entry(["a"]) }
-	var lists: Dictionary = QuestLog.build(quests, farm_state, {}, DAY)
+	var lists: Dictionary = QuestLog.build(quests, farm_state, {})
 	return "" if (lists[QuestLog.OPEN] as Array).is_empty() and (lists[QuestLog.DONE] as Array).is_empty() else "Got %s" % [lists]
 
 
@@ -117,8 +170,8 @@ func test_every_shipped_quest_has_its_words() -> String:
 	var quests: Array[Dictionary] = QuestEngine.quests()
 	var farm_state: Dictionary = {}
 	for quest: Dictionary in quests:
-		farm_state[str(quest["id"])] = _entry([], -1, {}, DAY)
-	var open: Array = QuestLog.build(quests, farm_state, farm_state, DAY)[QuestLog.OPEN]
+		farm_state[str(quest["id"])] = _entry([], -1, {})
+	var open: Array = QuestLog.build(quests, farm_state, farm_state)[QuestLog.OPEN]
 	if open.size() != quests.size() or quests.is_empty():
 		return "%d of %d shipped quests are listed" % [open.size(), quests.size()]
 	for row: Dictionary in open:
@@ -127,7 +180,7 @@ func test_every_shipped_quest_has_its_words() -> String:
 	for quest: Dictionary in quests:
 		var ids: Array = (quest["steps"] as Array).map(func(step: Dictionary) -> String: return step["id"])
 		farm_state[str(quest["id"])] = _entry(ids, DAY, {}, DAY)
-	var lists: Dictionary = QuestLog.build(quests, farm_state, farm_state, DAY)
+	var lists: Dictionary = QuestLog.build(quests, farm_state, farm_state)
 	return "" if (lists[QuestLog.DONE] as Array).size() == quests.size() and (lists[QuestLog.OPEN] as Array).is_empty() else "Done, all are with the done."
 
 

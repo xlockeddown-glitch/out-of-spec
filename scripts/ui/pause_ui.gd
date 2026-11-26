@@ -20,6 +20,7 @@ var quitter: Callable
 
 
 func _ready() -> void:
+	add_to_group(QuestsUI.MODAL_GROUP)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	if not saver.is_valid():
 		saver = SaveGame.write

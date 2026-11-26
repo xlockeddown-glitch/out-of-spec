@@ -22,6 +22,7 @@ var _result_label: Label
 
 
 func _ready() -> void:
+	add_to_group(QuestsUI.MODAL_GROUP)
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	_build()

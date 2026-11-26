@@ -22,6 +22,7 @@ var _mist: Button
 
 
 func _ready() -> void:
+	add_to_group(QuestsUI.MODAL_GROUP)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var center := CenterContainer.new()
