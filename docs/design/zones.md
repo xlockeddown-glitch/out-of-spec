@@ -423,6 +423,8 @@ Each PR logs its decisions in `docs/decisions.md` and names its placeholders.
 
    *Built 2026-11-26 (feat/tunnel-rescue):* `TunnelRecall` plus `GameState` hooks and `CoopBeds.recall_to_bed`; numbers in `economy.json` `tunnel_recall` [PLACEHOLDER]. Host and solo only: the host cannot see which scene a guest is in, so a guest left in the tunnels is not rescued yet (needs a presence message). See decisions.md, 2026-11-26.
 2. **Zone data.** `data/zones.json`: id, name, band, hazards, finds, hub scene, entrance. A data check. No scene. The tunnels get a row.
+
+   *Built 2026-11-26 (feat/zone-data):* `data/zones.json` (11 rows: the six zones of ง2 and the five far sites of ง11, bands as in the doc) read by `ZoneData` (`scripts/world/zone_data.gd`: `ids`, `zone`, `band`, `zones_for_level`, `hub_scene`, and a `problems` check); `tests/test_zones.gd` runs the check. The tunnels row is `lava_tubes`, hub `res://scenes/basalt_tunnels.tscn`; the other hub scenes are empty. Ids, hazard and find words and the far-site entrances are [PLACEHOLDER]. See decisions.md, 2026-11-26.
 3. **Soft-gate warning.** The terminal and lift line from ยง7.1, and the lab-level rows of ยง7.2 in `lab_gates`. Works on the tunnels.
 4. **Zone address and presence model.** The host tracks each player's place (`farm`, `dome`, `zone_id`, depth); the phone shows it; `rover_in_tunnels` becomes a zone id (a save and protocol change). Pure rules, no new scene. **Needs a second reviewer.** Everything below depends on it.
 5. **Lava Tubes hub.** The tunnel mouth stays the entrance. Orin's beacon rack, a notice board and the quest Beacon Run. No generated depth yet.

@@ -1,0 +1,137 @@
+{
+  "_note": "Zones (docs/design/zones.md, build step 2). One row per zone. band is the lab level the content is tuned for, [min, max]; bands overlap on purpose and are not gates. Ryan's anchors: underground about 5 to 20, the moons about 21 to 50, far sites 50 to 99; every other band edge, every id and every name here is [PLACEHOLDER] (the ids are invented for code, not from the doc). hazards and finds are words from ZoneData.HAZARDS and ZoneData.FINDS (section 5 and section 4 of the doc; far sites use the one-line ideas of section 11). hub_scene is the res:// path of the zone's hub scene, or an empty string while it has none; only the basalt tunnels have a scene today. entrance is how the first visit gets there (section 2, section 8). area is underground, moon or far. tarantula_hook is a short string, empty when the zone has none. notes holds Ryan's answers from section 14.1 as short strings. No hazard or find has any rule or number yet; this table is data only.",
+  "zones": [
+    {
+      "id": "lava_tubes",
+      "name": "Lava Tubes",
+      "area": "underground",
+      "band": [5, 20],
+      "hazards": ["heat", "loose_basalt", "dark"],
+      "finds": ["crystal_ore", "basalt_glass", "vent_samples"],
+      "hub_scene": "res://scenes/basalt_tunnels.tscn",
+      "entrance": "The tunnel mouth the rover already drives into.",
+      "tarantula_hook": "Thermal-vent morph near the warm vents [ASSUMPTION]. The wild Cobalt Sentinel is already here.",
+      "notes": "The existing basalt tunnels, the first hub."
+    },
+    {
+      "id": "flooded_aquifer",
+      "name": "Flooded Aquifer",
+      "area": "underground",
+      "band": [8, 24],
+      "hazards": ["water_depth", "pressure_drop"],
+      "finds": ["water_samples", "drowned_gear", "gauge_blocks"],
+      "hub_scene": "",
+      "entrance": "A sinkhole south of the plateau, reached by rover.",
+      "tarantula_hook": "",
+      "notes": "The second area (Ryan, section 14.1 answer 6)."
+    },
+    {
+      "id": "colony_mine",
+      "name": "Abandoned Colony Mine",
+      "area": "underground",
+      "band": [12, 30],
+      "hazards": ["collapse", "bad_air", "old_charges"],
+      "finds": ["ore", "lost_gear", "robot_parts", "gauge_blocks"],
+      "hub_scene": "",
+      "entrance": "A sealed gate on the plateau road, opened by a key quest.",
+      "tarantula_hook": "",
+      "notes": ""
+    },
+    {
+      "id": "ice_caves",
+      "name": "Polar Ice Caves",
+      "area": "underground",
+      "band": [18, 35],
+      "hazards": ["cold", "slick_ice", "white_out"],
+      "finds": ["ice_cores", "minerals", "frozen_probes", "tarantulas"],
+      "hub_scene": "",
+      "entrance": "A long drive north, then a ramp.",
+      "tarantula_hook": "Terraform test pods: a sealed, heated trial pod under the ice [ASSUMPTION].",
+      "notes": ""
+    },
+    {
+      "id": "phobos",
+      "name": "Phobos",
+      "area": "moon",
+      "band": [21, 40],
+      "hazards": ["low_gravity", "dust", "launch_window"],
+      "finds": ["station_data", "robot_parts", "tarantulas", "gauge_blocks"],
+      "hub_scene": "",
+      "entrance": "Shuttle from the pad; needs the shuttle license.",
+      "tarantula_hook": "Station escapees, adapted in warm service tunnels: a new moon-adapted form with a wider climate band.",
+      "notes": "Escaped station stock; the Larder is the only story exception (Ryan, 14.1 answer 10); exotic low-expansion gauge blocks (14.1 answer 11)."
+    },
+    {
+      "id": "deimos",
+      "name": "Deimos",
+      "area": "moon",
+      "band": [26, 50],
+      "hazards": ["low_gravity", "dust", "launch_window", "locked_crates"],
+      "finds": ["smuggled_crates", "lost_standards", "tarantulas", "gauge_blocks"],
+      "hub_scene": "",
+      "entrance": "Shuttle from the pad; needs the shuttle license.",
+      "tarantula_hook": "Smuggler caches in warm crates: a new moon-adapted form with a wider climate band.",
+      "notes": "Caches and test pods; exotic low-expansion gauge blocks (Ryan, 14.1 answer 11)."
+    },
+    {
+      "id": "valles_marineris",
+      "name": "Valles Marineris",
+      "area": "far",
+      "band": [50, 62],
+      "hazards": ["wind", "long_drives", "thin_air"],
+      "finds": ["sediment_samples", "minerals"],
+      "hub_scene": "",
+      "entrance": "Not designed yet (a long drive; section 11).",
+      "tarantula_hook": "",
+      "notes": "Sketched only; no story beat above level 60."
+    },
+    {
+      "id": "olympus_caves",
+      "name": "Olympus Mons caves",
+      "area": "far",
+      "band": [55, 70],
+      "hazards": ["heat", "getting_lost"],
+      "finds": ["minerals", "ore"],
+      "hub_scene": "",
+      "entrance": "Not designed yet (section 11).",
+      "tarantula_hook": "",
+      "notes": "Sketched only; a larger cousin of the Lava Tubes."
+    },
+    {
+      "id": "polar_caps",
+      "name": "Polar caps",
+      "area": "far",
+      "band": [60, 72],
+      "hazards": ["cold", "white_out"],
+      "finds": ["ice_cores"],
+      "hub_scene": "",
+      "entrance": "Not designed yet (section 11).",
+      "tarantula_hook": "",
+      "notes": "Sketched only."
+    },
+    {
+      "id": "asteroid_belt",
+      "name": "Asteroid belt",
+      "area": "far",
+      "band": [70, 85],
+      "hazards": ["vacuum", "debris"],
+      "finds": ["metal_samples", "tarantulas"],
+      "hub_scene": "",
+      "entrance": "Not designed yet (an expedition; section 11).",
+      "tarantula_hook": "A spider farm in a tin can [ASSUMPTION].",
+      "notes": "Sketched only."
+    },
+    {
+      "id": "outer_moons",
+      "name": "Outer moons",
+      "area": "far",
+      "band": [85, 99],
+      "hazards": ["radiation", "cold", "long_trip"],
+      "finds": ["tarantulas", "lost_standards"],
+      "hub_scene": "",
+      "entrance": "Not designed yet (an expedition; section 11).",
+      "tarantula_hook": "A prestige tarantula [PLACEHOLDER].",
+      "notes": "Sketched only; Europa and Ganymede style ice."
+    }
+  ]
+}
