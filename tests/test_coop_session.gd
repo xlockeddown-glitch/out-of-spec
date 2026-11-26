@@ -337,3 +337,21 @@ func test_the_game_has_no_rpcs() -> String:
 			if file.ends_with(".gd") and "@rpc" in FileAccess.get_file_as_string(dir + "/" + file):
 				return "%s has an RPC: co-op goes through CoopSession and FarmCommands" % file
 	return ""
+
+
+## An exported game reads its scripts without the invisible byte order mark,
+## so one written into a script's text is gone there. CoopSession's was, and every
+## string, so every hello, failed is_plain() in the exported game only.
+func test_no_script_hides_a_byte_order_mark() -> String:
+	var mark: String = String.chr(0xFEFF)
+	if SessionScript.is_plain([mark + "text"]) or not SessionScript.is_plain(["text", ""]):
+		return "is_plain() must refuse only text that starts with a byte order mark"
+	var pending: Array[String] = ["res://scripts"]
+	while not pending.is_empty():
+		var dir: String = pending.pop_back()
+		for sub: String in DirAccess.get_directories_at(dir):
+			pending.append(dir + "/" + sub)
+		for file: String in DirAccess.get_files_at(dir):
+			if file.ends_with(".gd") and mark in FileAccess.get_file_as_string(dir + "/" + file):
+				return "%s has a byte order mark in its text: write String.chr(0xFEFF)" % file
+	return ""

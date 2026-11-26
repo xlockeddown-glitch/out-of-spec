@@ -224,7 +224,7 @@ static func is_plain(value: Variant, depth: int = 0) -> bool:
 			return true
 		TYPE_STRING, TYPE_STRING_NAME:
 			# Godot drops a byte order mark when it reads text.
-			return not str(value).begins_with("﻿")
+			return not str(value).begins_with(String.chr(0xFEFF))
 		TYPE_ARRAY:
 			if depth >= MAX_DEPTH or not value.get_typed_builtin() in LIST_TYPES:
 				return false
