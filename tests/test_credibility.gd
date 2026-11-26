@@ -17,6 +17,7 @@ const DAY: int = 20
 
 func _make_state() -> GameStateScript:
 	var gs: GameStateScript = GameStateScript.new()
+	gs.lab_gates_kept = gs.all_lab_gate_ids()  # these tests are not about the lab-level gates
 	gs.build_registry()
 	gs.reset_credibility()
 	gs.credits = 10000
@@ -242,6 +243,7 @@ func test_contract_standard_discount_and_takeover() -> String:
 	var dome: DriftingSensor = gs.get_sensor(DOME)
 	dome.cal_due_day = DAY + 4
 	gs.contract_state = "complete"
+	gs.lab_gates_kept.append(gs.KEPT_CONTRACT_SALE)  # a farm that had earned it: the discount alone opens no tier
 	var hb: DriftingSensor = gs.get_sensor(HB700)
 	var price: int = hb.price_credits * (100 - gs.contract_discount_pct()) / 100
 	if problem == "" and gs.standard_price_credits(HB700) != price:
@@ -366,6 +368,7 @@ func test_contract_standard_without_wd1() -> String:
 	var dome: DriftingSensor = gs.get_sensor(DOME)
 	dome.cal_due_day = 0
 	gs.contract_state = "complete"
+	gs.lab_gates_kept.append(gs.KEPT_CONTRACT_SALE)  # a farm that had earned it: the discount alone opens no tier
 	if gs.is_in_service(DOME):
 		problem = "The test needs the dome gauge out of service before the purchase."
 	if problem == "" and gs.buy_standard(HB700) != "":

@@ -15,6 +15,7 @@ func _run(body: Callable) -> String:
 	var saved: float = GameClock.elapsed_days
 	GameClock.elapsed_days = 6.0
 	var gs: GameStateScript = GameStateScript.new()
+	gs.lab_gates_kept = gs.all_lab_gate_ids()  # these tests are not about the lab-level gates
 	gs.build_registry()
 	gs.credits = 100000
 	gs.crystal_ore = 100
@@ -79,8 +80,13 @@ func _check_gate(gs: GameStateScript) -> String:
 		return "Bram must not sell the Rb-2D."
 	gs.traceable_lab = false
 	gs.contract_state = "complete"
-	if gs.tier_problem(HB700) != "" or not HB700 in gs.bram_catalog():
-		return "The contract HB-700 skips the gate."
+	# The contract's discount opens nothing early (section 3.4): the gate holds.
+	if gs.tier_problem(HB700) == "" or not HB700 in gs.bram_catalog():
+		return "The contract HB-700 must wait for Tier 3, and be listed."
+	# A farm that had earned the contract before the gates keeps the sale.
+	gs.lab_gates_kept.append(gs.KEPT_CONTRACT_SALE)
+	if gs.tier_problem(HB700) != "":
+		return "A farm that had earned the contract keeps its sale."
 	return ""
 
 

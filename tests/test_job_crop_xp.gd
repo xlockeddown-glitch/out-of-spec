@@ -17,6 +17,7 @@ func _run(body: Callable) -> String:
 	var saved: float = GameClock.elapsed_days
 	GameClock.elapsed_days = 0.0
 	var gs: GameStateScript = GameStateScript.new()
+	gs.lab_gates_kept = gs.all_lab_gate_ids()  # these tests are not about the lab-level gates
 	gs.build_registry()
 	gs.reset_credibility()
 	gs.credibility = 30

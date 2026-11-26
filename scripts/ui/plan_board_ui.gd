@@ -129,6 +129,10 @@ func _refresh() -> void:
 	elif not GameState.lab_build.is_empty():
 		_grow_button.text = "One build at a time: wait for this one to finish."
 		_grow_button.disabled = true
+	elif GameState.lab_gate_note(GameState.lab_size_gate_id(next)) != "":
+		_grow_button.text = "GROW TO %s: %s" % [str(next.get("name", "?")).to_upper(),
+			GameState.lab_gate_note(GameState.lab_size_gate_id(next))]
+		_grow_button.disabled = true
 	else:
 		var days: int = int(next.get("build_days", 1))
 		_grow_button.text = "GROW TO %s: %s spaces  (%s, %s day%s)" % [str(next.get("name", "?")).to_upper(),

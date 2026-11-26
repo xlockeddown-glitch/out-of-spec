@@ -12,6 +12,7 @@ const DRIFT: StringName = &"sensor_drift_config"
 
 func _make_state() -> GameStateScript:
 	var gs: GameStateScript = GameStateScript.new()
+	gs.lab_gates_kept = gs.all_lab_gate_ids()  # these tests are not about the lab-level gates
 	gs.build_registry()
 	gs.credits = 10000
 	gs.crystal_ore = 10

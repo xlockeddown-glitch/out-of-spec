@@ -17,6 +17,7 @@ const GATE_LEVEL: int = 5
 
 func _run(body: Callable) -> String:
 	var gs: GameStateScript = GameStateScript.new()
+	gs.lab_gates_kept = gs.all_lab_gate_ids()  # these tests are not about the lab-level gates
 	gs.build_registry()
 	# A body that stops on a script error returns null, which must not pass.
 	var out: Variant = body.call(gs)

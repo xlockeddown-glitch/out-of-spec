@@ -26,6 +26,7 @@ func _run(body: Callable, fixtures: Array = []) -> String:
 		table["quests"] = mine
 	GameClock.elapsed_days = 0.0
 	var gs: GameStateScript = GameStateScript.new()
+	gs.lab_gates_kept = gs.all_lab_gate_ids()  # these tests are not about the lab-level gates
 	gs.build_registry()
 	gs.set_world_seed(77)
 	gs.reset_credibility()

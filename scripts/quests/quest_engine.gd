@@ -428,6 +428,12 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 		farm.add_credits(int(rewards["credits"]))
 	# The amount written on the quest, in any lab (section 3.2.1).
 	farm.give_lab_xp(int(rewards.get("lab_xp", 0)))
+	# The provisional way through a gate: most of the lab XP still missing to
+	# the level of the row that names this quest, worked out after the lump.
+	var lift: int = farm.provisional_lab_xp(str(quest.get("id", "")))
+	if lift > 0:
+		farm.post_phone("OIRM counts \"%s\" toward the lab level: %s lab XP." % [str(quest.get("title", "")), SP811.integer(lift)])
+		farm.give_lab_xp(lift)
 	for key: Variant in rewards:
 		var skill: String = _reward_skill(str(key))
 		if skill == "":
