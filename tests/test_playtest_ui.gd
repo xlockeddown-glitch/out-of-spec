@@ -169,3 +169,37 @@ func test_the_menu_blocks_driving_keys_only_while_the_game_runs_on() -> String:
 	pause.free()
 	tree.paused = false
 	return problem
+
+
+func test_the_menu_follows_players_joining_and_leaving() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var pause := PauseUI.new()
+	tree.root.add_child(pause)
+	var problem: String = ""
+	pause.open()
+	CoopSession.players = ["player_1", "player_2"]
+	CoopSession.player_joined.emit("player_2")
+	if tree.paused or pause._title.text != "MENU" or not RoverController.input_blocked:
+		problem = "A guest joining must unpause and block driving keys."
+	CoopSession.players = ["player_1"]
+	CoopSession.player_left.emit("player_2")
+	if not tree.paused or pause._title.text != "PAUSED" or RoverController.input_blocked:
+		problem = "The guest leaving must pause again."
+	pause.close()
+	CoopSession.players = []
+	pause.free()
+	tree.paused = false
+	return problem
+
+
+func test_a_blocked_rover_takes_no_till_press() -> String:
+	var rover: RoverController = RoverController.new()
+	var event := InputEventAction.new()
+	event.action = &"rover_till"
+	event.pressed = true
+	RoverController.input_blocked = true
+	rover._input(event)
+	var blocked: bool = rover._till_presses.is_empty()
+	RoverController.input_blocked = false
+	rover.free()
+	return "" if blocked else "A till press must not count while the menu blocks keys."

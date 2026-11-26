@@ -49,6 +49,8 @@ func _ready() -> void:
 	_quit_button = PlanBoardUI._button("SAVE AND QUIT")
 	_quit_button.pressed.connect(_on_quit)
 	column.add_child(_quit_button)
+	CoopSession.player_joined.connect(_on_players_changed.unbind(1))
+	CoopSession.player_left.connect(_on_players_changed.unbind(1))
 	hide()
 
 
@@ -79,21 +81,36 @@ func open() -> void:
 	_armed = false
 	_note.text = ""
 	var alone: bool = is_alone()
-	_title.text = "PAUSED" if alone else "MENU"
-	if FarmCommands.guest:
-		_text.text = "The farm runs on and is saved on the host's computer."
-		_quit_button.text = "QUIT"
-	else:
-		_text.text = ("The game is paused. " if alone else "The farm runs on. ") \
-				+ "It saves each morning and when you quit here or close the window."
-		_quit_button.text = "SAVE AND QUIT"
+	_apply(alone)
+	_text.text = _body(alone)
 	if get_parent() != null:
 		get_parent().move_child(self, get_parent().get_child_count() - 1)
 	show()
-	if alone and is_inside_tree():
-		get_tree().paused = true
-	RoverController.input_blocked = not alone
 	_resume_button.grab_focus()
+
+
+func _on_players_changed() -> void:
+	if visible:
+		_apply(is_alone())
+		_text.text = _body(is_alone())
+
+
+## Pauses the game and says PAUSED when alone; otherwise MENU, and the game runs
+## on with this screen's driving keys blocked.
+func _apply(alone: bool) -> void:
+	_title.text = "PAUSED" if alone else "MENU"
+	if is_inside_tree():
+		get_tree().paused = alone
+	RoverController.input_blocked = not alone
+
+
+func _body(alone: bool) -> String:
+	if FarmCommands.guest:
+		_quit_button.text = "QUIT"
+		return "The farm runs on and is saved on the host's computer."
+	_quit_button.text = "SAVE AND QUIT"
+	var lead: String = "The game is paused. " if alone else "The farm runs on. "
+	return lead + "It saves each morning and when you quit here or close the window."
 
 
 func close() -> void:

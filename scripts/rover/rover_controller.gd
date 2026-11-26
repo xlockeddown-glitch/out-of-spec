@@ -23,10 +23,10 @@ signal ore_mined(fissure_id: StringName)
 ## A boulder was drilled, `hits` times by now.
 signal boulder_hit(hits: int)
 signal dig_rejected(reason: String)
-## Said when there is no ground to dig; the screens add where to dig.
 ## Set by the menu panel while the game runs on behind it (co-op): this screen
 ## then reads no driving keys, as with none held. Rover and walker both obey it.
 static var input_blocked: bool = false
+## Said when there is no ground to dig; the screens add where to dig.
 const ROCK_REFUSAL: String = "This rock can't be dug."
 signal fill_rejected(reason: String)
 
@@ -287,7 +287,7 @@ func _park() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"rover_till", false) and not CoopWalkers.on_foot():
+	if event.is_action_pressed(&"rover_till", false) and not input_blocked and not CoopWalkers.on_foot():
 		_till_presses.append({"seed": GameState.current_seed(), "offset": GameState.planting_offset_steps})
 
 
@@ -410,7 +410,7 @@ func _sample_local_input(throttle: float) -> void:
 	for press: Dictionary in _till_presses:
 		queue_command(Command.TILL, str(press["seed"]), int(press["offset"]))
 	_till_presses.clear()
-	if Input.is_action_just_pressed(&"rover_zero_steering"):
+	if not input_blocked and Input.is_action_just_pressed(&"rover_zero_steering"):
 		queue_command(Command.ZERO_STEERING)
 
 

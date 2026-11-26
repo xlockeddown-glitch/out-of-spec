@@ -420,7 +420,7 @@ func _show_dug() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"rover_dig"):
+	if event.is_action_pressed(&"rover_dig") and not RoverController.input_blocked and not get_tree().paused:
 		_dig_pressed_msec = Time.get_ticks_msec()
 
 
