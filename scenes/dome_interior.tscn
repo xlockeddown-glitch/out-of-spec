@@ -1,4 +1,4 @@
-[gd_scene load_steps=41 format=3]
+[gd_scene load_steps=42 format=3]
 
 [ext_resource type="Script" path="res://scripts/dome/dome_interior.gd" id="1_dome"]
 [ext_resource type="Script" path="res://scripts/dome/terrarium.gd" id="2_terr"]
@@ -138,6 +138,9 @@ size = Vector3(0.7, 0.6, 0.5)
 
 [sub_resource type="BoxShape3D" id="Inspect_md2p_humidity_generator"]
 size = Vector3(0.7, 1.2, 0.6)
+
+[sub_resource type="BoxShape3D" id="Inspect_mug_ring"]
+size = Vector3(0.14, 0.05, 0.14)
 
 [sub_resource type="BoxShape3D" id="SentinelShape"]
 size = Vector3(0.7, 0.6, 0.5)
@@ -624,6 +627,27 @@ prop_id = "fm3_field_meter_case"
 
 [node name="Shape" type="CollisionShape3D" parent="FieldMeterCaseModel/Inspect"]
 shape = SubResource("Inspect_fm3_field_meter_case")
+
+
+[node name="MugRing" type="Node3D" parent="."]
+unique_name_in_owner = true
+visible = false
+position = Vector3(3.3, 0.88, 0.5)
+rotation = Vector3(0, 0.6, 0)
+script = ExtResource("5_slot")
+model_path = "res://assets/voxels/mug_ring.glb"
+model_scale = 0.025
+[node name="MugRingInspect" type="Area3D" parent="MugRing"]
+unique_name_in_owner = true
+position = Vector3(0, 0.025, 0)
+collision_layer = 8
+collision_mask = 0
+script = ExtResource("30_inspect")
+enabled = false
+prop_id = "mug_ring"
+
+[node name="Shape" type="CollisionShape3D" parent="MugRing/MugRingInspect"]
+shape = SubResource("Inspect_mug_ring")
 
 
 [node name="HygrometerModel" type="Node3D" parent="."]

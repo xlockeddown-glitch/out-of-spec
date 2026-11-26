@@ -1,5 +1,5 @@
 {
-  "_note": "Quests (docs/design/quests_levels_story.md section 5). Every number is a [PLACEHOLDER]. Read by scripts/quests/quest_engine.gd, which only watches what GameState already keeps. A quest: kind (story, lab, personal, daily), giver (a cast id), title, scope (farm, or player: each player's own, kept on the farm and in a guest's own file), gates (lab_level, band, skill {id, level}, total_level, quest_points, quest_done: all must hold), offer (when: always, day_at_least with day, or any step check with its fields), offer_line (what the giver says with the offer: a path in dialogue_dispatches.json or the line itself), steps (in order unless any_order is true) and rewards (credits, lab_xp, xp_<skill id>, quest_points, xp_certificate, phone: a path in dialogue_dispatches.json or the line itself). xp_certificate is the XP one certificate is worth: each player who took part is given one and spends it on one skill of their own (SKILLS, K). It is sized to the quest, not the player, so the 10 % curve makes it lift a low level a lot and a high level a little. A step: id, text, check and its fields, at_least (1 if left out). The count and counter checks count from the day the quest was accepted unless ever is true. In a quest done in order, a later count or counter step counts from when the step before it was done (unless ever is true), so what is done early is not counted for a later step. Checks: stat_at_least (stat), flag (flag), band_at_least (band), owns_standard (standard_id), lab_size, count (log, where), state_is (state, is: one value or a list), level (skill: a skill id, lab or total), counter (counter: a source id of data/skills.json, or crops_sold_in_spec with where { crop_id }: what Lin has bought in spec). A step may carry minigame (a mini-game's id; set_the_zero is the one there is): it must be a count of cal_log rows whose where names one instrument_id, and while it is the quest's open step the bench opens that game for that instrument, on a farm that has calibrated its kind before too. The step is done by its check alone, so a skip or a poor try does it as a plain calibration does. A score of 60 or more is kept with the step; when the quest is paid, Fine (80) adds 10 % of the quest's credits and Reference (95) adds 20 % [ASSUMPTION], and at Reference the giver also says the step's minigame_line (a path in dialogue_dispatches.json or the line itself). Lab and daily quests pay no quest points. closed_when (when: a step check with its fields): a quest that was never offered is marked done with nothing paid once this holds, for an offer that can no longer come. A quest id and a step id are kept in saves and must never be renamed; a quest must have steps, each a dictionary with its own id. Quests are offered each morning and when a farm is opened, not after a command. The lab-level gates of the design's unlock table are not here: they wait for build step 9.",
+  "_note": "Quests (docs/design/quests_levels_story.md section 5). Every number is a [PLACEHOLDER]. Read by scripts/quests/quest_engine.gd, which only watches what GameState already keeps. A quest: kind (story, lab, personal, daily), giver (a cast id), title, scope (farm, or player: each player's own, kept on the farm and in a guest's own file), gates (lab_level, band, skill {id, level}, total_level, quest_points, quest_done: all must hold), offer (when: always, day_at_least with day, or any step check with its fields), offer_line (what the giver says with the offer: a path in dialogue_dispatches.json or the line itself), steps (in order unless any_order is true) and rewards (credits, lab_xp, xp_<skill id>, quest_points, xp_certificate, phone: a path in dialogue_dispatches.json or the line itself). xp_certificate is the XP one certificate is worth: each player who took part is given one and spends it on one skill of their own (SKILLS, K). It is sized to the quest, not the player, so the 10 % curve makes it lift a low level a lot and a high level a little. A step: id, text, check and its fields, at_least (1 if left out). The count and counter checks count from the day the quest was accepted unless ever is true. In a quest done in order, a later count or counter step counts from when the step before it was done (unless ever is true), so what is done early is not counted for a later step. Checks: stat_at_least (stat), flag (flag), band_at_least (band), owns_standard (standard_id), lab_size, count (log, where), state_is (state, is: one value or a list), level (skill: a skill id, lab or total), counter (counter: a source id of data/skills.json, or crops_sold_in_spec with where { crop_id }: what Lin has bought in spec). A step may carry minigame (a mini-game's id; set_the_zero is the one there is): it must be a count of cal_log rows whose where names one instrument_id, and while it is the quest's open step the bench opens that game for that instrument, on a farm that has calibrated its kind before too. The step is done by its check alone, so a skip or a poor try does it as a plain calibration does. A score of 60 or more is kept with the step; when the quest is paid, Fine (80) adds 10 % of the quest's credits and Reference (95) adds 20 % [ASSUMPTION], and at Reference the giver also says the step's minigame_line (a path in dialogue_dispatches.json or the line itself). Lab and daily quests pay no quest points. closed_when (when: a step check with its fields): a quest that was never offered is marked done with nothing paid once this holds, for an offer that can no longer come. A quest id and a step id are kept in saves and must never be renamed; a quest must have steps, each a dictionary with its own id. A quest may have endings (a list of { id, when and that check's fields, phone }): when it is paid, the giver says the phone line of the first ending whose check holds, in place of the reward's phone; an ending's when is always, day_at_least or a step check, and is looked at before the quest is paid; every ending pays the same, and which one it was is not kept. The count logs are cal_log, job_log, audit_log, certificates and oirm_trips. Quests are offered each morning and when a farm is opened, not after a command. The lab-level gates of the design's unlock table are not here: they wait for build step 9.",
   "quests": [
     {
       "id": "every_sticker_counts",
@@ -50,6 +50,46 @@
           "check": "counter", "counter": "crops_sold_in_spec", "where": { "crop_id": "dust_turnip" } }
       ],
       "rewards": { "credits": 150, "quest_points": 1, "xp_certificate": 200, "phone": "npcs/lin/quests/thirsty_probe_done" }
+    },
+    {
+      "id": "warmly_dispatch",
+      "kind": "story",
+      "giver": "odalys",
+      "title": "Warmly, Dispatch",
+      "scope": "farm",
+      "gates": {},
+      "offer": { "when": "always" },
+      "offer_line": "npcs/odalys/quests/warmly_dispatch_offer",
+      "steps": [
+        { "id": "first_audit", "text": "Have your first audit on file.",
+          "check": "count", "log": "audit_log", "where": {}, "ever": true }
+      ],
+      "endings": [
+        { "id": "grace", "when": "flag", "flag": "audit_grace_used",
+          "phone": "npcs/odalys/quests/warmly_dispatch_grace" },
+        { "id": "clean", "when": "stat_at_least", "stat": "clean_audit_streak",
+          "phone": "npcs/odalys/quests/warmly_dispatch_clean" }
+      ],
+      "rewards": { "lab_xp": 100, "quest_points": 1 }
+    },
+    {
+      "id": "paperwork_from_orbit",
+      "kind": "lab",
+      "giver": "oirm",
+      "title": "Paperwork From Orbit",
+      "scope": "farm",
+      "gates": { "lab_level": 12 },
+      "offer": { "when": "always" },
+      "offer_line": "npcs/oirm/quests/paperwork_from_orbit_offer",
+      "steps": [
+        { "id": "account", "text": "Open an OIRM account.",
+          "check": "flag", "flag": "oirm_account" },
+        { "id": "send", "text": "Send a standard to OIRM.",
+          "check": "count", "log": "oirm_trips", "where": {}, "ever": true },
+        { "id": "certificate", "text": "Get its certificate back.",
+          "check": "count", "log": "certificates", "where": { "issuer": "OIRM", "founding": false } }
+      ],
+      "rewards": { "credits": 100, "lab_xp": 300, "phone": "npcs/oirm/quests/paperwork_from_orbit_done" }
     }
   ]
 }

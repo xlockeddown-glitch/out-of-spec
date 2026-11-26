@@ -906,6 +906,21 @@ def sentinel_crib() -> Model:
     return m
 
 
+def mug_ring() -> Model:
+    """The coffee ring the manager's mug leaves on the calibration bench after the audit's
+    one-time warning (quest S2, docs/design/quests_levels_story.md section 8). Made here, not
+    from an art pack: a flat ring one voxel thick, 5 x 5 voxels at 0.025 m (0.125 m across),
+    origin at its center on the bench top. One voxel is left out where the mug's handle side
+    sat dry, and two are a paler brown where the ring is thin. The slot sinks it 0.02 m into
+    the bench, so 5 mm stands proud."""
+    m = Model("mug_ring", offset=(-2.5, 0.0, -2.5))
+    m.disc_y("stain", 2.5, 2.5, 2.6, 0, "#5A3A22", hollow=1.2)
+    m.clear(4, 0, 1)
+    for x, z in ((0, 3), (3, 4)):
+        m.put("stain", x, 0, z, "#7A5434")
+    return m
+
+
 MODELS = [
     (lambda: tractor(False), 0.1), (lambda: tractor(True), 0.1),
     (terrarium, 0.1), (curlyhair, 0.1), (bram_bay, 0.2), (ore_fissure, 0.2),
@@ -944,6 +959,7 @@ MODELS = [
       for n in TERRACE],
     *[((lambda n=n: prop_sheet(n, COBALT, "spider")), 0.025) for n in ("cobalt_body", "cobalt_leg")],
     (sentinel_crib, 0.05),
+    (mug_ring, 0.025),
 ]
 
 
