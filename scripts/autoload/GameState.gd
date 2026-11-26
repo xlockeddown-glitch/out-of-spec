@@ -695,9 +695,22 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return "'lab_build' has a field of the wrong type."
 	for list: String in ["job_board", "active_jobs"]:
 		for job: Dictionary in data[list]:
-			if not _optional_fields(job, ["id", "customer", "item", "discipline", "area", "min_band"],
-					["pay", "min_tier", "bench_minutes", "due_in_days", "accepted_day"]):
+			if not _optional_fields(job, ["id", "customer", "item", "discipline", "area", "min_band", QUEST_JOB],
+					["pay", "min_tier", "bench_minutes", "due_in_days", "accepted_day", "flat_cut_pct"]):
 				return "'%s' has a field of the wrong type." % list
+	# Only a job a quest handed out has these two, and such a job is never on
+	# the board. A quest has one job out at a time.
+	for offer: Dictionary in data["job_board"]:
+		if offer.has(QUEST_JOB) or offer.has("flat_cut_pct"):
+			return "'job_board' has a quest's job."
+	var quests_with_a_job: Array[String] = []
+	for job: Dictionary in data["active_jobs"]:
+		var from_quest: String = str(job.get(QUEST_JOB, ""))
+		if from_quest == "":
+			continue
+		if from_quest in quests_with_a_job:
+			return "'active_jobs' has two jobs from one quest."
+		quests_with_a_job.append(from_quest)
 	for entry: Dictionary in data["harvest_bin"]:
 		if not _optional_fields(entry, [], ["advance"]):
 			return "'harvest_bin' has a field of the wrong type."
@@ -4575,6 +4588,65 @@ func active_job(job_id: String) -> Dictionary:
 	return {}
 
 
+# --- A job handed out by a quest (quests_levels_story.md section 6, S3) -----------
+
+## The mark on a job a quest handed out: the quest's id, on the job in
+## active_jobs and on its row in job_log. A board job has none. Such a job is
+## never on the board: the board is filled from data/economy.json's templates
+## only, and this job comes from the quest (data/quests.json, `job`).
+const QUEST_JOB: String = "quest"
+
+
+## The accepted job `quest_id` handed out, or {}.
+func quest_job(quest_id: String) -> Dictionary:
+	for job: Dictionary in active_jobs:
+		if quest_id != "" and str(job.get(QUEST_JOB, "")) == quest_id:
+			return job
+	return {}
+
+
+## True once `quest_id` has handed out its job: it is in active_jobs, or it was
+## done and has its row in job_log.
+func has_quest_job(quest_id: String) -> bool:
+	if quest_id == "":
+		return false
+	if not quest_job(quest_id).is_empty():
+		return true
+	for row: Dictionary in job_log:
+		if str(row.get(QUEST_JOB, "")) == quest_id:
+			return true
+	return false
+
+
+## Host, from the quests' look (QuestEngine): puts the job of `quest_id` in
+## active_jobs, as accept_job does a board offer, unless this quest's job is
+## there already or was done. Returns the job, or {} when none was handed out.
+## Nothing is asked of the lab first (job_accept_problem): the envelope is under
+## the airlock whether or not the lab can do it yet, and the bench says what is
+## missing. It says nothing on the phone; the caller does (quest_job_text).
+func issue_quest_job(quest_id: String, template: Dictionary) -> Dictionary:
+	if quest_id == "" or has_quest_job(quest_id):
+		return {}
+	var today: int = GameClock.get_day_index()
+	var job: Dictionary = template.duplicate(true)
+	job[QUEST_JOB] = quest_id
+	job["job_id"] = "JOB-%04d" % _next_job_number
+	_next_job_number += 1
+	job["accepted_day"] = today
+	job["due_day"] = today + maxi(int(template.get("due_in_days", 2)), 0)
+	active_jobs.append(job)
+	jobs_changed.emit()
+	return job
+
+
+## "JOB-0004 is yours, not the board's: a gauge for Chet's customer. Calibrate
+## it at the bench by day 9 with a traceable standard for 200 CR."
+func quest_job_text(job: Dictionary) -> String:
+	return "%s is yours, not the board's: %s for %s. Calibrate it at the bench by day %s with a traceable standard for %s CR." % [
+		job.get("job_id", "?"), job.get("item", "?"), job.get("customer", "?"),
+		SP811.integer(int(job.get("due_day", 0))), SP811.integer(int(job.get("pay", 0)))]
+
+
 ## The standard complete_job would use for `job` today: the best one not at
 ## OIRM, or "" if there is none.
 func job_bench_standard(job: Dictionary) -> String:
@@ -4632,18 +4704,27 @@ func complete_job(job_id: String, player_id: String = "") -> Dictionary:
 	if minutes > 0.0:
 		GameClock.advance(minutes / 1440.0)
 	active_jobs.erase(job)
-	# Taken today: a promotion from this payout must not offer it again.
-	_board_taken.append(str(job.get("id", "")))
+	# Taken today: a promotion from this payout must not offer it again. A
+	# quest's job was never the board's to offer.
+	if str(job.get(QUEST_JOB, "")) == "":
+		_board_taken.append(str(job.get("id", "")))
 	var today: int = GameClock.get_day_index()
 	var on_time: bool = today <= int(job["due_day"])
 	var offered: int = int(job.get("pay", 0))
 	var pay: float = float(offered)
 	var points: int = 0
+	# A job that says flat_cut_pct (a quest's) is cut once by that much for late,
+	# untraceable or both, in place of the board's two cuts.
+	var flat: bool = job.has("flat_cut_pct")
+	if flat and not (on_time and traceable):
+		pay *= (100.0 - clampf(float(job["flat_cut_pct"]), 0.0, 100.0)) / 100.0
 	if not on_time:
-		pay *= (100.0 - clampf(_jobs_number("late_pay_cut_pct", 50.0), 0.0, 100.0)) / 100.0
+		if not flat:
+			pay *= (100.0 - clampf(_jobs_number("late_pay_cut_pct", 50.0), 0.0, 100.0)) / 100.0
 		points += int(_jobs_number("late_job_points", -3.0))
 	if not traceable:
-		pay *= (100.0 - clampf(_jobs_number("untraceable_pay_cut_pct", 75.0), 0.0, 100.0)) / 100.0
+		if not flat:
+			pay *= (100.0 - clampf(_jobs_number("untraceable_pay_cut_pct", 75.0), 0.0, 100.0)) / 100.0
 		points += int(_jobs_number("untraceable_job_points", -5.0))
 	if on_time and traceable:
 		points = int(_jobs_number("clean_job_points", 2.0))
@@ -4662,6 +4743,9 @@ func complete_job(job_id: String, player_id: String = "") -> Dictionary:
 		"points": points,
 		"bench_minutes": minutes,
 	}
+	# A quest's job says so on its row, and only such a row has the key.
+	if str(job.get(QUEST_JOB, "")) != "":
+		result[QUEST_JOB] = str(job[QUEST_JOB])
 	job_log.append(result)
 	add_credits(result["pay"])
 	_xp_after_job(result, player_id)
@@ -4696,6 +4780,14 @@ func _expire_jobs(day: int) -> void:
 	for job: Dictionary in active_jobs.duplicate():
 		if not job.get("at_bench", false) and day > int(job["due_day"]) + grace:
 			active_jobs.erase(job)
+			# A quest's job costs nothing when it runs out: the quest hands it out
+			# again at its next look, this same morning. Said now, so the line is
+			# before the one that brings it back: _morning_notes are posted after
+			# that look, which would put "ran out" after the new job's line.
+			if str(job.get(QUEST_JOB, "")) != "":
+				post_phone("%s ran out: %s went back to %s." % [job["job_id"], job.get("item", "?"), job.get("customer", "?")])
+				jobs_changed.emit()
+				continue
 			change_credibility(int(_jobs_number("abandoned_job_points", -5.0)))
 			var note: String = "%s cancelled: %s took %s elsewhere." % [job["job_id"], job.get("customer", "?"), job.get("item", "?")]
 			if _morning:
@@ -4871,18 +4963,21 @@ func _lab_size_for_area_text(need: int) -> String:
 func _lab_spaces_in_use(discipline: String) -> int:
 	var keep: int = 0
 	for job: Dictionary in active_jobs:
-		if str(job.get("discipline", "")) != discipline:
+		if str(job.get("discipline", "")) != discipline or str(job.get(QUEST_JOB, "")) != "":
 			continue
 		var size_id: String = str(job.get("area", ""))
 		keep = maxi(keep, lab_area_spaces_needed(size_id) if size_id != "" else 1)
 	return keep
 
 
-## Accepted jobs of `discipline` (at the bench or waiting).
+## Accepted board jobs of `discipline` (at the bench or waiting): the jobs that
+## hold a space of its area. A quest's job holds none. It is handed out without
+## asking the lab for room and complete_job asks for none, so it must not fill
+## an area or keep one from being cleared while it cannot be done yet.
 func jobs_in_progress(discipline: String) -> int:
 	var count: int = 0
 	for job: Dictionary in active_jobs:
-		if str(job.get("discipline", "")) == discipline:
+		if str(job.get("discipline", "")) == discipline and str(job.get(QUEST_JOB, "")) == "":
 			count += 1
 	return count
 

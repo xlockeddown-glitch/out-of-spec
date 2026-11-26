@@ -43,6 +43,16 @@ extends RefCounted
 ## that earned a grade is kept with the step (`scores`) and, when the quest is
 ## paid, gives the bonus of section 7.2.
 ##
+## A farm's quest may carry "job" (section 6, S3): a job as the board's are,
+## handed out by the quest and never on the board. On an offering look, while the
+## quest is accepted and not done, the farm is asked to put it in active_jobs
+## unless one of this quest's is there or in job_log (GameState.issue_quest_job).
+## So a job that ran out or was dropped is back the next morning, as often as it
+## takes, and no day is kept for it. Nothing new is saved: the job and its
+## job_log row carry the quest's id (`quest`), and the `quest_job` check and a
+## `count` of job_log rows read that. Handing out that job is the one thing the
+## engine asks the farm to do; the rest of it only watches.
+##
 ## Not built yet: accept and turn-in by the player (the quest log, build step 7;
 ## until then an offered quest is accepted at once and paid when its last step
 ## holds) and item rewards (step 10).
@@ -66,7 +76,7 @@ const LOGS: Dictionary = { "cal_log": "cal_log", "job_log": "job_log", "audit_lo
 const COUNTING: Array[String] = ["count", "counter"]
 ## The checks check_value() knows: what a step's `check` may be, and with
 ## `always` and `day_at_least` (WHENS) what a `when` may be.
-const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter"]
+const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job"]
 ## A `when` that is not a step check (offer_holds).
 const WHENS: Array[String] = ["always", "day_at_least"]
 ## A reward of skill XP is "xp_<skill id>".
@@ -88,6 +98,18 @@ const ENDINGS: String = "endings"
 ## On a mini-game step: what the giver says when the quest is paid and the game
 ## was played to the best grade. A path in dialogue_dispatches.json or the line.
 const MINIGAME_LINE: String = "minigame_line"
+## On a quest: a list of gates dictionaries of which one must hold ("credibility
+## 20, or lab level 6"), beside `gates`, which must all hold. See any_gate_holds().
+const ANY_GATE: String = "any_gate"
+## On a farm's quest: the job it hands out, a job template as data/economy.json
+## has them (id, customer, item, discipline, min_tier, pay, due_in_days,
+## bench_minutes) and, if it likes, flat_cut_pct. See GameState.issue_quest_job.
+const JOB: String = "job"
+## What the giver says when the quest's job is handed out again: a path in
+## dialogue_dispatches.json or the line itself.
+const JOB_AGAIN_LINE: String = "job_again_line"
+## What a quest's job must say in text.
+const JOB_TEXTS: Array[String] = ["id", "customer", "item", "discipline"]
 
 
 static func quests() -> Array[Dictionary]:
@@ -151,6 +173,18 @@ static func _update_one(farm: Node, quest: Dictionary, state: Dictionary, presen
 	var steps: Array = quest["steps"]
 	var done: Array = entry["steps_done"]
 	var moved: bool = is_new
+	# The quest's own job: handed out with the quest, and again on any offering
+	# look that finds it gone with no row in job_log (it ran out, or was dropped).
+	var issued: Dictionary = {}
+	if offers and owner == "" and quest.has(JOB):
+		issued = farm.issue_quest_job(id, quest[JOB])
+		if not issued.is_empty():
+			moved = true
+			if not is_new:
+				var again: String = phone_line(str(quest.get(JOB_AGAIN_LINE, "")))
+				if again != "":
+					farm.post_phone("%s: %s" % [giver_name(quest), again])
+				farm.post_phone(farm.quest_job_text(issued))
 	var finished: Array[String] = []
 	var in_order: bool = not bool(quest.get("any_order", false))
 	# The step before this one was done in this look.
@@ -194,6 +228,8 @@ static func _update_one(farm: Node, quest: Dictionary, state: Dictionary, presen
 		# `offer_line`: what the giver says with the offer, a path or the words.
 		var said: String = phone_line(str(quest.get("offer_line", "")))
 		farm.post_phone("%s: New quest, %s. %s%s" % [giver_name(quest), title, "" if said == "" else said + " ", next])
+		if not issued.is_empty():
+			farm.post_phone(farm.quest_job_text(issued))
 	elif not finished.is_empty():
 		farm.post_phone("QUEST %s: step done. Next: %s" % [title, next])
 	return moved
@@ -350,6 +386,8 @@ static func data_problem(quest: Dictionary) -> String:
 		if not id is String or id == "" or id in ids:
 			return "a step has no id, or two steps have the same id."
 		ids.append(id)
+		if str(step.get("check", "")) == "quest_job" and (not step.get("quest") is String or step["quest"] == ""):
+			return "step '%s' looks for a quest's job and names no quest." % id
 		if step.has(MINIGAME_LINE) and not step.has("minigame"):
 			return "step '%s' has a mini-game line and no mini-game." % id
 		if step.has("minigame"):
@@ -362,6 +400,27 @@ static func data_problem(quest: Dictionary) -> String:
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:
 		if quest.has(key) and not quest[key] is Dictionary:
 			return "'%s' is not a dictionary." % key
+	if quest.has(ANY_GATE):
+		if not quest[ANY_GATE] is Array or (quest[ANY_GATE] as Array).is_empty():
+			return "'any_gate' is not a list, or is empty."
+		for gates: Variant in quest[ANY_GATE]:
+			if not gates is Dictionary or (gates as Dictionary).is_empty():
+				return "'any_gate' has an entry that is not a dictionary of gates."
+	if quest.has(JOB):
+		var job: Variant = quest[JOB]
+		if not job is Dictionary or str(quest.get("scope", SCOPE_FARM)) != SCOPE_FARM:
+			return "'job' is not a dictionary, or the quest is not the farm's."
+		for key: String in JOB_TEXTS:
+			if not job.get(key) is String or job[key] == "":
+				return "'job' has no %s." % key
+		for key: String in ["pay", "min_tier", "due_in_days", "bench_minutes", "flat_cut_pct"]:
+			if job.has(key) and not (job[key] is int or job[key] is float):
+				return "'job' has a %s that is not a number." % key
+		for key: String in ["job_id", "due_day", "accepted_day", "at_bench", "quest", "min_band", "area"]:
+			if job.has(key):
+				return "'job' has '%s', which is not a quest job's to say." % key
+	if quest.has(JOB_AGAIN_LINE) and (not quest.has(JOB) or not quest[JOB_AGAIN_LINE] is String or quest[JOB_AGAIN_LINE] == ""):
+		return "'job_again_line' is not text, or the quest has no job."
 	if quest.has(ENDINGS):
 		if not quest[ENDINGS] is Array or (quest[ENDINGS] as Array).is_empty():
 			return "'endings' is not a list, or is empty."
@@ -384,7 +443,21 @@ static func data_problem(quest: Dictionary) -> String:
 
 ## Whether the quest's own gates and its offer hold.
 static func is_offered(farm: Node, quest: Dictionary, present: Array[String], owner: String = "") -> bool:
-	return gates_hold(farm, quest.get("gates", {}), present, owner) and offer_holds(farm, quest.get("offer", {}), present, owner)
+	return gates_hold(farm, quest.get("gates", {}), present, owner) and any_gate_holds(farm, quest, present, owner) \
+			and offer_holds(farm, quest.get("offer", {}), present, owner)
+
+
+## `any_gate`: a list of gates dictionaries, and one of them must hold (each as
+## gates_hold reads it, so all of that one's keys). A quest with none is open.
+static func any_gate_holds(farm: Node, quest: Dictionary, present: Array[String], owner: String = "") -> bool:
+	if not quest.has(ANY_GATE):
+		return true
+	var list: Variant = quest[ANY_GATE]
+	if list is Array:
+		for gates: Variant in list:
+			if gates is Dictionary and gates_hold(farm, gates, present, owner):
+				return true
+	return false
 
 
 ## All of a quest's gates (section 5.2). For a gate on a player's own level or
@@ -400,6 +473,9 @@ static func gates_hold(farm: Node, gates: Dictionary, present: Array[String], ow
 					return false
 			"band":
 				if farm.credibility_band_index() < farm._band_index_named(str(gate)):
+					return false
+			"credibility":
+				if int(farm.credibility) < int(gate):
 					return false
 			"skill":
 				if not gate is Dictionary or _best_level(farm, str(gate.get("id", "")), present) < int(gate.get("level", 1)):
@@ -571,6 +647,8 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 			for player: String in farm._known_players():
 				total += farm.action_count(str(step.get("counter", "")), player)
 			return total
+		"quest_job":
+			return int(farm.has_quest_job(str(step.get("quest", ""))))
 	return 0
 
 
