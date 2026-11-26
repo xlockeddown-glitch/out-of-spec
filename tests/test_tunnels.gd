@@ -448,3 +448,41 @@ func test_water_is_where_the_ground_is_lower_and_darker_where_deeper() -> String
 		problem = "Only the column at the shore is foam"
 	water.free()
 	return problem
+
+
+func test_basalt_is_lighter_than_the_first_dark_one() -> String:
+	var old := Color("#232832")
+	if TunnelRock.BASALT.get_luminance() < old.get_luminance() + 0.03:
+		return "The basalt must be lighter than #232832"
+	if TunnelRock.BASALT.get_luminance() >= TunnelRock.BASALT_FLOOR.get_luminance():
+		return "The walls must stay darker than the floor"
+	return ""
+
+
+## A walker is a capsule 0.3 m wide in radius and 1.6 m tall. Nothing that is
+## drawn or solid may stand where one passes through an arch.
+func test_a_walker_fits_through_every_arch_opening() -> String:
+	var rock: TunnelRock = _rock()
+	var problem: String = ""
+	for y: int in TunnelRock.MAP.size():
+		for x: int in TunnelRock.MAP[y].length():
+			var kind: String = TunnelRock.tile(Vector2i(x, y))
+			if not kind in "AB":
+				continue
+			var along: Vector3 = Vector3.RIGHT if kind == "A" else Vector3.BACK
+			# Meters along the arch from a floor cell's middle; a pillar's inner face is
+			# 1.1 m from the middle of an end cell.
+			for k: float in [-0.7, -0.35, 0.0, 0.35, 0.7]:
+				var feet: Vector3 = TunnelRock.at(Vector2i(x, y)) + along * k
+				var walker := AABB(feet + Vector3(-0.3, 0.0, -0.3), Vector3(0.6, 1.6, 0.6))
+				for node: Node in rock.get_children():
+					if node is MeshInstance3D and (node as MeshInstance3D).mesh is BoxMesh:
+						var mesh := node as MeshInstance3D
+						if AABB(mesh.position - (mesh.mesh as BoxMesh).size * 0.5, (mesh.mesh as BoxMesh).size).intersects(walker):
+							problem = "Arch stone at %s is in a walker's way at %s" % [mesh.position, feet]
+					elif node is StaticBody3D and (node as StaticBody3D).collision_layer & TunnelRock.LAYER_WORLD != 0:
+						var box := (node.get_child(0) as CollisionShape3D).shape as BoxShape3D
+						if box != null and AABB((node as StaticBody3D).position - box.size * 0.5, box.size).intersects(walker):
+							problem = "%s is in a walker's way at %s" % [node.name, feet]
+	rock.free()
+	return problem

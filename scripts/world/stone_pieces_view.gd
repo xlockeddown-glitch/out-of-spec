@@ -5,7 +5,7 @@ extends Node3D
 
 const STONE := Color("#807a73")
 const STONE_DARK := Color("#6b665f")
-const BASALT := Color("#232832")
+const BASALT := Color("#353c49")
 const BASALT_FLOOR := Color("#495261")
 ## How thick a pad's slabs are, and how high and wide a channel's
 ## lips are [PLACEHOLDER]. So are the wall's tiers and the slabs' lifts below.

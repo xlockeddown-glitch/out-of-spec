@@ -873,7 +873,7 @@ model_path = "res://assets/voxels/water_cistern.glb"
 model_scale = 0.1
 
 [node name="Gauge" type="Node3D" parent="WorldView/WorldViewport/World/WaterCisternModel"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0.62)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0.62)
 script = ExtResource("37_gauge")
 
 [node name="Inspect" type="Area3D" parent="WorldView/WorldViewport/World/WaterCisternModel"]

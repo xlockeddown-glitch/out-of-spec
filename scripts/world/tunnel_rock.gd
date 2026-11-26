@@ -66,11 +66,16 @@ const ARCH_SIGNAL_M: float = 1.9  # [PLACEHOLDER]
 const ARCH_LOW_M: float = 2.3  # [PLACEHOLDER]
 const ARCH_HIGH_M: float = 4.0  # [PLACEHOLDER]
 const ROCK_M: float = 6.0  # [PLACEHOLDER]
+## A pillar's thickness along the arch. Above them the stone steps in this much
+## more each course, for this many courses, under a capstone [PLACEHOLDER].
+const PILLAR_M: float = 0.8
+const ARCH_STEP_M: float = 0.7
+const ARCH_COURSES: int = 2
 ## An arch this near the rover is seen through.
 const FADE_NEAR_M: float = 6.0  # [PLACEHOLDER]
 const FADE_ALPHA: float = 0.2  # [PLACEHOLDER]
 
-const BASALT := Color("#232832")
+const BASALT := Color("#353c49")  # lighter than the first #232832 [PLACEHOLDER]
 const BASALT_FLOOR := Color("#495261")
 const TEAL := Color("#38e1c6")
 const AMBER := Color("#f5a623")
@@ -332,18 +337,26 @@ func _build_arch(cell: Vector2i, along: Vector2i) -> void:
 	stone.albedo_color = BASALT.lightened(0.12)
 	stone.roughness = 1.0
 	for side: float in [-1.0, 1.0]:
-		var size: Vector3 = step * 0.8 + across * 2.0 + Vector3.UP * ARCH_LOW_M
+		var size: Vector3 = step * PILLAR_M + across * 2.0 + Vector3.UP * ARCH_LOW_M
 		var foot: Vector3 = middle + step * side * width_m * 0.5 + Vector3.UP * ARCH_LOW_M * 0.5
 		_add_mesh(foot, size, stone)
 		_add_body("Pillar", LAYER_WORLD, foot, size)
 	var lintel: StandardMaterial3D = stone.duplicate()
 	lintel.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	lintel.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
-	var height_m: float = ARCH_HIGH_M - ARCH_LOW_M
-	_add_mesh(middle + Vector3.UP * (ARCH_LOW_M + height_m * 0.35),
-		step * (width_m + 1.6) + across * 2.0 + Vector3.UP * height_m * 0.7, lintel)
-	_add_mesh(middle + Vector3.UP * (ARCH_HIGH_M - height_m * 0.15),
-		step * (width_m * 0.6) + across * 1.5 + Vector3.UP * height_m * 0.3, lintel)
+	# Above the pillars the stone steps in course by course and a capstone spans
+	# the top, so the opening is a stepped arch you can see through. Nothing here
+	# is solid below ARCH_LOW_M, where the rover and walkers pass.
+	var course_m: float = (ARCH_HIGH_M - ARCH_LOW_M) / (ARCH_COURSES + 1.0)
+	for course: int in ARCH_COURSES:
+		var reach_m: float = PILLAR_M + ARCH_STEP_M * (course + 1)
+		var base_m: float = ARCH_LOW_M + course_m * course
+		for side: float in [-1.0, 1.0]:
+			var edge_m: float = width_m * 0.5 + PILLAR_M * 0.5
+			_add_mesh(middle + step * side * (edge_m - reach_m * 0.5) + Vector3.UP * (base_m + course_m * 0.5),
+				step * reach_m + across * 2.0 + Vector3.UP * course_m, lintel)
+	_add_mesh(middle + Vector3.UP * (ARCH_HIGH_M - course_m * 0.5),
+		step * (width_m + PILLAR_M) + across * 2.0 + Vector3.UP * course_m, lintel)
 	_lintels[middle] = lintel
 
 
