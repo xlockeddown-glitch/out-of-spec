@@ -8,8 +8,8 @@ extends Node
 const ACTIONS: Array[StringName] = [
 	&"accept_job", &"add_robot_calibrate_card", &"add_robot_card", &"add_robot_collect_card",
 	&"adjust_setpoint", &"build_block_stack", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
-	&"calibrate_at_bench", &"catch_sentinel", &"change_depth", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
-	&"harvest_crop", &"hit_boulder", &"mine_fissure", &"move_rover", &"place_beacon", &"place_stone", &"plant_crop", &"release_robot", &"remove_robot_card", &"report_place",
+	&"calibrate_at_bench", &"catch_sentinel", &"change_depth", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fast_travel", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
+	&"harvest_crop", &"hit_boulder", &"leave_zone", &"mine_fissure", &"move_rover", &"place_beacon", &"place_stone", &"plant_crop", &"release_robot", &"remove_robot_card", &"report_place",
 	&"sell_harvest_to_lin", &"send_to_oirm", &"service_wheels", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay", &"spend_xp_certificate",
 	&"start_lab_grow", &"survey_ore", &"take_find", &"till", &"zero_steering",
 ]
@@ -212,9 +212,9 @@ func refusal(action: StringName, reason: String) -> Variant:
 
 ## What a rover reports every tick. The host measures the rovers it simulates, so
 ## these are not actions: a guest can't send them, and its own rover changes nothing.
-func rover_drove(meters: float) -> void:
+func rover_drove(meters: float, rover_id: String = "") -> void:
 	if not guest:
-		_farm().add_rover_usage(meters, _farm().local_player_id)
+		_farm().add_rover_usage(meters, _farm().local_player_id, rover_id)
 
 
 func rover_uplink(rover_id: String, has_los: bool) -> void:

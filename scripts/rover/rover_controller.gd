@@ -158,6 +158,7 @@ func _ready() -> void:
 	steering.error_changed.connect(_on_steering_error_changed)
 	GameState.upgrades_changed.connect(_apply_upgrades)
 	SaveGame.saving.connect(_park)
+	add_to_group(GameState.LIVE_ROVER_GROUP)
 	GameState.farm_loaded.connect(_unpark)
 	GameState.rover_place_changed.connect(_show_place)
 	_apply_upgrades()
@@ -280,6 +281,14 @@ func _keep_off_edge() -> void:
 	global_position.z = clampf(global_position.z, -edge_m, edge_m)
 
 
+## Where this rover is now, for a check that must not park it; null while it only
+## follows the cache (then the cache is the newer word).
+func live_transform() -> Variant:
+	if _following or GameState.rover_is_away(rover_id):
+		return null
+	return global_transform
+
+
 func _park() -> void:
 	# Whoever drives says where it is.
 	if _following or GameState.rover_is_away(rover_id):
@@ -358,6 +367,11 @@ func away_text() -> String:
 
 ## The one rover is on the farm or in the tunnels. In the other scene it is gone.
 func _show_place() -> void:
+	# A change that is another rover's alone (a field rover starting or going) leaves
+	# this one, and whoever is driving it, as it is.
+	var only: String = GameState.rover_place_scope
+	if only != "" and only != rover_id:
+		return
 	var away: bool = GameState.rover_is_away(rover_id)
 	visible = not away
 	process_mode = Node.PROCESS_MODE_DISABLED if away else Node.PROCESS_MODE_INHERIT
@@ -471,7 +485,7 @@ func _drive(delta: float) -> void:
 		_keep_off_edge()
 	# Horizontal displacement actually achieved; pushing into a rock adds no drift.
 	var driven: float = Vector2(global_position.x - before.x, global_position.z - before.z).length()
-	FarmCommands.rover_drove(driven)
+	FarmCommands.rover_drove(driven, rover_id)
 
 
 func _set_following(following: bool) -> void:

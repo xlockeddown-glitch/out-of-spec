@@ -272,6 +272,7 @@ func test_older_saves_have_the_rover_on_the_farm() -> String:
 		problem = "The place must be saved"
 	saved.erase("rover_zone")
 	saved.erase("rover_in_tunnels")
+	saved.erase("rover_lent")  # an older save has neither
 	if later.farm_from_dict(saved) != "" or later.rover_in_tunnels:
 		problem = "A save without one has it on the farm"
 	for wrong: Variant in ["tunnels", 1, null]:

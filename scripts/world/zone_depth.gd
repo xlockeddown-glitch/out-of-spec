@@ -257,6 +257,14 @@ static func pose_for_depth(depth: int) -> Transform3D:
 	return start_transform() if depth > 0 else hatch_exit_transform()
 
 
+## Where a rebuilt scene starts its rover: `known` (the pose the host parked or told,
+## or null) if it lies inside `depth`'s rock, else where the depth starts it.
+static func rebuild_pose(known: Variant, depth: int, world_seed: int, day: int) -> Transform3D:
+	if known is Transform3D and TunnelRock.holds_in(grid_for(depth, world_seed, day), (known as Transform3D).origin):
+		return known
+	return pose_for_depth(depth)
+
+
 ## True if a rover at `at` is within reach of the way up.
 static func near_ascent(at: Vector3) -> bool:
 	var there: Vector3 = TunnelRock.at_in(_blank(), UP_CELL)

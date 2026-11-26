@@ -281,6 +281,25 @@ var rover_zone: String = "":
 		# (setting the same zone again, as a load does, keeps it).
 		if value != old and value != TUNNELS_ZONE:
 			rover_depth = 0
+		if value == "":
+			rover_lent = false  # a rover that is not in a zone is not lent to one
+## True while the farm's own rover is lent to a zone: driven in through the real
+## entrance (move_rover), so the farm is without it. False when a zone's field rover
+## (the TUNNEL_ROVER slot) is there for people who fast-travelled (fast_travel),
+## and the farm rover stays home. Saved with rover_zone; a save from before it
+## says lent for any rover in a zone, as it was then. Never true on the farm.
+## The zones the farm has been to by the real entrance: the fast-travel console
+## lists only these (zones doc section 8.1). Farm-wide, saved, sent with the
+## rover's place. A save whose rover is lent grandfathers its zone.
+var zones_unlocked: Array[String] = []
+
+## Only the host sets it, for the one emit of rover_place_changed that is one
+## rover's alone (so the others' leases stay): that rover's id, else "".
+var rover_place_scope: String = ""
+
+var rover_lent: bool = false:
+	set(value):
+		rover_lent = value and rover_zone != ""
 ## How far below the hub the one rover is: 0 is the hub, 1 the first depth
 ## (ZoneDepth). The rover has one depth, so every screen in the tunnels shows it:
 ## nobody is at another depth than the rover. Saved, and sent to guests with
@@ -300,6 +319,7 @@ var rover_in_tunnels: bool:
 		return rover_zone != ""
 	set(value):
 		rover_zone = TUNNELS_ZONE if value else ""
+		rover_lent = value
 const TUNNELS_ZONE: String = "lava_tubes"
 ## Host: where each player is, as player id -> [place, depth] (ZonePresence). A
 ## player not in it is on the farm. Not saved: a loaded farm has everyone on the
@@ -312,6 +332,8 @@ const TUNNEL_ROVER: String = "rover_1_tunnels"
 const TUNNEL_PAD := Vector3(20.5, 0.0, -15.5)
 const TUNNEL_EXIT := Vector3(-1.5, 0.0, 27.4)
 const TUNNEL_PAD_REACH_M: float = 6.0
+## Rover controllers that can say where their rover is now (live_transform).
+const LIVE_ROVER_GROUP: StringName = &"live_rovers"
 ## Just inside the tunnels' mouth [PLACEHOLDER].
 const TUNNEL_START := Transform3D(Basis.IDENTITY, Vector3(-1.5, 0.05, 22.5))
 ## Vector3i -> true for every tilled soil cell.
@@ -656,13 +678,13 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
-	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch"]
+	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
-	"_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry",
+	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals",
 	"rover_in_tunnels", "player_places", "settle_due",
 ]
 
@@ -776,6 +798,17 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return "'rover_depth' is out of range."
 	if depth is int and depth > 0 and data.get("rover_zone", "") != TUNNELS_ZONE:
 		return "'rover_depth' is set for a rover that is not in the Lava Tubes."
+	if data.has("rover_lent") and not data["rover_lent"] is bool:
+		return "'rover_lent' is not a yes or no."
+	if data.get("rover_lent", false) and data.get("rover_zone", "") == "":
+		return "'rover_lent' is set for a rover that is on the farm."
+	var seen_zones: Array[String] = []
+	for zone_id: Variant in data.get("zones_unlocked", []):
+		if not zone_id is String or not ZoneData.is_playable(StringName(zone_id)):
+			return "'zones_unlocked' holds a zone that does not exist."
+		if seen_zones.has(zone_id):
+			return "'zones_unlocked' holds a zone twice."
+		seen_zones.append(zone_id)
 	# Saves before zones say it as a yes or no.
 	if not data.get("rover_in_tunnels", false) is bool:
 		return "'rover_in_tunnels' is not a yes or no."
@@ -983,6 +1016,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	player_places.clear()
 	_recall_warned_day = 0
 	_recall_rescued_day = 0
+	_console_arrivals.clear()
 	_rescue_notes.clear()
 	_ore_at_entry = -1
 	farm_loaded.emit()
@@ -1053,6 +1087,11 @@ func put_farm(data: Dictionary) -> void:
 	if not data.has("rover_zone") and data.get("rover_in_tunnels", false):
 		# A save from before zones: the bool said the tunnels.
 		rover_zone = TUNNELS_ZONE
+	if not data.has("rover_lent"):
+		# A save from before fast travel: a rover in a zone was the farm's, lent.
+		rover_lent = rover_zone != ""
+	if not data.has("zones_unlocked") and _has_been_to_tunnels(data) and not zones_unlocked.has(TUNNELS_ZONE):
+		zones_unlocked.append(TUNNELS_ZONE)  # it has been in there
 	_level_pads()
 	if not data.has("stone"):
 		# From before stone, so its broken boulders gave none.
@@ -4014,13 +4053,17 @@ func add_tire_usage(meters: float) -> void:
 ## Distance a rover drove this tick: wears the steering encoder and the tire
 ## gauge. There is one of each, whichever rover drove. The driver's Field Ops
 ## skill spares the encoder.
-func add_rover_usage(meters: float, player_id: String = "") -> void:
+func add_rover_usage(meters: float, player_id: String = "", rover_id: String = "") -> void:
 	if FarmCommands.guest:
 		return  # the host's rover wears the sensors
 	if not is_finite(meters) or meters < 0.0:
 		return
 	steering.add_usage(meters * skill_factor("steering_usage", player_id))
 	add_tire_usage(meters)
+	# The wheels that wear are the farm rover's: a field rover's metres are not
+	# counted unless it is the farm rover lent to the zone.
+	if rover_id == TUNNEL_ROVER and not rover_lent:
+		return
 	var were_due: bool = wheels_due()
 	wheel_meters += meters
 	if wheels_due() and not were_due:
@@ -4058,7 +4101,7 @@ func wheel_service_text() -> String:
 ## which is 1.0 for a skip and a poor try. The meters, when the nuts are next
 ## due and the rover do not see it.
 func service_wheels(player_id: String = "", score: int = MinigameScore.SKIPPED) -> String:
-	if rover_in_tunnels:
+	if rover_lent:
 		return "The rover is in the tunnels. Bram's bay is up on the farm."
 	if not wheels_due():
 		return "The wheel nuts are not due: %s m driven of %s m." % [
@@ -4106,6 +4149,7 @@ func players_in(place: String, among: Array[String]) -> Array[String]:
 ## Host: a player left, or dropped.
 func forget_place(player_id: String) -> void:
 	player_places.erase(player_id)
+	_console_arrivals.erase(player_id)
 
 
 ## A session starting or ending: only this screen's own player is known.
@@ -4138,7 +4182,7 @@ func settle_rover_depth(refresh: bool = true) -> bool:
 		return false
 	rover_transforms[TUNNEL_ROVER] = ZoneDepth.start_transform()
 	rover_epoch += 1
-	rover_place_changed.emit()
+	_emit_field_rover_changed()  # the field rover moved: a lease on the farm rover stays
 	return true
 
 
@@ -4152,7 +4196,7 @@ func settle_rover_depth(refresh: bool = true) -> bool:
 func change_depth(target_depth: int, player_id: String = "") -> String:
 	if rover_zone != TUNNELS_ZONE:
 		return "The rover is not in the Lava Tubes."
-	var driver: String = CoopRovers.driver(rover_here())
+	var driver: String = CoopRovers.driver(TUNNEL_ROVER)
 	if driver == "":
 		# Nobody holds the lease (it ends half a second after the rover stops): the
 		# host and solo player, or a player who is in the tunnels at the rover's depth.
@@ -4173,27 +4217,64 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 	rover_depth = target_depth
 	rover_transforms[TUNNEL_ROVER] = ZoneDepth.pose_for_depth(target_depth)
 	rover_epoch += 1
-	rover_place_changed.emit()
+	_emit_field_rover_changed()
 	return ""
 
 
-## The id the rover goes by where it is now.
+## The id of the rover the farm's real entrance deals with: the farm's own rover,
+## or, while it is lent to a zone, the one it is in there. (A field rover that
+## someone fast-travelled to is TUNNEL_ROVER, and the farm does not deal with it.)
 func rover_here() -> String:
-	return TUNNEL_ROVER if rover_in_tunnels else ROVER
+	return TUNNEL_ROVER if rover_lent else ROVER
 
 
-## True if this is the rover's id in the place it is not in.
+## An older save (no unlock list) that shows any sign of the Lava Tubes having been
+## visited: the rover is out, a field rover's pose was kept (the old way home kept
+## it), something was found or a beacon placed there.
+func _has_been_to_tunnels(data: Dictionary) -> bool:
+	if rover_lent or rover_zone != "":
+		return true
+	var poses: Variant = data.get("rover_transforms", {})
+	if poses is Dictionary and (poses as Dictionary).has(TUNNEL_ROVER):
+		return true
+	var taken: Variant = data.get("finds_taken", {})
+	if taken is Dictionary and (taken as Dictionary).has(ZoneDepth.ZONE):
+		return true
+	var beacons: Variant = data.get("beacons_placed", [])
+	if beacons is Array and not (beacons as Array).is_empty():
+		return true
+	# A trip that ended in a rescue left its phone lines (the rover pose was erased).
+	var log: Variant = data.get("phone_log", [])
+	if log is Array:
+		var marks: Array[String] = []
+		for key: String in ["rescue_text", "cost_text", "cost_none_text"]:
+			marks.append(TunnelRecall.text(key).split("%s")[0])
+		for line: Variant in log:
+			for mark: String in marks:
+				if line is String and mark != "" and (line as String).begins_with(mark):
+					return true
+	return false
+
+
+## True if this is the rover's id in the place it is not in: the farm's own rover
+## while it is lent, a zone's field rover while no zone is live.
 func rover_is_away(rover_id: String) -> bool:
-	return rover_id == (ROVER if rover_in_tunnels else TUNNEL_ROVER)
+	if rover_id == ROVER:
+		return rover_lent
+	return rover_id == TUNNEL_ROVER and rover_zone == ""
 
 
-## Takes the rover into the tunnels or out, from the pad there. Returns "" or why
-## not. It comes in at the mouth and comes out where it went in.
+## Takes the farm's rover into the tunnels or out, from the pad there (the real
+## entrance, which lends it: `rover_lent`). Returns "" or why not. It comes in at
+## the mouth and comes out where it went in. While a field rover is live in the
+## tunnels (fast_travel) the farm rover cannot go in: there is one rover there.
 func move_rover(into_tunnels: bool, player_id: String = "") -> String:
-	if into_tunnels == rover_in_tunnels:
+	if into_tunnels == rover_lent:
 		return "The rover is already there."
 	if into_tunnels and TunnelRecall.closed(GameClock.elapsed_days):
 		return TunnelRecall.text("closed_text")
+	if into_tunnels and rover_zone != "" and not _places_in(rover_zone).is_empty():
+		return FastTravel.text("field_rover_out")  # players are in there on it
 	if not CoopRovers.driver(rover_here()) in ["", player_id]:
 		return "Someone else is driving the rover."
 	SaveGame.saving.emit()  # it says where it is
@@ -4203,11 +4284,136 @@ func move_rover(into_tunnels: bool, player_id: String = "") -> String:
 	if not into_tunnels and rover_depth > 0:
 		return "The rover must come up first."
 	if into_tunnels:
+		_console_arrivals.clear()  # a mouth entry starts a trip: the baseline is the mouth's
+		if rover_zone != "":
+			# Every refusal is behind us. Nobody is with the field rover: it goes, and the mouth is free.
+			_release_field_rover()
+			_emit_field_rover_changed()
 		park_rover(TUNNEL_ROVER, TUNNEL_START)
 		_ore_at_entry = crystal_ore
-	rover_in_tunnels = into_tunnels
+		if not zones_unlocked.has(TUNNELS_ZONE):
+			zones_unlocked.append(TUNNELS_ZONE)  # the first real visit opens it to the console
+	rover_in_tunnels = into_tunnels  # sets rover_lent with it
+	if not into_tunnels:
+		_console_arrivals.clear()  # the trip is over
 	rover_place_changed.emit()
 	return ""
+
+
+# --- Fast travel (zones doc section 8.1, build step 7) ---------------------------
+
+## Host: the player goes from the dome's console to a zone's field rover, in the
+## zone. `zone_id` is a zone with a scene; `player_id` is filled in from the
+## connection. Returns "" or why not (the screen then changes scene). The farm
+## rover stays home. If no zone rover is live, a field rover is put at the zone's
+## start; if one is, the player joins it where it is, unless it is left below with
+## nobody below (FastTravel.arrival_plan): then it starts again at the hub, as a
+## new epoch. Shut after the rescue hour, like the mouth.
+func fast_travel(zone_id: String, player_id: String = "") -> String:
+	if not ZoneData.is_playable(StringName(zone_id)) or not zones_unlocked.has(zone_id):
+		return FastTravel.text("no_zone")
+	if place_of(player_id) != ZonePresence.DOME:
+		return FastTravel.text("console_in_dome")
+	if TunnelRecall.closed(GameClock.elapsed_days):
+		return TunnelRecall.text("closed_text")
+	if rover_zone != "" and rover_zone != zone_id:
+		return FastTravel.text("field_rover_out")
+	var plan: String = FastTravel.arrival_plan(rover_zone != "", rover_depth, _places_in(zone_id, player_id))
+	if plan == FastTravel.START:
+		SaveGame.saving.emit()
+		rover_transforms[TUNNEL_ROVER] = TUNNEL_START
+		rover_zone = zone_id  # the farm rover stays where it is, home
+		_ore_at_entry = -1  # a fast-travel rescue takes credits only [PLACEHOLDER]: the farm's ore is not the zone's
+		rover_epoch += 1
+	elif plan == FastTravel.RE_PARK:
+		if CoopRovers.driver(TUNNEL_ROVER) != "":
+			return FastTravel.text("someone_driving")
+		rover_depth = 0
+		rover_transforms[TUNNEL_ROVER] = TUNNEL_START
+		rover_epoch += 1
+	player_places[player_id] = [zone_id, rover_depth]
+	_console_arrivals[player_id] = true
+	if plan != FastTravel.JOIN:
+		_emit_field_rover_changed()  # a rover moved; joining moves none, so nobody's lease is lost
+	return ""
+
+
+## Host: the player goes from a zone to the dome, where the console is. The last
+## one out of a zone whose field rover is its own (not the farm's, lent) lets it
+## go: the next arrival starts one again. `player_id` is filled in from the
+## connection. Returns "" or why not.
+func leave_zone(player_id: String = "") -> String:
+	var zone: String = place_of(player_id)
+	if zone == ZonePresence.FARM or zone == ZonePresence.DOME:
+		return "You are not in a zone."
+	if rover_lent:
+		return FastTravel.text("use_the_mouth")  # the farm's rover is out: it comes home by the mouth
+	if depth_of(player_id) != 0 or rover_depth != 0:
+		return "The way home is from the hub."
+	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+	if at == null or (at as Vector3).distance_to(TUNNEL_EXIT) > TUNNEL_PAD_REACH_M:
+		return "The rover is not on the pad."
+	player_places[player_id] = [ZonePresence.DOME, 0]
+	_console_arrivals.erase(player_id)
+	if rover_zone != "" and _places_in(rover_zone).is_empty():
+		_release_field_rover()
+		_emit_field_rover_changed()
+	return ""
+
+
+## The leases and poses the pad check reads; the CoopRovers autoload unless a test
+## puts its own here.
+var rovers_node: Node = null
+
+
+## Where a rover is now, as a position, or null if it has none. Read without a
+## side effect (nothing is parked). Someone else's drive wins: with a teammate on the
+## farm, the pose the host last accepted or heard (CoopRovers) is the newest word,
+## and the host's own controller, which may not have run yet, must not overwrite it.
+## Only a rover this player drives (alone, or the host with nobody else driving) is
+## asked of its controller, which knows better than the last parking.
+func _rover_pose_now(rover_id: String) -> Variant:
+	var rovers: Node = rovers_node if rovers_node != null else CoopRovers
+	if rovers.together():
+		var heard: Variant = rovers.told_pose(rover_id)
+		if heard != null:
+			return (heard as Transform3D).origin
+	if rovers.driver(rover_id) in ["", local_player_id]:
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		for node: Node in tree.get_nodes_in_group(LIVE_ROVER_GROUP) if tree != null else []:
+			if node.get("rover_id") == rover_id:
+				var live: Variant = node.call("live_transform")
+				if live != null:
+					return (live as Transform3D).origin
+	if not rover_transforms.has(rover_id):
+		return null
+	return parked_rover_transform(rover_id).origin
+
+
+## The [place, depth] of everyone the host knows to be in `zone_id`.
+func _places_in(zone_id: String, except_player: String = "") -> Array:
+	var found: Array = []
+	for who: Variant in player_places:
+		if who != except_player and str(player_places[who][0]) == zone_id:
+			found.append(player_places[who])
+	return found
+
+
+## rover_place_changed for the field rover alone: leases of other rovers stay.
+func _emit_field_rover_changed() -> void:
+	rover_place_scope = TUNNEL_ROVER
+	rover_place_changed.emit()
+	rover_place_scope = ""
+
+
+## Host: a field rover (not the farm's) goes away: the zone has none live. Nothing
+## of the farm's moves.
+func _release_field_rover() -> void:
+	rover_transforms.erase(TUNNEL_ROVER)
+	rover_zone = ""
+	_ore_at_entry = -1
+	_console_arrivals.clear()  # the trip is over
+	rover_epoch += 1
 
 
 # --- The recall (zones doc section 6.1) ---------------------------------------
@@ -4222,6 +4428,9 @@ var _rescue_notes: Array[String] = []
 ## known, e.g. a farm that loaded in them). Ore gained since is what a rescue
 ## can take; the rest of the pile is the farm's and is never touched [ASSUMPTION].
 var _ore_at_entry: int = -1
+## Host: the players who came to the zone by the console on this trip. Their rescue
+## takes credits only [PLACEHOLDER]: the ore baseline is the mouth entrant's. Not saved.
+var _console_arrivals: Dictionary = {}
 ## Only tests set it: where the local player is (true: in the tunnels).
 var recall_in_tunnels: Callable = Callable()
 ## Only tests set it: stands in for CoopBeds, and makes the rescue run at once.
@@ -4242,6 +4451,9 @@ func _local_in_tunnels() -> bool:
 func _tick_recall() -> void:
 	# Rover not in the tunnels: the player walks out with E as today [ASSUMPTION].
 	if FarmCommands.guest or not rover_in_tunnels or not _local_in_tunnels():
+		return
+	# Out through the pad but still fading out of the tunnels scene: already home.
+	if player_places.has(local_player_id) and place_of(local_player_id) in [ZonePresence.DOME, ZonePresence.FARM]:
 		return
 	var day: int = GameClock.get_day_index()
 	match TunnelRecall.phase(GameClock.elapsed_days, _recall_warned_day, _recall_rescued_day):
@@ -4277,13 +4489,24 @@ func rescue_from_tunnels(player_id: String = "") -> Dictionary:
 	if FarmCommands.guest:
 		return TunnelRecall.cost(0, 0)  # the host decides and applies it
 	var who: String = performer_name(_player(player_id))
-	var bill: Dictionary = TunnelRecall.cost(credits, ore_carried_in())
+	var leaving: String = player_id if player_id != "" else local_player_id
+	if player_places.has(leaving) or rover_zone != "":
+		player_places[leaving] = [ZonePresence.FARM, 0]  # carried out, to bed
+	var ore: int = 0 if _console_arrivals.has(leaving) else ore_carried_in()
+	_console_arrivals.erase(leaving)
+	var bill: Dictionary = TunnelRecall.cost(credits, ore)
 	if bill["credits"] > 0:
 		add_credits(-int(bill["credits"]))
 	if bill["ore"] > 0:
 		crystal_ore -= int(bill["ore"])
 		ore_changed.emit(crystal_ore)
-	bring_rover_home()
+	# With nobody else recorded below, the rover goes: the farm's lent one comes home, a
+	# field one is released (else the farm keeps rover_in_tunnels, and a save would send
+	# Continue and a second rescue back down). While someone is still recorded there it stays.
+	# [KNOWN LIMIT] a guest still fading in is not recorded yet: the unacknowledged
+	# airlock race (a follow-up needs host-acknowledged arrivals).
+	if rover_zone != "" and _places_in(rover_zone).is_empty():
+		bring_rover_home()  # lent: home; field: released with its scoped emit
 	post_phone(TunnelRecall.text("rescue_text") % who.to_lower())
 	var line: String
 	if bill["credits"] == 0 and bill["ore"] == 0:
@@ -4308,6 +4531,11 @@ func ore_carried_in() -> int:
 func bring_rover_home() -> void:
 	if FarmCommands.guest or not rover_in_tunnels:
 		return
+	if not rover_lent:
+		# A field rover, not the farm's: it goes, and the farm rover is where it was.
+		_release_field_rover()
+		_emit_field_rover_changed()
+		return
 	var home: Transform3D = parked_rover_transform(ROVER, Transform3D(Basis.IDENTITY, TUNNEL_PAD))
 	if home.origin.distance_to(TUNNEL_PAD) > TUNNEL_PAD_REACH_M:
 		home = Transform3D(Basis.IDENTITY, TUNNEL_PAD)
@@ -4315,6 +4543,7 @@ func bring_rover_home() -> void:
 	rover_transforms.erase(TUNNEL_ROVER)
 	rover_in_tunnels = false
 	_ore_at_entry = -1
+	_console_arrivals.clear()  # the trip is over
 	rover_place_changed.emit()
 
 
@@ -4754,7 +4983,7 @@ func sentinel_chance() -> float:
 func set_rover_lights(on: bool, player_id: String = "") -> String:
 	if not rover_in_tunnels:
 		return "The rover is not in the tunnels."
-	if not CoopRovers.driver(rover_here()) in ["", player_id]:
+	if not CoopRovers.driver(TUNNEL_ROVER) in ["", player_id]:
 		return "Someone else is driving the rover."
 	if on == rover_lights:
 		return ""
@@ -4866,7 +5095,7 @@ func catch_sentinel(reading_pct: float, player_id: String = "") -> String:
 		return "The cup can't hold that."
 	if not rover_in_tunnels:
 		return "The rover is not in the tunnels."
-	if not CoopRovers.driver(rover_here()) in ["", player_id]:
+	if not CoopRovers.driver(TUNNEL_ROVER) in ["", player_id]:
 		return "Someone else is driving the rover."
 	SaveGame.saving.emit()  # it says where it is
 	watch_sentinel(TUNNEL_ROVER, parked_rover_transform(TUNNEL_ROVER).origin, 0.0)
@@ -6178,12 +6407,10 @@ func place_stone(cell: Vector3i, kind: int, player_id: String = "") -> String:
 	SaveGame.saving.emit()  # rovers say where they are
 	var rovers: Array[Transform3D] = []
 	for id: String in rover_transforms:
-		if not rover_is_away(id):
+		if id != TUNNEL_ROVER and not rover_is_away(id):  # a field rover's place is not here
 			rovers.append(rover_transforms[id])
-	if rover_in_tunnels:
-		rovers.clear()  # its place is in there
 	var walkers: Array[Vector2] = []
-	if not rover_in_tunnels:
+	if not rover_lent:
 		for pose: Array in CoopWalkers.out.values():
 			walkers.append(Vector2(pose[0], pose[2]))
 	var problem: String = StonePieces.problem(at, kind, stone_pieces, rovers, dug, walkers)
@@ -6230,7 +6457,7 @@ func _lift_to_ground() -> void:
 		if pose.origin.y < ground_m:
 			pose.origin.y = ground_m
 			rover_transforms[id] = pose
-	if rover_in_tunnels:
+	if rover_lent:
 		return  # the players are in there too
 	for pose: Array in CoopWalkers.out.values():
 		pose[1] = maxf(pose[1], Terrain.height(Vector2(pose[0], pose[2]), dug))

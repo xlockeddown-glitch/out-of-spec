@@ -178,7 +178,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_rover_entered_exit() -> void:
-	_hud.push_log("WAY UP: press E to go up." if _below else "TUNNEL MOUTH: press E to leave.")
+	_hud.push_log("WAY UP: press E to go up." if _below else ("WAY HOME: press E to go back to the dome." if not GameState.rover_lent else "TUNNEL MOUTH: press E to leave."))
 
 
 ## Says what E does when the rover first comes by the rack, the board or a spot.
@@ -327,10 +327,25 @@ func _rebuild_for_depth() -> void:
 		# The old rover node reports its pose as it leaves; make it the new one, and
 		# have the next scene's rover start there too. (A new day on the same depth
 		# keeps the rover where it is.)
-		_rover.global_transform = ZoneDepth.pose_for_depth(GameState.rover_depth)
+		_rover.global_transform = _rover_pose_for_rebuild()
 		ZoneDepth.arrive_at = _rover.global_transform
 		ZoneDepth.arrive_pending = true
 	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+
+
+## Where the rebuilt scene's rover starts: where the rover is, if that is inside
+## this depth's rock. A guest has the host's told pose; the host has its parked one,
+## which counts only if the rover has a pose at all, and it lies inside this depth's
+## rock (so a trip through the airlock that raced a console re-park does not put the
+## rover by the hatch while it is at the hub start; a depth change parks a pose of
+## its own, so the hatch is for when none is valid); else where a depth starts it.
+func _rover_pose_for_rebuild() -> Transform3D:
+	var known: Variant = null
+	if FarmCommands.guest:
+		known = CoopRovers.told_pose(GameState.TUNNEL_ROVER)
+	elif GameState.rover_transforms.has(GameState.TUNNEL_ROVER):
+		known = GameState.parked_rover_transform(GameState.TUNNEL_ROVER)
+	return ZoneDepth.rebuild_pose(known, GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
 
 
 ## Not left to a signal, which a busy swap can swallow and a later snapshot with the
@@ -486,6 +501,19 @@ func _leave_tunnels() -> void:
 	if _moving:
 		return
 	_moving = true
+	if not GameState.rover_lent:
+		# A field rover, from the dome's console: the way home is the dome, where
+		# the console is. The farm's rover never left home.
+		var left: String = await FarmCommands.request(&"leave_zone")
+		if not is_inside_tree():
+			return
+		if left != "":
+			_moving = false
+			_hud.push_log("TUNNEL MOUTH: " + left)
+			return
+		SceneSwitcher.outside = SceneSwitcher.FARM_SCENE
+		SceneSwitcher.go_to(SceneSwitcher.DOME_SCENE)
+		return
 	var problem: String = await FarmCommands.request(&"move_rover", [false])
 	if not is_inside_tree():
 		return

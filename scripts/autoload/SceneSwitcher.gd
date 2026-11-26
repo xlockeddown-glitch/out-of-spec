@@ -39,7 +39,21 @@ func toggle_farm_dome() -> void:
 	if CoopWalkers.on_foot():
 		return  # only the rover goes anywhere
 	var on_dome: bool = current != null and current.scene_file_path == DOME_SCENE
-	swap_to(outside if on_dome else DOME_SCENE)
+	swap_to(exit_path() if on_dome else DOME_SCENE)
+
+
+## Where the dome's airlock leads. The tunnels only while a rover is there for
+## the player: one that was sent home, or let go, leaves the farm out the door.
+func exit_path() -> String:
+	if outside == TUNNELS_SCENE and (GameState.rover_zone == "" or TunnelRecall.closed(GameClock.elapsed_days)):
+		outside = FARM_SCENE
+	return outside
+
+
+## True if `scene_path` is the dome and a console request is out: nothing leaves the
+## dome until it is answered, whatever the way (Tab, the airlock, the phone).
+func trip_holds_dome(scene_path: String) -> bool:
+	return FastTravel.pending and scene_path == DOME_SCENE
 
 
 ## Like swap_to, but after a swap in progress instead of not at all.
@@ -57,6 +71,9 @@ func is_busy() -> bool:
 func swap_to(path: String) -> void:
 	if _busy:
 		return
+	var current: Node = get_tree().current_scene
+	if trip_holds_dome(current.scene_file_path if current != null else ""):
+		return  # a console trip the host may have agreed to has not got its answer: the dome stays
 	_busy = true
 	if path != TUNNELS_SCENE:
 		# Anywhere but the tunnels, no screen is below them.
@@ -65,6 +82,7 @@ func swap_to(path: String) -> void:
 		# The tunnels show the depth the one rover is at.
 		ZoneDepth.follow(GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
 	_note_outside(path)
+	note_arrival(path)
 	var tween: Tween = create_tween()
 	tween.tween_property(_fade, "color:a", 1.0, FADE_SECONDS)
 	await tween.finished
@@ -79,6 +97,22 @@ func swap_to(path: String) -> void:
 	await tween.finished
 	_busy = false
 	scene_swapped.emit(path)
+
+
+## The player is in a zone from the moment the swap into it is committed, not when
+## its scene has loaded: nothing the host decides in the fade (a console arrival, a
+## rescue) may treat them as still at home. The host sets it directly; a guest tells
+## the host now, as the console path does (the report after the swap says it again,
+## and a place the host already has is not sent twice). Any other place is reported
+## when the swap is done.
+func note_arrival(path: String) -> void:
+	var at: Array = ZonePresence.for_scene(path)
+	if at.is_empty() or at[0] in [ZonePresence.FARM, ZonePresence.DOME]:
+		return
+	if FarmCommands.guest:
+		CoopScenes.report_scene(path)
+	else:
+		GameState.player_places[GameState.local_player_id] = at
 
 
 func _note_outside(path: String) -> void:
