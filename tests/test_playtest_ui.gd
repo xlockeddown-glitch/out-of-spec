@@ -70,3 +70,80 @@ func test_esc_opens_and_closes_the_pause_panel() -> String:
 		problem = "RESUME must close it."
 	pause.free()
 	return problem
+
+
+func _key(code: Key) -> InputEventKey:
+	var event := InputEventKey.new()
+	event.keycode = code
+	event.pressed = true
+	return event
+
+
+func test_an_open_pause_panel_takes_every_key() -> String:
+	var root: Node = (Engine.get_main_loop() as SceneTree).root
+	var pause := PauseUI.new()
+	root.add_child(pause)
+	var problem: String = ""
+	pause.open()
+	root.get_tree().paused = false
+	var seen: bool = false
+	# _unhandled_input marks the event handled through the viewport; the call
+	# must at least not close the panel on an ordinary key.
+	pause._unhandled_input(_key(KEY_H))
+	seen = pause.visible
+	if not seen:
+		problem = "An ordinary key must leave the panel open."
+	pause._unhandled_input(_key(KEY_ESCAPE))
+	if pause.visible:
+		problem = "Esc must close it."
+	pause.free()
+	root.get_tree().paused = false
+	return problem
+
+
+func test_pause_stops_the_game_only_when_alone() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var pause := PauseUI.new()
+	tree.root.add_child(pause)
+	var problem: String = ""
+	pause.open()
+	if not PauseUI.is_alone() or not tree.paused or pause._title.text != "PAUSED":
+		problem = "Alone, it must pause and say PAUSED."
+	pause.close()
+	if tree.paused:
+		problem = "RESUME must unpause."
+	CoopSession.players = ["player_1", "player_2"]
+	pause.open()
+	if tree.paused or pause._title.text != "MENU":
+		problem = "With a guest it must run on and say MENU."
+	pause.close()
+	CoopSession.players = []
+	pause.free()
+	tree.paused = false
+	return problem
+
+
+func test_quit_warns_guests_then_reports_a_failed_save() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var pause := PauseUI.new()
+	var quits: Array[int] = []
+	pause.quitter = func() -> void: quits.append(1)
+	pause.saver = func() -> String: return "Disk full."
+	tree.root.add_child(pause)
+	var farm_open: bool = SaveGame.farm_open
+	SaveGame.farm_open = true
+	var problem: String = ""
+	CoopSession.players = ["player_1", "player_2"]
+	pause.open()
+	pause._on_quit()
+	if not quits.is_empty() or not pause._note.text.contains("dropped"):
+		problem = "The first press must only warn."
+	pause._on_quit()
+	if not quits.is_empty() or pause._note.text != "SAVE FAILED: Disk full.":
+		problem = "A failed save must say so and not quit: %s" % pause._note.text
+	CoopSession.players = []
+	SaveGame.farm_open = farm_open
+	pause.close()
+	pause.free()
+	tree.paused = false
+	return problem

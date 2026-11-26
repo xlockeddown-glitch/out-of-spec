@@ -23,6 +23,8 @@ signal ore_mined(fissure_id: StringName)
 ## A boulder was drilled, `hits` times by now.
 signal boulder_hit(hits: int)
 signal dig_rejected(reason: String)
+## Said when there is no ground to dig; the screens add where to dig.
+const ROCK_REFUSAL: String = "This rock can't be dug."
 signal fill_rejected(reason: String)
 
 ## Following another player's driving: how fast it closes in, and from how far it
@@ -568,7 +570,7 @@ func dig_cell() -> Vector2i:
 func _change_ground(deeper: bool) -> void:
 	var rejected: Signal = dig_rejected if deeper else fill_rejected
 	if ground == null:
-		rejected.emit("This rock can't be dug." if deeper else "There is nothing to fill here.")
+		rejected.emit(ROCK_REFUSAL if deeper else "There is nothing to fill here.")
 		return
 	if not is_stopped():
 		rejected.emit("Stop the rover first.")

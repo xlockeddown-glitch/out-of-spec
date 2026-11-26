@@ -5,8 +5,8 @@ extends Node
 
 ## Phone-log lines replayed into the HUD when the farm loads.
 const LOG_REPLAY_LINES: int = 6
-## What the rover says when there is no ground to dig (rover_controller.gd).
-const ROCK_REFUSAL: String = "This rock can't be dug."
+## A dig key press counts as this screen's own for this long, ms.
+const OWN_DIG_MS: int = 3000
 ## With the rover in the other scene, these only say where it is.
 const ROVER_KEYS: Array[StringName] = [
 	&"rover_forward", &"rover_reverse", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill"]
@@ -50,6 +50,8 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 var _robots_ui: RobotsUI
 ## Sum of the dug depths when last looked at, to tell a dig from a fill.
 var _dug_depth: int = 0
+## When this screen last pressed dig, so a snapshot or the other player's dig isn't ours.
+var _dig_pressed_msec: int = -OWN_DIG_MS
 var _walkers: FarmWalkers
 var _bram_line: String = ""
 ## Seconds left showing a clicked prop's text in the hover label.
@@ -111,7 +113,7 @@ func _ready() -> void:
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.skill_leveled.connect(_on_skill_leveled)
 	SaveGame.save_failed.connect(_hud.push_log)
-	GameClock.day_started.connect(_on_day_started_saved.unbind(1))
+	SaveGame.saved.connect(_hud.push_log.bind("Saved."))
 	GameState.rover_place_changed.connect(_on_rover_place_changed)
 	GameState.credits_changed.connect(_on_credits_changed)
 	GameState.ore_changed.connect(_on_ore_changed)
@@ -279,17 +281,7 @@ func _on_till_rejected(reason: String) -> void:
 
 
 func _on_dig_rejected(reason: String) -> void:
-	_hud.push_log("DIG FAILED: %s" % reason + (" Dig on the hills outside." if reason == ROCK_REFUSAL else ""))
-
-
-## SaveGame's own handler is connected first and saves deferred; this follows it.
-func _on_day_started_saved() -> void:
-	if SaveGame.farm_open and not FarmCommands.guest:
-		_hud.push_log.call_deferred("Saved.")
-
-
-func _on_fill_rejected(reason: String) -> void:
-	_hud.push_log("FILL FAILED: %s" % reason)
+	_hud.push_log("DIG FAILED: %s" % reason + (" Dig on the hills outside." if reason == RoverController.ROCK_REFUSAL else ""))
 
 
 func _on_blocks_changed() -> void:
@@ -404,7 +396,9 @@ func _check_with_block() -> void:
 ## announced by their own lines, which follow this one.
 func _say_dug() -> void:
 	var total: int = _total_dug()
-	if total > _dug_depth:
+	var own: bool = Time.get_ticks_msec() - _dig_pressed_msec < OWN_DIG_MS
+	if total > _dug_depth and own:
+		_dig_pressed_msec = -OWN_DIG_MS
 		_hud.push_log("Dug. H fills it again.")
 	_dug_depth = total
 
@@ -419,6 +413,11 @@ func _total_dug() -> int:
 func _show_dug() -> void:
 	_rover.ground.show_dug(GameState.dug)
 	_rover.keep_above_ground()
+
+
+func _input(event: InputEvent) -> void:
+	if event.is_action_pressed(&"rover_dig"):
+		_dig_pressed_msec = Time.get_ticks_msec()
 
 
 func _unhandled_input(event: InputEvent) -> void:

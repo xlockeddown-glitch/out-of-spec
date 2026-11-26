@@ -202,7 +202,7 @@ func _on_till_rejected(reason: String) -> void:
 
 
 func _on_dig_rejected(reason: String) -> void:
-	_hud.push_log("DIG FAILED: %s" % reason)
+	_hud.push_log("DIG FAILED: %s" % reason + (" The tunnel floor is solid basalt." if reason == RoverController.ROCK_REFUSAL else ""))
 
 
 func _on_fill_rejected(reason: String) -> void:

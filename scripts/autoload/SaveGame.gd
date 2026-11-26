@@ -12,6 +12,8 @@ extends Node
 signal saving
 ## An autosave failed; `text` says why. Shown to the player.
 signal save_failed(text: String)
+## A morning's autosave was written.
+signal saved
 
 const MAGIC: String = "OOSSAVE1"
 const VERSION: int = 1
@@ -53,6 +55,8 @@ func _autosave() -> void:
 	if problem != "":
 		push_warning("SaveGame: " + problem)
 		save_failed.emit("SAVE FAILED: " + problem)
+	else:
+		saved.emit()
 
 
 ## Starts a new farm and saves it. A saved farm already there is kept beside it
