@@ -53,6 +53,17 @@ extends RefCounted
 ## `count` of job_log rows read that. Handing out that job is the one thing the
 ## engine asks the farm to do; the rest of it only watches.
 ##
+## A quest of kind "daily" is a daily ask (section 6, D2): a player's own, and
+## one a day. On an offering look each player present who holds none of today's
+## is given one, picked from the asks whose gates and offer hold for them by the
+## farm's seed, the day and the player (daily_roll), so the pick is the same
+## however often it is asked. Its entry is a player's own quest's, in
+## player_quest_state, and `accepted` is its day: an entry of another day is
+## taken out on the next look, done or not, with nothing paid and nothing lost,
+## so the same ask can come again. A daily ask stays on its farm: it is not in
+## what travels in a guest's file (travelling, take_brought), and neither is
+## its certificate, which can be given as often as the ask is done.
+##
 ## Not built yet: accept and turn-in by the player (the quest log, build step 7;
 ## until then an offered quest is accepted at once and paid when its last step
 ## holds) and item rewards (step 10).
@@ -64,6 +75,8 @@ const ENTRY_KEYS: Array[String] = ["accepted", "steps_done", "base", "shown", "p
 const PLAYER_ENTRY_KEYS: Array[String] = ["accepted", "steps_done", "base", "shown", "players", "done", "carried"]
 const SCOPE_FARM: String = "farm"
 const SCOPE_PLAYER: String = "player"
+## A daily ask's `kind`. See _update_dailies().
+const KIND_DAILY: String = "daily"
 ## What `stat_at_least` may read.
 const STATS: Array[String] = ["credits", "credibility", "crystal_ore", "stone", "optical_silk_spools", "clean_audit_streak"]
 ## What `flag` may read; `oirm_account` is has_oirm_account().
@@ -76,7 +89,7 @@ const LOGS: Dictionary = { "cal_log": "cal_log", "job_log": "job_log", "audit_lo
 const COUNTING: Array[String] = ["count", "counter"]
 ## The checks check_value() knows: what a step's `check` may be, and with
 ## `always` and `day_at_least` (WHENS) what a `when` may be.
-const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job"]
+const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled"]
 ## A `when` that is not a step check (offer_holds).
 const WHENS: Array[String] = ["always", "day_at_least"]
 ## A reward of skill XP is "xp_<skill id>".
@@ -132,6 +145,8 @@ static func update(farm: Node, present: Array[String], offers: bool = true, play
 		var moved: bool = false
 		for quest: Dictionary in all:
 			var scope: String = str(quest.get("scope", SCOPE_FARM))
+			if is_daily(quest):
+				continue
 			if scope == SCOPE_FARM:
 				if _update_one(farm, quest, farm.quest_state, present, offers, "", played):
 					moved = true
@@ -146,7 +161,115 @@ static func update(farm: Node, present: Array[String], offers: bool = true, play
 		if not moved:
 			break
 		changed = true
+	# After the rest, so an ask is picked by the lab level this look ends with.
+	if _update_dailies(farm, all, present, offers, played):
+		changed = true
 	return changed
+
+
+# --- Daily asks (section 6, D2) -------------------------------------------------
+
+static func is_daily(quest: Dictionary) -> bool:
+	return str(quest.get("kind", "")) == KIND_DAILY
+
+
+## Whether `quest_id` is one of this build's daily asks.
+static func is_daily_id(quest_id: String) -> bool:
+	return is_daily(DataManager.get_record(TABLE, quest_id, SECTION))
+
+
+## The daily asks whose data is right.
+static func daily_quests() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for quest: Dictionary in quests():
+		if is_daily(quest) and data_problem(quest) == "":
+			out.append(quest)
+	return out
+
+
+## Host: the daily asks of the players in `present`. An ask of another day is
+## taken out, done or not: nothing is paid for it and nothing is lost. Today's
+## is moved on and paid as any player's own quest is. With `offers`, a player who
+## holds none of today's is given one (pick_daily). True if anything changed.
+static func _update_dailies(farm: Node, all: Array[Dictionary], present: Array[String], offers: bool, played: Dictionary = {}) -> bool:
+	var dailies: Array[Dictionary] = []
+	for quest: Dictionary in all:
+		if is_daily(quest):
+			dailies.append(quest)
+	if dailies.is_empty():
+		return false
+	var today: int = GameClock.get_day_index()
+	var changed: bool = false
+	for player: String in present:
+		var own: Dictionary = farm.player_quest_state.get(player, {})
+		var held: Dictionary = {}
+		var moved: bool = false
+		for quest: Dictionary in dailies:
+			var id: String = str(quest["id"])
+			if not own.has(id):
+				continue
+			if int((own[id] as Dictionary).get("accepted", -1)) != today:
+				own.erase(id)
+				moved = true
+			elif held.is_empty():
+				held = quest
+		if held.is_empty() and offers:
+			held = pick_daily(farm, dailies, player, today)
+		var alone: Array[String] = [player]
+		if not held.is_empty() and _update_one(farm, held, own, alone, offers, player, played):
+			moved = true
+		if moved:
+			changed = true
+			# Kept only while it holds something.
+			if own.is_empty():
+				farm.player_quest_state.erase(player)
+			else:
+				farm.player_quest_state[player] = own
+	return changed
+
+
+## Host: the look at one player's daily ask alone, with offers, for a guest who
+## has just come in: they need not wait for the morning (GameState.let_in_guest).
+static func update_daily_of(farm: Node, player_id: String) -> bool:
+	var alone: Array[String] = [player_id]
+	return _update_dailies(farm, daily_quests(), alone, true)
+
+
+## The ask `player_id` is given on `day`: one of `dailies` whose gates and offer
+## hold for them now, by daily_roll(). {} when none holds.
+static func pick_daily(farm: Node, dailies: Array[Dictionary], player_id: String, day: int) -> Dictionary:
+	var alone: Array[String] = [player_id]
+	var open: Array[Dictionary] = []
+	for quest: Dictionary in dailies:
+		if is_offered(farm, quest, alone, player_id):
+			open.append(quest)
+	if open.is_empty():
+		return {}
+	return open[daily_roll(int(farm.world_seed), day, player_id) % open.size()]
+
+
+## A whole number from the farm's seed, the day and the player, the same on any
+## machine and after any reload. Not GameState's generator: asking draws nothing.
+static func daily_roll(world_seed: int, day: int, player_id: String) -> int:
+	return ("%d:%d:%s" % [world_seed, day, player_id]).sha256_text().left(7).hex_to_int()
+
+
+## The daily ask `player_id` holds today, as data/quests.json has it, or {}. It
+## reads player_quest_state alone, so a guest's copy answers as the host does.
+static func daily_ask(farm: Node, player_id: String) -> Dictionary:
+	var own: Dictionary = farm.player_quest_state.get(player_id, {})
+	for quest: Dictionary in daily_quests():
+		var entry: Variant = own.get(str(quest["id"]))
+		if entry is Dictionary and int(entry.get("accepted", -1)) == GameClock.get_day_index():
+			return quest
+	return {}
+
+
+## Whether `player_id` has done today's ask.
+static func daily_done(farm: Node, player_id: String) -> bool:
+	var ask: Dictionary = daily_ask(farm, player_id)
+	var own: Dictionary = farm.player_quest_state.get(player_id, {})
+	return not ask.is_empty() and int((own[str(ask["id"])] as Dictionary).get("done", -1)) >= 0
 
 
 ## One quest in `state`: the farm's quest_state, or one player's own entries
@@ -227,7 +350,11 @@ static func _update_one(farm: Node, quest: Dictionary, state: Dictionary, presen
 	if is_new:
 		# `offer_line`: what the giver says with the offer, a path or the words.
 		var said: String = phone_line(str(quest.get("offer_line", "")))
-		farm.post_phone("%s: New quest, %s. %s%s" % [giver_name(quest), title, "" if said == "" else said + " ", next])
+		if is_daily(quest):
+			# An ask is the giver's own line, then what counts.
+			farm.post_phone("%s: %sToday's ask: %s" % [giver_name(quest), "" if said == "" else said + " ", next])
+		else:
+			farm.post_phone("%s: New quest, %s. %s%s" % [giver_name(quest), title, "" if said == "" else said + " ", next])
 		if not issued.is_empty():
 			farm.post_phone(farm.quest_job_text(issued))
 	elif not finished.is_empty():
@@ -291,7 +418,8 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 	var given: int = 0
 	if certificate > 0:
 		for player: String in players:
-			if not farm.has_had_xp_certificate(str(quest["id"]), player) and farm.give_xp_certificate(player, str(quest["id"]), certificate) != "":
+			# A daily ask's is given each time the ask is done.
+			if (is_daily(quest) or not farm.has_had_xp_certificate(str(quest["id"]), player)) and farm.give_xp_certificate(player, str(quest["id"]), certificate) != "":
 				given += 1
 	if given > 0:
 		farm.post_phone("XP CERTIFICATE: %s XP in a skill of your choice, for each player who took part. Open SKILLS (K) to spend it." % SP811.integer(certificate))
@@ -400,6 +528,11 @@ static func data_problem(quest: Dictionary) -> String:
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:
 		if quest.has(key) and not quest[key] is Dictionary:
 			return "'%s' is not a dictionary." % key
+	if is_daily(quest):
+		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_PLAYER:
+			return "a daily ask is not a player's own (scope player)."
+		if int((quest.get("rewards", {}) as Dictionary).get("quest_points", 0)) != 0:
+			return "a daily ask pays quest points."
 	if quest.has(ANY_GATE):
 		if not quest[ANY_GATE] is Array or (quest[ANY_GATE] as Array).is_empty():
 			return "'any_gate' is not a list, or is empty."
@@ -649,6 +782,10 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 			return total
 		"quest_job":
 			return int(farm.has_quest_job(str(step.get("quest", ""))))
+		"found_blocks":
+			return (farm.found_blocks as Dictionary).size()
+		"plot_untilled":
+			return farm.untilled_cells()
 	return 0
 
 
@@ -818,11 +955,12 @@ static func player_state_problem(states: Dictionary) -> String:
 
 # --- A guest's own record (build step 8) ----------------------------------------
 
-## The quests of scope "player" whose data is right, by id.
+## The quests of scope "player" whose data is right, by id. Not the daily asks:
+## they do not travel.
 static func player_quests() -> Dictionary:
 	var out: Dictionary = {}
 	for quest: Dictionary in quests():
-		if str(quest.get("scope", SCOPE_FARM)) == SCOPE_PLAYER and data_problem(quest) == "":
+		if str(quest.get("scope", SCOPE_FARM)) == SCOPE_PLAYER and not is_daily(quest) and data_problem(quest) == "":
 			out[str(quest["id"])] = quest
 	return out
 
@@ -834,6 +972,9 @@ static func travelling(farm: Node, player_id: String) -> Dictionary:
 	var out: Dictionary = {}
 	var own: Dictionary = farm.player_quest_state.get(player_id, {})
 	for id: Variant in own:
+		# A daily ask stays on its farm.
+		if is_daily_id(str(id)):
+			continue
 		var entry: Dictionary = own[id]
 		out[id] = { "done": int(entry["done"]) >= 0, "steps": (entry["steps_done"] as Array).duplicate(), "counts": (entry["shown"] as Dictionary).duplicate() }
 	return out

@@ -176,6 +176,9 @@ func _keep_record(mine: Dictionary) -> bool:
 	var theirs: Dictionary = farm.xp_certificates.get(me, {})
 	for id: Variant in theirs:
 		var source: String = farm.xp_certificate_source(str(id))
+		# A daily ask's certificate stays on the farm that gave it.
+		if QuestEngine.is_daily_id(source):
+			continue
 		here[source] = maxi(int(theirs[id]), int(here.get(source, 0)))
 	if _keep_counts(held, here, MOST_QUESTS):
 		changed = true
