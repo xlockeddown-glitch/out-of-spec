@@ -1,6 +1,6 @@
 # Quests, levels, story episodes and bench mini-games (design proposal)
 
-Status: **proposal, 2026-11-26. Nothing here is decided except what §0.1 lists as Ryan's decisions.** This PR changes no code and no data table. Every number is a [PLACEHOLDER] or an [ASSUMPTION] until Ryan sets it. Open questions are in §10.
+Status: **proposal, 2026-11-26; Ryan answered all eleven open questions (§10).** Those answers are design decisions for this feature; they still need logging in `docs/decisions.md` when the first slice lands. This PR changes no code and no data table. Every number is still a [PLACEHOLDER] or an [ASSUMPTION] until Ryan sets it.
 
 Ryan asked for four things:
 
@@ -50,10 +50,11 @@ Written against main at `3b9fe96`.
 - The story is a loose spine. No fixed act order. A player can ignore it and farm.
 - Co-op: lab quests and the lab level are shared. Personal quests and levels belong to each player and travel with a guest.
 - Mini-games: short, skill-based, and "the closer you get the better the calibration ends up being".
+- His answers to this doc's eleven questions are in §10.
 
 ### 0.2 A name clash to settle
 
-`data/dialogue_dispatches.json` has `"megacorp_name": "OmniSpec Orbital Compliance"`, senders such as "Orbital Compliance" and "Audit Division", and a dispatch (`disp_04`) that says "OmniSpec". The story's corporation is **BNH** (Brightwell-Nonesuch Habitats, "Every Sticker Counts"), and the dispatches there are signed "Warmly, Dispatch" by Odalys Brandt. No script reads `megacorp_name`, so the fix is text only. It is question 6 in §10. No quest text should name the corporation until Ryan picks.
+`data/dialogue_dispatches.json` has `"megacorp_name": "OmniSpec Orbital Compliance"`, senders such as "Orbital Compliance" and "Audit Division", and a dispatch (`disp_04`) that says "OmniSpec". The story's corporation is **BNH** (Brightwell-Nonesuch Habitats, "Every Sticker Counts"), and the dispatches there are signed "Warmly, Dispatch" by Odalys Brandt. No script reads `megacorp_name`, so the fix is text only. **Decided (§10, 6): BNH sends the dispatches and Odalys signs them "Warmly, Dispatch". OmniSpec is dropped from the dispatch file.** That text fix is its own small PR (§9, step 12); this PR does not touch the data file.
 
 ## 1. The spine and how episodes hang off it
 
@@ -143,7 +144,7 @@ A flat ×5 is not enough for the top. At 50 XP each, level 99 would need about 1
 - **Mini-games multiply XP** up to ×1.5 [PLACEHOLDER] (§7).
 - The rule that stays: `_xp_after_calibration` gives no XP for an untraceable calibration or one done before half the interval. Spamming the bench earns nothing.
 
-How long level 99 should take is a taste call. It is question 3 in §10.
+**Decided (§10, 3): about 150 hours of play to level 99 in one skill, for a player who favors that skill.** The multipliers above must be tuned to hit that; nobody has checked yet that they do. The pace along the way (for example, when level 50 comes) is still open.
 
 ### 2.4 Level effects spread over 99 levels
 
@@ -162,7 +163,7 @@ Straight lines between the rows. A new player feels the skill move early. A leve
 
 ### 2.5 Existing saves
 
-On first load after the change, XP is multiplied by the same 5 and the level is read off the new curve. Nobody drops below what they can already do: anything a save has unlocked stays unlocked (question 5 in §10).
+On first load after the change, XP is multiplied by the same 5 and the level is read off the new curve. Nobody drops below what they can already do: anything a save has unlocked stays unlocked, and the lab level is credited from the farm's `cal_log`, `job_log` and `audit_log` (decided, §10, 5).
 
 ## 3. The lab level
 
@@ -192,7 +193,7 @@ Farming, digging and driving do not feed the lab level. They feed personal skill
 
 ### 3.3 Which skills move to the lab
 
-Recommended (question 1 in §10):
+Decided (§10, 1):
 
 | Skill today | Scope today | Proposal | Why |
 |---|---|---|---|
@@ -205,7 +206,7 @@ Recommended (question 1 in §10):
 
 ### 3.4 Unlock table
 
-Built mostly from things that exist or are already designed in `docs/design/equipment_skills_robots.md`. "Also needs" is the gate the game has today; it stays (question 4 in §10). Every level number is a [PLACEHOLDER].
+Built mostly from things that exist or are already designed in `docs/design/equipment_skills_robots.md`. "Also needs" is the gate the game has today; it stays: a thing opens when the lab level is reached **and** its existing condition is met (decided, §10, 4). Every level number is a [PLACEHOLDER].
 
 | Lab level | Opens | Also needs | Status |
 |---:|---|---|---|
@@ -240,7 +241,7 @@ Between the rows, every level gives a small shared thing so "something unlocks e
 
 ### 4.1 The list
 
-Seven skills [ASSUMPTION], each 1 to 99. The two new ones are tied to actions that already exist (question 2 in §10).
+Seven skills, each 1 to 99. The two new ones, Agronomy and Earthworks, are tied to actions that already exist (decided, §10, 2).
 
 | Skill | Earned by (existing actions) | What it improves |
 |---|---|---|
@@ -269,7 +270,7 @@ One or two per row so the table stays readable. Levels are [PLACEHOLDER]. Items 
 | 40 | sign a job as "expedited" for more pay (NEW) | | | spools one grade finer (NEW) | | a second harvest from some crops (NEW) | |
 | 50 | half-way cape: a lab coat color (NEW, cosmetic) | same | same | same | same | same | same |
 | 60 | 75 % of effects | 75 % of effects | 75 % of effects | 75 % of effects | 75 % of effects | 75 % of effects | 75 % of effects |
-| 75 | train a friend: they get +10 % XP at your bench (NEW) | | | | | | |
+| 75 | your initials stamped on the units you calibrate (NEW, cosmetic) | | | | | | |
 | 99 | 100 % of effects; a title on your certificates (NEW, cosmetic) | same | same | same | same | same | same |
 
 A personal skill never locks a room, a tier or a contract. It makes the player quicker, cleaner or better paid. [ASSUMPTION]
@@ -287,7 +288,7 @@ Total level = the sum of a player's skill levels. Seven skills gives 7 to 693.
 - The lab level opens the same doors for everyone on the farm.
 - Quests pay part of their XP as an **XP certificate** (NEW): a lump the player spends on any skill they pick. It is sized to the quest, not to the player, so it lifts a low level a lot and a high level a little.
 - Front-loaded effects (§2.4) keep the gap in *results* small even when the gap in levels is large.
-- Question 8 in §10 asks whether to add more catch-up than this.
+- That is all the catch-up there is. No mentor bonus (decided, §10, 8).
 
 ## 5. The quest system
 
@@ -388,7 +389,7 @@ A new QUESTS section in the phone HUD, in the phone's current look. No restyle.
 
 - One per story quest, one per larger personal quest [PLACEHOLDER]. Lab and daily quests pay none.
 - Personal. They travel with a guest.
-- Used as a gate on a few later episodes and for keepsakes from the cast (question 11 in §10). They buy no power.
+- Used as a gate on a few later episodes and for keepsakes from the cast (decided, §10, 11). They buy no power.
 - Shown on the SKILLS view next to total level.
 
 ### 5.7 The first contract and the job board as quests
@@ -573,7 +574,7 @@ The score is 0 to 100. The game shows it as a grade on the result.
 | 80 to 94 | Fine | ×0.6 | ×1.3 | Done, with a bonus |
 | 95 to 100 | Reference | ×0.4 | ×1.5 | Done, with a bonus and a line from the giver |
 
-- **The floor is the one-click result.** A poor try gives exactly what skipping gives. Nobody is punished for trying (question 10 in §10).
+- **The floor is the one-click result.** A poor try gives exactly what skipping gives. Nobody is punished for trying (decided, §10, 10).
 - **A smaller as-left residual is a real reward.** The unit starts its interval closer to zero, so it stays in tolerance longer and is more likely to pass on time next round.
 - "Hold the Reading" scales the **operator's uncertainty term** instead of the residual, by the same factors. That can lift the TUR a little. It never changes the standard's own uncertainty.
 - A paid job done at Fine or Reference pays a bonus of 10 % or 20 %.
@@ -593,7 +594,7 @@ These follow the same front-loaded shape as §2.4. The existing effects stay and
 
 ### 7.4 Where they appear
 
-Not on every calibration. Routine work stays one click.
+Not on every calibration. Routine work stays one click. Decided (§10, 9): a mini-game comes up on a quest step, on the first calibration of each instrument type, and when CAREFUL is on.
 
 | Moment | Mini-game? |
 |---|---|
@@ -601,8 +602,8 @@ Not on every calibration. Routine work stays one click.
 | The same, with **CAREFUL** switched on at the bench | Yes, by choice. Opens at Calibration 5 |
 | A quest step marked `"minigame"` | Yes, the first time. Skippable |
 | The first calibration of an instrument type the lab has never done | Yes, once per type |
-| Calibrating a standard | Offered, default on |
-| A paid job | Offered, for the bonus |
+| Calibrating a standard | Only with CAREFUL on |
+| A paid job | Only with CAREFUL on, for the bonus |
 | The grace-night calibrations by the manager | No |
 
 **Robots** never play. A robot's work counts as a flat score of 60 (Good), less if the robot's own sensors are out of tolerance. A careful player always beats a robot. A robot always beats skipping.
@@ -632,7 +633,7 @@ Not on every calibration. Routine work stays one click.
 |---|---|---|
 | Lab level, lab XP | the farm | host's save |
 | Lab quests, today's jobs | the farm | host's save |
-| Story quest progress | the farm (question 7 in §10) | host's save |
+| Story quest progress | the farm (decided, §10, 7) | host's save |
 | Quest points | each player | host's save by player id; the guest's own file |
 | Personal quests, daily asks | each player | same |
 | Personal skills, total level | each player | same (as today) |
@@ -645,7 +646,7 @@ A guest who finishes a story quest on a friend's farm keeps the quest point. The
 1. **The curve.** `data/skills.json` gets the geometric curve, top level 99 and the ×5 sources. Effects respread. Old saves convert. No new features.
 2. **XP for jobs and crops.** The logged open item. Adds the per-player action counter.
 3. **The lab level.** Lab XP, its feeds, shown on the SKILLS view and phone. Instrumentation folds in. No gates yet.
-4. **Robotics and Husbandry go personal; Agronomy and Earthworks arrive.** Only after Ryan answers questions 1 and 2.
+4. **Robotics and Husbandry go personal; Agronomy and Earthworks arrive.** As decided in §10, 1 and 2.
 5. **Quest engine.** `data/quests.json`, `quest_state` in the save, the checks in §5.3, three quests (S1 without its mini-game, L1, L3). Progress goes to the phone as plain lines.
 6. **Quest log on the phone.**
 7. **Co-op for quests.** Personal quest state and quest points in the guest file. Lab quests in the farm sync.
@@ -653,87 +654,34 @@ A guest who finishes a story quest on a friend's farm keeps the quest point. The
 9. **Mini-game 1: Set the Zero.** With skip, difficulty and the CAREFUL switch. Added to S1.
 10. **The rest of the first slice.** S2, S3, L2, L4, P1 to P3, daily asks.
 11. **Mini-games 2 to 5,** one PR each.
-12. **Dispatch names.** The text fix from §0.2, once Ryan answers question 6.
+12. **Dispatch names.** The text fix from §0.2: BNH in place of OmniSpec in `data/dialogue_dispatches.json`, signed "Warmly, Dispatch". It depends on nothing else here and can go first.
 
 Each PR logs its decisions in `docs/decisions.md` and names its placeholders.
 
-## 10. Open questions for Ryan
+## 10. Ryan's decisions (2026-11-26)
 
-Recommended option first. Each has a write-in. "Ask other models first" is there where it is a taste call.
+Ryan answered every open question. He took the recommended option each time. These still need logging in `docs/decisions.md` when the first slice lands.
 
-**1. Which of today's farm skills (Instrumentation, Robotics, Husbandry) move into the lab level?**
+| # | Question | Decision | Where it lands |
+|---:|---|---|---|
+| 1 | Which farm skills move into the lab level? | Only Instrumentation folds into the lab level. Robotics and Husbandry become personal skills. | §3.3 |
+| 2 | Which new personal skills? | Add Agronomy and Earthworks. | §4.1 |
+| 3 | How long to level 99 in one skill? | About 150 hours of play. | §2.3 |
+| 4 | Lab level and the existing gates? | Both. A thing opens when the lab level is reached and its existing condition is met. | §3.4 |
+| 5 | Saves that exist today? | Everything unlocked stays unlocked. XP converts to the new curve. The lab level is credited from the farm's logs. | §2.5 |
+| 6 | OmniSpec or BNH? | BNH sends the dispatches. Odalys signs "Warmly, Dispatch". OmniSpec is dropped from the dispatch file. | §0.2, §9 step 12 |
+| 7 | Whose progress is a story quest in co-op? | The farm's. Steps are shared, and every player who took part gets the quest point. | §5.1, §8 |
+| 8 | Catch-up for friends who play less? | As proposed: the lab level opens the same doors, and XP certificates lift low levels most. No mentor bonus. | §4.4 |
+| 9 | How often do bench mini-games come up? | On quest steps, on the first calibration of each instrument type, and when CAREFUL is on. | §7.4 |
+| 10 | A poor mini-game try? | It gives the same as skipping. | §7.2 |
+| 11 | What are quest points for? | They gate later episodes and earn keepsakes. No power. | §5.6 |
 
-- a. Instrumentation folds into the lab level. Robotics and Husbandry become personal skills. (Recommended)
-- b. All three fold into the lab level. Players keep only Calibration, Uncertainty and Field Ops, plus any new skills.
-- c. None fold. The three stay as shared farm skills next to the lab level.
-- d. Ask other models first.
+Still open after these answers:
 
-**2. Which new personal skills should the game add now?**
-
-- a. Agronomy (crops) and Earthworks (digging, stone, gauge blocks). (Recommended)
-- b. Agronomy only.
-- c. None yet. Raise the six existing skills to 99 first.
-- d. Ask other models first.
-
-**3. About how many hours of play should level 99 in one skill take a player who favors that skill?**
-
-- a. About 150 hours. A long-haul goal, with level 50 near 15 hours. (Recommended)
-- b. About 80 hours.
-- c. About 300 hours.
-- d. Ask other models first.
-
-**4. How should the lab level work with the gates the game already has (a clean audit for Tier 1, Trusted for the job board, and so on)?**
-
-- a. Both. A thing opens when the lab level is reached and its existing condition is met. (Recommended)
-- b. The lab level replaces the existing conditions.
-- c. The lab level gates only new things. Existing gates stay exactly as they are.
-
-**5. What happens to saves that exist today when the 99-level curve and lab-level gates arrive?**
-
-- a. They keep everything already unlocked. XP converts to the new curve, and the lab level is credited from the calibration, job and audit logs. (Recommended)
-- b. They convert, and anything above the new lab level locks again until it is earned.
-- c. No conversion. The new system applies to new farms only.
-
-**6. `data/dialogue_dispatches.json` signs its messages "OmniSpec Orbital Compliance", but the story's corporation is BNH (Brightwell-Nonesuch Habitats). Which name wins?**
-
-- a. BNH. Change the dispatch file to BNH, with Odalys signing "Warmly, Dispatch". (Recommended)
-- b. Both. OmniSpec becomes BNH's compliance arm, and the audit messages keep that name.
-- c. OmniSpec. Change the story to match the dispatch file.
-
-**7. In co-op, whose progress is a story quest?**
-
-- a. The farm's. Steps are shared, and every player who took part gets the quest point, once per player. (Recommended)
-- b. The host's only. Guests help but earn no quest points on someone else's farm.
-- c. Each player's own. Everyone does every story quest separately, even on the same farm.
-- d. Ask other models first.
-
-**8. How much should the game help friends who play less catch up?**
-
-- a. As proposed: the lab level opens the same doors for everyone, and quests pay XP certificates that lift low levels most. (Recommended)
-- b. Add a mentor bonus too: a lower-level player earns 50 % more XP while working near a higher-level friend.
-- c. No catch-up. Levels show exactly what each player has done.
-- d. Ask other models first.
-
-**9. How often should bench mini-games come up?**
-
-- a. On quest steps, on the first calibration of each instrument type, and whenever the player switches CAREFUL on. Routine calibrations stay one click. (Recommended)
-- b. On every bench calibration, always with a skip button.
-- c. On quest steps only.
-- d. Ask other models first.
-
-**10. What should a poor mini-game try give, compared with pressing skip?**
-
-- a. The same as skip. Trying can only help. (Recommended)
-- b. Slightly worse than skip (a larger as-left error), so skipping is the safe choice and playing is a small gamble.
-- c. A retry. A poor try can be played again, up to three times, with the best score kept.
-- d. Ask other models first.
-
-**11. What are quest points for?**
-
-- a. They gate a few later story episodes and earn keepsakes from the cast. No power. (Recommended)
-- b. They are spent in a shop for cosmetics and small perks.
-- c. They are a score only, shown next to total level.
-- d. Ask other models first.
+- Every number. The curve's base and growth, the ×5, the tier multipliers, every level in the unlock tables, every reward and every mini-game figure are [PLACEHOLDER].
+- The assumptions in §11.
+- Decision 3 sets the total (about 150 hours). The XP numbers have not been checked against it, and the pace along the way needs playtesting.
+- Decision 7 says "every player who took part". [ASSUMPTION] A player took part if they were on the farm when any step was done. A point is paid once per player per quest, on any farm (§8).
 
 ## 11. Assumptions in one place
 
