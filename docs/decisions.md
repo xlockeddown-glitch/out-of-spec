@@ -1284,3 +1284,11 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - The edge of the land stops a driving rover, one wheelbase in, where a load already put it. Before, it could drive off and fall, and beyond 500 m down the host's word of it ended every guest's session. The 500 m limit stays.
 
 - Pit seep (Ryan, Nov 25): a pit no longer fills at once. Ground water rises 0.25 m a day [PLACEHOLDER] from the pit floor and stops at the level the pit would reach in the end. The host works it out on its clock (every 0.005 day; a long sleep fills at once) and saves it as `pit_seep`; guests are told. An old save starts with full pits.
+
+## Cobalt Sentinel: real care numbers (2026-11-25)
+- Ryan: the Sentinel (real species Cyriopagopus lividus, formerly Haplopelma lividum) uses real cobalt blue tarantula care figures instead of invented ones. Sources and URLs are in `_source` in `data/tarantula_species.json`.
+- Temperature: four sources read 20-26 °C (The Tarantula Collective), 23.9-27.8 °C (Exotics Source, 75-82 °F), 23.3-27.8 °C (The Defiant Forest, 74-82 °F) and 25-30 °C (Bantam Earth). All four overlap at 25-26 °C. The game has one ideal, so it is 25 °C, the low end of that overlap and the midpoint of the 24-26 °C overlap of the first three (was 22 [PLACEHOLDER]).
+- Humidity: 75 to 85 % in two sources (The Tarantula Collective's figure is from its breeding section; its general care text gives none), and a third says 70 to 80 %. Ideal is the midpoint, 80 %, unchanged but now sourced.
+- Tolerances (±3 °C, ±8 %) and lag_reduction_pct (25) are still the art bible's and are [PLACEHOLDER]; no source gives them.
+- Molt: only one source gives an interval, 1 to 7 months, stored as `molt_interval_real_days_range` [30, 210] (real-world days), and it is not used by the game yet. No source gives days by life stage or a premolt length, so `molt_days` and `premolt_days` stay unset [PLACEHOLDER]. The tank still molts on the playtest pace (`GameState.PLAYTEST_MOLT_DAYS`).
+- Left for GameState.gd (another PR touches it): the comment on `PLAYTEST_MOLT_DAYS` says to use the species' molt_days; it stays correct until a sourced value exists.
