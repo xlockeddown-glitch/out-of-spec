@@ -123,6 +123,7 @@ func _ready() -> void:
 	SaveGame.saved.connect(_hud.push_log.bind("Saved."))
 	GameState.rover_place_changed.connect(_on_rover_place_changed)
 	GameState.credits_changed.connect(_on_credits_changed)
+	GameState.one_use_changed.connect(_on_one_use_changed)
 	GameState.ore_changed.connect(_on_ore_changed)
 	GameState.credibility_changed.connect(_on_credibility_changed)
 	GameState.lab_xp_changed.connect(_on_credibility_changed.bind(0))
@@ -711,6 +712,12 @@ func _on_skill_leveled(player_id: String, skill_id: String, _level: int) -> void
 
 func _on_credits_changed(amount: int) -> void:
 	_hud.set_credits(amount)
+	if _bram_bay.rover_inside:
+		_refresh_bram()
+
+
+## Bram's price shows the discount while one is held.
+func _on_one_use_changed() -> void:
 	if _bram_bay.rover_inside:
 		_refresh_bram()
 

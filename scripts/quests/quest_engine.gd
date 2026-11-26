@@ -70,9 +70,16 @@ extends RefCounted
 ## (keepsakes_of), so one comes with its quest in a guest's file and can't be
 ## held twice.
 ##
+## A quest may pay "one_use": the id of one in the data's `one_use_rewards`
+## (section 9, item 10). It is held (GameState.one_use_held, saved) until the
+## action it is for uses it on its own: Bram's discount on the next standard he
+## sells, a free refit of one lab area. A reward of "holder" player is given to
+## each player the quest pays and is for a player's own quest; one of holder farm
+## is the farm's and is for a farm quest. A daily ask pays none.
+##
 ## Not built yet: accept and turn-in by the player (the quest log, build step 7;
 ## until then an offered quest is accepted at once and paid when its last step
-## holds), item rewards and a place to look at keepsakes (step 10).
+## holds).
 
 const TABLE: StringName = &"quests"
 const SECTION: String = "quests"
@@ -132,6 +139,9 @@ const ANY_SUFFIX: String = "*"
 ## A reward of a keepsake: its id in the data's KEEPSAKES. Cosmetic only.
 const KEEPSAKE: String = "keepsake"
 const KEEPSAKES: String = "keepsakes"
+## A reward of a one-use reward: its id in the data's ONE_USE_REWARDS.
+const ONE_USE: String = "one_use"
+const ONE_USE_REWARDS: String = "one_use_rewards"
 ## An entry's one key that is not always there: step id -> the score kept.
 const SCORES: String = "scores"
 ## On a quest: its endings (section 8, S2), a list of { id, when and that check's
@@ -462,6 +472,21 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 				given += 1
 	if given > 0:
 		farm.post_phone("XP CERTIFICATE: %s XP in a skill of your choice, for each player who took part. Open SKILLS (K) to spend it." % SP811.integer(certificate))
+	# One each for a reward of a player, one for the farm for the farm's: held
+	# until the action it is for uses it (GameState.give_one_use).
+	var one_use: String = str(rewards.get(ONE_USE, ""))
+	if one_use != "":
+		var holders: Array[String] = []
+		if one_use_of_farm(one_use):
+			holders.append(farm.FARM_HOLDER)
+		else:
+			holders.assign(players)
+		var held: int = 0
+		for holder: String in holders:
+			if farm.give_one_use(one_use, holder):
+				held += 1
+		if held > 0 and one_use_held_line(one_use) != "":
+			farm.post_phone(one_use_held_line(one_use))
 	# Section 7.2: a mini-game step played to Fine or better adds to the quest's
 	# credits. A skip or a poor try kept no score, and is paid as written.
 	# The same share more of its skill XP [ASSUMPTION], so a quest that pays no
@@ -515,6 +540,8 @@ static func reward_text(quest: Dictionary) -> String:
 		parts.append("an XP certificate (%s XP)" % SP811.integer(int(rewards[XP_CERTIFICATE])))
 	if keepsake_name(str(rewards.get(KEEPSAKE, ""))) != "":
 		parts.append("a keepsake (%s)" % keepsake_name(str(rewards[KEEPSAKE])))
+	if one_use_name(str(rewards.get(ONE_USE, ""))) != "":
+		parts.append(one_use_name(str(rewards[ONE_USE])))
 	return ", ".join(parts)
 
 
@@ -523,6 +550,52 @@ static func keepsake_name(keepsake_id: String) -> String:
 	if keepsake_id == "" or not DataManager.has_record(TABLE, keepsake_id, KEEPSAKES):
 		return ""
 	return str(DataManager.get_record(TABLE, keepsake_id, KEEPSAKES).get("display_name", keepsake_id))
+
+
+## A keepsake's text, "" for one the data has none of.
+static func keepsake_text(keepsake_id: String) -> String:
+	if keepsake_name(keepsake_id) == "":
+		return ""
+	return str(DataManager.get_record(TABLE, keepsake_id, KEEPSAKES).get("text", ""))
+
+
+## A one-use reward the data has (an id of `one_use_rewards`).
+static func has_one_use(reward_id: String) -> bool:
+	return reward_id != "" and DataManager.has_record(TABLE, reward_id, ONE_USE_REWARDS)
+
+
+## Whether the reward is the farm's (held by the farm) and not a player's.
+static func one_use_of_farm(reward_id: String) -> bool:
+	return has_one_use(reward_id) and str(DataManager.get_record(TABLE, reward_id, ONE_USE_REWARDS).get("holder", "player")) == "farm"
+
+
+## The percent a discount reward takes off, 0 for any other.
+static func one_use_pct(reward_id: String) -> int:
+	if not has_one_use(reward_id):
+		return 0
+	return int(DataManager.get_record(TABLE, reward_id, ONE_USE_REWARDS).get("pct", 0))
+
+
+## A one-use reward's name, or "" for none the data has.
+static func one_use_name(reward_id: String) -> String:
+	if not has_one_use(reward_id):
+		return ""
+	return str(DataManager.get_record(TABLE, reward_id, ONE_USE_REWARDS).get("display_name", reward_id))
+
+
+## What the phone says when the reward is given, and when it is used.
+static func one_use_held_line(reward_id: String) -> String:
+	return _one_use_text(reward_id, "held_line")
+
+
+static func one_use_used_line(reward_id: String) -> String:
+	return _one_use_text(reward_id, "used_line")
+
+
+static func _one_use_text(reward_id: String, key: String) -> String:
+	if not has_one_use(reward_id):
+		return ""
+	return str(DataManager.get_record(TABLE, reward_id, ONE_USE_REWARDS).get(key, ""))
 
 
 ## The keepsakes a player holds: those of their own quests that are done, here
@@ -626,6 +699,14 @@ static func data_problem(quest: Dictionary) -> String:
 		# never one that can be closed with nothing paid.
 		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_PLAYER or is_daily(quest) or quest.has("closed_when"):
 			return "a keepsake is for a player's own quest that is not a daily ask and has no closed_when."
+	var one_use: Variant = (quest.get("rewards", {}) as Dictionary).get(ONE_USE)
+	if one_use != null:
+		if not one_use is String or not has_one_use(one_use):
+			return "its one-use reward is not one the data has."
+		if is_daily(quest):
+			return "a daily ask pays no one-use reward."
+		if one_use_of_farm(one_use) != (str(quest.get("scope", SCOPE_FARM)) == SCOPE_FARM):
+			return "a one-use reward of a player is for a player's own quest, and one of the farm's for a farm quest."
 	if is_daily(quest):
 		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_PLAYER:
 			return "a daily ask is not a player's own (scope player)."

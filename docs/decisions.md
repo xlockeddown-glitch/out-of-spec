@@ -1876,3 +1876,21 @@ Built from Ryan's decision of 2026-11-26: a QUESTS view opened by a key, the sam
 4. Do you want the pin (one quest's next step kept on the phone, section 5.5) as its own small job?
 5. A quest the game closed without pay (its offer went stale) is hidden. Or should it show as closed?
 6. The DONE list will grow. Scroll it, or show only the last few?
+
+
+## 2026-11-26: One-use rewards and keepsakes (build order step 10 of `docs/design/quests_levels_story.md`)
+
+Ryan's answers: a one-use reward is spent on its own on the next action it is for, with a phone line saying so; the two are Bram's 10 % discount on the next standard (P1) and a free refit of one lab area (L4); a keepsake shelf in the dome shows the keepsakes held, and the QUESTS page lists them.
+
+- **How it is given.** `"one_use": "<id>"` in a quest's `rewards`, an id in `one_use_rewards` of `data/quests.json`. `QuestEngine._finish` gives it with `GameState.give_one_use` (host only) and posts the reward's `held_line`. The data check refuses an unknown id, a daily ask's, a player's reward on a farm quest and a farm's on a player quest.
+- **Where it is held.** `one_use_held` (holder -> reward -> count), a saved farm field: in `SAVED_LATER`, checked in `farm_dict_problem` (counts 1 to 9, rewards the data has, the right kind of holder), shown to guests by `FarmSync.SHOWN_BY` (`one_use_changed`). A player's reward is held under their id, the farm's under `_farm`. [ASSUMPTION] The most of one reward a holder keeps is 9.
+- **Bram's discount.** [PLACEHOLDER] 10 %. It takes the percent off after the contract's discount, for Bram's stock only; the catalog (`standard_price_text` / `standard_price_credits`) shows the discounted price and "(10 % off, one use)" while one is held. `buy_standard` spends it only after the purchase has gone through, so a refusal (a gate, too little money) keeps it, and the lab-level and old gates are checked first as before. The discount is the buying player's own.
+- **The free refit.** [ASSUMPTION] The smallest fitting thing: clearing a lab area (`clear_lab_area`, the "refit") costs nothing while the farm holds one. The day it takes stays and fitting the space out again is as it was. The next clear is paid for.
+- **Keepsake shelf.** `scripts/dome/keepsake_shelf.gd` on the dome's back wall: a plank and one object for each keepsake the local player holds (`QuestEngine.keepsakes_of`), rebuilt when quests change or a farm loads; click to read the name and text through the dome's toast, as the mug ring does. [PLACEHOLDER] The objects are a small box (a cylinder for the watch) in the greybox look: there is no voxel model for them yet. `pocket_watch` is a keepsake in the data with a [PLACEHOLDER] text. The QUESTS page gets a short KEEPSAKES list in the present phone style (no new colors, fonts or frames).
+- **Co-op.** The host spends rewards; guests see the result with the farm snapshot. A held reward stays on the farm that gave it: it is not in a guest's own file (the file keeps only what travels: quest points and certificates). A keepsake follows section 10 Q7 and what `keepsakes_of` already does.
+- **No change** to `SaveGame.VERSION` (1) or `CoopSession.PROTOCOL` (16): a save from before has no `one_use_held` and holds none.
+
+### Questions for Ryan
+
+- Is 10 % right for the discount, and is "the next lab space cleared costs nothing" the right reading of a free refit?
+- Should a held reward travel in a guest's own file, so the discount a guest earned goes with them to another farm?
