@@ -28,6 +28,7 @@ func _ready() -> void:
 	_build()
 	hide()
 	GameState.lab_changed.connect(_on_lab_changed)
+	GameState.one_use_changed.connect(_on_lab_changed)
 	GameState.jobs_changed.connect(_on_lab_changed)
 	GameState.credits_changed.connect(_refresh_if_open.unbind(1))
 	GameState.ore_changed.connect(_refresh_if_open.unbind(1))
@@ -197,7 +198,8 @@ func _on_fit_pressed(discipline: String) -> void:
 
 
 func _on_clear_pressed(discipline: String) -> void:
-	_show_result(await FarmCommands.request(&"clear_lab_area", [discipline]), "Clearing one %s space: %s." % [discipline, GameState.lab_refit_text()])
+	var cost: String = GameState.lab_refit_text()  # before a free refit is used up
+	_show_result(await FarmCommands.request(&"clear_lab_area", [discipline]), "Clearing one %s space: %s." % [discipline, cost])
 
 
 func _show_result(problem: String, done_text: String) -> void:

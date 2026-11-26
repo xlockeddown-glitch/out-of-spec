@@ -16,6 +16,7 @@ const DIM: Color = SkillsUI.DIM
 const TITLE: String = "QUESTS"
 const NONE_OPEN: String = "No open quests. A new one comes with the morning."
 const DONE_TITLE: String = "DONE"
+const KEEPSAKES_TITLE: String = "KEEPSAKES"
 ## Every panel that takes the whole screen joins this group when it is made.
 const MODAL_GROUP: StringName = &"modal_panel"
 const MORE: String = "+%s more"
@@ -121,3 +122,9 @@ func _refresh() -> void:
 		_rows.add_child(PlanBoardUI._label("    " + QuestLog.title_text(row), DIM, 16))
 	if int(latest["more"]) > 0:
 		_rows.add_child(PlanBoardUI._label("    " + MORE % SP811.integer(int(latest["more"])), DIM, 16))
+	# The keepsakes this player holds, as the shelf in the dome shows them.
+	var kept: Array[String] = QuestEngine.keepsakes_of(GameState, GameState.local_player_id)
+	if not kept.is_empty():
+		_rows.add_child(PlanBoardUI._label(KEEPSAKES_TITLE, DIM, 20))
+	for id: String in kept:
+		_rows.add_child(PlanBoardUI._label("    " + QuestEngine.keepsake_name(id), DIM, 16))

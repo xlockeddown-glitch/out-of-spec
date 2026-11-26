@@ -63,6 +63,8 @@ signal lab_xp_changed
 signal quests_changed
 ## A player was given an XP certificate or spent one (xp_certificates).
 signal xp_certificates_changed
+## A one-use reward was given or spent (one_use_held).
+signal one_use_changed
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -408,6 +410,12 @@ var xp_certificates_given: int = 0
 ## Player id -> the sources (quest ids) of the certificates they have spent, here
 ## or on another farm. A quest never gives a player its certificate twice.
 var xp_certificates_spent: Dictionary = {}
+## One-use rewards held and not yet used (section 9, item 10): holder -> reward
+## id (data/quests.json one_use_rewards) -> how many. The holder is a player id
+## for a reward of a player (Bram's discount) or FARM_HOLDER for the farm's (the
+## free refit). give_one_use() writes it; the action it is for spends it, on the
+## host only (buy_standard, clear_lab_area). It stays on the farm that gave it.
+var one_use_held: Dictionary = {}
 ## Crop id -> how many of that crop Lin has bought in spec, from the whole farm.
 ## sell_harvest_to_lin() is the only writer; a quest counts it.
 var crops_sold_in_spec: Dictionary = {}
@@ -606,7 +614,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
-	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept"]
+	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -806,6 +814,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 		quest_problem = QuestEngine.player_state_problem(data.get("player_quest_state", {}))
 	if quest_problem == "":
 		quest_problem = xp_certificates_spent_problem(data.get("xp_certificates_spent", {}))
+	if quest_problem == "":
+		quest_problem = one_use_problem(data.get("one_use_held", {}))
 	if quest_problem != "":
 		return quest_problem
 	if data.get("wheel_meters", 0.0) < 0.0:
@@ -906,6 +916,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	lab_xp_changed.emit()
 	quests_changed.emit()
 	xp_certificates_changed.emit()
+	one_use_changed.emit()
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
 	silk_changed.emit(optical_silk_spools)
@@ -1742,6 +1753,7 @@ func _forget_a_guest(players: Array[String]) -> void:
 			player_quest_state.erase(player_id)
 			xp_certificates.erase(player_id)
 			xp_certificates_spent.erase(player_id)
+			one_use_held.erase(player_id)
 			for entry: Variant in quest_state.values():
 				if entry is Dictionary and entry.get("players") is Array:
 					(entry["players"] as Array).erase(player_id)
@@ -2295,6 +2307,79 @@ static func xp_certificates_spent_problem(spent: Dictionary) -> String:
 	for player: Variant in spent:
 		if not player is String or player == "" or not QuestEngine._all_text(spent[player]):
 			return "'xp_certificates_spent' has an entry that is not a player's sources."
+	return ""
+
+
+# --- One-use rewards (docs/design/quests_levels_story.md section 9, item 10) -----
+
+## The holder of a reward of the farm's: not a player id.
+const FARM_HOLDER: String = "_farm"
+## The most of one reward a holder may keep [ASSUMPTION].
+const MOST_ONE_USE: int = 9
+## Bram's discount on the next standard he sells (P1's reward).
+const ONE_USE_DISCOUNT: String = "bram_discount_10"
+## The next lab space cleared costs nothing (L4's reward).
+const ONE_USE_REFIT: String = "free_lab_refit"
+
+
+## Who holds reward `reward_id` for `player_id` ("" = the local player): the
+## farm for a reward of the farm's, else the player.
+func _one_use_holder(reward_id: String, player_id: String = "") -> String:
+	return FARM_HOLDER if QuestEngine.one_use_of_farm(reward_id) else _player(player_id)
+
+
+## Gives `holder` (a player id, or FARM_HOLDER) one of reward `reward_id`.
+## Returns false when the data has no such reward, the holder is not right for
+## it, or they already hold the most. On the host only: the quest engine calls it.
+func give_one_use(reward_id: String, holder: String) -> bool:
+	if not QuestEngine.has_one_use(reward_id) or holder == "" or holder == MANAGER_ID:
+		return false
+	if (holder == FARM_HOLDER) != QuestEngine.one_use_of_farm(reward_id):
+		return false
+	var held: Dictionary = one_use_held.get_or_add(holder, {})
+	if int(held.get(reward_id, 0)) >= MOST_ONE_USE:
+		return false
+	held[reward_id] = int(held.get(reward_id, 0)) + 1
+	one_use_changed.emit()
+	return true
+
+
+## How many of `reward_id` `player_id` ("" = the local player) can use: the
+## farm's if it is a reward of the farm's.
+func one_use_count(reward_id: String, player_id: String = "") -> int:
+	return int((one_use_held.get(_one_use_holder(reward_id, player_id), {}) as Dictionary).get(reward_id, 0))
+
+
+## Uses one. True if there was one to use. The action it is for calls this
+## after it has gone through, never before.
+func _spend_one_use(reward_id: String, player_id: String = "") -> bool:
+	var holder: String = _one_use_holder(reward_id, player_id)
+	var held: Dictionary = one_use_held.get(holder, {})
+	if int(held.get(reward_id, 0)) < 1:
+		return false
+	held[reward_id] = int(held[reward_id]) - 1
+	if int(held[reward_id]) <= 0:
+		held.erase(reward_id)
+	if held.is_empty():
+		one_use_held.erase(holder)
+	one_use_changed.emit()
+	return true
+
+
+## "" or why saved one_use_held can't be loaded: holder -> reward id -> a count
+## from 1 to MOST_ONE_USE, of a reward the data has.
+static func one_use_problem(held: Dictionary) -> String:
+	for holder: Variant in held:
+		var own: Variant = held[holder]
+		if not holder is String or holder == "" or typeof(own) != TYPE_DICTIONARY:
+			return "'one_use_held' has an entry that is not a holder's rewards."
+		for id: Variant in own:
+			if not id is String or not own[id] is int or own[id] < 1 or own[id] > MOST_ONE_USE:
+				return "'one_use_held' has a reward that is not a count of 1 to %d." % MOST_ONE_USE
+			if not QuestEngine.has_one_use(id):
+				return "'one_use_held' has a reward the data does not have."
+			if (holder == FARM_HOLDER) != QuestEngine.one_use_of_farm(id):
+				return "'one_use_held' has a reward held by the wrong kind of holder."
 	return ""
 
 
@@ -4024,13 +4109,25 @@ func _is_contract_stock(standard_id: String) -> bool:
 
 
 ## Bram's price in credits, after the contract discount once it applies.
-func standard_price_credits(standard_id: String) -> int:
+## After Bram's one-use discount too, if `player_id` ("" = the local player)
+## holds one and the standard is Bram's.
+func standard_price_credits(standard_id: String, player_id: String = "") -> int:
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	if sensor == null:
 		return 0
+	var price: int = sensor.price_credits
 	if _is_contract_stock(standard_id):
-		return _discounted(sensor.price_credits)
-	return sensor.price_credits
+		price = _discounted(price)
+	return price * (100 - standard_discount_pct(standard_id, player_id)) / 100
+
+
+## The percent off Bram's one-use discount takes from this standard for
+## `player_id` now: 0 for a standard that is not Bram's (Kestrel's has none) or
+## when none is held. It lowers the price only: the gates still apply.
+func standard_discount_pct(standard_id: String, player_id: String = "") -> int:
+	if get_sensor(standard_id) == null or not _is_bram_stock(standard_id) or one_use_count(ONE_USE_DISCOUNT, player_id) < 1:
+		return 0
+	return clampi(QuestEngine.one_use_pct(ONE_USE_DISCOUNT), 0, 100)
 
 
 func _discounted(price: int) -> int:
@@ -4038,31 +4135,33 @@ func _discounted(price: int) -> int:
 
 
 ## "250 CR + 2 crystal ore" for a standard's price.
-func standard_price_text(standard_id: String) -> String:
+func standard_price_text(standard_id: String, player_id: String = "") -> String:
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	if sensor == null:
 		return ""
-	return "%s CR + %d crystal ore" % [SP811.integer(standard_price_credits(standard_id)), sensor.price_ore]
+	var off: int = standard_discount_pct(standard_id, player_id)
+	return "%s CR + %d crystal ore%s" % [SP811.integer(standard_price_credits(standard_id, player_id)), sensor.price_ore,
+		"" if off == 0 else " (%d %% off, one use)" % off]
 
 
 ## Why Bram can't sell this standard right now, or "" if he can.
-func standard_purchase_problem(standard_id: String) -> String:
+func standard_purchase_problem(standard_id: String, player_id: String = "") -> String:
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	if sensor == null or sensor.role != "standard" or not _is_bram_stock(standard_id):
 		return "Bram doesn't stock that."
-	return _purchase_problem(standard_id)
+	return _purchase_problem(standard_id, player_id)
 
 
-func _purchase_problem(standard_id: String) -> String:
+func _purchase_problem(standard_id: String, player_id: String = "") -> String:
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	if owned_standards.has(standard_id):
 		return "The %s is already on the colony." % sensor.short_name
 	var gate: String = tier_problem(standard_id)
 	if gate != "":
 		return gate
-	if credits < standard_price_credits(standard_id) or crystal_ore < sensor.price_ore:
+	if credits < standard_price_credits(standard_id, player_id) or crystal_ore < sensor.price_ore:
 		return "Costs %s; you have %s CR and %d crystal ore." % [
-			standard_price_text(standard_id), SP811.integer(credits), crystal_ore]
+			standard_price_text(standard_id, player_id), SP811.integer(credits), crystal_ore]
 	return ""
 
 
@@ -4071,13 +4170,18 @@ func _purchase_problem(standard_id: String) -> String:
 ## to OIRM, valid for its first interval, and puts the units it calibrates in
 ## service (due one interval from today, with no calibration on record yet).
 func buy_standard(standard_id: String, player_id: String = "") -> String:
-	var problem: String = standard_purchase_problem(standard_id)
+	player_id = _player(player_id)
+	var problem: String = standard_purchase_problem(standard_id, player_id)
 	if problem != "":
 		return problem
 	var sensor: DriftingSensor = get_sensor(standard_id)
 	var today: int = GameClock.get_day_index()
+	# Bram's one-use discount comes off this price and is used up with it.
+	var off: int = standard_discount_pct(standard_id, player_id)
 	# New from the maker: adjusted against their own OIRM-traceable reference.
-	var zeroed: Dictionary = _take_standard(standard_id)
+	var zeroed: Dictionary = _take_standard(standard_id, player_id)
+	if off > 0 and _spend_one_use(ONE_USE_DISCOUNT, player_id):
+		post_phone(QuestEngine.one_use_used_line(ONE_USE_DISCOUNT))
 	sensor.cal_due_day = today + sensor.cal_interval_days
 	var prefix: String = sensor.certificate_prefix if sensor.certificate_prefix != "" else "MKR"
 	var issuer: String = sensor.maker if sensor.maker != "" else "the maker"
@@ -4099,9 +4203,9 @@ func buy_standard(standard_id: String, player_id: String = "") -> String:
 
 ## Pays for a standard and puts it on the colony, reading true. Returns the
 ## zeroing.
-func _take_standard(standard_id: String) -> Dictionary:
+func _take_standard(standard_id: String, player_id: String = "") -> Dictionary:
 	var sensor: DriftingSensor = get_sensor(standard_id)
-	add_credits(-standard_price_credits(standard_id))
+	add_credits(-standard_price_credits(standard_id, player_id))
 	crystal_ore -= sensor.price_ore
 	ore_changed.emit(crystal_ore)
 	owned_standards[standard_id] = GameClock.get_day_index()
@@ -5432,7 +5536,10 @@ func fit_lab_area(discipline: String, player_id: String = "") -> String:
 	return ""
 
 
+## Nothing while the farm holds a free refit (one_use_held).
 func _lab_refit_cost() -> Vector2i:
+	if one_use_count(ONE_USE_REFIT) > 0:
+		return Vector2i.ZERO
 	return Vector2i(maxi(int(_lab_number("refit_credits", 0.0)), 0), maxi(int(_lab_number("refit_ore", 0.0)), 0))
 
 
@@ -5444,7 +5551,8 @@ func _lab_refit_days() -> int:
 func lab_refit_text() -> String:
 	var cost: Vector2i = _lab_refit_cost()
 	var days: int = _lab_refit_days()
-	return "%s, %s day%s" % [lab_cost_text(cost.x, cost.y), SP811.integer(days), "" if days == 1 else "s"]
+	return "%s, %s day%s%s" % [lab_cost_text(cost.x, cost.y), SP811.integer(days), "" if days == 1 else "s",
+		" (one-use free refit)" if one_use_count(ONE_USE_REFIT) > 0 else ""]
 
 
 ## Why a space of `discipline` can't be cleared now, or "".
@@ -5470,6 +5578,8 @@ func clear_lab_area(discipline: String) -> String:
 		return problem
 	var cost: Vector2i = _lab_refit_cost()
 	_lab_pay(cost.x, cost.y)
+	if cost == Vector2i.ZERO and _spend_one_use(ONE_USE_REFIT):
+		post_phone(QuestEngine.one_use_used_line(ONE_USE_REFIT))
 	_sync_lab_layout()
 	var at: int = lab_layout.rfind(discipline)
 	if at >= 0:
