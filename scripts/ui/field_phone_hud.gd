@@ -7,6 +7,7 @@ signal zero_steering_pressed
 signal slot_spool_pressed
 signal enter_dome_pressed
 signal trade_pressed
+signal wheel_service_pressed
 ## A Tier 1 standard's buy button (milestone 3a).
 signal buy_standard_pressed(standard_id: String)
 ## An ACCEPT button on the job board (paid calibration jobs).
@@ -26,6 +27,7 @@ const COLOR_FAIL := DriftingSensor.COLOR_OUT_OF_TOLERANCE
 var _log_lines: PackedStringArray = []
 ## Bram's Tier 1 buttons, built in code under the trade button.
 var _standards_box: VBoxContainer
+var _wheels_button: Button
 ## Lab credibility band, a row under the clock, built in code.
 var _credibility_label: Label
 ## The molt, once Husbandry shows it on the phone; hidden until then.
@@ -65,6 +67,13 @@ func _ready() -> void:
 	_slot_spool_button.pressed.connect(func() -> void: slot_spool_pressed.emit())
 	_dome_button.pressed.connect(func() -> void: enter_dome_pressed.emit())
 	_trade_button.pressed.connect(func() -> void: trade_pressed.emit())
+	_wheels_button = Button.new()
+	_wheels_button.name = "WheelServiceButton"
+	_wheels_button.focus_mode = Control.FOCUS_NONE
+	_wheels_button.custom_minimum_size = Vector2(0, 40)
+	_wheels_button.add_theme_font_size_override("font_size", 15)
+	_wheels_button.pressed.connect(func() -> void: wheel_service_pressed.emit())
+	_bram_panel.add_child(_wheels_button)
 	_standards_box = VBoxContainer.new()
 	_standards_box.name = "StandardsBox"
 	_bram_panel.add_child(_standards_box)
@@ -200,6 +209,12 @@ func show_bram(line: String, cost: int, ore: int, owned: bool) -> void:
 	else:
 		_trade_button.text = "TRADE %d ORE: WIDE TREADS  [E]" % cost
 		_trade_button.disabled = ore < cost
+
+
+## Bram's wheel service, under his trade: one press when the nuts are due.
+func show_wheel_service(text: String, due: bool) -> void:
+	_wheels_button.text = text + ("  [Y]" if due else "")
+	_wheels_button.disabled = not due
 
 
 ## Bram's Tier 1 stock. Each offer is { "id", "text", "disabled" }; `note`

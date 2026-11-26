@@ -23,6 +23,9 @@ signal ore_changed(ore: int)
 signal farm_loaded
 signal fissures_changed
 signal upgrades_changed
+## The rover's wheel nuts came due, or Bram re-torqued them. A guest also hears
+## it as the meters driven change.
+signal wheels_changed
 ## A standard left on, or came back from, the OIRM drop pod (milestone 2).
 signal oirm_changed
 signal credibility_changed(points: int)
@@ -404,6 +407,10 @@ var xp_certificates_spent: Dictionary = {}
 ## Crop id -> how many of that crop Lin has bought in spec, from the whole farm.
 ## sell_harvest_to_lin() is the only writer; a quest counts it.
 var crops_sold_in_spec: Dictionary = {}
+## Meters the rover has driven since its wheel nuts were last torqued in Bram's
+## bay. add_rover_usage() and service_wheels() are the only writers. Nothing
+## reads it but the service itself: a rover drives the same with nuts overdue.
+var wheel_meters: float = 0.0
 ## Robot id ("TR-1") -> { frame, name, state (ROBOT_STATES), done_day,
 ## ordered_by }. Assembled robots' sensors are in `sensors` as "sensor@robot".
 var robots: Dictionary = {}
@@ -590,7 +597,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
-	"player_quest_state", "xp_certificates_spent"]
+	"player_quest_state", "xp_certificates_spent", "wheel_meters"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -792,6 +799,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 		quest_problem = xp_certificates_spent_problem(data.get("xp_certificates_spent", {}))
 	if quest_problem != "":
 		return quest_problem
+	if data.get("wheel_meters", 0.0) < 0.0:
+		return "'wheel_meters' is not a distance driven."
 	var robot_problem: String = _robots_dict_problem(data.get("robots", {}))
 	if robot_problem != "":
 		return robot_problem
@@ -3667,6 +3676,51 @@ func add_rover_usage(meters: float, player_id: String = "") -> void:
 		return
 	steering.add_usage(meters * skill_factor("steering_usage", player_id))
 	add_tire_usage(meters)
+	var were_due: bool = wheels_due()
+	wheel_meters += meters
+	if wheels_due() and not were_due:
+		post_phone("BRAM: Your wheel nuts are due a re-torque. Bring the rover by my bay when you pass.")
+		wheels_changed.emit()
+
+
+## Meters between two wheel services [PLACEHOLDER].
+func wheel_service_due_m() -> float:
+	return DataManager.get_number(ITEMS_TABLE, "wheel_service/due_m", 1500.0)
+
+
+## True once the rover has driven that far since its nuts were last torqued. It
+## is a reason to visit Bram and nothing more: no wear, drift, speed or price
+## reads it, and a rover never stops for it.
+func wheels_due() -> bool:
+	return wheel_meters >= wheel_service_due_m()
+
+
+## The service button's words in Bram's bay.
+func wheel_service_text() -> String:
+	if wheels_due():
+		return "RE-TORQUE WHEEL NUTS"
+	return "WHEEL NUTS OK: %s m OF %s m" % [SP811.integer(floori(wheel_meters)), SP811.integer(roundi(wheel_service_due_m()))]
+
+
+## Bram re-torques the rover's five wheel nuts, in star order. Returns "" or why
+## not. It costs nothing and changes nothing but the meters counted, the
+## player's Robotics XP and the lab's XP; a quest step may count it (the
+## `service_wheels` source). Where the rover stands is the screen's to check, as
+## for his treads.
+## `score` is for Torque to Spec (docs/design/quests_levels_story.md section 7.1),
+## which is not built: nothing reads it yet, and FarmCommands never passes one.
+@warning_ignore("unused_parameter")
+func service_wheels(player_id: String = "", score: int = MinigameScore.SKIPPED) -> String:
+	if rover_in_tunnels:
+		return "The rover is in the tunnels. Bram's bay is up on the farm."
+	if not wheels_due():
+		return "The wheel nuts are not due: %s m driven of %s m." % [
+			SP811.integer(floori(wheel_meters)), SP811.integer(roundi(wheel_service_due_m()))]
+	wheel_meters = 0.0
+	_award_xp("service_wheels", player_id)
+	_award_lab_xp("lab_wheels", player_id)
+	wheels_changed.emit()
+	return ""
 
 
 ## The id the rover goes by where it is now.

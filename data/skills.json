@@ -39,6 +39,7 @@
     { "id": "commission_robot", "skill": "robotics", "xp": 125 },
     { "id": "robot_job", "skill": "robotics", "xp": 5 },
     { "id": "calibrate_robot", "skill": "robotics", "xp": 25 },
+    { "id": "service_wheels", "skill": "robotics", "xp": 25 },
     { "id": "calibrate_robot_player", "skill": "calibration", "xp": 25 },
     { "id": "job_done", "skill": "calibration", "xp": 0.5, "per": "credit paid" },
     { "id": "job_clean", "skill": "uncertainty", "xp": 0.25, "per": "credit paid" },
@@ -56,6 +57,7 @@
     { "id": "lab_clean_audit", "xp": 250 },
     { "id": "lab_certificate", "xp": 200 },
     { "id": "lab_spool", "xp": 25 },
+    { "id": "lab_wheels", "xp": 10 },
     { "id": "lab_robot", "xp": 250 },
     { "id": "lab_area", "xp": 150 },
     { "id": "lab_grown", "xp": 500 }
