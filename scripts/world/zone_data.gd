@@ -104,6 +104,8 @@ const WARNING_HARD: String = "Deeper levels need a lab level of %s."
 ## they need no warning (at or above the band's start, or no such zone).
 static func warning_text(id: StringName, lab_level: int) -> String:
 	var row: Dictionary = zone(id)
+	# The deep gate's level is read as written, not through lab_gate_level(): the
+	# row is built:false (gates nothing yet) but the line must still name it.
 	var deep: Dictionary = DataManager.get_record(&"skills", StringName(str(row.get("deep_gate", ""))), "lab_gates")
 	return warning_for(row, lab_level, int(deep.get("level", 0)))
 
@@ -147,6 +149,9 @@ static func problems(table: Array) -> Array[String]:
 		if typeof(row.get("area")) == TYPE_STRING and not AREAS.has(str(row["area"])):
 			out.append("%s: unknown area %s" % [label, row["area"]])
 		out.append_array(_band_problems(label, row.get("band")))
+		var deep: Variant = row.get("deep_gate")
+		if deep != null and (not deep is String or not DataManager.has_record(&"skills", StringName(deep as String), "lab_gates")):
+			out.append("%s: deep_gate %s is not a lab_gates row" % [label, deep])
 		out.append_array(_words_problems(label, "hazards", row.get("hazards"), HAZARDS))
 		out.append_array(_words_problems(label, "finds", row.get("finds"), FINDS))
 		var scene: Variant = row.get("hub_scene")

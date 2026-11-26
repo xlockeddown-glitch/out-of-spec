@@ -39,7 +39,8 @@ func test_a_hard_gate_deeper_down_is_named() -> String:
 
 
 func test_the_warning_is_not_a_wall() -> String:
-	# The only thing a warning does is speak: the host's move_rover has no level check.
+	# A new lab (level 1, under the band) can still drive the rover in: only the
+	# warning speaks, and move_rover never refuses over a level.
 	var gs: GameState = preload("res://scripts/autoload/GameState.gd").new()
 	gs.build_registry()
 	var problem: String = ""
@@ -47,10 +48,30 @@ func test_the_warning_is_not_a_wall() -> String:
 		problem = "Setup: a new lab is under the Lava Tubes band."
 	elif ZoneData.warning_text(&"lava_tubes", gs.lab_level()) == "":
 		problem = "A new lab is warned."
-	elif gs.lab_gate_level("lava_tubes_warning") != 0 or not gs.lab_gate_open("lava_tubes_warning"):
-		problem = "The Lava Tubes row is the warning level only and gates nothing."
+	else:
+		gs.park_rover(gs.ROVER, Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD + Vector3(1.0, 0.0, 0.0)))
+		var said: String = gs.move_rover(true)
+		if said.contains("lab level") or (said != "" and said != TunnelRecall.text("closed_text")):
+			problem = "The tunnels refused a low lab: %s" % said
+		elif said == "" and not gs.rover_in_tunnels:
+			problem = "The rover did not go in."
+	if problem == "":
+		for id: String in ["lava_tubes_warning", "aquifer_hub", "colony_mine_hub", "ice_caves_hub", "deimos_hub"]:
+			if gs.lab_gate_level(id) != 0 or not gs.lab_gate_open(id):
+				problem = "The hub row %s must gate nothing (hubs are never hard-gated)." % id
 	gs.free()
 	return problem
+
+
+func test_a_deep_gate_must_name_a_row() -> String:
+	var good: Dictionary = (ZoneData.rows()[0] as Dictionary).duplicate(true)
+	good["deep_gate"] = "lava_tubes_deep"
+	if not ZoneData.problems([good]).is_empty():
+		return "A real row is fine: %s" % [ZoneData.problems([good])]
+	good["deep_gate"] = "no_such_row"
+	if ZoneData.problems([good]).is_empty():
+		return "A deep_gate that is no row must be caught."
+	return ""
 
 
 func test_the_zone_rows_are_in_order_and_gate_nothing() -> String:
