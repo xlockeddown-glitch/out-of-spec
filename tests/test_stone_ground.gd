@@ -34,6 +34,9 @@ func _keep() -> Dictionary:
 		"dug": GameState.dug.duplicate(),
 		"levels": Terrain.level_points.duplicate(),
 		"stone": GameState.stone,
+		"seep": GameState.pit_seep.duplicate(),
+		"tunnels": GameState.rover_in_tunnels,
+		"rovers": GameState.rover_transforms.duplicate(),
 	}
 
 
@@ -42,7 +45,9 @@ func _restore(kept: Dictionary) -> void:
 	GameState.dug.assign(kept["dug"])
 	GameState.stone = kept["stone"]
 	Terrain.level_points = kept["levels"]
-	GameState.rover_transforms.erase("test_rover")
+	GameState.pit_seep.assign(kept["seep"])
+	GameState.rover_in_tunnels = kept["tunnels"]
+	GameState.rover_transforms = kept["rovers"]
 	CoopWalkers.out.erase("test_walker")
 
 
@@ -731,3 +736,122 @@ func test_a_guest_is_told_when_a_pad_changes_the_ground() -> String:
 	host.free()
 	guest.free()
 	return "\n".join(problems)
+
+
+func test_a_pad_change_leaves_the_tunnels_alone() -> String:
+	var strip: Array[Vector2i] = _strip(3)
+	if strip.size() < 6:
+		return "No strip of cells up a hill that goes well over the limit."
+	var problems: PackedStringArray = []
+	var kept: Dictionary = _keep()
+	_hold(_pads(strip))
+	var spot: Vector2 = _middle(strip[1])
+	var low := Transform3D(Basis.IDENTITY, Vector3(spot.x, -50.0, spot.y))
+	# On the farm: the rover that is in the tunnels keeps its tunnel pose.
+	GameState.rover_in_tunnels = false
+	GameState.rover_transforms[GameState.TUNNEL_ROVER] = low
+	GameState.rover_transforms[GameState.ROVER] = low
+	var i: int = strip.size() - 1
+	while i > 1 and Terrain.level_points.is_empty():
+		GameState.place_stone(_at(strip[i]), StonePieces.TAKE_UP)
+		i -= 1
+	if Terrain.level_points.is_empty():
+		problems.append("Taking up the far pads must bring the group under the limit.")
+	if GameState.rover_transforms[GameState.TUNNEL_ROVER] != low:
+		problems.append("A pad change must not move a rover that is in the tunnels.")
+	if GameState.rover_transforms[GameState.ROVER].origin.y < Terrain.height(spot, GameState.dug) - 0.0001:
+		problems.append("The farm rover on the pads must still be lifted.")
+	# In the tunnels: the players' poses are not the farm's either.
+	_hold(_pads(strip))
+	GameState.rover_in_tunnels = true
+	GameState.rover_transforms[GameState.ROVER] = low
+	CoopWalkers.out["test_walker"] = [spot.x, -50.0, spot.y, 0.0, 0.0]
+	i = strip.size() - 1
+	while i > 1 and Terrain.level_points.is_empty():
+		GameState.place_stone(_at(strip[i]), StonePieces.TAKE_UP)
+		i -= 1
+	if GameState.rover_transforms[GameState.ROVER] != low:
+		problems.append("A pad change must not move the farm rover left behind while in the tunnels.")
+	if CoopWalkers.out["test_walker"][1] != -50.0:
+		problems.append("A pad change must not move a player while the rover is in the tunnels.")
+	CoopWalkers.out.erase("test_walker")
+	_restore(kept)
+	return "
+".join(problems)
+
+
+func test_a_pad_whose_edge_is_too_steep_is_refused_at_placement() -> String:
+	var problems: PackedStringArray = []
+	var found: bool = false
+	var kept: Dictionary = _keep()
+	for start: Vector2i in _sloped(60):
+		for way: Vector2i in [Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT, Vector2i.UP]:
+			var built: Dictionary[Vector2i, int] = {}
+			var line: Array[Vector2i] = []
+			for i: int in 10:
+				var next: Vector2i = start + way * i
+				if not Terrain.can_dig(next):
+					break
+				var why: String = StonePieces.problem(next, StonePieces.PAD, built, _none, _no_dug)
+				if why == "Too steep at its edge to climb." and not found:
+					found = true
+					line.append(next)
+					var levels: Dictionary[Vector2i, float] = Terrain.pad_levels(line, _no_dug)
+					if Terrain.group_unlevelled(line, _no_dug) != "" 							or Terrain.max_step_m(Terrain.group_points(line), levels, _no_dug) <= Terrain.PAD_STEP_M:
+						problems.append("The refusal needs a levelled group whose edge steps over the limit.")
+					# The game refuses it too and changes nothing.
+					_hold(built)
+					var before: Dictionary[Vector2i, float] = Terrain.level_points.duplicate()
+					GameState.stone = 20
+					if GameState.place_stone(_at(next), StonePieces.PAD) != why or GameState.stone != 20 							or GameState.stone_pieces.has(next) or Terrain.level_points != before:
+						problems.append("The game must refuse the pad at %s and change nothing." % next)
+					_restore(kept)
+				if why != "":
+					break
+				built[next] = StonePieces.PAD
+				line.append(next)
+	if not found:
+		problems.append("No pad on this farm's hills has an edge too steep to climb.")
+	return "
+".join(problems)
+
+
+func test_a_pad_change_settles_the_pit_water_again() -> String:
+	var kept: Dictionary = _keep()
+	var problems: PackedStringArray = []
+	var pit: Vector2i = NOWHERE
+	var pad: Vector2i = NOWHERE
+	for cell: Vector2i in _sloped(60):
+		if pit != NOWHERE or StonePieces.problem(cell, StonePieces.PAD, _no_pieces, _none, _no_dug) != "":
+			continue
+		for step: Vector2i in [Vector2i.RIGHT, Vector2i.LEFT, Vector2i.UP, Vector2i.DOWN]:
+			var next: Vector2i = cell + step * 3
+			if pit == NOWHERE and Terrain.can_dig(next) and not Terrain.is_near_water(next):
+				pit = next
+				pad = cell
+	if pit == NOWHERE:
+		return "No pit beside a pad to try."
+	_hold({})
+	GameState.dug.assign({pit: PitWater.SEEP_STEPS})
+	# The pit stands a little off the pad (its side would be too steep to climb next
+	# to it). Its water as it stood before: above what the ground now holds, as
+	# it is when the ground round a pit moves down.
+	var stale: Dictionary[Vector2i, float] = PitWater.seep({}, GameState.dug, 100.0)
+	for cell: Vector2i in stale:
+		stale[cell] += 5.0
+	GameState.pit_seep.assign(stale)
+	GameState.stone = 10
+	if GameState.place_stone(_at(pad), StonePieces.PAD) != "":
+		problems.append("The pad beside the pit was refused.")
+	var want: Dictionary[Vector2i, float] = PitWater.seep(stale, GameState.dug, 0.0)
+	if want == stale:
+		problems.append("The test needs water that settles lower.")
+	if GameState.pit_seep != want:
+		problems.append("A pad change must settle the pit water again: %s, not %s" % [GameState.pit_seep, want])
+	GameState.pit_seep.assign(stale)
+	GameState.place_stone(_at(pad), StonePieces.TAKE_UP)
+	if GameState.pit_seep != want:
+		problems.append("Taking a pad up must settle the pit water again.")
+	_restore(kept)
+	return "
+".join(problems)

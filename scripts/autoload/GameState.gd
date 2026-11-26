@@ -4581,11 +4581,15 @@ func _level_pads(host: bool = false) -> void:
 ## too, when it hears of the ground (the scene's _show_dug).
 func _lift_to_ground() -> void:
 	for id: Variant in rover_transforms:
+		if rover_is_away(id):
+			continue  # a pose in the tunnels is not on the farm
 		var pose: Transform3D = rover_transforms[id]
 		var ground_m: float = Terrain.height(Vector2(pose.origin.x, pose.origin.z), dug)
 		if pose.origin.y < ground_m:
 			pose.origin.y = ground_m
 			rover_transforms[id] = pose
+	if rover_in_tunnels:
+		return  # the players are in there too
 	for pose: Array in CoopWalkers.out.values():
 		pose[1] = maxf(pose[1], Terrain.height(Vector2(pose[0], pose[2]), dug))
 
