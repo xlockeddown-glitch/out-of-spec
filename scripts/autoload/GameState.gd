@@ -332,6 +332,8 @@ const TUNNEL_ROVER: String = "rover_1_tunnels"
 const TUNNEL_PAD := Vector3(20.5, 0.0, -15.5)
 const TUNNEL_EXIT := Vector3(-1.5, 0.0, 27.4)
 const TUNNEL_PAD_REACH_M: float = 6.0
+## Rover controllers that can say where their rover is now (live_transform).
+const LIVE_ROVER_GROUP: StringName = &"live_rovers"
 ## Just inside the tunnels' mouth [PLACEHOLDER].
 const TUNNEL_START := Transform3D(Basis.IDENTITY, Vector3(-1.5, 0.05, 22.5))
 ## Vector3i -> true for every tilled soil cell.
@@ -682,7 +684,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
-	"rover_place_scope", "_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry",
+	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry",
 	"rover_in_tunnels", "player_places", "settle_due",
 ]
 
@@ -4178,7 +4180,7 @@ func settle_rover_depth(refresh: bool = true) -> bool:
 		return false
 	rover_transforms[TUNNEL_ROVER] = ZoneDepth.start_transform()
 	rover_epoch += 1
-	rover_place_changed.emit()
+	_emit_field_rover_changed()  # the field rover moved: a lease on the farm rover stays
 	return true
 
 
@@ -4213,7 +4215,7 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 	rover_depth = target_depth
 	rover_transforms[TUNNEL_ROVER] = ZoneDepth.pose_for_depth(target_depth)
 	rover_epoch += 1
-	rover_place_changed.emit()
+	_emit_field_rover_changed()
 	return ""
 
 
@@ -4312,10 +4314,6 @@ func fast_travel(zone_id: String, player_id: String = "") -> String:
 		rover_depth = 0
 		rover_transforms[TUNNEL_ROVER] = TUNNEL_START
 		rover_epoch += 1
-	if rover_zone != "":
-		# Anyone who comes by the console is rescued for credits only [PLACEHOLDER]; the
-		# entry baseline of whoever lent the farm rover must not be inherited by a joiner.
-		_ore_at_entry = -1
 	player_places[player_id] = [zone_id, rover_depth]
 	if plan != FastTravel.JOIN:
 		_emit_field_rover_changed()  # a rover moved; joining moves none, so nobody's lease is lost
@@ -4334,14 +4332,43 @@ func leave_zone(player_id: String = "") -> String:
 		return FastTravel.text("use_the_mouth")  # the farm's rover is out: it comes home by the mouth
 	if depth_of(player_id) != 0 or rover_depth != 0:
 		return "The way home is from the hub."
-	SaveGame.saving.emit()  # a rover driven here says where it is now, not where it was last parked
-	if not rover_transforms.has(TUNNEL_ROVER) or parked_rover_transform(TUNNEL_ROVER).origin.distance_to(TUNNEL_EXIT) > TUNNEL_PAD_REACH_M:
+	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+	if at == null or (at as Vector3).distance_to(TUNNEL_EXIT) > TUNNEL_PAD_REACH_M:
 		return "The rover is not on the pad."
 	player_places[player_id] = [ZonePresence.DOME, 0]
 	if rover_zone != "" and _places_in(rover_zone).is_empty():
 		_release_field_rover()
 		_emit_field_rover_changed()
 	return ""
+
+
+## The leases and poses the pad check reads; the CoopRovers autoload unless a test
+## puts its own here.
+var rovers_node: Node = null
+
+
+## Where a rover is now, as a position, or null if it has none. Read without a
+## side effect (nothing is parked). Someone else's drive wins: with a teammate on the
+## farm, the pose the host last accepted or heard (CoopRovers) is the newest word,
+## and the host's own controller, which may not have run yet, must not overwrite it.
+## Only a rover this player drives (alone, or the host with nobody else driving) is
+## asked of its controller, which knows better than the last parking.
+func _rover_pose_now(rover_id: String) -> Variant:
+	var rovers: Node = rovers_node if rovers_node != null else CoopRovers
+	if rovers.together():
+		var heard: Variant = rovers.told_pose(rover_id)
+		if heard != null:
+			return (heard as Transform3D).origin
+	if rovers.driver(rover_id) in ["", local_player_id]:
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		for node: Node in tree.get_nodes_in_group(LIVE_ROVER_GROUP) if tree != null else []:
+			if node.get("rover_id") == rover_id:
+				var live: Variant = node.call("live_transform")
+				if live != null:
+					return (live as Transform3D).origin
+	if not rover_transforms.has(rover_id):
+		return null
+	return parked_rover_transform(rover_id).origin
 
 
 ## The [place, depth] of everyone the host knows to be in `zone_id`.

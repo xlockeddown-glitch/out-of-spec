@@ -158,6 +158,7 @@ func _ready() -> void:
 	steering.error_changed.connect(_on_steering_error_changed)
 	GameState.upgrades_changed.connect(_apply_upgrades)
 	SaveGame.saving.connect(_park)
+	add_to_group(GameState.LIVE_ROVER_GROUP)
 	GameState.farm_loaded.connect(_unpark)
 	GameState.rover_place_changed.connect(_show_place)
 	_apply_upgrades()
@@ -278,6 +279,14 @@ func _keep_off_edge() -> void:
 	var edge_m: float = Terrain.HALF_M - wheelbase_m
 	global_position.x = clampf(global_position.x, -edge_m, edge_m)
 	global_position.z = clampf(global_position.z, -edge_m, edge_m)
+
+
+## Where this rover is now, for a check that must not park it; null while it only
+## follows the cache (then the cache is the newer word).
+func live_transform() -> Variant:
+	if _following or GameState.rover_is_away(rover_id):
+		return null
+	return global_transform
 
 
 func _park() -> void:

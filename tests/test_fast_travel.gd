@@ -19,6 +19,26 @@ class _NoBeds:
 		put_to_bed.append(player_id)
 
 
+## A rover controller that says where its rover is, as the real one does.
+class _LiveRover:
+	extends Node
+	var rover_id: String = "rover_tunnel"
+	var at: Vector3 = Vector3.ZERO
+	var asked: int = 0
+
+	func live_transform() -> Variant:
+		asked += 1
+		return Transform3D(Basis.IDENTITY, at)
+
+
+## Rovers where a guest is on the farm.
+class _TogetherRovers:
+	extends "res://scripts/autoload/CoopRovers.gd"
+
+	func together() -> bool:
+		return true
+
+
 func _state() -> GameStateScript:
 	var gs: GameStateScript = GameStateScript.new()
 	gs.build_registry()
@@ -643,14 +663,151 @@ func test_leaving_the_zone_reads_the_rover_where_it_is_now() -> String:
 		return "")
 	# Continued from a save made off the pad: the parked pose is old, the rover's is live.
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3(-1.5, 0.05, 10.0))
-	var live: Callable = func() -> void:
-		gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)  # what the controller parks
-	SaveGame.saving.connect(live)
+	var live := _LiveRover.new()
+	live.rover_id = gs.TUNNEL_ROVER
+	live.at = gs.TUNNEL_EXIT  # driven onto the pad
+	(Engine.get_main_loop() as SceneTree).root.add_child(live)
+	live.add_to_group(GameStateScript.LIVE_ROVER_GROUP)
+	var saved: Array[int] = [0]
+	var count: Callable = func() -> void: saved[0] += 1
+	SaveGame.saving.connect(count)
 	var problem: String = gs.leave_zone(me)
-	SaveGame.saving.disconnect(live)
+	SaveGame.saving.disconnect(count)
+	live.get_parent().remove_child(live)
+	live.free()
 	var bad: bool = problem != "" or gs.place_of(me) != ZonePresence.DOME
 	gs.free()
-	return "Driven onto the pad, E leaves (%s)" % problem if bad else ""
+	if bad:
+		return "Driven onto the pad, E leaves (%s)" % problem
+	if saved[0] != 0:
+		return "The check reads the pose and saves nothing"
+	return ""
+
+
+func test_a_guest_s_newer_pose_beats_the_host_controller_s_older_one() -> String:
+	var session: Node = _session()
+	var gs: GameStateScript = session.commands.state
+	gs.zones_unlocked.append(ZONE)
+	var rovers: Node = _TogetherRovers.new()
+	rovers.start(session, gs)
+	gs.rovers_node = rovers
+	var me: String = _in_dome(gs, "player_2")
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, me)
+		return "")
+	# The host has just loaded: its controller is on the pad, not yet following anyone.
+	var live := _LiveRover.new()
+	live.rover_id = gs.TUNNEL_ROVER
+	live.at = gs.TUNNEL_EXIT
+	(Engine.get_main_loop() as SceneTree).root.add_child(live)
+	live.add_to_group(GameStateScript.LIVE_ROVER_GROUP)
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)
+	# The guest drove off the pad; the host accepted that pose.
+	rovers._drivers[gs.TUNNEL_ROVER] = [me, 1 << 60]
+	rovers._poses[gs.TUNNEL_ROVER] = [[-1.5, 0.05, 10.0, 0.0, 0.0, true], 0]
+	var refused: String = gs.leave_zone(me)
+	var asked: int = live.asked
+	live.get_parent().remove_child(live)
+	live.free()
+	var problems: Array[String] = []
+	if refused == "" or gs.place_of(me) == ZonePresence.DOME:
+		problems.append("The guest's off-pad pose wins over the host's older on-pad one")
+	if asked != 0:
+		problems.append("The host's controller is not asked while a teammate drives")
+	rovers.free()
+	return _finish("
+".join(problems))
+
+
+func test_a_depth_change_and_a_re_park_keep_the_farm_rover_s_lease() -> String:
+	var session: Node = _session()
+	var gs: GameStateScript = session.commands.state
+	var rovers: Node = RoversScript.new()
+	rovers.start(session, gs)
+	gs.rover_zone = gs.TUNNELS_ZONE
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.descent_position())
+	var problems: Array[String] = []
+	rovers._drivers[gs.ROVER] = ["player_4", 1 << 60]
+	rovers._drivers[gs.TUNNEL_ROVER] = ["player_5", 1 << 60]
+	var refused: String = gs.change_depth(1)
+	if refused != "":
+		problems.append("The test's descent was refused: %s" % refused)
+	if rovers.driver(gs.ROVER) != "player_4" or rovers.driver(gs.TUNNEL_ROVER) != "":
+		problems.append("A field rover going down clears its own lease and not the farm rover's")
+	rovers._drivers[gs.ROVER] = ["player_4", 1 << 60]
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3(900.0, 0.0, 900.0))  # in the rock
+	if not gs.settle_rover_depth(false):
+		problems.append("The test's rover was not re-parked")
+	if rovers.driver(gs.ROVER) != "player_4":
+		problems.append("A morning re-park keeps the farm rover's lease")
+	if gs.rover_place_scope != "":
+		problems.append("The scope is not left set")
+	rovers.free()
+	return _finish("
+".join(problems))
+
+
+func test_the_airlock_records_the_player_in_the_zone_at_the_commit() -> String:
+	var me: String = GameState.local_player_id
+	var held: Variant = GameState.player_places.get(me)
+	var guest_held: bool = FarmCommands.guest
+	FarmCommands.guest = false
+	GameState.player_places[me] = [ZonePresence.DOME, 0]
+	SceneSwitcher.note_arrival(SceneSwitcher.DOME_SCENE)
+	var problems: Array[String] = []
+	if GameState.place_of(me) != ZonePresence.DOME:
+		problems.append("Only a zone is recorded early")
+	SceneSwitcher.note_arrival(SceneSwitcher.TUNNELS_SCENE)
+	if GameState.place_of(me) != ZONE:
+		problems.append("The host is in the zone as the swap is committed")
+	FarmCommands.guest = guest_held
+	if held == null:
+		GameState.player_places.erase(me)
+	else:
+		GameState.player_places[me] = held
+	var source: String = FileAccess.get_file_as_string("res://scripts/autoload/SceneSwitcher.gd")
+	if not "CoopScenes.report_scene(path)" in source:
+		problems.append("A guest tells the host at swap start")
+	if not "note_arrival(path)" in source.split("func swap_to")[1].split("await")[0]:
+		problems.append("It is recorded before the fade")
+	return "
+".join(problems)
+
+
+func test_a_console_arrival_does_not_re_park_a_rover_a_host_is_arriving_at() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = _in_dome(gs, "player_2")
+	gs.rover_zone = ZONE
+	gs.rover_depth = 0
+	var parked: Transform3D = Transform3D(Basis.IDENTITY, Vector3(-1.5, 0.05, 15.0))
+	gs.rover_transforms[gs.TUNNEL_ROVER] = parked
+	gs.player_places[gs.local_player_id] = [ZONE, 0]  # the host, in the fade into the zone
+	var epoch: int = gs.rover_epoch
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, me)
+		return "")
+	var kept: bool = gs.parked_rover_transform(gs.TUNNEL_ROVER).origin == parked.origin and gs.rover_epoch == epoch
+	gs.free()
+	return "" if kept else "The host's arrival counts: the rover stays where it is"
+
+
+func test_a_rebuild_puts_the_rover_where_it_is_when_that_is_in_the_rock() -> String:
+	var problems: Array[String] = []
+	var seed_value: int = 424242
+	var day: int = 1
+	var hub: Transform3D = ZoneDepth.pose_for_depth(0)
+	var inside: Transform3D = Transform3D(Basis.IDENTITY, ZoneDepth.start_transform().origin)
+	if ZoneDepth.rebuild_pose(inside, 1, seed_value, day).origin != inside.origin:
+		problems.append("A parked pose inside the depth's rock is kept")
+	if ZoneDepth.rebuild_pose(Transform3D(Basis.IDENTITY, Vector3(900.0, 0.0, 900.0)), 1, seed_value, day).origin != ZoneDepth.pose_for_depth(1).origin:
+		problems.append("A pose in the rock is the depth's start")
+	if ZoneDepth.rebuild_pose(null, 0, seed_value, day).origin != hub.origin:
+		problems.append("No pose is the depth's start")
+	var source: String = FileAccess.get_file_as_string("res://scripts/basalt_tunnels.gd")
+	if not "parked_rover_transform(GameState.TUNNEL_ROVER)" in source:
+		problems.append("The host's rebuild asks for its parked pose")
+	return "
+".join(problems)
 
 
 func test_nothing_leaves_the_dome_while_a_trip_is_pending() -> String:
@@ -666,7 +823,7 @@ func test_nothing_leaves_the_dome_while_a_trip_is_pending() -> String:
 	return "\n".join(problems)
 
 
-func test_a_joiner_does_not_inherit_the_lender_s_ore_baseline() -> String:
+func test_a_console_join_keeps_the_lender_s_baseline_and_a_new_field_rover_clears_it() -> String:
 	var gs: GameStateScript = _state()
 	var me: String = _in_dome(gs)
 	gs.crystal_ore = 7
@@ -677,9 +834,22 @@ func test_a_joiner_does_not_inherit_the_lender_s_ore_baseline() -> String:
 	_at(12.0, func() -> String:
 		gs.fast_travel(ZONE, me)  # the host joins it by the console
 		return "")
-	var carried: int = gs.ore_carried_in()
+	var problems: Array[String] = []
+	if gs.ore_carried_in() != 83:
+		problems.append("A join does not erase the entrant's baseline (%d)" % gs.ore_carried_in())
+	var fresh: GameStateScript = _state()
+	var you: String = _in_dome(fresh)
+	fresh.crystal_ore = 50
+	fresh._ore_at_entry = 10  # left over from an earlier trip
+	_at(12.0, func() -> String:
+		fresh.fast_travel(ZONE, you)
+		return "")
+	if fresh.ore_carried_in() != 0:
+		problems.append("A new field rover by the console takes no ore (%d)" % fresh.ore_carried_in())
+	fresh.free()
 	gs.free()
-	return "" if carried == 0 else "A console rescue takes no ore (%d)" % carried
+	return "
+".join(problems)
 
 
 func test_a_refused_mouth_entry_leaves_the_field_rover_and_a_good_one_says_it_went() -> String:
@@ -746,3 +916,26 @@ func test_an_open_console_lists_a_zone_unlocked_while_it_is_open() -> String:
 	ui.free()
 	GameState.zones_unlocked.assign(held)
 	return "" if rows == 1 else "The unlock appears without reopening (%d rows)" % rows
+
+
+func test_an_open_console_keeps_its_focus_unless_the_list_changed() -> String:
+	var held: Array[String] = GameState.zones_unlocked.duplicate()
+	GameState.zones_unlocked.assign([ZONE])
+	var ui := FastTravelUI.new()
+	(Engine.get_main_loop() as SceneTree).root.add_child(ui)
+	ui.open()
+	var go: Button = ui._rows.get_child(0).get_child(1)
+	go.grab_focus()
+	var problems: Array[String] = []
+	GameState.rover_place_changed.emit()  # a teammate's depth change
+	if ui._rows.get_child(0).get_child(1) != go or not go.has_focus():
+		problems.append("A rover update with the same list leaves the rows and the focus")
+	GameState.zones_unlocked.clear()
+	GameState.rover_place_changed.emit()
+	if ui._rows.get_child_count() == 0 or ui._shown.size() != 0:
+		problems.append("A changed list is rebuilt")
+	ui.get_parent().remove_child(ui)
+	ui.free()
+	GameState.zones_unlocked.assign(held)
+	return "
+".join(problems)

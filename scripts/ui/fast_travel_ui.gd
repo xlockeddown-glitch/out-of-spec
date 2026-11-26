@@ -19,6 +19,9 @@ var _focus_before: Control
 ## The zone whose warning was shown, so the next press on it goes.
 var _warned: String = ""
 var _going: bool = false
+## The destinations the rows were built from, so a rover update that changes none
+## of them leaves the rows (and the button with focus) alone.
+var _shown: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -51,9 +54,15 @@ func _ready() -> void:
 
 
 ## The unlock list may arrive while the panel is open (a teammate's first visit).
+## Only a change in what can be chosen rebuilds the rows; a teammate's depth change
+## does not take focus off a button.
 func _on_place_changed() -> void:
-	if visible and not _going:
+	if visible and not _going and _places() != _shown:
 		_refresh()
+
+
+func _places() -> Array[Dictionary]:
+	return FastTravel.destinations(GameState.lab_level(), GameState.zones_unlocked)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -86,15 +95,25 @@ func close() -> void:
 		_close_button.release_focus()
 
 
+## Builds the rows again. A button that had focus keeps it: the one in the same row,
+## or the last row if there are fewer now (the close button when there are none).
 func _refresh() -> void:
+	var focused: int = -1
+	var owner_now: Control = get_viewport().gui_get_focus_owner() if is_inside_tree() else null
+	for i: int in _rows.get_child_count():
+		if owner_now != null and _rows.get_child(i).is_ancestor_of(owner_now):
+			focused = i
 	for child: Node in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
-	var places: Array[Dictionary] = FastTravel.destinations(GameState.lab_level(), GameState.zones_unlocked)
-	if places.is_empty():
+	_shown = _places()
+	if _shown.is_empty():
 		_rows.add_child(PlanBoardUI._label(FastTravel.text("none"), DIM, 20))
+		if focused >= 0:
+			_close_button.grab_focus()
 		return
-	for place: Dictionary in places:
+	var buttons: Array[Button] = []
+	for place: Dictionary in _shown:
 		var row := HBoxContainer.new()
 		var name_label: Label = PlanBoardUI._label(str(place["name"]), TEXT, 22)
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -103,6 +122,9 @@ func _refresh() -> void:
 		go.pressed.connect(_on_go.bind(place))
 		row.add_child(go)
 		_rows.add_child(row)
+		buttons.append(go)
+	if focused >= 0:
+		buttons[mini(focused, buttons.size() - 1)].grab_focus()
 
 
 func _on_go(place: Dictionary) -> void:

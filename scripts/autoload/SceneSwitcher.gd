@@ -82,6 +82,7 @@ func swap_to(path: String) -> void:
 		# The tunnels show the depth the one rover is at.
 		ZoneDepth.follow(GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
 	_note_outside(path)
+	note_arrival(path)
 	var tween: Tween = create_tween()
 	tween.tween_property(_fade, "color:a", 1.0, FADE_SECONDS)
 	await tween.finished
@@ -96,6 +97,22 @@ func swap_to(path: String) -> void:
 	await tween.finished
 	_busy = false
 	scene_swapped.emit(path)
+
+
+## The player is in a zone from the moment the swap into it is committed, not when
+## its scene has loaded: nothing the host decides in the fade (a console arrival, a
+## rescue) may treat them as still at home. The host sets it directly; a guest tells
+## the host now, as the console path does (the report after the swap says it again,
+## and a place the host already has is not sent twice). Any other place is reported
+## when the swap is done.
+func note_arrival(path: String) -> void:
+	var at: Array = ZonePresence.for_scene(path)
+	if at.is_empty() or at[0] in [ZonePresence.FARM, ZonePresence.DOME]:
+		return
+	if FarmCommands.guest:
+		CoopScenes.report_scene(path)
+	else:
+		GameState.player_places[GameState.local_player_id] = at
 
 
 func _note_outside(path: String) -> void:

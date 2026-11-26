@@ -333,18 +333,19 @@ func _rebuild_for_depth() -> void:
 	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
 
 
-## Where the rebuilt scene's rover starts: where the host says it is, if this is a
-## guest and the host has told a pose that is inside this depth's rock (so a trip
-## through the airlock that raced a console re-park does not put the rover by the
-## hatch while it is at the hub start); else where a depth starts it.
+## Where the rebuilt scene's rover starts: where the rover is, if that is inside
+## this depth's rock. A guest has the host's told pose; the host has its parked one,
+## which counts only if the rover has a pose at all, and it lies inside this depth's
+## rock (so a trip through the airlock that raced a console re-park does not put the
+## rover by the hatch while it is at the hub start; a depth change parks a pose of
+## its own, so the hatch is for when none is valid); else where a depth starts it.
 func _rover_pose_for_rebuild() -> Transform3D:
-	var fallback: Transform3D = ZoneDepth.pose_for_depth(GameState.rover_depth)
-	if not FarmCommands.guest:
-		return fallback
-	var told: Variant = CoopRovers.told_pose(GameState.TUNNEL_ROVER)
-	if told is Transform3D and TunnelRock.holds_in(ZoneDepth.grid_for(GameState.rover_depth, GameState.world_seed, GameClock.get_day_index()), (told as Transform3D).origin):
-		return told
-	return fallback
+	var known: Variant = null
+	if FarmCommands.guest:
+		known = CoopRovers.told_pose(GameState.TUNNEL_ROVER)
+	elif GameState.rover_transforms.has(GameState.TUNNEL_ROVER):
+		known = GameState.parked_rover_transform(GameState.TUNNEL_ROVER)
+	return ZoneDepth.rebuild_pose(known, GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
 
 
 ## Not left to a signal, which a busy swap can swallow and a later snapshot with the
