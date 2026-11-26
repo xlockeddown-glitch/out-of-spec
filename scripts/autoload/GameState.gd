@@ -64,6 +64,9 @@ signal xp_certificates_changed
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
 const STEERING_ID: String = "rover_steering_encoder"
+## What a check against a block is counted under in action_counts, before the
+## instrument's id ("check_with_block:rover_steering_encoder"). Kept in saves.
+const BLOCK_CHECK_COUNT: String = "check_with_block:"
 const HYGROMETER_ID: String = "hygrometer"
 const TIRE_ID: String = "rover_tire_pressure"
 const THERMOMETER_ID: String = "terrarium_thermometer"
@@ -1607,6 +1610,10 @@ func let_in_guest(key: String, brought: Dictionary, players: Array[String], reco
 			player_skill_xp[player_id][skill] = xp
 			skill_xp_changed.emit(player_id, skill)
 	_take_guest_record(player_id, record)
+	# Today's ask, if they hold none: a friend who drops in need not wait for the
+	# morning (docs/design/quests_levels_story.md section 6, D2).
+	if QuestEngine.update_daily_of(self, player_id):
+		quests_changed.emit()
 	return player_id
 
 
@@ -1625,7 +1632,8 @@ func let_in_guest(key: String, brought: Dictionary, players: Array[String], reco
 func _take_guest_record(player_id: String, record: Dictionary) -> void:
 	var rewards: Dictionary = {}
 	for quest: Dictionary in QuestEngine.quests():
-		if QuestEngine.data_problem(quest) == "":
+		# A daily ask and its certificate stay on their farm: a record names none.
+		if QuestEngine.data_problem(quest) == "" and not QuestEngine.is_daily(quest):
 			rewards[str(quest["id"])] = quest.get("rewards", {})
 	var quests_moved: bool = false
 	var certificates_moved: bool = false
@@ -2044,10 +2052,13 @@ func spend_xp_certificate(certificate_id: String, skill_id: String, player_id: S
 	held.erase(certificate_id)
 	if held.is_empty():
 		xp_certificates.erase(player_id)
+	# A daily ask gives its certificate each time it is done, so that one is
+	# never written down as spent for good.
 	var source: String = xp_certificate_source(certificate_id)
-	var gone: Array = xp_certificates_spent.get_or_add(player_id, [])
-	if not source in gone:
-		gone.append(source)
+	if not QuestEngine.is_daily_id(source):
+		var gone: Array = xp_certificates_spent.get_or_add(player_id, [])
+		if not source in gone:
+			gone.append(source)
 	give_skill_xp(skill_id, xp, player_id)
 	xp_certificates_changed.emit()
 	return ""
@@ -3549,6 +3560,15 @@ func is_fissure_available(fissure_id: StringName) -> bool:
 		return true
 	var regrow: int = int(DataManager.get_number(ITEMS_TABLE, "crystal_ore/fissure_regrow_days", 1.0))
 	return GameClock.get_day_index() >= int(mined_fissures[fissure_id]) + regrow
+
+
+## How many fissures can be mined now.
+func open_fissures() -> int:
+	var open: int = 0
+	for fissure: StringName in FISSURES:
+		if is_fissure_available(fissure):
+			open += 1
+	return open
 
 
 func mine_fissure(fissure_id: StringName, player_id: String = "") -> bool:
@@ -5283,6 +5303,15 @@ func crop_name(crop_id: String) -> String:
 const PLOT: Rect2i = Rect2i(-6, -6, 12, 12)
 
 
+## How many cells of the plot are still to till.
+func untilled_cells() -> int:
+	var tilled: int = 0
+	for cell: Variant in tilled_cells:
+		if cell is Vector3i and cell.y == 0 and PLOT.has_point(Vector2i(cell.x, cell.z)):
+			tilled += 1
+	return PLOT.get_area() - tilled
+
+
 ## Records a cell as tilled, so it stays tilled across scene swaps. Returns
 ## false if it already was, or is off the plot.
 func till(cell: Vector3i, player_id: String = "") -> bool:
@@ -5422,12 +5451,18 @@ func block_in_hand() -> Dictionary:
 
 ## Puts an instrument against a block the farm has dug up, as ReferenceBlock.check()
 ## says, or { refused, reason }. A check, not a calibration: the instrument, its
-## drift and the log stay as they were, and the block is kept.
-func check_with_block(instrument_id: String) -> Dictionary:
+## drift and the log stay as they were, and the block is kept. A check that gave
+## a result is counted for who did it (action_counts, as BLOCK_CHECK_COUNT and
+## the instrument, with no XP): a quest can count it, and nothing else reads it.
+func check_with_block(instrument_id: String, player_id: String = "") -> Dictionary:
 	var block: Dictionary = block_in_hand()
 	if block.is_empty():
 		return { "refused": true, "reason": "No reference block yet. Dig for one." }
-	return ReferenceBlock.check(get_sensor(instrument_id), block)
+	var result: Dictionary = ReferenceBlock.check(get_sensor(instrument_id), block)
+	if not result.get("refused", false) and _player(player_id) != MANAGER_ID:
+		var done: Dictionary = (action_counts.get_or_add(_player(player_id), {}) as Dictionary).get_or_add(BLOCK_CHECK_COUNT + instrument_id, { "count": 0, "xp": 0 })
+		done["count"] = int(done["count"]) + 1
+	return result
 
 
 ## Surveys for ore from where the rover is, as OrePocket.survey() says, or

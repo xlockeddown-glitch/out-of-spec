@@ -200,14 +200,20 @@
         "Bring me six crystal ore and I'll bolt wider treads onto your tractor. Cuts steering drift in half on loose dirt.",
         "Tip for Thursday's audit: zero your hygrometers before noon. The drone always checks the dome first.",
         "When a solar flare hits, park the bots and stay indoors. Saves me welding your bumper back on."
-      ]
+      ],
+      "quests": {
+        "daily_ore_offer": "Two ore, if you are out that way.",
+        "daily_ore_done": "Two ore. So you were out that way."
+      }
     },
     "lin": {
       "name": "Dr. Lin",
       "quests": {
         "thirsty_probe_offer": "Your irrigation thinks the bed is at 40 %. Your turnip disagrees. I trust the turnip.",
         "thirsty_probe_done": "Your probe is lying to you. Was. Better.",
-        "thirsty_probe_reference": "I checked your zero against my own scale. Twice. I found nothing to complain about. I did look."
+        "thirsty_probe_reference": "I checked your zero against my own scale. Twice. I found nothing to complain about. I did look.",
+        "daily_reeds_offer": "Three Biscuit Reeds, in spec.",
+        "daily_reeds_done": "Three. In spec. I weighed them anyway."
       }
     },
     "vance": {
@@ -229,7 +235,9 @@
       "quests": {
         "warmly_dispatch_offer": "This is Odalys Brandt at BNH Dispatch. Every message BNH sends you goes through my desk first. Inspector Vance's first audit is on the schedule. Have the stickers on your bench in date when he lands.",
         "warmly_dispatch_clean": "Your first audit is on file with nothing in it for me to relay. I had three apology templates ready and have put them back in the drawer. Warmly, Dispatch.",
-        "warmly_dispatch_grace": "Your first audit is on file. The form says warning, so that is what I filed. Someone sat up with your paperwork so that it would say no more than that, and left a mug on your bench. I am told the ring comes out. I would not hurry. Warmly, Dispatch."
+        "warmly_dispatch_grace": "Your first audit is on file. The form says warning, so that is what I filed. Someone sat up with your paperwork so that it would say no more than that, and left a mug on your bench. I am told the ring comes out. I would not hurry. Warmly, Dispatch.",
+        "daily_block_offer": "Check the rover's steering encoder against a block for me.",
+        "daily_block_done": "The steering check is on file. Warmly, Dispatch."
       }
     },
     "chet": {
@@ -239,6 +247,13 @@
         "certified_in_three_fonts_again": "The envelope is back under your airlock. The gauge still reads wrong, and I am still not asking anyone else.",
         "certified_in_three_fonts_clean": "The customer says it reads right, and on the day, and the paperwork goes all the way up. I checked. I did not know it could do that. The whole envelope is yours, and I owe you one. Tell nobody.",
         "certified_in_three_fonts_sour": "Well, it is back. Not when I said it would be, or not with paperwork I can show anyone, and I had to eyeball an excuse for the customer. Half the envelope is yours. We are square."
+      }
+    },
+    "orin": {
+      "name": "Old Orin",
+      "quests": {
+        "daily_row_offer": "Till me a row by the beacon.",
+        "daily_row_done": "A straight row. The beacon has something to look at now."
       }
     }
   }

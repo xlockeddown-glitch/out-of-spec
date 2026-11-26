@@ -190,19 +190,37 @@ func test_the_check_reads_the_error() -> String:
 	return "\n".join(problems)
 
 
+## The farm as it is saved, without the counts of checks with a block: every
+## other count of what players did stays in the comparison.
+func _but_the_counts(gs: Node) -> Dictionary:
+	var farm: Dictionary = gs.farm_to_dict().duplicate(true)
+	var counts: Dictionary = farm.get("action_counts", {})
+	for player: Variant in counts.keys():
+		var own: Dictionary = counts[player]
+		for source: Variant in own.keys():
+			if str(source).begins_with(gs.BLOCK_CHECK_COUNT):
+				own.erase(source)
+		if own.is_empty():
+			counts.erase(player)
+	return farm
+
+
 func test_the_check_changes_nothing() -> String:
 	var gs: Node = _make()
 	var cell: Vector2i = _block_cell(gs)
 	gs.dig(Vector3i(cell.x, 0, cell.y))
 	var sensor: DriftingSensor = gs.get_sensor("relay_dish_azimuth")
 	sensor.error = 0.3
-	var before: PackedByteArray = var_to_bytes(gs.farm_to_dict())
+	var before: PackedByteArray = var_to_bytes(_but_the_counts(gs))
 	for i: int in 3:
 		gs.check_with_block("relay_dish_azimuth")
 		gs.check_with_block(gs.STEERING_ID)
 	var problems: PackedStringArray = []
-	if before != var_to_bytes(gs.farm_to_dict()):
+	# All a check leaves is that it was done, for a daily ask to count (no XP).
+	if before != var_to_bytes(_but_the_counts(gs)):
 		problems.append("A check changed the farm.")
+	if gs.action_count(gs.BLOCK_CHECK_COUNT + gs.STEERING_ID) != 3 or gs.action_xp(gs.BLOCK_CHECK_COUNT + gs.STEERING_ID) != 0:
+		problems.append("A check is counted for who did it, with no XP.")
 	if sensor.error != 0.3:
 		problems.append("A check is not a calibration.")
 	if gs.found_blocks.size() != 1 or gs.block_in_hand().is_empty():

@@ -121,7 +121,8 @@ func test_odalys_signs_warmly_dispatch() -> String:
 		var text: String = str(lines[key])
 		if text.to_lower().contains("omnispec"):
 			return "%s must not name OmniSpec." % key
-		if text.ends_with(" Warmly, Dispatch.") == (str(key) == "warmly_dispatch_offer"):
+		# Her daily ask's lines (tests/test_quests_d2.gd) are not these notes.
+		if str(key).begins_with("warmly_dispatch_") and text.ends_with(" Warmly, Dispatch.") == (str(key) == "warmly_dispatch_offer"):
 			return "%s: the closing notes end ' Warmly, Dispatch.' and the offer does not." % key
 		# The warning can come from a fault the bench has no part in.
 		if text.to_lower().contains("overnight") or text.to_lower().contains("ran your bench"):
