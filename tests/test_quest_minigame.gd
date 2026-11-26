@@ -149,7 +149,7 @@ func _check_old_farm(commands: Node) -> String:
 	late.free()
 	if not same:
 		return "A guest takes a snapshot with a kept score, and the game is no longer due there: %s %s" % [join_problem, late_entry]
-	if SessionScript.PROTOCOL != 19:
+	if SessionScript.PROTOCOL != 20:
 		return "An entry may now have `scores`, which a build before refuses: the protocol is 18."
 	var stale: Variant = commands.execute(HOST, BENCH, [PROBE, 100])
 	if not stale is Dictionary or int(stale.get(MinigameScore.RECORD_KEY, 0)) != MinigameScore.SKIPPED or entry[QuestEngine.SCORES] != { "cal": 97 }:

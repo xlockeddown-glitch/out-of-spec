@@ -654,3 +654,31 @@ func test_a_pose_from_before_the_rover_was_moved_is_dropped() -> String:
 	elif not fresh:
 		problem = "A pose with the current epoch was refused."
 	return _finish(problem)
+
+
+## Round three, problem 2: the host's own rover poses carry the epoch too, and a guest
+## drops one from before the rover was moved.
+func test_a_guest_drops_a_host_pose_from_before_the_rover_was_moved() -> String:
+	var host: Node = _host()
+	var guest: Node = _guest(host)
+	var theirs: Node = RoversScript.new()
+	theirs.start(guest, guest.commands.state)
+	var state: Node = guest.commands.state
+	var id: String = GameState.TUNNEL_ROVER
+	state.rover_zone = ZoneDepth.ZONE
+	state.rover_depth = ZoneDepth.DEPTH
+	state.rover_epoch = 5
+	var parked: Vector3 = ZoneDepth.start_transform().origin
+	state.rover_transforms[id] = Transform3D(Basis.IDENTITY, parked)
+	var stale := Vector3(parked.x + 3.0, 0.0, parked.z)
+	theirs._on_told(id, "", [stale.x, 0.0, stale.z, 0.0, 0.0, true, 4], 1000)
+	var kept: bool = theirs.place(id).origin.is_equal_approx(parked)
+	theirs._on_told(id, "", [stale.x, 0.0, stale.z, 0.0, 0.0, true, 5], 2000)
+	var took: bool = theirs.place(id).origin.is_equal_approx(stale)
+	theirs.free()
+	var problem: String = ""
+	if not kept:
+		problem = "A host pose from an older epoch refilled the guest's cache."
+	elif not took:
+		problem = "A host pose with the current epoch was dropped."
+	return _finish(problem)

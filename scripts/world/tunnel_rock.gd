@@ -134,12 +134,40 @@ static func holds_in(map: PackedStringArray, place: Vector3) -> bool:
 const ROVER_HALF_M := Vector2(0.9, 1.5)
 
 
-## True if the rover's body, not only its middle, is on floor on a given map: its
-## middle and the four corners of its footprint.
+## True if the rover's body is on floor on a given map: every cell that the rotated
+## footprint rectangle overlaps (not a few sample points, which can step over a corner
+## of rock), judged as holds_in judges a cell's middle.
 static func holds_body_in(map: PackedStringArray, at: Transform3D) -> bool:
-	for corner: Vector2 in [Vector2.ZERO, ROVER_HALF_M, -ROVER_HALF_M, Vector2(ROVER_HALF_M.x, -ROVER_HALF_M.y), Vector2(-ROVER_HALF_M.x, ROVER_HALF_M.y)]:
-		var p: Vector3 = at.origin + at.basis * Vector3(corner.x, 0.0, corner.y)
-		if not holds_in(map, Vector3(p.x, at.origin.y, p.z)):
+	var centre := Vector2(at.origin.x, at.origin.z)
+	var u := Vector2(at.basis.x.x, at.basis.x.z).normalized()
+	var v := Vector2(at.basis.z.x, at.basis.z.z).normalized()
+	if u == Vector2.ZERO or v == Vector2.ZERO:
+		u = Vector2.RIGHT
+		v = Vector2.DOWN
+	var reach: float = ROVER_HALF_M.length() + CELL_M
+	var half: float = CELL_M * 0.5
+	var width: int = map[0].length()
+	var depth: int = map.size()
+	var first := Vector2i(roundi((centre.x - reach) / CELL_M + (width - 1) * 0.5), roundi((centre.y - reach) / CELL_M + (depth - 1) * 0.5))
+	var last := Vector2i(roundi((centre.x + reach) / CELL_M + (width - 1) * 0.5), roundi((centre.y + reach) / CELL_M + (depth - 1) * 0.5))
+	for cy: int in range(first.y, last.y + 1):
+		for cx: int in range(first.x, last.x + 1):
+			var middle := Vector2((cx - (width - 1) * 0.5) * CELL_M, (cy - (depth - 1) * 0.5) * CELL_M)
+			if not _footprint_overlaps(centre, u, v, middle, half):
+				continue
+			if not holds_in(map, Vector3(middle.x, at.origin.y, middle.y)):
+				return false
+	return true
+
+
+## Separating-axis test: the footprint (centre, axes u and v, ROVER_HALF_M) against a
+## square cell (middle, half side). Touching by a hair is not overlap.
+static func _footprint_overlaps(centre: Vector2, u: Vector2, v: Vector2, middle: Vector2, half: float) -> bool:
+	var d: Vector2 = centre - middle
+	for axis: Vector2 in [Vector2.RIGHT, Vector2.DOWN, u, v]:
+		var rover_r: float = absf(u.dot(axis)) * ROVER_HALF_M.x + absf(v.dot(axis)) * ROVER_HALF_M.y
+		var cell_r: float = (absf(axis.x) + absf(axis.y)) * half
+		if absf(d.dot(axis)) >= rover_r + cell_r - 0.001:
 			return false
 	return true
 

@@ -872,3 +872,64 @@ func test_only_the_canonical_find_ids_pass_a_save() -> String:
 		if allowed[i] != "":
 			return "Find %d was refused: %s" % [i, allowed[i]]
 	return ""
+
+
+# --- Round three of the review ----------------------------------------------------
+
+func test_the_footprint_check_sees_rock_between_its_corners() -> String:
+	# GPT's case: seed 424242, the rover at (-11.4, 0.05, -2.4) turned 45 degrees, with
+	# its middle and four corners on floor but rock under its side on some day's layout.
+	# Over many days and turns: wherever a dense sweep of the body finds rock the check
+	# must say so, and there must be cases where the five old points all miss it.
+	var half: Vector2 = TunnelRock.ROVER_HALF_M
+	var corners: Array[Vector2] = [Vector2.ZERO, half, -half, Vector2(half.x, -half.y), Vector2(-half.x, half.y)]
+	var gaps: int = 0
+	var missed: int = 0
+	for day: int in range(1, 61):
+		var grid: PackedStringArray = ZoneDepth.grid_for(1, SEED, day)
+		for degrees: int in [0, 15, 30, 45, 60, 75, 90]:
+			var at := Transform3D(Basis(Vector3.UP, deg_to_rad(float(degrees))), Vector3(-11.4, 0.05, -2.4))
+			var five: bool = true
+			for corner: Vector2 in corners:
+				five = five and TunnelRock.holds_in(grid, at.origin + at.basis * Vector3(corner.x, 0.0, corner.y))
+			var dense: bool = true
+			for i: int in range(-9, 10):
+				for j: int in range(-15, 16):
+					var local := Vector3(i * 0.1, 0.0, j * 0.1)
+					dense = dense and TunnelRock.holds_in(grid, at.origin + at.basis * local)
+			var held: bool = TunnelRock.holds_body_in(grid, at)
+			if five and not dense:
+				gaps += 1
+			if held and not dense:
+				missed += 1
+			if dense and not held and not five:
+				return "Day %d, %d degrees: the check saw rock the sweep did not." % [day, degrees]
+	if gaps == 0:
+		return "No day and turn shows the gap between the five old points (the test needs one)."
+	return "" if missed == 0 else "%d rovers with rock under them were called on floor." % missed
+
+
+func test_a_save_made_below_keeps_the_depth_through_continue() -> String:
+	var held: Dictionary = SaveGame.snapshot()
+	var held_open: bool = SaveGame.farm_open
+	var path: String = "user://test_zone_depth_continue.save"
+	GameState.rover_zone = ZoneDepth.ZONE
+	GameState.rover_depth = 1
+	GameState.rover_transforms[GameState.TUNNEL_ROVER] = ZoneDepth.start_transform()
+	var problem: String = ""
+	# The player is in the tunnels, on the farm, or in the dome when it is saved.
+	for scene: String in [SceneSwitcher.TUNNELS_SCENE, SceneSwitcher.FARM_SCENE, SceneSwitcher.DOME_SCENE]:
+		GameState.rover_zone = ZoneDepth.ZONE
+		GameState.rover_depth = 1
+		var data: Dictionary = SaveGame.snapshot()
+		data["scene"] = scene
+		SaveGame._write_data(data, path)
+		GameState.rover_zone = ""  # a farm already running somewhere else
+		if SaveGame.continue_farm(path) != "":
+			problem = "%s: the save was refused" % scene
+		elif GameState.rover_depth != 1 or GameState.rover_zone != ZoneDepth.ZONE:
+			problem = "%s: Continue left the rover at %s depth %d" % [scene, GameState.rover_zone, GameState.rover_depth]
+	DirAccess.remove_absolute(path)
+	SaveGame.restore(held)
+	SaveGame.farm_open = held_open
+	return problem

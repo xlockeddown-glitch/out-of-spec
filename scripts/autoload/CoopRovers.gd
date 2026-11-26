@@ -4,7 +4,7 @@ extends Node
 ## The host says who drives, checks where they say it is, counts the distance and
 ## tells everyone. Alone nothing here does anything. Autoloaded as `CoopRovers`.
 ##
-## A pose is [x, y, z, yaw, speed in m/s, whether it sees the relay], and from a guest
+## A pose is [x, y, z, yaw, speed in m/s, whether it sees the relay], and from either side
 ## one more number: the rover epoch (GameState.rover_epoch) it has been told.
 
 ## A driver is done this long after the rover stops, or is last heard from
@@ -179,7 +179,7 @@ func tick(now: int) -> void:
 			_sent_at.erase(rover_id)
 		if _is_due(rover_id, now, STILL_MS if who == "" else MOVING_MS):
 			_said_driver[rover_id] = who
-			session.tell_rover(rover_id, who, _poses[rover_id][0])
+			session.tell_rover(rover_id, who, _poses[rover_id][0] + [farm.rover_epoch])
 
 
 ## Host: a guest says where the rover it drives is.
@@ -236,6 +236,12 @@ func _refuse(player_id: String, rover_id: String, what: String, now: int) -> voi
 func _on_told(rover_id: String, driver_id: String, pose: Array, now: int = Time.get_ticks_msec()) -> void:
 	if not farm.rover_transforms.has(rover_id) or farm.rover_is_away(rover_id):
 		return
+	# A pose the host sent before it moved the rover (a late hub pose after the descent)
+	# is old news: it must not refill the cache and beat the new parking spot.
+	if pose.size() == 7 and rover_id == farm.TUNNEL_ROVER and pose[6] < farm.rover_epoch:
+		return
+	if pose.size() == 7:
+		pose = pose.slice(0, 6)
 	_told_driver[rover_id] = driver_id
 	var own: String = farm.local_player_id
 	if _drivers.has(rover_id) and driver_id != own and (driver_id != "" or now - _claimed_at.get(rover_id, 0) > CLAIM_MS):
