@@ -544,7 +544,9 @@ func test_the_shipped_mini_game_steps_can_be_played() -> String:
 			found.append("%s/%s" % [quest["id"], step["id"]])
 			var unit: String = QuestEngine.step_instrument(step)
 			var line: String = str(step.get(QuestEngine.MINIGAME_LINE, ""))
-			if not str(step["minigame"]) in QuestEngine.MINIGAMES or gs.get_sensor(unit) == null:
+			# Wring the Blocks is for no instrument: its step counts built stacks.
+			var stack: bool = step["minigame"] == MinigameScore.WRING_THE_BLOCKS and QuestEngine.is_stack_step(step)
+			if not str(step["minigame"]) in QuestEngine.MINIGAMES or (gs.get_sensor(unit) == null and not stack):
 				problem = "%s has a mini-game step for no game or no instrument of the farm's." % quest["id"]
 			elif line.contains("/") and QuestEngine.phone_line(line) == line:
 				problem = "%s's mini-game line is a path with no text at it." % quest["id"]

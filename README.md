@@ -74,6 +74,7 @@ Open `project.godot` in Godot 4.7 and press F5. The farm saves each morning and 
 | B / N | Build or take up a stone piece in front of the stopped rover / next piece kind |
 | V | Ore survey from the stopped rover: bearing to the nearest ore pocket |
 | Q | Check the stopped rover's steering encoder (or the dish, at the relay) against a block |
+| J | Wring a stack of gauge blocks to a named length from the stopped rover (Wring the Blocks; needs two blocks; Esc skips) |
 | F | Get out of the stopped rover on the farm and walk (WASD), or get back in from 6 m |
 | R or ZERO STEERING button | Re-zero steering drift remotely |
 | E | At a pad, bay, tunnel mouth or the catch cup: use it (field cal pad, enter or leave the tunnels, trade 6 crystal ore for wide treads, open the catch cup by the Sentinel) |
