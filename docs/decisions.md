@@ -1991,3 +1991,10 @@ Ryan's idea: stage areas almost level specific. Underground for lab levels about
 - **Synced the smallest way.** The table rides in the clock the host already sends every 300 ms and with the farm (like `in_bed`), not in the farm dict, so it needs no saved variable. A guest validates the shape and keeps the host's copy; an older clock without `places` leaves it empty.
 - **The phone shows it.** The F7 co-op page, the one page that lists the players, adds the place to each player's line in its own capitals and style, for example "PLAYER 2  LAVA TUBES" (zone name from `data/zones.json`; "FARM", "DOME"; ", depth N" below the hub). No restyle, no new colours, fonts or frames.
 - **Not done (next PRs).** The recall still rescues host and solo only; presence now lets the host see a guest left in the tunnels at 02:00, so rescuing one is possible. Field rovers per zone, depths and fast travel are also next.
+
+### 2026-11-26: Zones step 4, review fixes
+
+- **Stale places.** Hosting starting, a session closing and a guest leaving now clear every place but this screen's own player's (`GameState.clear_other_places`), so a rejoining guest does not show an old place.
+- **Reports have their own lane.** `report_place` has its own wait flag in `FarmCommands`, so it never blocks a gameplay command and one never blocks it. The guest keeps one sender and sends only the newest place (`ZonePresence.next_to_send`), until the host has answered it, so an older trip cannot land after a newer one. A report the host did not answer is retried (5 times, 0.3 s [PLACEHOLDER]); nothing is left unsent once answered. The host runs `report_place` without the quest look.
+- **Playable zones only.** The rover zone and presence accept a zone only if it has an existing hub scene (`ZoneData.is_playable`; today only `lava_tubes`), derived from data/zones.json.
+- **One validator.** `ZonePresence.place_problem` is the one rule for the host's command and a guest's check of the clock: farm and dome have depth 0, a zone must be playable, and `MAX_DEPTH` is now 0 [PLACEHOLDER], raised by the PR that adds depths.

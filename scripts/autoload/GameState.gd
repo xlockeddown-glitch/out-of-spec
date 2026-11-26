@@ -729,8 +729,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 	if not liters is float or liters < 0.0 or liters > CISTERN_CAPACITY_L:
 		return "'cistern_liters' is out of range."
 	var zone: Variant = data.get("rover_zone", "")
-	if zone is String and zone != "" and not ZoneData.has_zone(StringName(zone)):
-		return "'rover_zone' is not a zone."
+	if zone is String and zone != "" and not ZoneData.is_playable(StringName(zone)):
+		return "'rover_zone' is not a zone with a scene."
 	# Saves before zones say it as a yes or no.
 	if not data.get("rover_in_tunnels", false) is bool:
 		return "'rover_in_tunnels' is not a yes or no."
@@ -4057,6 +4057,14 @@ func players_in(place: String, among: Array[String]) -> Array[String]:
 ## Host: a player left, or dropped.
 func forget_place(player_id: String) -> void:
 	player_places.erase(player_id)
+
+
+## A session starting or ending: only this screen's own player is known.
+func clear_other_places() -> void:
+	var mine: Variant = player_places.get(local_player_id)
+	player_places.clear()
+	if mine != null:
+		player_places[local_player_id] = mine
 
 
 ## The id the rover goes by where it is now.

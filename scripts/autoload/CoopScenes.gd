@@ -9,8 +9,8 @@ var _note: String = ""
 var _leaving: bool = false
 
 
-## A guest's report of its place is tried this many times while an earlier
-## command is still waiting for its answer [PLACEHOLDER].
+## A guest's report of its place is tried again this many times when the host
+## gave no answer, 0.3 s apart [PLACEHOLDER].
 const REPORT_TRIES: int = 5
 const REPORT_WAIT_S: float = 0.3
 

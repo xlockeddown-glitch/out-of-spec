@@ -39,6 +39,9 @@ var remote: Callable
 var state: Node
 
 var _waiting: bool = false
+## The automatic place report has a wait flag of its own, so it never blocks a
+## gameplay command and a gameplay command never blocks it.
+var _waiting_place: bool = false
 
 
 ## Does `action` for the player at this screen and returns GameState's own answer,
@@ -51,11 +54,18 @@ func request(action: StringName, arguments: Array = []) -> Variant:
 	if not remote.is_valid():
 		return refusal(action, "Not connected to the host.")
 	# A second press before the answer must not act twice.
-	if _waiting:
+	var presence: bool = action == &"report_place"
+	if _waiting_place if presence else _waiting:
 		return refusal(action, "Still waiting for the host.")
-	_waiting = true
+	if presence:
+		_waiting_place = true
+	else:
+		_waiting = true
 	var answer: Variant = await remote.call(action, arguments)
-	_waiting = false
+	if presence:
+		_waiting_place = false
+	else:
+		_waiting = false
 	if typeof(answer) != _method(action)["return"]["type"]:
 		return refusal(action, "The host gave no answer.")
 	return answer
@@ -114,6 +124,9 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	if bench:
 		MinigameScore.arm(_farm(), str(passed[0]), score)
 	var result: Variant = _farm().callv(action, passed)
+	if action == &"report_place":
+		# Only where someone is: nothing for the quests to look at.
+		return result
 	if bench:
 		# A refusal zeroes nothing, so the factor is taken back here.
 		MinigameScore.disarm(_farm(), str(passed[0]))

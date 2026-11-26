@@ -85,6 +85,13 @@ static func zones_for_level(level: int) -> Array[StringName]:
 	return out
 
 
+## True if `id` is a zone a player can be in today: it has a hub scene that
+## exists. The rover and presence rules take only these.
+static func is_playable(id: StringName) -> bool:
+	var path: String = hub_scene(id) if has_zone(id) else ""
+	return path != "" and ResourceLoader.exists(path)
+
+
 ## The hub scene path of `id`, or "" while it has none.
 static func hub_scene(id: StringName) -> String:
 	return str(zone(id).get("hub_scene", ""))

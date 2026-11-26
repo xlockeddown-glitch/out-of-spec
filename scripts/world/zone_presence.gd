@@ -7,16 +7,30 @@ extends RefCounted
 
 const FARM: String = "farm"
 const DOME: String = "dome"
-## The deepest a report may say [PLACEHOLDER]. Only depth 0 exists today.
-const MAX_DEPTH: int = 12
+## The deepest a report may say [PLACEHOLDER]. Only depth 0 exists today; a
+## later depth PR raises this.
+const MAX_DEPTH: int = 0
 ## The place of someone the host has not heard from: everyone starts on the farm.
 const DEFAULT_PLACE: String = FARM
 const NOT_YOURS: String = "A place is reported by the player who is there."
 
 
-## True if `place` is the farm, the dome or a zone in data/zones.json.
+## True if `place` is the farm, the dome or a zone a player can be in (one with a
+## scene, ZoneData.is_playable).
 static func is_place(place: String) -> bool:
-	return place == FARM or place == DOME or (place != "" and ZoneData.has_zone(StringName(place)))
+	return place == FARM or place == DOME or (place != "" and ZoneData.is_playable(StringName(place)))
+
+
+## Why [place, depth] cannot be: the one rule for the host's command and for a
+## guest checking the host's table. "" if it can.
+static func place_problem(place: String, depth: int) -> String:
+	if not is_place(place):
+		return "'%s' is not a place." % place
+	if depth < 0 or depth > MAX_DEPTH:
+		return "Depth %d is out of range." % depth
+	if depth > 0 and (place == FARM or place == DOME):
+		return "The %s has no depth." % place
+	return ""
 
 
 ## Why this report can't be taken, or "". `about` is whose place it says,
@@ -27,13 +41,7 @@ static func problem(place: String, depth: int, about: String, sender: String, pl
 		return "That player is not on this farm."
 	if about != sender:
 		return NOT_YOURS
-	if not is_place(place):
-		return "'%s' is not a place." % place
-	if depth < 0 or depth > MAX_DEPTH:
-		return "Depth %d is out of range." % depth
-	if depth > 0 and (place == FARM or place == DOME):
-		return "The %s has no depth." % place
-	return ""
+	return place_problem(place, depth)
 
 
 ## [place, depth] for a scene, or an empty array for a scene that is no place
@@ -49,18 +57,53 @@ static func for_scene(path: String) -> Array:
 	return []
 
 
+## What to send next: `latest` if it is not what the host last acknowledged, else
+## nothing. Only the newest place is ever sent, so an older trip can never land
+## after a newer one.
+static func next_to_send(acknowledged: Array, latest: Array) -> Array:
+	return latest if latest != acknowledged else []
+
+
+static var _latest: Array = []
+static var _acknowledged: Array = []
+static var _sending: bool = false
+
+
+## Forgets what was said (tests).
+static func reset_reports() -> void:
+	_latest = []
+	_acknowledged = []
+	_sending = false
+
+
 ## Says where this screen's player is, as the scene `path` gives it (nothing for a
-## menu). Alone or as the host it is set at once; a guest asks the host, trying
-## again while an earlier command of its own is still unanswered.
+## menu). Alone or as the host it is set at once; a guest asks the host. One
+## sender runs at a time on its own wait flag (never the gameplay command's), and
+## it keeps going until the newest place is acknowledged; a swap while it waits
+## only replaces what it will send next. `tries` and `wait_s` bound the retries
+## of one place the host did not answer.
 static func report_scene(path: String, tree: SceneTree, tries: int, wait_s: float) -> void:
 	var at: Array = for_scene(path)
 	if at.is_empty():
 		return
-	for _try: int in tries:
-		var answer: Variant = await FarmCommands.request(&"report_place", at)
-		if answer != "Still waiting for the host.":
-			return
-		await tree.create_timer(wait_s).timeout
+	_latest = at
+	if _sending:
+		return
+	_sending = true
+	var failed: int = 0
+	while true:
+		var now: Array = next_to_send(_acknowledged, _latest)
+		if now.is_empty():
+			break
+		var answer: Variant = await FarmCommands.request(&"report_place", now)
+		if answer == "The host gave no answer." and failed < tries:
+			failed += 1
+			await tree.create_timer(wait_s).timeout
+			continue
+		# Answered, refused for good, or out of tries for this place.
+		failed = 0
+		_acknowledged = now
+	_sending = false
 
 
 ## A table of places the host sent, or "": a dictionary of player -> [place, depth].
@@ -72,7 +115,7 @@ static func table_problem(table: Variant) -> String:
 		var entry: Variant = table[player]
 		if not player is String or not entry is Array or (entry as Array).size() != 2 \
 				or not entry[0] is String or not entry[1] is int \
-				or not is_place(entry[0]) or entry[1] < 0 or entry[1] > MAX_DEPTH:
+				or place_problem(entry[0], entry[1]) != "":
 			return "has an entry that is not a place"
 	return ""
 

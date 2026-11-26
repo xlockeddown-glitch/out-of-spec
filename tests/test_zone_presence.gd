@@ -5,6 +5,9 @@ extends RefCounted
 
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 const ScenesScript: GDScript = preload("res://scripts/autoload/CoopScenes.gd")
+const CommandsScript: GDScript = preload("res://scripts/autoload/FarmCommands.gd")
+
+signal _answered(answer: Variant)
 
 
 class _Session:
@@ -76,7 +79,10 @@ func test_an_unknown_zone_is_refused() -> String:
 	problems.append(gs.farm_dict_problem(data))
 	data["rover_zone"] = 3
 	problems.append(gs.farm_dict_problem(data))
+	# A zone with no scene yet is not somewhere the rover can be.
 	data["rover_zone"] = "flooded_aquifer"
+	problems.append(gs.farm_dict_problem(data))
+	data["rover_zone"] = "lava_tubes"
 	var known: String = gs.farm_dict_problem(data)
 	data["rover_zone"] = ""
 	data["rover_in_tunnels"] = "yes"
@@ -101,6 +107,9 @@ func test_the_validator_judges_a_report() -> String:
 		["lava_tubes", -1, "player_2", "player_2", false],
 		["lava_tubes", ZonePresence.MAX_DEPTH + 1, "player_2", "player_2", false],
 		["farm", 1, "player_2", "player_2", false],
+		["lava_tubes", 1, "player_2", "player_2", false],
+		["flooded_aquifer", 0, "player_2", "player_2", false],
+		["flooded_aquifer", 1, "player_2", "player_2", false],
 		["farm", 0, "player_1", "player_2", false],
 		["farm", 0, "player_9", "player_9", false],
 		["farm", 0, "", "", false],
@@ -176,6 +185,13 @@ func test_the_host_clock_carries_places_to_a_guest() -> String:
 	bad["places"] = { "player_2": ["atlantis", 0] }
 	var refused: String = FarmSync.follow_clock(bad, guest)
 	var kept: bool = guest.player_places == copy
+	# The same rule as the host's command: no depth on the farm, no scene-less zone.
+	var also_bad: Array[String] = []
+	for entry: Array in [["farm", 1], ["dome", 1], ["flooded_aquifer", 0], ["lava_tubes", 1]]:
+		bad["places"] = { "player_2": entry }
+		also_bad.append(FarmSync.follow_clock(bad, guest))
+	if "" in also_bad:
+		kept = false
 	FarmCommands.guest = false
 	GameClock.elapsed_days = elapsed
 	GameClock.seconds_per_day = speed
@@ -202,3 +218,100 @@ func test_the_page_says_where_each_player_is() -> String:
 	if ZonePresence.label("lava_tubes", 2) != "Lava Tubes, depth 2" or ZonePresence.label("dome") != "Dome":
 		return "Labels were '%s' and '%s'" % [ZonePresence.label("lava_tubes", 2), ZonePresence.label("dome")]
 	return ""
+
+
+# --- Review fixes --------------------------------------------------------------
+
+func test_the_clock_and_the_command_share_one_rule() -> String:
+	for entry: Array in [["farm", 1], ["dome", 1], ["flooded_aquifer", 0], ["flooded_aquifer", 1], ["lava_tubes", 1], ["lava_tubes", -1], ["nowhere", 0]]:
+		if ZonePresence.place_problem(entry[0], entry[1]) == "" or ZonePresence.table_problem({ "player_2": entry }) == "":
+			return "%s was accepted" % [entry]
+	for entry: Array in [["farm", 0], ["dome", 0], ["lava_tubes", 0]]:
+		if ZonePresence.place_problem(entry[0], entry[1]) != "" or ZonePresence.table_problem({ "player_2": entry }) != "":
+			return "%s was refused" % [entry]
+	return "" if ZoneData.is_playable(&"lava_tubes") and not ZoneData.is_playable(&"flooded_aquifer") else "Playable zones are wrong."
+
+
+func test_only_the_newest_place_is_sent() -> String:
+	var farm: Array = ["farm", 0]
+	var dome: Array = ["dome", 0]
+	# Farm told, then a quick trip to the dome and back: nothing is left to send.
+	if not ZonePresence.next_to_send(farm, farm).is_empty():
+		return "Sent what the host already has"
+	# Told the farm, the player is now in the dome: the dome, never an older place.
+	if ZonePresence.next_to_send(farm, dome) != dome:
+		return "Did not send the newest place"
+	# Nothing told yet, the newest is the farm after dome and back.
+	var latest: Array = dome
+	latest = farm
+	return "" if ZonePresence.next_to_send([], latest) == farm else "An older place would be sent"
+
+
+func test_a_quick_trip_ends_with_the_last_place_told() -> String:
+	ZonePresence.reset_reports()
+	var me: String = GameState.local_player_id
+	var before: Variant = GameState.player_places.get(me)
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	# Alone, each report is answered at once; the last scene must be the last said.
+	ZonePresence.report_scene(SceneSwitcher.FARM_SCENE, tree, 1, 0.0)
+	ZonePresence.report_scene(SceneSwitcher.DOME_SCENE, tree, 1, 0.0)
+	ZonePresence.report_scene(SceneSwitcher.FARM_SCENE, tree, 1, 0.0)
+	var told: String = GameState.place_of(me)
+	ZonePresence.reset_reports()
+	if before == null:
+		GameState.player_places.erase(me)
+	else:
+		GameState.player_places[me] = before
+	return "" if told == "farm" else "The last place told was %s" % told
+
+
+func test_a_place_report_does_not_use_the_command_slot() -> String:
+	var commands: Node = CommandsScript.new()
+	commands.state = _state()
+	commands.guest = true
+	var got: Array = []
+	var ask: Callable = func(action: StringName, _arguments: Array) -> Variant:
+		return await _answered
+	commands.remote = ask
+	var place: Callable = func() -> void: got.append(await commands.request(&"report_place", ["farm", 0]))
+	var bed: Callable = func() -> void: got.append(await commands.request(&"go_to_bed"))
+	place.call()
+	# The report is out and unanswered: a real command must not be refused for it.
+	bed.call()
+	var bed_refused: bool = not got.is_empty()
+	place.call()
+	var twice_refused: bool = got.size() == 1 and str(got[0]) == "Still waiting for the host."
+	_answered.emit("")
+	_answered.emit(false)
+	commands.state.free()
+	commands.free()
+	return "" if not bed_refused and twice_refused else "bed_refused %s, second report refused %s, got %s" % [bed_refused, twice_refused, got]
+
+
+func test_a_session_ending_forgets_other_places() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = gs.local_player_id
+	gs.player_places[me] = ["dome", 0]
+	gs.player_places["player_2"] = ["lava_tubes", 0]
+	gs.clear_other_places()
+	var kept: bool = gs.player_places == { me: ["dome", 0] }
+	# The real session close does it through the commands' farm.
+	gs.player_places["player_2"] = ["lava_tubes", 0]
+	var old: Node = FarmCommands.state
+	FarmCommands.state = gs
+	CoopSession.leave()
+	FarmCommands.state = old
+	var closed: bool = gs.player_places == { me: ["dome", 0] }
+	gs.free()
+	return "" if kept and closed else "kept %s, closed %s" % [kept, closed]
+
+
+func test_the_host_runs_a_place_report_without_the_quest_look() -> String:
+	var gs: GameStateScript = _state()
+	var commands: Node = CommandsScript.new()
+	commands.state = gs
+	var answer: Variant = commands.execute(gs.local_player_id, &"report_place", ["lava_tubes", 0])
+	var where: String = gs.place_of(gs.local_player_id)
+	commands.free()
+	gs.free()
+	return "" if answer == "" and where == "lava_tubes" else "Answer '%s', place %s" % [answer, where]
