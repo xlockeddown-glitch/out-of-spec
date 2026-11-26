@@ -15,13 +15,18 @@ const CAREFUL_UNLOCK: String = "careful_bench"
 const SKILL: String = "calibration"
 ## GameState.MANAGER_ID: the grace-night calibrations are not a player's.
 const MANAGER: String = "Manager"
+## This game's id, as a quest step's `minigame` names it (data/quests.json).
+const SET_THE_ZERO: String = "set_the_zero"
 
 ## Section 7.2, best first: at `from` and over, the as-left residual is times
 ## `residual`. Under the last row a try is Standard, the same as a skip.
+## `quest_bonus` is the quest grade's "bonus": that share of the quest's credits
+## more [ASSUMPTION: the design gives no size; these are its paid-job bonus,
+## 10 % and 20 %]. `giver_line`: the giver has a line for it.
 const GRADES: Array[Dictionary] = [
-	{ "from": 95, "name": "Reference", "residual": 0.4 },
-	{ "from": 80, "name": "Fine", "residual": 0.6 },
-	{ "from": 60, "name": "Good", "residual": 0.8 },
+	{ "from": 95, "name": "Reference", "residual": 0.4, "quest_bonus": 0.2, "giver_line": true },
+	{ "from": 80, "name": "Fine", "residual": 0.6, "quest_bonus": 0.1, "giver_line": false },
+	{ "from": 60, "name": "Good", "residual": 0.8, "quest_bonus": 0.0, "giver_line": false },
 ]
 const STANDARD_GRADE: String = "Standard"
 
@@ -32,6 +37,28 @@ static func residual_factor(score: int) -> float:
 		if score >= int(grade["from"]):
 			return float(grade["residual"])
 	return 1.0
+
+
+## True for a score that earned a grade over Standard. A skip and a poor try did not.
+static func is_graded(score: int) -> bool:
+	return score >= int(GRADES[-1]["from"])
+
+
+## The share of a quest's credits a mini-game step played to this score adds
+## (section 7.2, "Done, with a bonus"): 0.0 under Fine.
+static func quest_bonus(score: int) -> float:
+	for grade: Dictionary in GRADES:
+		if score >= int(grade["from"]):
+			return float(grade["quest_bonus"])
+	return 0.0
+
+
+## Whether the quest's giver has a line for this score (Reference).
+static func earns_line(score: int) -> bool:
+	for grade: Dictionary in GRADES:
+		if score >= int(grade["from"]):
+			return bool(grade["giver_line"])
+	return false
 
 
 static func grade_name(score: int) -> String:
@@ -82,11 +109,17 @@ static func may_count(farm: Node, instrument_id: String, player_id: String) -> b
 ## Whether the game opens for this player (never "") at the bench: a key moment
 ## of section 7.4. With the CAREFUL unlock and `careful`, the player's own
 ## switch, any bench calibration is one, a standard's too. Without, only a
-## unit's first calibration of its kind.
+## unit's first calibration of its kind, or a unit's calibration while an open
+## quest step carries this game for it (every try, until the step is done).
 static func is_due(farm: Node, instrument_id: String, player_id: String, careful: bool) -> bool:
 	var sensor: DriftingSensor = farm.get_sensor(instrument_id)
 	if sensor == null:
 		return false
+	# An open quest step that carries this game for the instrument is a key
+	# moment, on an old farm that has calibrated its kind before too. Not for a
+	# standard: its game still needs CAREFUL, as before.
+	if sensor.role != "standard" and QuestEngine.has_minigame_step(farm, SET_THE_ZERO, instrument_id, player_id):
+		return true
 	if careful and farm.has_skill_unlock(CAREFUL_UNLOCK, player_id):
 		return true
 	return sensor.role != "standard" and is_first_of_type(farm.cal_log, instrument_id)

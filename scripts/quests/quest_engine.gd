@@ -18,6 +18,9 @@ extends RefCounted
 ##               phone is told when it grows, and it never goes back
 ##   players     who was on the farm when any step was done (they took part)
 ##   done        the day it was finished and paid, or -1
+## and, only once a mini-game was played well for one of its steps:
+##   scores      step id -> the score the host counted for the calibration that
+##               did the step (60 to 100; a skip or a poor try keeps none)
 ##
 ## A quest of scope "player" is each player's own (section 5.4): its entry is in
 ## player_quest_state, by player id then quest id, and has one key more:
@@ -33,10 +36,16 @@ extends RefCounted
 ## started or opened), so an offer never lands on top of what a command said.
 ## Steps are ticked and a finished quest is paid on every look.
 ##
+## A step may carry "minigame" (section 7.4): while it is the open step of an
+## accepted quest, the bench opens that game for the step's instrument
+## (has_minigame_step, read by MinigameScore on the host and on a guest's copy).
+## The step is still done by its check alone, so a skip does it too. A score
+## that earned a grade is kept with the step (`scores`) and, when the quest is
+## paid, gives the bonus of section 7.2.
+##
 ## Not built yet: accept and turn-in by the player (the quest log, build step 7;
 ## until then an offered quest is accepted at once and paid when its last step
-## holds), mini-game steps (step 11: a step may carry "minigame", which nothing
-## reads yet) and item rewards (step 10).
+## holds) and item rewards (step 10).
 
 const TABLE: StringName = &"quests"
 const SECTION: String = "quests"
@@ -63,6 +72,14 @@ const XP_CERTIFICATE: String = "xp_certificate"
 ## A `counter` that is not a source of data/skills.json: what Lin has bought in
 ## spec, of the crop `where.crop_id` names or of every crop.
 const SOLD_IN_SPEC: String = "crops_sold_in_spec"
+## The mini-games a step may carry in `minigame`. Such a step is a `count` of
+## `cal_log` rows whose `where` names one instrument: the one the game is for.
+const MINIGAMES: Array[String] = ["set_the_zero"]
+## An entry's one key that is not always there: step id -> the score kept.
+const SCORES: String = "scores"
+## On a mini-game step: what the giver says when the quest is paid and the game
+## was played to the best grade. A path in dialogue_dispatches.json or the line.
+const MINIGAME_LINE: String = "minigame_line"
 
 
 static func quests() -> Array[Dictionary]:
@@ -72,7 +89,9 @@ static func quests() -> Array[Dictionary]:
 ## Moves on and pays the farm's quests, and offers new ones if `offers`.
 ## `present` is who is on the farm now. True if anything changed. Host only: the
 ## caller sees to that. A quest whose data is wrong (data_problem) is left alone.
-static func update(farm: Node, present: Array[String], offers: bool = true) -> bool:
+## `played` is a mini-game the command before this look was played with
+## (played_game), or nothing.
+static func update(farm: Node, present: Array[String], offers: bool = true, played: Dictionary = {}) -> bool:
 	var changed: bool = false
 	var all: Array[Dictionary] = []
 	for quest: Dictionary in quests():
@@ -84,14 +103,14 @@ static func update(farm: Node, present: Array[String], offers: bool = true) -> b
 		for quest: Dictionary in all:
 			var scope: String = str(quest.get("scope", SCOPE_FARM))
 			if scope == SCOPE_FARM:
-				if _update_one(farm, quest, farm.quest_state, present, offers, ""):
+				if _update_one(farm, quest, farm.quest_state, present, offers, "", played):
 					moved = true
 			elif scope == SCOPE_PLAYER:
 				for player: String in present:
 					# Kept only once it holds something.
 					var own: Dictionary = farm.player_quest_state.get(player, {})
 					var alone: Array[String] = [player]
-					if _update_one(farm, quest, own, alone, offers, player):
+					if _update_one(farm, quest, own, alone, offers, player, played):
 						farm.player_quest_state[player] = own
 						moved = true
 		if not moved:
@@ -102,7 +121,7 @@ static func update(farm: Node, present: Array[String], offers: bool = true) -> b
 
 ## One quest in `state`: the farm's quest_state, or one player's own entries
 ## (`owner` is then that player, and `present` that player alone).
-static func _update_one(farm: Node, quest: Dictionary, state: Dictionary, present: Array[String], offers: bool, owner: String) -> bool:
+static func _update_one(farm: Node, quest: Dictionary, state: Dictionary, present: Array[String], offers: bool, owner: String, played: Dictionary = {}) -> bool:
 	var id: String = str(quest["id"])
 	var is_new: bool = not state.has(id)
 	if is_new:
@@ -146,6 +165,7 @@ static func _update_one(farm: Node, quest: Dictionary, state: Dictionary, presen
 			moved = true
 		if have >= need:
 			done.append(step_id)
+			_keep_score(farm, entry, step, played, owner)
 			finished.append(str(step.get("text", "")))
 			for player: String in present:
 				if not player in entry["players"]:
@@ -229,9 +249,22 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 				given += 1
 	if given > 0:
 		farm.post_phone("XP CERTIFICATE: %s XP in a skill of your choice, for each player who took part. Open SKILLS (K) to spend it." % SP811.integer(certificate))
+	# Section 7.2: a mini-game step played to Fine or better adds to the quest's
+	# credits. A skip or a poor try kept no score, and is paid as written.
+	var score: int = quest_score(quest, entry)
+	var bonus: int = roundi(int(rewards.get("credits", 0)) * MinigameScore.quest_bonus(score))
+	if bonus > 0:
+		farm.add_credits(bonus)
+		farm.post_phone("QUEST BONUS: %s, played to %s. %s CR more." % [str(quest["title"]), MinigameScore.grade_name(score).to_upper(), SP811.integer(bonus)])
 	var line: String = phone_line(str(rewards.get("phone", "")))
 	if line != "":
 		farm.post_phone("%s: %s" % [giver_name(quest), line])
+	# The best grade also has a line from the giver, one for each such step.
+	if MinigameScore.earns_line(score):
+		for step: Variant in quest["steps"]:
+			var said: String = phone_line(str(step.get(MINIGAME_LINE, "")))
+			if step.has("minigame") and said != "":
+				farm.post_phone("%s: %s" % [giver_name(quest), said])
 
 
 ## "250 lab XP, 1 quest point": what the quest pays, for the phone.
@@ -291,6 +324,15 @@ static func data_problem(quest: Dictionary) -> String:
 		if not id is String or id == "" or id in ids:
 			return "a step has no id, or two steps have the same id."
 		ids.append(id)
+		if step.has(MINIGAME_LINE) and not step.has("minigame"):
+			return "step '%s' has a mini-game line and no mini-game." % id
+		if step.has("minigame"):
+			if not step["minigame"] is String or not step["minigame"] in MINIGAMES:
+				return "step '%s' has a mini-game this build does not have." % id
+			if step_instrument(step) == "":
+				return "step '%s' has a mini-game and is not a count of one instrument's cal_log rows." % id
+			if step.has(MINIGAME_LINE) and (not step[MINIGAME_LINE] is String or step[MINIGAME_LINE] == ""):
+				return "step '%s' has a mini-game line that is not text." % id
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:
 		if quest.has(key) and not quest[key] is Dictionary:
 			return "'%s' is not a dictionary." % key
@@ -519,6 +561,99 @@ static func _same(a: Variant, b: Variant) -> bool:
 	return typeof(a) == typeof(b) and a == b
 
 
+# --- Mini-game steps (section 7.4) ----------------------------------------------
+
+## The instrument a step's mini-game is for: the one its `count` of cal_log rows
+## names in `where`. "" for any other step.
+static func step_instrument(step: Dictionary) -> String:
+	var where: Variant = step.get("where")
+	if str(step.get("check", "")) != "count" or str(step.get("log", "")) != "cal_log" or not where is Dictionary:
+		return ""
+	var instrument: Variant = where.get("instrument_id", "")
+	return instrument if instrument is String else ""
+
+
+## True while an accepted quest that is not done has an open step carrying
+## `minigame` for this instrument: a key moment, however often the lab has
+## calibrated that kind before (a standard's own calibration is left to
+## MinigameScore). The farm's quests count for every player, and a
+## player's own quests for that player. It only reads quest_state and
+## player_quest_state, which a guest has as the host's copy, so it answers the
+## same on a guest. In a quest done in order only the first step not done is open.
+static func has_minigame_step(farm: Node, minigame: String, instrument_id: String, player_id: String) -> bool:
+	if instrument_id == "":
+		return false
+	for quest: Dictionary in quests():
+		if data_problem(quest) != "":
+			continue
+		var state: Dictionary = farm.quest_state
+		if str(quest.get("scope", SCOPE_FARM)) == SCOPE_PLAYER:
+			state = farm.player_quest_state.get(player_id, {})
+		var entry: Variant = state.get(str(quest["id"]))
+		if not entry is Dictionary or int(entry.get("done", -1)) >= 0:
+			continue
+		var in_order: bool = not bool(quest.get("any_order", false))
+		for step: Variant in quest["steps"]:
+			if str(step.get("id", "")) in entry.get("steps_done", []):
+				continue
+			if str(step.get("minigame", "")) == minigame and step_instrument(step) == instrument_id:
+				return true
+			if in_order:
+				break
+	return false
+
+
+## What FarmCommands tells the look after a command a mini-game was played with:
+## the game, the instrument, who played, and the score the host counted.
+static func played_game(minigame: String, instrument_id: String, player_id: String, score: int) -> Dictionary:
+	return { "minigame": minigame, "instrument_id": instrument_id, "player_id": player_id, "score": score }
+
+
+## A step was done in the look after `played`: its score is kept if the game was
+## this step's and it earned a grade. A skip, a poor try and a calibration with
+## no game keep nothing, so their entry is the same as it always was. A
+## player's own quest (`owner`) keeps only that player's score. The newest
+## cal_log row must be the scored calibration itself: the player's own by hand,
+## traceable, and a row the step counts, so a robot's or the manager's row that
+## did the step is never given a player's grade. One calibration grades one
+## quest: the first whose step it does (`played` is emptied once it is kept).
+static func _keep_score(farm: Node, entry: Dictionary, step: Dictionary, played: Dictionary, owner: String) -> void:
+	if played.is_empty() or str(step.get("minigame", "")) == "" or str(step.get("minigame", "")) != str(played.get("minigame", "")):
+		return
+	var player: String = str(played.get("player_id", ""))
+	if step_instrument(step) != str(played.get("instrument_id", "")) or (owner != "" and owner != player):
+		return
+	var score: int = mini(int(played.get("score", MinigameScore.SKIPPED)), MinigameScore.MAX_SCORE)
+	if not MinigameScore.is_graded(score):
+		return
+	var log: Array = farm.cal_log
+	var row: Variant = log[-1] if not log.is_empty() else null
+	if not row is Dictionary or not bool(row.get("traceable", false)) or str(row.get("performed_by", "")) != player or str(row.get("programmed_by", "")) != "":
+		return
+	var where: Dictionary = step["where"]
+	for key: Variant in where:
+		if not _same(row.get(key), where[key]):
+			return
+	var scores: Dictionary = entry.get_or_add(SCORES, {})
+	scores[str(step.get("id", ""))] = score
+	played.clear()
+
+
+## The quest's score for its grade (section 7.2): the lowest kept among its
+## mini-game steps, or MinigameScore.SKIPPED if any has none or it has no such step.
+static func quest_score(quest: Dictionary, entry: Dictionary) -> int:
+	var scores: Dictionary = entry.get(SCORES, {})
+	var lowest: int = MinigameScore.SKIPPED
+	for step: Variant in quest["steps"]:
+		if not step.has("minigame"):
+			continue
+		var id: String = str(step.get("id", ""))
+		if not scores.has(id):
+			return MinigameScore.SKIPPED
+		lowest = int(scores[id]) if lowest == MinigameScore.SKIPPED else mini(lowest, int(scores[id]))
+	return lowest
+
+
 # --- Saved state --------------------------------------------------------------
 
 ## "" or why a saved quest_state can't be loaded. A quest this build's data does
@@ -527,7 +662,8 @@ static func _same(a: Variant, b: Variant) -> bool:
 static func state_problem(state: Dictionary, keys: Array[String] = ENTRY_KEYS, name: String = "quest_state") -> String:
 	for id: Variant in state:
 		var entry: Variant = state[id]
-		if not id is String or id == "" or typeof(entry) != TYPE_DICTIONARY or entry.size() != keys.size() or not entry.has_all(keys):
+		# `scores` is there only once a mini-game step was played to a grade.
+		if not id is String or id == "" or typeof(entry) != TYPE_DICTIONARY or entry.size() != keys.size() + int(entry.has(SCORES)) or not entry.has_all(keys):
 			return "'%s' has an entry that is not a quest's." % name
 		if not entry["accepted"] is int or not entry["done"] is int or entry["accepted"] < 0 or entry["done"] < -1:
 			return "'%s' has a day that is not a day." % name
@@ -535,6 +671,12 @@ static func state_problem(state: Dictionary, keys: Array[String] = ENTRY_KEYS, n
 			return "'%s' has a list that is not of names." % name
 		if not _text_to_counts(entry["base"]) or not _text_to_counts(entry["shown"]) or not _text_to_counts(entry.get("carried", {})):
 			return "'%s' has a count that is not a whole number." % name
+		if entry.has(SCORES):
+			if not _text_to_counts(entry[SCORES]):
+				return "'%s' has a score that is not a mini-game's." % name
+			for score: Variant in (entry[SCORES] as Dictionary).values():
+				if not MinigameScore.is_graded(score) or score > MinigameScore.MAX_SCORE:
+					return "'%s' has a score that is not a mini-game's." % name
 	return ""
 
 
