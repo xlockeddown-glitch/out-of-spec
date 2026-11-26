@@ -56,7 +56,7 @@ func test_rocks_stand_clear_on_high_ground() -> String:
 	for rock: Vector2i in HillDressing.ROCKS:
 		var at := Vector2(rock)
 		var half: Vector2 = HillDressing.rock_half_m(rock)
-		if Terrain.height(at, _none) < 2.0:
+		if Terrain.height(at, _none) < HillDressing.ROCK_MIN_HEIGHT_M:
 			return "The rock at %s is not on high ground." % rock
 		# A rover passes between it and level ground or another rock.
 		for corner: Vector2 in _footprint(at, half + Vector2.ONE * ROVER_M * 2.0):
@@ -78,6 +78,35 @@ func test_rocks_stand_clear_on_high_ground() -> String:
 		if buried_m > 0.6:
 			return "The rock at %s is buried by %.2f m." % [rock, buried_m]
 	return ""
+
+
+## The 2 m rule is relaxed: a terrace row stands out at the plateau's edge.
+func test_a_terrace_row_reaches_the_plateau_edge_and_every_rock_is_on_the_map() -> String:
+	var at_edge: Array[Vector2i] = []
+	for rock: Vector2i in HillDressing.ROCKS:
+		var half: Vector2 = HillDressing.rock_half_m(rock)
+		var spare := Vector2(Terrain.HALF_M - absf(rock.x) - half.x, Terrain.HALF_M - absf(rock.y) - half.y)
+		if minf(spare.x, spare.y) < 0.0:
+			return "The rock at %s hangs off the map." % rock
+		if HillDressing.ROCK_TURNS.has(rock) and minf(spare.x, spare.y) <= 2.5:
+			at_edge.append(rock)
+	# The whole new row (three pieces, touching) stands within 2.5 m of the edge.
+	for rock: Vector2i in [Vector2i(77, 45), Vector2i(77, 47), Vector2i(77, 49)]:
+		if not rock in at_edge:
+			return "The piece at %s is not at the plateau edge." % rock
+	return ""
+
+
+## The steepest step between whole-meter neighbors before the 2 m rule was relaxed.
+const STEEPEST_BEFORE_M: float = 0.7618
+## The hills are no steeper (the steepest step between neighbors stays as it was).
+func test_hills_are_no_steeper_than_before() -> String:
+	var steepest: float = 0.0
+	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M):
+		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M):
+			var here: float = Terrain.height(Vector2(x, z), _none)
+			steepest = maxf(steepest, maxf(absf(Terrain.height(Vector2(x + 1, z), _none) - here), absf(Terrain.height(Vector2(x, z + 1), _none) - here)))
+	return "" if steepest <= STEEPEST_BEFORE_M + 0.0001 else "The steepest step is %.4f m per meter." % steepest
 
 
 ## From level ground every line to the relay's dish misses every rock.
