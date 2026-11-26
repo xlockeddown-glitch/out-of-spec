@@ -91,7 +91,7 @@ func test_the_host_seeps_on_its_clock_and_a_guest_does_not() -> String:
 	var unchanged: bool = gs.pit_seep == before
 	gs.free()
 	if not risen:
-		return "The host's seep did not rise and say so."
+		return "The host's seep did not rise."
 	return "" if unchanged else "A guest moved the ground water."
 
 
@@ -270,9 +270,12 @@ func test_a_pit_that_reaches_its_end_is_drawn_at_it_and_says_so() -> String:
 func test_water_is_never_drawn_above_where_it_ends() -> String:
 	var cap: float = _full()[FLAT]
 	for hair: int in range(1, 100):
-		var level: float = _level(_lowered(hair * 0.0001))
+		var seeped: Dictionary[Vector2i, float] = _lowered(hair * 0.0001)
+		var level: float = _level(seeped)
 		if level > cap:
 			return "Water shown at %f is above its end %f." % [level, cap]
+		if level > seeped[FLAT] + 0.00001:
+			return "Water shown at %f is above its seep %f." % [level, seeped[FLAT]]
 	return ""
 
 
@@ -281,10 +284,12 @@ func test_a_dig_far_from_every_pit_sends_no_seep_change() -> String:
 	gs._on_time_advanced(1000.0)
 	var told: Array[int] = [0]
 	gs.pit_seep_changed.connect(func() -> void: told[0] += 1)
-	gs.dig(Vector3i(20, 0, 20))
+	var problem: String = gs.dig(Vector3i(20, 0, 20))
 	gs._on_time_advanced(GameStateScript.SEEP_STEP_DAYS)
 	gs._on_time_advanced(1.0)
 	gs.free()
+	if problem != "":
+		return "The far dig was refused: " + problem
 	return "" if told[0] == 0 else "A far dig sent %d seep changes." % told[0]
 
 
@@ -330,3 +335,25 @@ func test_filling_the_floor_above_the_water_leaves_no_water_below_it() -> String
 			bad = "Water is drawn below the floor."
 	gs.free()
 	return problem if problem != "" else bad
+
+
+func test_host_steps_tell_the_screens_until_the_pit_is_full() -> String:
+	var gs: GameStateScript = _state()
+	var told: Array[int] = [0]
+	gs.pit_seep_changed.connect(func() -> void: told[0] += 1)
+	var cap: float = _full()[FLAT]
+	var steps: int = 0
+	while steps < 100000 and not is_equal_approx(gs.pit_seep.get(FLAT, -INF), cap):
+		gs._on_time_advanced(GameStateScript.SEEP_STEP_DAYS)
+		steps += 1
+	var reached: bool = is_equal_approx(gs.pit_seep.get(FLAT, -INF), cap)
+	var while_rising: int = told[0]
+	gs._on_time_advanced(GameStateScript.SEEP_STEP_DAYS)
+	gs._on_time_advanced(GameStateScript.SEEP_STEP_DAYS)
+	var after_full: int = told[0] - while_rising
+	gs.free()
+	if not reached:
+		return "The pit never reached its end in %d steps." % steps
+	if while_rising == 0:
+		return "The host's steps filled the pit without telling the screens."
+	return "" if after_full == 0 else "A full pit still sent %d changes." % after_full
