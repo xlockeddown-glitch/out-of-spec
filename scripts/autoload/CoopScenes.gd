@@ -9,11 +9,36 @@ var _note: String = ""
 var _leaving: bool = false
 
 
+## A guest's report of its place is tried again this many times when the host
+## gave no answer, 0.3 s apart [PLACEHOLDER].
+const REPORT_TRIES: int = 5
+const REPORT_WAIT_S: float = 0.3
+
+## Only tests set others.
+var session: Node
+var farm: Node
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	CoopSync.farm_ready.connect(func() -> void: SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE))
 	CoopSync.stopped.connect(func(text: String) -> void: _note = text)
 	CoopSession.lost.connect(_on_lost)
+	SceneSwitcher.scene_swapped.connect(report_scene)
+	start(CoopSession, GameState)
+
+
+func start(with_session: Node, with_farm: Node) -> void:
+	session = with_session
+	farm = with_farm
+	# The host forgets a player who leaves or drops (zones doc section 12.3).
+	session.player_left.connect(farm.forget_place)
+
+
+## This screen's player is in the place `path` is (nothing is said for a menu).
+## On the host it is set at once; a guest tells the host, which checks it.
+func report_scene(path: String) -> void:
+	await ZonePresence.report_scene(path, get_tree(), REPORT_TRIES, REPORT_WAIT_S)
 
 
 func _on_lost() -> void:

@@ -29,7 +29,7 @@ signal walked(player_id: String, pose: Array)
 signal walkers_told(poses: Dictionary)
 
 ## Raise it whenever two versions could disagree about the farm or the messages.
-const PROTOCOL: int = 16
+const PROTOCOL: int = 17
 const DEFAULT_PORT: int = 24711
 const MAX_PLAYERS: int = 4
 
@@ -128,6 +128,7 @@ func host(listen_port: int = DEFAULT_PORT, bind_ip: String = "*", transport: Str
 	_open(peer)
 	_hosting = true
 	players = [_local_id()]
+	_forget_places()
 	return ""
 
 
@@ -157,6 +158,7 @@ func leave() -> void:
 		_farm_commands().guest = false
 		_farm_commands()._farm().local_player_id = _own_id
 		_own_id = ""
+		_forget_places()
 
 
 ## Guest: ends the connection, as if the host had. `lost` follows.
@@ -571,6 +573,7 @@ func _close() -> void:
 	_links.clear()
 	_events.clear()
 	players.clear()
+	_forget_places()
 	if _own_id != "":
 		_farm_commands().remote = Callable()
 	for number: int in _asks.keys():
@@ -708,6 +711,16 @@ func note_refusal(player_id: String, what: String, now: int = Time.get_ticks_mse
 		return
 	_noted_at[player_id] = now
 	print("Co-op: %s: %s" % [player_id, what])
+
+
+## No one is known to be anywhere once a session starts or ends, but this
+## screen's own player.
+func _forget_places() -> void:
+	var farm: Node = _farm_commands()._farm()
+	if farm.has_method("clear_other_places"):
+		farm.clear_other_places()
+	# A new host has heard nothing from this screen yet.
+	ZonePresence.forget_acknowledged()
 
 
 func _farm_commands() -> Node:

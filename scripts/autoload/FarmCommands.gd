@@ -9,12 +9,13 @@ const ACTIONS: Array[StringName] = [
 	&"accept_job", &"add_robot_calibrate_card", &"add_robot_card", &"add_robot_collect_card",
 	&"adjust_setpoint", &"build_block_stack", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
 	&"calibrate_at_bench", &"catch_sentinel", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
-	&"harvest_crop", &"hit_boulder", &"mine_fissure", &"move_rover", &"place_stone", &"plant_crop", &"release_robot", &"remove_robot_card",
+	&"harvest_crop", &"hit_boulder", &"mine_fissure", &"move_rover", &"place_stone", &"plant_crop", &"release_robot", &"remove_robot_card", &"report_place",
 	&"sell_harvest_to_lin", &"send_to_oirm", &"service_wheels", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay", &"spend_xp_certificate",
 	&"start_lab_grow", &"survey_ore", &"till", &"zero_steering",
 ]
-## What a player in bed may do and stay in bed: going to bed, and paperwork.
-const NO_WAKE: Array[StringName] = [&"go_to_bed", &"spend_xp_certificate"]
+## What a player in bed may do and stay in bed: going to bed, paperwork, and
+## saying where they are.
+const NO_WAKE: Array[StringName] = [&"go_to_bed", &"report_place", &"spend_xp_certificate"]
 ## What is done at a cell of the farm's ground: the cell in front of the rover, or
 ## under it. The cell's middle is within this far of the rover [PLACEHOLDER]: the
 ## 2 m it digs ahead, half a cell's corner and what the host's word of the
@@ -38,6 +39,9 @@ var remote: Callable
 var state: Node
 
 var _waiting: bool = false
+## The automatic place report has a wait flag of its own, so it never blocks a
+## gameplay command and a gameplay command never blocks it.
+var _waiting_place: bool = false
 
 
 ## Does `action` for the player at this screen and returns GameState's own answer,
@@ -50,11 +54,18 @@ func request(action: StringName, arguments: Array = []) -> Variant:
 	if not remote.is_valid():
 		return refusal(action, "Not connected to the host.")
 	# A second press before the answer must not act twice.
-	if _waiting:
+	var presence: bool = action == &"report_place"
+	if _waiting_place if presence else _waiting:
 		return refusal(action, "Still waiting for the host.")
-	_waiting = true
+	if presence:
+		_waiting_place = true
+	else:
+		_waiting = true
 	var answer: Variant = await remote.call(action, arguments)
-	_waiting = false
+	if presence:
+		_waiting_place = false
+	else:
+		_waiting = false
 	if typeof(answer) != _method(action)["return"]["type"]:
 		return refusal(action, "The host gave no answer.")
 	return answer
@@ -113,6 +124,9 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	if bench:
 		MinigameScore.arm(_farm(), str(passed[0]), score)
 	var result: Variant = _farm().callv(action, passed)
+	if action == &"report_place":
+		# Only where someone is: nothing for the quests to look at.
+		return result
 	if bench:
 		# A refusal zeroes nothing, so the factor is taken back here.
 		MinigameScore.disarm(_farm(), str(passed[0]))

@@ -270,6 +270,7 @@ func test_older_saves_have_the_rover_on_the_farm() -> String:
 	later.build_registry()
 	if later.farm_from_dict(saved) != "" or not later.rover_in_tunnels:
 		problem = "The place must be saved"
+	saved.erase("rover_zone")
 	saved.erase("rover_in_tunnels")
 	if later.farm_from_dict(saved) != "" or later.rover_in_tunnels:
 		problem = "A save without one has it on the farm"

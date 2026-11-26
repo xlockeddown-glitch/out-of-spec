@@ -95,7 +95,7 @@ func open() -> void:
 
 
 func _refresh() -> void:
-	var who: String = players_text(CoopSession.players, GameState.local_player_id)
+	var who: String = players_text(CoopSession.players, GameState.local_player_id, GameState.player_places, true)
 	if FarmCommands.guest:
 		_action.text = "LEAVE THIS FARM"
 		_about.text = "You are on a friend's farm. It is saved on the host's PC, not on this one.\n\n" + who
@@ -165,8 +165,10 @@ static func strip_text(players: Array[String], own_id: String, hosting: bool, to
 	return "CO-OP  %d PLAYERS, YOU ARE %s%s  (F7)" % [players.size(), player_name(own_id), driving]
 
 
-## The host is first.
-static func players_text(players: Array[String], own_id: String) -> String:
+## The host is first. With `show_places`, each line also says where that player is
+## (`places`: player -> [place, depth], GameState.player_places), in the same
+## capitals; a player not in it is on the farm.
+static func players_text(players: Array[String], own_id: String, places: Dictionary = {}, show_places: bool = false) -> String:
 	var lines: PackedStringArray = []
 	for index: int in players.size():
 		var line: String = player_name(players[index])
@@ -174,6 +176,9 @@ static func players_text(players: Array[String], own_id: String) -> String:
 			line += "  HOST"
 		if players[index] == own_id:
 			line += "  YOU"
+		if show_places:
+			var at: Array = places.get(players[index], [ZonePresence.DEFAULT_PLACE, 0])
+			line += "  " + ZonePresence.label(str(at[0]), int(at[1])).to_upper()
 		lines.append(line)
 	return "\n".join(lines)
 

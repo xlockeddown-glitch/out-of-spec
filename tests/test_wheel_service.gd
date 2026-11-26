@@ -271,8 +271,8 @@ func test_the_meters_are_saved() -> String:
 
 
 func test_no_save_version_or_message_changed() -> String:
-	if SessionScript.PROTOCOL != 16:
-		return "The service rides the command path: the protocol is still 16."
+	if SessionScript.PROTOCOL != 17:
+		return "The service rides the command path: the protocol is still 17."
 	if SaveGame.VERSION != 1:
 		return "The meters are a later field: the save version is still 1."
 	if not "wheel_meters" in GameStateScript.SAVED_LATER:
