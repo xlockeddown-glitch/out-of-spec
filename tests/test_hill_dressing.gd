@@ -82,12 +82,20 @@ func test_rocks_stand_clear_on_high_ground() -> String:
 
 ## The 2 m rule is relaxed: a terrace row stands out at the plateau's edge, and the
 ## hills are no steeper (the steepest step between neighbors stays as it was).
-func test_a_terrace_row_reaches_the_plateau_edge() -> String:
-	var nearest_m: float = 1000.0
+func test_a_terrace_row_reaches_the_plateau_edge_and_every_rock_is_on_the_map() -> String:
+	var at_edge: Array[Vector2i] = []
 	for rock: Vector2i in HillDressing.ROCKS:
-		if HillDressing.ROCK_TURNS.has(rock):
-			nearest_m = minf(nearest_m, Terrain.HALF_M - float(maxi(absi(rock.x), absi(rock.y))) - HillDressing.rock_half_m(rock).x)
-	return "" if nearest_m <= 3.0 else "No terrace row reaches the plateau edge (nearest is %.1f m)." % nearest_m
+		var half: Vector2 = HillDressing.rock_half_m(rock)
+		var spare := Vector2(Terrain.HALF_M - absf(rock.x) - half.x, Terrain.HALF_M - absf(rock.y) - half.y)
+		if minf(spare.x, spare.y) < 0.0:
+			return "The rock at %s hangs off the map." % rock
+		if HillDressing.ROCK_TURNS.has(rock) and minf(spare.x, spare.y) <= 2.5:
+			at_edge.append(rock)
+	# The whole new row (three pieces, touching) stands within 2.5 m of the edge.
+	for rock: Vector2i in [Vector2i(77, 45), Vector2i(77, 47), Vector2i(77, 49)]:
+		if not rock in at_edge:
+			return "The piece at %s is not at the plateau edge." % rock
+	return ""
 
 
 func test_hills_are_no_steeper_than_before() -> String:
