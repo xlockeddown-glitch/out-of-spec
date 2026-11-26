@@ -329,6 +329,12 @@ var farm_skill_xp: Dictionary = {}
 ## An effect uses the larger of this and its level's share. Only converting an
 ## old save writes it, so a new farm has none and it never rises.
 var skill_effect_floor: Dictionary = {}
+## Player id -> { XP source id (data/skills.json): { "count": times, "xp": XP } }:
+## what each player has done that earned XP, and how much it gave, farm skills
+## included. _award_xp is the only writer. It is how the XP crops gave Field
+## Ops can move to Agronomy when that skill arrives (crop_xp), and what a quest
+## will count (docs/design/quests_levels_story.md section 5.3).
+var action_counts: Dictionary = {}
 ## The curve the XP above is counted on. A save without it is from the 10-level
 ## curve, and is converted as it loads (_convert_old_skills).
 var skill_curve: int = SKILL_CURVE
@@ -516,7 +522,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
-	"skill_effect_floor", "skill_curve"]
+	"skill_effect_floor", "skill_curve", "action_counts"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -675,6 +681,15 @@ func farm_dict_problem(data: Dictionary) -> String:
 			var share: Variant = floors[owner_id][skill]
 			if not skill is String or not share is float or share < 0.0 or share > 1.0:
 				return "'skill_effect_floor' has a share that is not from 0 to 1."
+	var counts: Dictionary = data.get("action_counts", {})
+	for player: Variant in counts:
+		if not player is String or typeof(counts[player]) != TYPE_DICTIONARY:
+			return "'action_counts' has an entry that is not a player's."
+		for source: Variant in counts[player]:
+			var done: Variant = counts[player][source]
+			if not source is String or typeof(done) != TYPE_DICTIONARY or done.size() != 2 \
+					or not done.get("count") is int or not done.get("xp") is int or done["count"] < 0 or done["xp"] < 0:
+				return "'action_counts' has a count that is not whole numbers."
 	var robot_problem: String = _robots_dict_problem(data.get("robots", {}))
 	if robot_problem != "":
 		return robot_problem
@@ -1468,6 +1483,7 @@ func _forget_a_guest(players: Array[String]) -> void:
 			guest_ids.erase(hashed)
 			player_skill_xp.erase(player_id)
 			skill_effect_floor.erase(player_id)
+			action_counts.erase(player_id)
 			return
 
 
@@ -1544,7 +1560,8 @@ func _old_effect_share(skill_id: String, old_level: int) -> float:
 
 
 ## Gives the XP of one source in data/skills.json, times `scale`, to the acting
-## player, or to the farm for a farm skill. The manager earns none.
+## player, or to the farm for a farm skill, and counts it for that player
+## (action_counts). The manager earns none.
 func _award_xp(source_id: String, player_id: String = "", scale: float = 1.0) -> void:
 	if player_id == MANAGER_ID:
 		return
@@ -1555,6 +1572,9 @@ func _award_xp(source_id: String, player_id: String = "", scale: float = 1.0) ->
 	var gained: int = roundi(float(source.get("xp", 0)) * scale)
 	if gained <= 0 or DataManager.get_record(SKILLS_TABLE, skill, "skills").is_empty():
 		return
+	var done: Dictionary = (action_counts.get_or_add(player_id, {}) as Dictionary).get_or_add(source_id, { "count": 0, "xp": 0 })
+	done["count"] = int(done["count"]) + 1
+	done["xp"] = int(done["xp"]) + gained
 	var farm: bool = is_farm_skill(skill)
 	var before: int = skill_xp(skill, player_id)
 	if farm:
@@ -1568,6 +1588,41 @@ func _award_xp(source_id: String, player_id: String = "", scale: float = 1.0) ->
 	var level: int = _level_for_xp(before + gained)
 	if level > _level_for_xp(before):
 		skill_leveled.emit(owner_id, skill, level)
+
+
+## How many times `player_id` ("" = the local player) earned XP from a source.
+func action_count(source_id: String, player_id: String = "") -> int:
+	return int(_action(source_id, player_id).get("count", 0))
+
+
+## The XP those times gave, to the player or to the farm.
+func action_xp(source_id: String, player_id: String = "") -> int:
+	return int(_action(source_id, player_id).get("xp", 0))
+
+
+func _action(source_id: String, player_id: String) -> Dictionary:
+	var own: Dictionary = action_counts.get(local_player_id if player_id == "" else player_id, {})
+	return own.get(source_id, {})
+
+
+## The XP a player has had from the crop sources (those marked "crop" in
+## data/skills.json). It went to Field Ops, and is Agronomy's when that arrives.
+func crop_xp(player_id: String = "") -> int:
+	var total: int = 0
+	for source: Dictionary in DataManager.get_records(SKILLS_TABLE, "xp_sources"):
+		if source.get("crop", false):
+			total += action_xp(str(source["id"]), player_id)
+	return total
+
+
+## XP for a finished job (docs/design/quests_levels_story.md section 2.3), by
+## the credits it paid after any cut: job_done for each, and job_clean too
+## when it was on time and traceable.
+func _xp_after_job(result: Dictionary, player_id: String) -> void:
+	var paid: float = float(result["pay"])
+	_award_xp("job_done", player_id, paid)
+	if result["on_time"] and result["traceable"]:
+		_award_xp("job_clean", player_id, paid)
 
 
 ## XP for a calibration (section 2.2), times the standard's tier scale. An untraceable one, or one made before
@@ -4087,6 +4142,7 @@ func complete_job(job_id: String, player_id: String = "") -> Dictionary:
 	}
 	job_log.append(result)
 	add_credits(result["pay"])
+	_xp_after_job(result, player_id)
 	# Report the change the score actually made (it stops at 0 and the maximum).
 	var before: int = credibility
 	change_credibility(points)
@@ -4782,7 +4838,7 @@ func fill(cell: Vector3i, player_id: String = "") -> String:
 ## Returns "" or the reason not. With too few credits for the seed, Lin
 ## fronts it and takes its cost out of that crop's sale, so fines can't lock
 ## the player out of farming.
-func plant_crop(cell: Vector3i, crop_id: String = "", offset_steps: int = OFFSET_CURRENT) -> String:
+func plant_crop(cell: Vector3i, crop_id: String = "", offset_steps: int = OFFSET_CURRENT, player_id: String = "") -> String:
 	if crop_id == "":
 		crop_id = current_seed()
 	if crop_id == "" or crop(crop_id).is_empty():
@@ -4812,6 +4868,7 @@ func plant_crop(cell: Vector3i, crop_id: String = "", offset_steps: int = OFFSET
 			crop_name(crop_id), SP811.integer(advance)])
 	else:
 		add_credits(-cost)
+	_award_xp("plant_crop", player_id)
 	crops_changed.emit()
 	return ""
 
@@ -4979,7 +5036,8 @@ func adjust_setpoint(cell: Vector3i, steps: int) -> float:
 
 
 ## Harvests a ready crop into the bin. Returns the bin entry, or {} if not ready.
-func harvest_crop(cell: Vector3i) -> Dictionary:
+## One in spec gives XP by what Lin pays for it.
+func harvest_crop(cell: Vector3i, player_id: String = "") -> Dictionary:
 	if not is_crop_ready(cell):
 		return {}
 	var planting: Dictionary = plantings[cell]
@@ -4991,6 +5049,8 @@ func harvest_crop(cell: Vector3i) -> Dictionary:
 	}
 	plantings.erase(cell)
 	harvest_bin.append(entry)
+	if entry["in_spec"]:
+		_award_xp("harvest_in_spec", player_id, crop_sale_price(entry))
 	crops_changed.emit()
 	return entry
 
@@ -5013,19 +5073,23 @@ func harvest_bin_value() -> int:
 
 
 ## Lin buys the whole bin. Returns the credits paid (0 if the bin was empty).
-func sell_harvest_to_lin() -> int:
+## The seller gets XP by the crops' price, before any fronted seed comes out.
+func sell_harvest_to_lin(player_id: String = "") -> int:
 	if harvest_bin.is_empty():
 		return 0
 	var total: int = harvest_bin_value()
 	var count: int = harvest_bin.size()
 	var off_spec: int = 0
 	var advanced: int = 0
+	var priced: int = 0
 	for entry: Dictionary in harvest_bin:
+		priced += crop_sale_price(entry)
 		if not entry.get("in_spec", false):
 			off_spec += 1
 		advanced += mini(int(entry.get("advance", 0)), crop_sale_price(entry))
 	harvest_bin.clear()
 	add_credits(total)
+	_award_xp("sell_crop", player_id, priced)
 	crops_changed.emit()
 	var note: String = ("" if off_spec == 0
 		else " %s off spec, paid at the reduced price." % SP811.integer(off_spec))

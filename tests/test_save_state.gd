@@ -154,7 +154,7 @@ func test_bad_data_is_refused_whole() -> String:
 			["molt_progress", NAN], ["cal_log", [{ "instrument_id": "x", "mpe": NAN }]],
 			["plantings", { Vector3i.ZERO: { "deep": [NAN] } }], ["rng_state", 1.5], ["sensors", []],
 			["player_skill_xp", { "player_1": 5 }], ["player_skill_xp", { "player_1": { "calibration": "many" } }],
-			["farm_skill_xp", { "husbandry": [] }], ["sensors", { sensor_id: { "error": NAN } }], ["sensors", { sensor_id: 3 }]]:
+			["farm_skill_xp", { "husbandry": [] }], ["action_counts", { "player_1": { "till": 1 } }], ["sensors", { sensor_id: { "error": NAN } }], ["sensors", { sensor_id: 3 }]]:
 		var bad: Dictionary = good.duplicate(true)
 		bad[change[0]] = change[1]
 		bads.append(bad)
