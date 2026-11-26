@@ -24,11 +24,8 @@ func _run(body: Callable) -> String:
 
 
 func _level(gs: GameStateScript, skill: String, level: int, player: String = "player_1") -> void:
-	if gs.is_farm_skill(skill):
-		gs.farm_skill_xp[skill] = gs.xp_for_level(level)
-	else:
-		var own: Dictionary = gs.player_skill_xp.get_or_add(player, {})
-		own[skill] = gs.xp_for_level(level)
+	var own: Dictionary = gs.player_skill_xp.get_or_add(player, {})
+	own[skill] = gs.xp_for_level(level)
 
 
 func test_factors_and_unlocks() -> String:
@@ -43,7 +40,8 @@ func _check_factors(gs: GameStateScript) -> String:
 		if gs.skill_factor(id) != 1.0:
 			return "%s must change nothing at level 1." % id
 		_level(gs, effect["skill"], 2)
-		if absf(gs.skill_factor(id) - (1.0 - float(effect["full"]) * gs.effect_share(2))) > EPS or gs.skill_factor(id) >= 1.0:
+		# A cut is under 1; a gain (a full under 0, as lin_price has) is over it.
+		if absf(gs.skill_factor(id) - (1.0 - float(effect["full"]) * gs.effect_share(2))) > EPS or (gs.skill_factor(id) >= 1.0) != (float(effect["full"]) < 0.0) or gs.skill_factor(id) == 1.0:
 			return "%s at level 2: %s" % [id, gs.skill_factor(id)]
 		_level(gs, effect["skill"], gs.max_skill_level())
 		if gs.skill_factor(id) <= 0.0 or gs.skill_factor(id) < float(effect.get("floor", 0.0)):

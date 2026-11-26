@@ -12,7 +12,7 @@ func _run(body: Callable) -> String:
 	return JobsTest.new()._run(func(gs: GameStateScript) -> String:
 		for id: String in gs.robot_sensor_ids(ROBOT):
 			gs.get_sensor(id).error = 0.0
-		gs.farm_skill_xp["robotics"] = gs.xp_for_level(2)
+		(gs.player_skill_xp.get_or_add("player_1", {}) as Dictionary)["robotics"] = gs.xp_for_level(2)
 		return body.call(gs))
 
 
@@ -26,10 +26,10 @@ func test_gates() -> String:
 
 
 func _check_gates(gs: GameStateScript) -> String:
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(2) - 1
+	(gs.player_skill_xp.get_or_add("player_1", {}) as Dictionary)["robotics"] = gs.xp_for_level(2) - 1
 	if gs.add_robot_collect_card(ROBOT) != "COLLECT SPOOL cards need Robotics level 2.":
 		return "It needs Robotics 2: %s" % gs.add_robot_collect_card(ROBOT)
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(2)
+	(gs.player_skill_xp.get_or_add("player_1", {}) as Dictionary)["robotics"] = gs.xp_for_level(2)
 	var record: Dictionary = gs.last_cal_records[GRIP]
 	gs.last_cal_records.erase(GRIP)
 	if not gs.add_robot_collect_card(ROBOT).contains("Grip Torque Sensor: not calibrated"):
@@ -64,7 +64,7 @@ func _check_collects(gs: GameStateScript) -> String:
 	gs._run_robot_cards()
 	if gs.optical_silk_spools != spools or gs.get_sensor(GRIP).error != 0.0:
 		return "With no spool ready it does nothing."
-	var xp: Array = [gs.farm_skill_xp["robotics"], gs.farm_skill_xp.get("husbandry", 0)]
+	var xp: Array = [gs.skill_xp("robotics"), gs.skill_xp("husbandry")]
 	_molt(gs)
 	gs._run_robot_cards()
 	if gs.optical_silk_spools != spools + 1 or gs.is_spool_ready() or gs.molt_progress != 0.0:
@@ -72,7 +72,7 @@ func _check_collects(gs: GameStateScript) -> String:
 	if gs.get_sensor(GRIP).error == 0.0 or gs.get_sensor("robot_joint_encoder@TR-1").error == 0.0 \
 			or gs.get_sensor("robot_tank_pressure@TR-1").error != 0.0:
 		return "Only the grip and the encoder wear."
-	if gs.farm_skill_xp["robotics"] != xp[0] + int(DataManager.get_record(&"skills", "robot_job", "xp_sources")["xp"]) or gs.farm_skill_xp.get("husbandry", 0) != xp[1]:
+	if gs.skill_xp("robotics") != xp[0] + int(DataManager.get_record(&"skills", "robot_job", "xp_sources")["xp"]) or gs.skill_xp("husbandry") != xp[1]:
 		return "A robot's work earns Robotics XP only."
 	# Another one can be collected the same day.
 	_molt(gs)

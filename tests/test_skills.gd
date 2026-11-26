@@ -40,16 +40,16 @@ func test_data_is_whole() -> String:
 
 
 func _check_data(gs: GameStateScript) -> String:
-	if gs.skill_ids() != (["calibration", "uncertainty", "robotics", "husbandry", "field_ops"] as Array[String]):
-		return "The five skills: %s" % [gs.skill_ids()]
+	if gs.skill_ids() != (["calibration", "uncertainty", "robotics", "husbandry", "field_ops", "agronomy", "earthworks"] as Array[String]):
+		return "The seven skills: %s" % [gs.skill_ids()]
 	for skill: Dictionary in DataManager.get_records(&"skills", "skills"):
-		if not skill["scope"] in ["player", "farm"]:
-			return "Skill %s is neither a player's nor the farm's." % skill["id"]
+		if skill["scope"] != "player" or gs.is_farm_skill(skill["id"]):
+			return "Skill %s is not a player's own." % skill["id"]
 	for source: Dictionary in DataManager.get_records(&"skills", "xp_sources"):
 		if not source["skill"] in gs.skill_ids():
 			return "Source %s names an unknown skill." % source["id"]
 	for used: String in ["calibrate_player", "calibrate_found_oot", "calibrate_on_time", "calibrate_clean_tur",
-			"clean_audit", "collect_spool", "slot_spool", "mine_fissure", "till"]:
+			"clean_audit", "collect_spool", "slot_spool", "mine_fissure", "till", "dig", "find_block"]:
 		if _xp(used) <= 0:
 			return "No XP for '%s'." % used
 	for used: String in ["buy_standard", "calibrate_standard"]:
@@ -67,13 +67,13 @@ func _check_curve(gs: GameStateScript) -> String:
 		return "Every skill starts at level 1."
 	for level: int in range(1, gs.max_skill_level()):
 		var needed: int = gs.xp_for_level(level + 1)
-		gs.farm_skill_xp["husbandry"] = needed - 1
+		gs.player_skill_xp["player_1"] = { "husbandry": needed - 1 }
 		if gs.skill_level("husbandry") != level:
 			return "%d XP must still be level %d." % [needed - 1, level]
-		gs.farm_skill_xp["husbandry"] = needed
+		gs.player_skill_xp["player_1"]["husbandry"] = needed
 		if gs.skill_level("husbandry") != level + 1:
 			return "%d XP must be level %d." % [needed, level + 1]
-	gs.farm_skill_xp["husbandry"] = gs.xp_for_level(gs.max_skill_level()) * 9
+	gs.player_skill_xp["player_1"]["husbandry"] = gs.xp_for_level(gs.max_skill_level()) * 9
 	return "" if gs.skill_level("husbandry") == gs.max_skill_level() else "The top level must hold."
 
 
@@ -84,13 +84,13 @@ func test_level_up_is_announced_once() -> String:
 func _check_level_up(gs: GameStateScript) -> String:
 	var seen: Array = []
 	gs.skill_leveled.connect(func(player: String, skill: String, level: int) -> void: seen.append([player, skill, level]))
-	gs.player_skill_xp["player_2"] = { "field_ops": gs.xp_for_level(2) - _xp("till") }
+	gs.player_skill_xp["player_2"] = { "agronomy": gs.xp_for_level(2) - _xp("till") }
 	gs.till(Vector3i(1, 0, 1), "player_2")
 	gs.till(Vector3i(2, 0, 1), "player_2")
-	return "" if seen == [["player_2", "field_ops", 2]] else "One level-up: %s" % [seen]
+	return "" if seen == [["player_2", "agronomy", 2]] else "One level-up: %s" % [seen]
 
 
-func test_xp_goes_to_the_player_or_the_farm() -> String:
+func test_xp_goes_to_the_acting_player() -> String:
 	return _run(_check_scope)
 
 
@@ -99,16 +99,16 @@ func _check_scope(gs: GameStateScript) -> String:
 	gs.till(Vector3i(1, 0, 1))
 	gs.till(Vector3i(2, 0, 1), "player_2")
 	gs.till(Vector3i(3, 0, 1), gs.MANAGER_ID)
-	if gs.skill_xp("field_ops") != _xp("till") or gs.skill_xp("field_ops", "player_2") != _xp("till"):
-		return "Field Ops is each player's own, once per cell."
+	if gs.skill_xp("agronomy") != _xp("till") or gs.skill_xp("agronomy", "player_2") != _xp("till") or gs.skill_xp("field_ops") != 0:
+		return "Tilling gives Agronomy, each player's own, once per cell."
 	if gs.player_skill_xp.has(gs.MANAGER_ID):
 		return "The manager earns none."
 	gs.molt_stage = gs.MoltStage.MOLTED
 	gs.collect_spool("player_2")
 	gs.collect_spool("player_2")
 	gs.slot_spool_into_relay()
-	if gs.skill_xp("husbandry") != _xp("collect_spool") + _xp("slot_spool") or gs.player_skill_xp["player_2"].has("husbandry"):
-		return "Husbandry is the farm's: %s" % gs.farm_skill_xp
+	if gs.skill_xp("husbandry", "player_2") != _xp("collect_spool") or gs.skill_xp("husbandry") != _xp("slot_spool") or not gs.farm_skill_xp.is_empty():
+		return "Husbandry is whoever did the work's: %s" % gs.player_skill_xp
 	return ""
 
 
@@ -211,7 +211,7 @@ func _check_save(gs: GameStateScript) -> String:
 	var data: Dictionary = gs.farm_to_dict()
 	gs.player_skill_xp.clear()
 	gs.farm_skill_xp.clear()
-	if gs.farm_from_dict(data) != "" or gs.skill_xp("field_ops", "player_2") != _xp("till") or gs.skill_xp("husbandry") != _xp("slot_spool"):
+	if gs.farm_from_dict(data) != "" or gs.skill_xp("agronomy", "player_2") != _xp("till") or gs.skill_xp("husbandry") != _xp("slot_spool"):
 		return "XP must survive a save."
 	data.erase("player_skill_xp")
 	data.erase("farm_skill_xp")
@@ -228,13 +228,13 @@ func _check_announced(gs: GameStateScript) -> String:
 	gs.local_player_id = "player_2"
 	gs.till(Vector3i(1, 0, 1))
 	gs._award_xp("slot_spool")
-	if seen != [["player_2", "field_ops"], ["", "husbandry"]]:
+	if seen != [["player_2", "agronomy"], ["player_2", "husbandry"]]:
 		return "Each gain must be announced: %s" % [seen]
 	var data: Dictionary = gs.farm_to_dict()
 	gs.local_player_id = "player_1"
-	if gs.farm_from_dict(data) != "" or gs.local_player_id != "player_1" or gs.skill_xp("field_ops") != 0:
+	if gs.farm_from_dict(data) != "" or gs.local_player_id != "player_1" or gs.skill_xp("agronomy") != 0:
 		return "A save must not change who plays here, or whose XP it is."
-	return "" if gs.skill_xp("field_ops", "player_2") == _xp("till") else "The saved player's XP must stay theirs."
+	return "" if gs.skill_xp("agronomy", "player_2") == _xp("till") else "The saved player's XP must stay theirs."
 
 
 func test_late_but_in_tolerance() -> String:

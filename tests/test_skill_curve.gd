@@ -68,7 +68,7 @@ func _check_levels(gs: GameStateScript) -> String:
 	for xp: int in [TOTALS[99], TOTALS[99] + 1, TOTALS[99] * 10, GameStateScript.MOST_SKILL_XP]:
 		if gs._level_for_xp(xp) != 99:
 			return "%d XP is level 99, the top." % xp
-	gs.farm_skill_xp["husbandry"] = TOTALS[99] * 3
+	gs.player_skill_xp["player_1"] = { "husbandry": TOTALS[99] * 3 }
 	return "" if gs.skill_level("husbandry") == 99 and gs.skill_text("husbandry").contains("top level") else "The top level must hold."
 
 
@@ -91,12 +91,13 @@ func _check_spread(gs: GameStateScript) -> String:
 	for effect: Dictionary in DataManager.get_records(&"skills", "effects"):
 		var low: float = float(effect.get("floor", 0.0))
 		for level: int in SHARES:
-			gs.farm_skill_xp[effect["skill"]] = gs.xp_for_level(level)
 			gs.player_skill_xp["player_1"] = { effect["skill"]: gs.xp_for_level(level) }
 			var wanted: float = maxf(low, 1.0 - float(effect["full"]) * SHARES[level])
 			if absf(gs.skill_factor(effect["id"]) - wanted) > EPS:
 				return "%s at level %d: %s, not %s" % [effect["id"], level, gs.skill_factor(effect["id"]), wanted]
-		# Level 99 has what level 10 had on the old curve.
+		# Level 99 has what level 10 had on the old curve, if there was one then.
+		if not effect.has("old_per_level"):
+			continue
 		var old_top: float = maxf(low, 1.0 - float(effect["old_per_level"]) * 9)
 		if absf(gs.skill_factor(effect["id"]) - old_top) > EPS:
 			return "%s at 99 must be the old level 10's %s: %s" % [effect["id"], old_top, gs.skill_factor(effect["id"])]
@@ -129,12 +130,12 @@ func test_new_farm_has_no_floor() -> String:
 
 func _check_new(gs: GameStateScript) -> String:
 	gs.till(Vector3i(1, 0, 1))
-	gs.farm_skill_xp["husbandry"] = gs.xp_for_level(40)
+	gs.player_skill_xp["player_1"]["husbandry"] = gs.xp_for_level(40)
 	var data: Dictionary = gs.farm_to_dict()
 	if data.get("skill_curve") != GameStateScript.SKILL_CURVE or data.get("skill_effect_floor") != {}:
 		return "A new farm is on the new curve, with no floor: %s" % [data.get("skill_effect_floor")]
-	var xp: int = gs.skill_xp("field_ops")
-	if gs.farm_from_dict(data) != "" or gs.skill_xp("field_ops") != xp or gs.skill_xp("husbandry") != gs.xp_for_level(40):
+	var xp: int = gs.skill_xp("agronomy")
+	if xp <= 0 or gs.farm_from_dict(data) != "" or gs.skill_xp("agronomy") != xp or gs.skill_xp("husbandry") != gs.xp_for_level(40):
 		return "A new save loads as it was saved."
 	return "" if gs.skill_effect_floor.is_empty() and gs.effect_floor("husbandry") == 0.0 else "It must not gain a floor."
 
@@ -148,7 +149,7 @@ func _check_old(gs: GameStateScript) -> String:
 	# What each effect was at old level 10, which nothing may fall under.
 	var old_top: Dictionary = {}
 	for effect: Dictionary in DataManager.get_records(&"skills", "effects"):
-		old_top[effect["id"]] = maxf(float(effect.get("floor", 0.0)), 1.0 - float(effect["old_per_level"]) * 9)
+		old_top[effect["id"]] = maxf(float(effect.get("floor", 0.0)), 1.0 - float(effect.get("old_per_level", 0.0)) * 9)
 	gs.player_skill_xp = {
 		"player_1": { "calibration": OLD_TOP_XP, "uncertainty": _old_xp(8), "field_ops": _old_xp(2) - 1 },
 		"player_2": { "calibration": _old_xp(4) },
@@ -159,8 +160,9 @@ func _check_old(gs: GameStateScript) -> String:
 		return "An old save must load: %s" % gs.farm_from_dict(old)
 	if gs.skill_xp("calibration") != OLD_TOP_XP * factor or gs.skill_xp("husbandry") != OLD_TOP_XP * 4 * factor \
 			or gs.skill_xp("calibration", "player_2") != _old_xp(4) * factor or gs.lab_xp != _old_xp(6) * factor \
-			or gs.farm_skill_xp.has("instrumentation"):
-		return "Old XP is multiplied by %d, the farm's too: %s %s" % [factor, gs.player_skill_xp, gs.farm_skill_xp]
+			or gs.skill_xp("husbandry", "player_2") != OLD_TOP_XP * 4 * factor or gs.skill_xp("robotics", "player_2") != _old_xp(3) * factor \
+			or not gs.farm_skill_xp.is_empty():
+		return "Old XP is multiplied by %d, and the farm's is each player's: %s %s" % [factor, gs.player_skill_xp, gs.farm_skill_xp]
 	for old_level: int in range(1, 11):
 		if gs._old_level(_old_xp(old_level)) != old_level or gs._level_for_xp(_old_xp(old_level) * factor) < old_level:
 			return "Old level %d must not turn into a lower one." % old_level
@@ -170,7 +172,8 @@ func _check_old(gs: GameStateScript) -> String:
 	for id: String in ["bench_time", "as_left_residual", "molt_time"]:
 		if absf(gs.skill_factor(id) - old_top[id]) > EPS:
 			return "%s must stay %s: %s" % [id, old_top[id], gs.skill_factor(id)]
-	if absf(gs.effect_floor("calibration") - 1.0) > EPS or absf(gs.effect_floor("husbandry") - 1.0) > EPS:
+	if absf(gs.effect_floor("calibration") - 1.0) > EPS or absf(gs.effect_floor("husbandry") - 1.0) > EPS \
+			or absf(gs.effect_floor("husbandry", "player_2") - 1.0) > EPS or absf(gs.molt_days() - gs.PLAYTEST_MOLT_DAYS * old_top["molt_time"]) > EPS:
 		return "An old level 10 keeps the whole effect: %s" % [gs.skill_effect_floor]
 	# Old level 8 was on the floor already: 1 - 0.1 x 7 = 0.3.
 	if absf(gs.skill_factor("operator_uncertainty") - 0.3) > EPS:
@@ -179,8 +182,8 @@ func _check_old(gs: GameStateScript) -> String:
 	if absf(gs.skill_factor("bench_time", "player_2") - 0.76) > EPS or gs.skill_factor("as_left_residual", "player_2") > 0.85 + EPS:
 		return "Player 2 keeps old level 4: %s, %s" % [gs.skill_factor("bench_time", "player_2"), gs.skill_factor("as_left_residual", "player_2")]
 	# Old level 1 had nothing to keep; a skill with no effect has no floor.
-	if gs.skill_effect_floor["player_1"].has("field_ops") or gs.skill_effect_floor[""].has("instrumentation") \
-			or gs.skill_effect_floor[""].has("robotics") or gs.effect_floor("calibration", "player_3") != 0.0:
+	if gs.skill_effect_floor["player_1"].has("field_ops") or gs.skill_effect_floor.has("") \
+			or gs.skill_effect_floor["player_1"].has("robotics") or gs.effect_floor("calibration", "player_3") != 0.0:
 		return "Only what was held is kept: %s" % [gs.skill_effect_floor]
 	if not gs.has_skill_unlock("molt_on_phone") or not gs.has_skill_unlock("budget_view") or gs.has_skill_unlock("budget_view", "player_2"):
 		return "An unlock that was open stays open."
@@ -208,7 +211,7 @@ func _check_empty(gs: GameStateScript) -> String:
 	if gs.farm_from_dict(old) != "" or not gs.skill_effect_floor.is_empty() or gs.skill_curve != GameStateScript.SKILL_CURVE:
 		return "A save older than skills loads with no XP and no floor."
 	gs.till(Vector3i(1, 0, 1))
-	return "" if gs.skill_xp("field_ops") == int(DataManager.get_record(&"skills", "till", "xp_sources")["xp"]) else "It earns XP at the new values."
+	return "" if gs.skill_xp("agronomy") == int(DataManager.get_record(&"skills", "till", "xp_sources")["xp"]) else "It earns XP at the new values."
 
 
 func test_bad_floor_is_refused() -> String:
@@ -217,7 +220,7 @@ func test_bad_floor_is_refused() -> String:
 
 func _check_bad(gs: GameStateScript) -> String:
 	var good: Dictionary = gs.farm_to_dict()
-	for change: Array in [["skill_curve", 1], ["skill_curve", 4], ["lab_xp", -1], ["lab_xp", 2000000000], ["lab_xp", 1.5], ["skill_curve", "2"], ["skill_effect_floor", []],
+	for change: Array in [["skill_curve", 1], ["skill_curve", 5], ["lab_xp", -1], ["lab_xp", 2000000000], ["lab_xp", 1.5], ["skill_curve", "2"], ["skill_effect_floor", []],
 			["skill_effect_floor", { "": 1.0 }], ["skill_effect_floor", { 4: {} }], ["skill_effect_floor", { "": { "husbandry": 1.5 } }],
 			["skill_effect_floor", { "": { "husbandry": -0.1 } }], ["skill_effect_floor", { "": { "husbandry": NAN } }],
 			["skill_effect_floor", { "player_1": { "calibration": "all" } }], ["skill_effect_floor", { "player_1": { 3: 0.5 } }]]:
@@ -251,7 +254,10 @@ func test_guest_file_from_the_old_curve() -> String:
 	var new: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"calibration":%d},"curve":%d}' % [key, OLD_TOP_XP, ProfileScript.CURVE]).to_utf8_buffer())
 	if new != { "key": key, "skills": { "calibration": OLD_TOP_XP } }:
 		return "A new guest file is read as it is: %s" % [new]
-	for curve: String in ["1", "3", "\"2\""]:
+	var before: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"field_ops":900},"curve":2}' % key).to_utf8_buffer())
+	if before != { "key": key, "skills": { "field_ops": 900 } }:
+		return "A guest file from before Agronomy is read as it is: %s" % [before]
+	for curve: String in ["1", "4", "2.5", "\"2\""]:
 		var odd: Dictionary = ProfileScript._parse(('{"key":"%s","skills":{"calibration":5},"curve":%s}' % [key, curve]).to_utf8_buffer())
 		if not odd.is_empty():
 			return "A guest file with curve %s is refused: %s" % [curve, odd]

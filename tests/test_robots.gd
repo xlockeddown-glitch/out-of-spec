@@ -97,7 +97,7 @@ func _check_gates(gs: GameStateScript) -> String:
 	_built(gs)
 	if not "Robotics" in gs.robot_build_problem("trellis"):
 		return "A second robot needs more Robotics."
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(10)
+	(gs.player_skill_xp.get_or_add("player_1", {}) as Dictionary)["robotics"] = gs.xp_for_level(10)
 	return gs.robot_build_problem("trellis")
 
 
@@ -277,7 +277,7 @@ func _check_ids(gs: GameStateScript) -> String:
 	_built(gs)
 	gs.robots["TR-2"] = gs.robots["TR-1"]
 	gs.robots.erase("TR-1")
-	gs.farm_skill_xp["robotics"] = 1000000.0
+	(gs.player_skill_xp.get_or_add("player_1", {}) as Dictionary)["robotics"] = 1000000.0
 	var problem: String = gs.build_robot("trellis")
 	if problem != "":
 		return problem

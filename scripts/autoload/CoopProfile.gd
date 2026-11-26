@@ -10,10 +10,15 @@ const MOST_XP: int = 1000000000
 ## So that they fit in a guest's message.
 const MOST_SKILLS: int = 16
 const MAX_FILE_BYTES: int = 8192
-## Written to the file as "curve": the XP in it is counted on the 99-level curve
-## (2 of GameState.KNOWN_CURVES; the lab level changed no player's XP, so it is
-## still 2). A file without it is from the 10-level curve.
-const CURVE: int = 2
+## Written to the file as "curve". 2 is XP counted on the 99-level curve, from
+## when Robotics and Husbandry were a farm's and crops fed Field Ops. 3 is that
+## with every skill the player's own and crop XP in Agronomy (4 of
+## GameState.KNOWN_CURVES; the lab level changed no player's XP, so no file says
+## that one). A file without it is from the 10-level curve.
+const CURVE: int = 3
+## The curves a file may say. A 2 loads as it is: nothing says how much of its
+## Field Ops came from crops, so none of it becomes Agronomy [ASSUMPTION].
+const KNOWN_CURVES: Array[int] = [2, 3]
 ## Skills there once were. A file that has one loads without it.
 const GONE_SKILLS: Array[String] = ["instrumentation"]
 
@@ -121,7 +126,7 @@ static func _parse(bytes: PackedByteArray) -> Dictionary:
 		return {}
 	# XP from the 10-level curve converts as a farm's does (GameState._convert_old_xp).
 	# A curve this build does not know is refused rather than guessed at.
-	if json.data.has("curve") and not (json.data["curve"] is float and int(json.data["curve"]) == CURVE):
+	if json.data.has("curve") and not (json.data["curve"] is float and json.data["curve"] == floorf(json.data["curve"]) and int(json.data["curve"]) in KNOWN_CURVES):
 		return {}
 	var factor: float = 1.0 if json.data.has("curve") else DataManager.get_number(&"skills", "old_curve/xp_factor", 5.0)
 	var whole: Dictionary = {}

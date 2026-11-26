@@ -58,16 +58,16 @@ func test_sources_are_whole() -> String:
 
 
 func _check_sources(gs: GameStateScript) -> String:
-	var skills: Dictionary = { "job_done": "calibration", "job_clean": "uncertainty", "plant_crop": "field_ops",
-		"harvest_in_spec": "field_ops", "sell_crop": "field_ops" }
+	var skills: Dictionary = { "job_done": "calibration", "job_clean": "uncertainty", "plant_crop": "agronomy",
+		"harvest_in_spec": "agronomy", "sell_crop": "agronomy" }
 	for id: String in skills:
 		var source: Dictionary = DataManager.get_record(&"skills", id, "xp_sources")
 		if source.get("skill") != skills[id] or float(source.get("xp", 0)) <= 0.0:
 			return "Source %s must give %s XP: %s" % [id, skills[id], source]
-		if bool(source.get("crop", false)) != (skills[id] == "field_ops"):
+		if bool(source.get("crop", false)) != (skills[id] == "agronomy"):
 			return "Only the crop sources are marked crop: %s" % id
 	if DataManager.get_record(&"skills", "till", "xp_sources").get("crop", false):
-		return "Tilling stays Field Ops when Agronomy arrives."
+		return "Tilling is not counted as crop XP: what it gave Field Ops stays there."
 	# Section 2.3: pay / 2 as Calibration XP, pay / 4 as Uncertainty XP.
 	return "" if _rate("job_done") == 0.5 and _rate("job_clean") == 0.25 else "The job rates are the design's."
 
@@ -136,7 +136,7 @@ func _check_manager(gs: GameStateScript) -> String:
 	return "" if gs.player_skill_xp.is_empty() and gs.action_counts.is_empty() else "A hired manager's job gives no one XP."
 
 
-func test_crops_give_field_ops() -> String:
+func test_crops_give_agronomy() -> String:
 	return _run(_check_crops)
 
 
@@ -144,17 +144,19 @@ func _check_crops(gs: GameStateScript) -> String:
 	var price: int = int(gs.crop(gs.current_seed())["base_sell_credits"])
 	_grow(gs)
 	var planted: int = roundi(_rate("plant_crop"))
-	if gs.skill_xp("field_ops") != planted or gs.action_count("plant_crop") != 1:
-		return "Planting gives Field Ops XP, got %d." % gs.skill_xp("field_ops")
+	if gs.skill_xp("agronomy") != planted or gs.action_count("plant_crop") != 1 or gs.skill_xp("field_ops") != 0:
+		return "Planting gives Agronomy XP, got %d." % gs.skill_xp("agronomy")
 	var entry: Dictionary = gs.harvest_crop(CELL)
 	var harvested: int = roundi(price * _rate("harvest_in_spec"))
-	if not entry.get("in_spec", false) or gs.skill_xp("field_ops") != planted + harvested:
-		return "An in-spec harvest gives XP by its price, got %d." % gs.skill_xp("field_ops")
-	if gs.sell_harvest_to_lin() != price:
-		return "Lin must pay the base price."
+	if not entry.get("in_spec", false) or gs.skill_xp("agronomy") != planted + harvested:
+		return "An in-spec harvest gives XP by its price, got %d." % gs.skill_xp("agronomy")
+	# The seller's Agronomy adds to what Lin pays, not to the XP.
+	var pays: int = roundi(price * gs.skill_factor("lin_price"))
+	if gs.sell_harvest_to_lin() != pays or pays < price:
+		return "Lin must pay the base price, and more for Agronomy."
 	var sold: int = roundi(price * _rate("sell_crop"))
-	if gs.skill_xp("field_ops") != planted + harvested + sold or gs.action_xp("sell_crop") != sold:
-		return "A sale gives XP by its price, got %d." % gs.skill_xp("field_ops")
+	if gs.skill_xp("agronomy") != planted + harvested + sold or gs.action_xp("sell_crop") != sold:
+		return "A sale gives XP by its price, got %d." % gs.skill_xp("agronomy")
 	if gs.sell_harvest_to_lin() != 0 or gs.action_count("sell_crop") != 1:
 		return "An empty bin is no sale."
 	if gs.plant_crop(Vector3i(9, 0, 9)) == "" or gs.action_count("plant_crop") != 1:
@@ -193,9 +195,9 @@ func _check_count(gs: GameStateScript) -> String:
 	var till: int = roundi(_rate("till"))
 	if gs.action_count("till") != 1 or gs.action_count("till", GUEST) != 2 or gs.action_xp("till", GUEST) != 2 * till:
 		return "Each player's tilling is counted: %s" % [gs.action_counts]
-	if gs.crop_xp(GUEST) != gs.skill_xp("field_ops", GUEST) - 2 * till or gs.crop_xp(GUEST) <= 0:
-		return "Crop XP is what Field Ops had from crops, not from tilling: %d" % gs.crop_xp(GUEST)
-	if gs.crop_xp() != gs.action_xp("sell_crop") or gs.crop_xp() != gs.skill_xp("field_ops") - till:
+	if gs.crop_xp(GUEST) != gs.skill_xp("agronomy", GUEST) - 2 * till or gs.crop_xp(GUEST) <= 0:
+		return "Crop XP is what crops gave, not tilling: %d" % gs.crop_xp(GUEST)
+	if gs.crop_xp() != gs.action_xp("sell_crop") or gs.crop_xp() != gs.skill_xp("agronomy") - till:
 		return "The seller's sale is theirs."
 	gs.credits = 100000
 	gs.tier1_unlocked = true
@@ -208,7 +210,7 @@ func _check_count(gs: GameStateScript) -> String:
 		return "The lab's XP is counted for the player who did the work."
 	gs._award_xp("slot_spool")
 	if gs.action_count("slot_spool") != 1 or gs.action_xp("slot_spool") != gs.skill_xp("husbandry"):
-		return "A farm skill's XP is counted for the player who did it."
+		return "Husbandry XP is counted for the player who did the work."
 	return "" if gs.action_count("no_such_source") == 0 and gs.action_xp("till", "player_9") == 0 else "Nothing done reads as 0."
 
 
@@ -232,7 +234,7 @@ func _check_saved(gs: GameStateScript) -> String:
 	data.erase("action_counts")
 	if gs.farm_from_dict(data) != "" or not gs.action_counts.is_empty() or gs.crop_xp() != 0:
 		return "An older save starts with nothing counted."
-	return "" if gs.skill_xp("field_ops") == roundi(_rate("plant_crop")) else "An older save keeps its XP."
+	return "" if gs.skill_xp("agronomy") == roundi(_rate("plant_crop")) else "An older save keeps its XP."
 
 
 func test_a_bad_count_is_refused() -> String:
