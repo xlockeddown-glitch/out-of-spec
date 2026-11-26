@@ -25,6 +25,12 @@ signal boulder_hit(hits: int)
 signal dig_rejected(reason: String)
 signal fill_rejected(reason: String)
 
+## Set by the menu panel while the game runs on behind it (co-op): this screen
+## then reads no driving keys, as with none held. Rover and walker both obey it.
+static var input_blocked: bool = false
+## Said when there is no ground to dig; the screens add where to dig.
+const ROCK_REFUSAL: String = "This rock can't be dug."
+
 ## Following another player's driving: how fast it closes in, and from how far it
 ## jumps there instead; and how far ahead of the last word it runs [PLACEHOLDER].
 const FOLLOW_PER_S: float = 12.0
@@ -282,7 +288,7 @@ func _park() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"rover_till", false) and not CoopWalkers.on_foot():
+	if event.is_action_pressed(&"rover_till", false) and not input_blocked and not CoopWalkers.on_foot():
 		_till_presses.append({"seed": GameState.current_seed(), "offset": GameState.planting_offset_steps})
 
 
@@ -297,7 +303,7 @@ func _physics_process(delta: float) -> void:
 		_till_presses.clear()
 		_applied_throttle = 0.0
 		_applied_steer = 0.0
-	var throttle: float = 0.0 if on_foot else Input.get_axis(&"rover_reverse", &"rover_forward")
+	var throttle: float = 0.0 if on_foot else 0.0 if input_blocked else Input.get_axis(&"rover_reverse", &"rover_forward")
 	var moves: bool = CoopRovers.moves_here(rover_id, throttle != 0.0 or (not _following and not is_stopped()))
 	if moves == _following:
 		_set_following(not moves)
@@ -400,12 +406,12 @@ func _raycast_to_relay() -> bool:
 
 func _sample_local_input(throttle: float) -> void:
 	# +steer = left = +yaw about Y.
-	var steer: float = Input.get_axis(&"rover_steer_right", &"rover_steer_left")
+	var steer: float = 0.0 if input_blocked else Input.get_axis(&"rover_steer_right", &"rover_steer_left")
 	_frames.append(UplinkFrame.new(_uplink_clock, throttle, steer))
 	for press: Dictionary in _till_presses:
 		queue_command(Command.TILL, str(press["seed"]), int(press["offset"]))
 	_till_presses.clear()
-	if Input.is_action_just_pressed(&"rover_zero_steering"):
+	if not input_blocked and Input.is_action_just_pressed(&"rover_zero_steering"):
 		queue_command(Command.ZERO_STEERING)
 
 
@@ -568,7 +574,7 @@ func dig_cell() -> Vector2i:
 func _change_ground(deeper: bool) -> void:
 	var rejected: Signal = dig_rejected if deeper else fill_rejected
 	if ground == null:
-		rejected.emit("This rock can't be dug." if deeper else "There is nothing to fill here.")
+		rejected.emit(ROCK_REFUSAL if deeper else "There is nothing to fill here.")
 		return
 	if not is_stopped():
 		rejected.emit("Stop the rover first.")

@@ -3,6 +3,8 @@ extends Control
 ## Robots at Bram's bay: order one, see what its sensors still need, release it.
 ## The order button is pressed twice.
 
+## The phone fills the screen from this fraction of its width (field_phone_hud.tscn).
+const PHONE_LEFT_ANCHOR: float = 0.68
 const TEAL: Color = Color("38E1C6")
 const AMBER: Color = Color("F5A623")
 const TEXT: Color = Color(0.85, 0.95, 0.88)
@@ -19,11 +21,14 @@ var _armed_id: String = ""
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	# Centered in the area left of the phone, not the whole screen.
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.anchor_right = PHONE_LEFT_ANCHOR
+	center.offset_right = 0.0
 	add_child(center)
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(980, 0)
+	panel.custom_minimum_size = Vector2(820, 0)
 	panel.add_theme_stylebox_override(&"panel", PlanBoardUI._panel_style())
 	center.add_child(panel)
 	var column := VBoxContainer.new()
