@@ -281,8 +281,17 @@ var rover_zone: String = "":
 		# (setting the same zone again, as a load does, keeps it).
 		if value != old and value != TUNNELS_ZONE:
 			rover_depth = 0
+		if value != old:
+			zone_heat_trip = false  # a heat trip is one rover trip: every way the rover leaves or arrives ends it
 		if value == "":
 			rover_lent = false  # a rover that is not in a zone is not lent to one
+## Host only, not saved: a vent's heat has struck the rover this trip (enter_vent), so
+## the instruments that ride it drift ZoneHazards.DRIFT_MULTIPLIER times as fast until
+## the trip ends. Cleared whenever rover_zone changes (leave_zone, move_rover(false),
+## bring_rover_home, a released field rover, a rescue, a new trip) and by farm_from_dict.
+## Only ever multiplies the wear add_rover_usage already adds: it never changes a
+## reading after the fact (docs/design/zones.md section 5).
+var zone_heat_trip: bool = false
 ## True while the farm's own rover is lent to a zone: driven in through the real
 ## entrance (move_rover), so the farm is without it. False when a zone's field rover
 ## (the TUNNEL_ROVER slot) is there for people who fast-travelled (fast_travel),
@@ -685,7 +694,7 @@ const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
 	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals",
-	"rover_in_tunnels", "player_places", "settle_due",
+	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip",
 ]
 
 
@@ -1019,6 +1028,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	_console_arrivals.clear()
 	_rescue_notes.clear()
 	_ore_at_entry = -1
+	zone_heat_trip = false
 	farm_loaded.emit()
 	lab_xp_changed.emit()
 	quests_changed.emit()
@@ -3413,6 +3423,7 @@ func _grow_pockets(day: int) -> void:
 func _on_day_started(day: int) -> void:
 	# A rover below stands on the new day's floor.
 	settle_rover_depth()
+	zone_heat_trip = false  # a heat trip is one day's trip
 	# Judged before the refill: the level only falls during the day, so empty
 	# now means it ran dry and the crops had no water.
 	var watered: bool = cistern_liters > 0.0
@@ -4058,8 +4069,14 @@ func add_rover_usage(meters: float, player_id: String = "", rover_id: String = "
 		return  # the host's rover wears the sensors
 	if not is_finite(meters) or meters < 0.0:
 		return
-	steering.add_usage(meters * skill_factor("steering_usage", player_id))
-	add_tire_usage(meters)
+	# A vent's heat (zone_heat_trip) multiplies the wear that is already there, on the
+	# instruments that ride the rover; the wheel nuts' count below is not wear.
+	# Only the rover that is in the zone feels it: the field rover, or the farm rover while
+	# lent. The farm rover on the farm never does.
+	var hot_rover: bool = rover_id == TUNNEL_ROVER or (rover_lent and rover_id == ROVER)
+	var heat: float = ZoneHazards.DRIFT_MULTIPLIER if zone_heat_trip and hot_rover else 1.0
+	steering.add_usage(meters * heat * skill_factor("steering_usage", player_id))
+	add_tire_usage(meters * heat)
 	# The wheels that wear are the farm rover's: a field rover's metres are not
 	# counted unless it is the farm rover lent to the zone.
 	if rover_id == TUNNEL_ROVER and not rover_lent:
@@ -4323,12 +4340,14 @@ func fast_travel(zone_id: String, player_id: String = "") -> String:
 		SaveGame.saving.emit()
 		rover_transforms[TUNNEL_ROVER] = TUNNEL_START
 		rover_zone = zone_id  # the farm rover stays where it is, home
+		zone_heat_trip = false  # a new trip, even into the zone the rover already stood in
 		_ore_at_entry = -1  # a fast-travel rescue takes credits only [PLACEHOLDER]: the farm's ore is not the zone's
 		rover_epoch += 1
 	elif plan == FastTravel.RE_PARK:
 		if CoopRovers.driver(TUNNEL_ROVER) != "":
 			return FastTravel.text("someone_driving")
 		rover_depth = 0
+		zone_heat_trip = false  # a new trip from the hub
 		rover_transforms[TUNNEL_ROVER] = TUNNEL_START
 		rover_epoch += 1
 	player_places[player_id] = [zone_id, rover_depth]
@@ -5052,6 +5071,34 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 		add_credits(int(pay["credits"]))
 	finds_changed.emit()
 	SaveGame.saving.emit()
+	return ""
+
+
+## Host: the rover is in a vent's cell (Lava Tubes, depth 1), for the player there.
+## `player_id` is filled in from the connection (FarmCommands). Returns "" or why not.
+## The host decides from its own state: the player is at that depth, the vent is one
+## of today's and is hot at the HOST's clock (a guest's clock can differ by a few game
+## minutes: a cool vent is refused, a harmless miss), and the host's copy of the tunnel
+## rover is within reach of it. If it is, zone_heat_trip is set for the trip (once: a
+## second blast in the same trip says nothing more) and the phone says so. The 20 game
+## minutes of docs/design/zones.md section 5 are not built (follow-up): advancing the
+## shared clock mid-trip meets the 02:00 recall and the other players' clocks.
+func enter_vent(vent_id: String, layout_day: int, player_id: String = "") -> String:
+	var day: int = GameClock.get_day_index()
+	if layout_day != day:
+		return "That was yesterday's floor. Look again."
+	var vents: Array = ZoneHazards.vents_for(world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, day)
+	var reason: String = ZoneHazards.entry_problem(vent_id, vents, GameClock.elapsed_days, place_of(player_id), depth_of(player_id), rover_depth)
+	if reason == "":
+		var today: Dictionary = ZoneDepth.layout(world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, day)
+		var vent: Dictionary = ZoneHazards.vent_in(vents, vent_id)
+		var at: Variant = _rover_pose_now(TUNNEL_ROVER)  # honours the told pose and the drive lease
+		reason = ZoneHazards.reach_problem(TunnelRock.at_in(today["grid"], vent["cell"]), rover_zone, at != null, at if at != null else Vector3.ZERO)
+	if reason != "":
+		return reason
+	if not zone_heat_trip:
+		zone_heat_trip = true
+		post_phone(ZoneHazards.WORDS["struck"])
 	return ""
 
 
