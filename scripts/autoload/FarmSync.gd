@@ -30,6 +30,7 @@ const SHOWN_BY: Dictionary = {
 	&"lab_changed": ["lab_size", "lab_areas", "lab_build", "lab_layout"],
 	&"robots_changed": ["robots"],
 	&"terrain_changed": ["dug"],
+	&"pit_seep_changed": ["pit_seep"],
 	&"boulders_changed": ["boulder_hits"],
 	&"blocks_changed": ["found_blocks"],
 	&"pockets_changed": ["found_pockets"],

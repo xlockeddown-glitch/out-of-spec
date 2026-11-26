@@ -34,6 +34,11 @@ func _wet(dug: Dictionary[Vector2i, int], pieces: Dictionary[Vector2i, int] = {}
 	return found
 
 
+## The pits are as full as they will get: the ground water has had its time.
+func _flood() -> void:
+	GameState.pit_seep.assign(PitWater.work_out(GameState.dug, {})["levels"])
+
+
 func _middle(cell: Vector2i) -> Vector2:
 	return (Vector2(cell) + Vector2.ONE * 0.5) * Terrain.CELL_M
 
@@ -287,6 +292,7 @@ func test_the_view_makes_blocks_on_the_ford_layer_and_clears_when_it_leaves() ->
 	PitWater.clear()
 	GameState.dug.clear()
 	GameState.dug.merge(_cone(FLAT, 4))
+	_flood()
 	var view := PitWaterView.new()
 	(Engine.get_main_loop() as SceneTree).root.add_child(view)
 	var problems: PackedStringArray = []
@@ -301,6 +307,7 @@ func test_the_view_makes_blocks_on_the_ford_layer_and_clears_when_it_leaves() ->
 	view.free()
 	GameState.dug.clear()
 	GameState.dug.merge(saved)
+	GameState.pit_seep.clear()
 	if not PitWater.levels().is_empty() or not PitWater.blocks().is_empty():
 		problems.append("Leaving the farm must clear the water.")
 	return "\n".join(problems)
@@ -310,7 +317,9 @@ func test_the_view_redraws_only_what_changed_and_follows_digging_and_filling() -
 	var saved: Dictionary[Vector2i, int] = GameState.dug.duplicate()
 	GameState.dug.clear()
 	GameState.dug.merge(_almost_deep(FLAT))
+	_flood()
 	GameState.dug.merge(_cone(SLOPE, 4))
+	_flood()
 	var view := PitWaterView.new()
 	var root: Window = (Engine.get_main_loop() as SceneTree).root
 	root.add_child(view)
@@ -331,6 +340,7 @@ func test_the_view_redraws_only_what_changed_and_follows_digging_and_filling() -
 	for water: Variant in first:
 		kept.append(water)
 	GameState.dug[FLAT] = 4
+	_flood()
 	view._refresh()
 	var survivors: int = 0
 	for water: Variant in kept:
@@ -345,6 +355,7 @@ func test_the_view_redraws_only_what_changed_and_follows_digging_and_filling() -
 	root.remove_child(view)
 	view.free()
 	GameState.dug.merge(saved)
+	GameState.pit_seep.clear()
 	return "\n".join(problems)
 
 
@@ -436,6 +447,7 @@ func test_a_walker_where_the_ground_turns_deep_is_moved_to_the_nearest_clear_spo
 	var saved: Dictionary[Vector2i, int] = GameState.dug.duplicate()
 	GameState.dug.clear()
 	GameState.dug.merge(dug)
+	_flood()
 	var tree: SceneTree = Engine.get_main_loop()
 	var walker := Walker.new()
 	tree.root.add_child(walker)
@@ -447,6 +459,7 @@ func test_a_walker_where_the_ground_turns_deep_is_moved_to_the_nearest_clear_spo
 	walker.free()
 	GameState.dug.clear()
 	GameState.dug.merge(saved)
+	GameState.pit_seep.clear()
 	return problem
 
 
@@ -522,6 +535,7 @@ func test_a_rover_and_a_walker_already_where_it_turns_deep_are_freed_by_the_view
 	tree.root.add_child(walker)
 	GameState.dug.clear()
 	GameState.dug.merge(_almost_deep(FLAT))
+	_flood()
 	var view := PitWaterView.new()
 	tree.root.add_child(view)
 	view.changed.connect(rover.leave_deep_water)
@@ -535,6 +549,7 @@ func test_a_rover_and_a_walker_already_where_it_turns_deep_are_freed_by_the_view
 	if not rover.global_position.is_equal_approx(rover_at) or not PitWater.blocks().is_empty():
 		problems.append("Shallow water must leave them alone.")
 	GameState.dug[FLAT] = 4
+	_flood()
 	view._refresh()
 	var rover_now := Vector2(rover.global_position.x, rover.global_position.z)
 	var walker_now := Vector2(walker.global_position.x, walker.global_position.z)
@@ -556,6 +571,7 @@ func test_a_rover_and_a_walker_already_where_it_turns_deep_are_freed_by_the_view
 	ground.free()
 	GameState.dug.clear()
 	GameState.dug.merge(saved)
+	GameState.pit_seep.clear()
 	return "\n".join(problems)
 
 
@@ -580,6 +596,7 @@ func test_a_stretch_draws_only_its_own_cells_even_with_other_water_in_its_box() 
 	var saved: Dictionary[Vector2i, int] = GameState.dug.duplicate()
 	GameState.dug.clear()
 	GameState.dug.merge(dug)
+	_flood()
 	var view := PitWaterView.new()
 	(Engine.get_main_loop() as SceneTree).root.add_child(view)
 	var problems: PackedStringArray = []
@@ -601,6 +618,7 @@ func test_a_stretch_draws_only_its_own_cells_even_with_other_water_in_its_box() 
 	view.free()
 	GameState.dug.clear()
 	GameState.dug.merge(saved)
+	GameState.pit_seep.clear()
 	return "\n".join(problems)
 
 
@@ -613,6 +631,7 @@ func test_the_engine_stops_a_body_at_deep_pit_water_and_not_at_shallow() -> Stri
 	var view := PitWaterView.new()
 	GameState.dug.clear()
 	GameState.dug.merge(_cone(FLAT, 4))
+	_flood()
 	tree.root.add_child(view)
 	var level_m: float = PitWater.level_m(middle)
 	var space: PhysicsDirectSpaceState3D = tree.root.world_3d.direct_space_state
@@ -642,6 +661,7 @@ func test_the_engine_stops_a_body_at_deep_pit_water_and_not_at_shallow() -> Stri
 	# Shallow: three steps in the middle, no block, the capsule goes through.
 	GameState.dug.clear()
 	GameState.dug.merge(_almost_deep(FLAT))
+	_flood()
 	var shallow := PitWaterView.new()
 	tree.root.add_child(shallow)
 	if not space.cast_motion(capsule).is_empty() and space.cast_motion(capsule)[0] < 0.99:
@@ -650,6 +670,7 @@ func test_the_engine_stops_a_body_at_deep_pit_water_and_not_at_shallow() -> Stri
 	shallow.free()
 	GameState.dug.clear()
 	GameState.dug.merge(saved)
+	GameState.pit_seep.clear()
 	return "\n".join(problems)
 
 
@@ -658,6 +679,7 @@ func test_the_view_works_out_the_water_only_when_the_digging_or_channels_change_
 	var saved_pieces: Dictionary[Vector2i, int] = GameState.stone_pieces.duplicate()
 	GameState.dug.clear()
 	GameState.dug.merge(_almost_deep(FLAT))
+	_flood()
 	var view := PitWaterView.new()
 	(Engine.get_main_loop() as SceneTree).root.add_child(view)
 	var problems: PackedStringArray = []
@@ -677,6 +699,7 @@ func test_the_view_works_out_the_water_only_when_the_digging_or_channels_change_
 		problems.append("Nothing was dug, yet the water was worked out again.")
 	# A dig is a change, and several changes in a frame are one look.
 	GameState.dug[FLAT] = 4
+	_flood()
 	var before: int = view.queued_count
 	for i: int in 5:
 		GameState.terrain_changed.emit()
@@ -696,6 +719,7 @@ func test_the_view_works_out_the_water_only_when_the_digging_or_channels_change_
 	view.free()
 	GameState.dug.clear()
 	GameState.dug.merge(saved)
+	GameState.pit_seep.clear()
 	GameState.stone_pieces.assign(saved_pieces)
 	return "\n".join(problems)
 

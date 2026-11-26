@@ -52,7 +52,7 @@ static func heading(keys: Vector2, view: Basis) -> Vector3:
 
 
 func _physics_process(delta: float) -> void:
-	var keys := Vector2(
+	var keys := Vector2.ZERO if RoverController.input_blocked else Vector2(
 		Input.get_axis(&"rover_steer_left", &"rover_steer_right"),
 		Input.get_axis(&"rover_forward", &"rover_reverse"))
 	walk(heading(keys, camera.global_basis), delta)
