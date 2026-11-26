@@ -152,7 +152,10 @@ func test_a_seep_value_that_is_not_a_finite_number_is_refused() -> String:
 	var data: Dictionary = gs.farm_to_dict()
 	var cell: Vector2i = FLAT
 	for bad: Variant in ["deep", INF, NAN, 3]:
-		(data["pit_seep"] as Dictionary)[cell] = bad
+		# A save read back from disk is untyped, so it can hold anything.
+		var seep: Dictionary = {}
+		seep[cell] = bad
+		data["pit_seep"] = seep
 		if gs.farm_dict_problem(data) == "":
 			gs.free()
 			return "A seep of %s was accepted." % str(bad)
