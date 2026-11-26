@@ -257,8 +257,12 @@ func test_a_nut_s_closeness_is_0_to_100() -> String:
 	var sweet: float = TorqueToSpec.BASE_SWEET
 	if TorqueToSpec.closeness(0.7, 0.7) != 100 or TorqueToSpec.closeness(0.7 + sweet * 0.999, 0.7) != TorqueToSpec.SWEET_SCORE:
 		return "On the line is 100, and the sweet spot's edge is SWEET_SCORE."
-	if TorqueToSpec.closeness(0.7 - TorqueToSpec.MISS_AT * sweet, 0.7) != 0 or TorqueToSpec.closeness(0.0, 0.85) != 0 or TorqueToSpec.closeness(1.0, 0.6, sweet * 0.5) != 0:
-		return "MISS_AT half-widths away, and anything farther, is 0."
+	if TorqueToSpec.closeness(0.7 - TorqueToSpec.MISS_DISTANCE, 0.7) != 0 or TorqueToSpec.closeness(0.0, 0.85) != 0 or TorqueToSpec.closeness(1.0, 0.6, sweet * 0.5) != 0:
+		return "MISS_DISTANCE away, and anything farther, is 0."
+	# The widest sweet spot there is does not move where a miss begins.
+	var widest: float = TorqueToSpec.sweet_half_width(1.0, MinigameSettings.sweet_factor(RELAXED))
+	if widest >= TorqueToSpec.MISS_DISTANCE * 0.5 or TorqueToSpec.closeness(0.7 - TorqueToSpec.MISS_DISTANCE, 0.7, widest) != 0 or TorqueToSpec.closeness(0.7 + TorqueToSpec.MISS_DISTANCE, 0.7, widest) != 0:
+		return "Calibration and the difficulty widen the sweet spot only: a miss begins at the same distance."
 	var last: int = 100
 	for i: int in 200:
 		var off: float = i * 0.004
@@ -371,7 +375,7 @@ func test_a_long_hold_is_let_go() -> String:
 		# The key stays down.
 		game.advance(TorqueToSpec.MAX_HOLD_S)
 		var let_go: bool = game.stage() != TorqueToSpec.Stage.CLIMB and not game.is_held() and game.nuts_done() == 1
-		var over: bool = game.closenesses()[0] < TorqueToSpec.SWEET_SCORE if let_go else false
+		var over: bool = game.closenesses()[0] == TorqueToSpec.MISSED if let_go else false
 		# The key comes up at last: nothing. Only a new press starts the next nut.
 		game.hold(false)
 		game.advance(TorqueToSpec.SET_S + 0.1)
@@ -380,7 +384,59 @@ func test_a_long_hold_is_let_go() -> String:
 		var again: bool = game.stage() == TorqueToSpec.Stage.CLIMB and game.is_held()
 		game.free()
 		if not holding or not let_go or not over or not waits or not again:
-			return "A hold longer than MAX_HOLD_S is let go and is that nut's torque, and a new press starts the next: %s on %d" % [[holding, let_go, over, waits, again], mode]
+			return "A hold longer than MAX_HOLD_S is let go and that nut is a miss, and a new press starts the next: %s on %d" % [[holding, let_go, over, waits, again], mode]
+	# The cap's own comment: the slowest climb, on the slowest difficulty, is
+	# past its line before the game lets go.
+	for mode: int in [RELAXED, STANDARD, SHARP]:
+		if TorqueToSpec.CLIMB_MAX_S / MinigameSettings.speed_factor(mode) >= TorqueToSpec.MAX_HOLD_S:
+			return "The slowest climb reaches its line before the hold cap on %d: %f s of %f." % [mode, TorqueToSpec.CLIMB_MAX_S / MinigameSettings.speed_factor(mode), TorqueToSpec.MAX_HOLD_S]
+	return ""
+
+
+## Plays a started game to its end, letting go of each nut only at `top` of
+## the bar. A `top` over 1 never lets go: the game does.
+func _play_to_top(game: TorqueToSpec, top: float) -> int:
+	var guard: int = 0
+	while game.is_playing() and guard < 5000:
+		guard += 1
+		match game.stage():
+			TorqueToSpec.Stage.READY:
+				game.hold(false)
+				game.hold(true)
+			TorqueToSpec.Stage.CLIMB:
+				if game.torque() >= top:
+					game.hold(false)
+				else:
+					game.advance(STEP)
+			TorqueToSpec.Stage.SET:
+				game.advance(STEP)
+			TorqueToSpec.Stage.RESULT:
+				game.advance(TorqueToSpec.RESULT_ARM_S + STEP)
+				game.hold(false)
+				game.hold(true)
+	return _scores[-1] if not _scores.is_empty() else -99
+
+
+func test_holding_every_nut_to_the_top_is_a_poor_try() -> String:
+	# Relaxed with all of Calibration is the widest sweet spot there is.
+	for mode: int in [RELAXED, STANDARD, SHARP]:
+		for motion_seed: int in 100:
+			var game: TorqueToSpec = _game()
+			game.play(1.0, mode, motion_seed)
+			var score: int = _play_to_top(game, 2.0)
+			var missed: bool = game.closenesses().count(TorqueToSpec.MISSED) == TorqueToSpec.NUTS
+			game.free()
+			if score != 0 or not missed:
+				return "Never letting go misses every nut and scores 0, on seed %d and difficulty %d: %d." % [motion_seed, mode, score]
+	# Nor does letting go just under the bar's end earn a grade over many lines.
+	var sum: int = 0
+	for motion_seed: int in 100:
+		var game: TorqueToSpec = _game()
+		game.play(1.0, RELAXED, motion_seed)
+		sum += _play_to_top(game, 0.97)
+		game.free()
+	if sum / 100.0 >= 60.0 or sum <= 0:
+		return "Letting go at the top of the bar every time is a poor try over many seeds: %f." % (sum / 100.0)
 	return ""
 
 

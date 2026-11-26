@@ -9,8 +9,8 @@ extends Control
 ## One button plays it (Space, Enter, the mouse button, or the gamepad's
 ## accept). Esc or the gamepad's cancel skips it, and so does SKIP. Nothing
 ## moves until a press: each nut waits for its own, with no clock on the wait.
-## No hold is longer than MAX_HOLD_S: the game lets go of a longer one, and that
-## is the nut's torque. Torque is in shares of the bar: 0 is slack and 1 is the
+## No hold is longer than MAX_HOLD_S: the game lets go of a longer one, and a
+## nut the game let go of is a miss. Torque is in shares of the bar: 0 is slack and 1 is the
 ## bar's end. The scoring and the climb are in the static functions, and
 ## advance() and hold() play it with no frames.
 
@@ -44,13 +44,18 @@ const BASE_SWEET: float = 0.04
 ## Section 7.3: the Calibration skill widens the sweet spot by up to this much more.
 const SKILL_WIDENING: float = 1.0
 ## Inside the sweet spot a nut's closeness runs from 100 at the line down to
-## this at its edge; this many half-widths from the line it is 0.
+## this at its edge. This far from the line, in shares of the bar, it is 0:
+## a fixed distance, so Calibration and the difficulty widen only the sweet
+## spot and never move where a miss begins.
 const SWEET_SCORE: int = 95
-const MISS_AT: float = 8.0
+const MISS_DISTANCE: float = 0.32
 ## Section 7.5 allows no hold longer than 3 s. This game lets go sooner, at
-## 2.5 s: the slowest climb on Relaxed is past its line by then.
+## 2.5 s: the slowest climb on Relaxed is past its line by then. A nut the
+## game let go of (at the cap or at the bar's end) scores MISSED: the player
+## never let go, so holding every nut to the top earns nothing.
 const MAX_HOLD_S: float = 2.5
-const HOLD_CAP_HINT: String = "The hold ran out: that is this nut's torque."
+const MISSED: int = 0
+const HOLD_CAP_HINT: String = "You never let go: this nut is a miss."
 ## How long a nut's own result shows before the next nut waits.
 const SET_S: float = 0.6
 ## At the result a press sooner than this is not taken.
@@ -118,13 +123,15 @@ static func climb_rate(hold_s: float, line: float, climb_s: float, phase: float,
 
 ## One nut's closeness, 0 to 100: the torque it was left at against its click
 ## line, with a sweet spot of ±`sweet_half`. Inside the sweet spot it is 95 to
-## 100; outside it falls in a straight line to 0 at MISS_AT half-widths. Under
-## the line and over it count the same.
+## 100; outside it falls in a straight line to 0 at MISS_DISTANCE from the
+## line, wherever the sweet spot ends. Under the line and over it count the same.
 static func closeness(torque: float, line: float, sweet_half: float = BASE_SWEET) -> int:
-	var widths: float = absf(torque - line) / maxf(sweet_half, 0.000001)
-	if widths <= 1.0:
-		return roundi(MinigameScore.MAX_SCORE - (MinigameScore.MAX_SCORE - SWEET_SCORE) * widths)
-	return clampi(floori(SWEET_SCORE - (widths - 1.0) * SWEET_SCORE / (MISS_AT - 1.0)), 0, SWEET_SCORE - 1)
+	# Snapped, so the same distance under and over never lands on two sides of a whole point.
+	var off: float = snappedf(absf(torque - line), 0.000001)
+	var sweet: float = clampf(sweet_half, 0.000001, MISS_DISTANCE * 0.5)
+	if off <= sweet:
+		return roundi(MinigameScore.MAX_SCORE - (MinigameScore.MAX_SCORE - SWEET_SCORE) * off / sweet)
+	return clampi(floori(SWEET_SCORE * (MISS_DISTANCE - off) / (MISS_DISTANCE - sweet)), 0, SWEET_SCORE - 1)
 
 
 ## The score, 0 to 100: the mean closeness of the five nuts. A nut not done
@@ -284,9 +291,10 @@ func hold(down: bool) -> void:
 				_finish(_score)
 
 
-## The nut is left at the torque it has. `capped`: the game let go, not the player.
+## The nut is left at the torque it has. `capped`: the game let go, not the
+## player, and the nut is a miss wherever the torque stood.
 func _set_nut(capped: bool) -> void:
-	_closeness.append(closeness(_torque, _lines[_nut], _sweet))
+	_closeness.append(MISSED if capped else closeness(_torque, _lines[_nut], _sweet))
 	if _closeness.size() >= NUTS:
 		_score = score(_closeness)
 		_begin(Stage.RESULT)

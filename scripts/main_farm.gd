@@ -895,6 +895,13 @@ func _try_wheel_service() -> void:
 		RoverController.input_blocked = was_blocked
 		if not is_inside_tree():
 			return
+		# The rover's controls were held, but the game may have run a long while
+		# and the rover may have left by another way: Bram services only a rover
+		# that is still in his bay, so nothing is sent.
+		if not _bram_bay.rover_inside:
+			_hud.push_log("BRAM: The rover left the bay. Nothing was serviced.")
+			_refresh_bram()
+			return
 		if score >= 0:
 			# With no game played nothing more is sent: the service is as it always was.
 			arguments = [score]
