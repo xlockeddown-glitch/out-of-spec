@@ -16,6 +16,8 @@ var _bed: Button
 var _close_button: Button
 var _addresses: PackedStringArray = []
 var _problem: String = ""
+## What the bed button last said, shown as its own line.
+var _bed_note: String = ""
 
 
 func _ready() -> void:
@@ -84,6 +86,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func open() -> void:
 	_problem = ""
+	_bed_note = ""
 	_addresses = local_addresses()
 	_refresh()
 	_panel.show()
@@ -111,18 +114,17 @@ func _refresh() -> void:
 		_about.text += "\n\nGO TO BED ends the day."
 	if _bed.disabled:
 		_about.text += " " + here
-	# Not hosting, the problem is already the whole text above.
-	if _problem != "" and (FarmCommands.guest or CoopSession.is_hosting()):
-		_about.text += "\n\n" + _problem
+	if _bed_note != "":
+		_about.text += "\n\n" + _bed_note
 	# A farm run on its own, not from the title menu, is nobody's to share.
 	_action.disabled = not FarmCommands.guest and not SaveGame.farm_open
 
 
 func _on_bed() -> void:
 	if GameState.local_player_id in CoopBeds.in_bed:
-		_problem = str(await FarmCommands.request(&"get_up"))
+		_bed_note = str(await FarmCommands.request(&"get_up"))
 	else:
-		_problem = str(await FarmCommands.request(&"go_to_bed"))
+		_bed_note = str(await FarmCommands.request(&"go_to_bed"))
 	if _panel.visible:
 		_refresh()
 

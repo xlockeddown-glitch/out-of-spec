@@ -131,10 +131,20 @@ func test_someone_joining_holds_a_solo_bed() -> String:
 		return "" if beds.go_to_bed("player_1") == "" else "A dropped joiner must not block bed")
 
 
-func test_beds_are_not_in_the_dome_or_tunnels() -> String:
-	if BedsScript.scene_refusal(SceneSwitcher.DOME_SCENE) == "" or BedsScript.scene_refusal(SceneSwitcher.TUNNELS_SCENE) == "":
-		return "No bed in the dome or tunnels"
+func test_beds_are_on_the_farm_only() -> String:
+	for path: String in [SceneSwitcher.DOME_SCENE, SceneSwitcher.TUNNELS_SCENE, SceneSwitcher.TITLE_SCENE, ""]:
+		if BedsScript.scene_refusal(path) == "":
+			return "No bed at '%s'" % path
 	return "" if BedsScript.scene_refusal(SceneSwitcher.FARM_SCENE) == "" else "The farm has the bed"
+
+
+func test_game_state_refuses_the_local_player_off_the_farm() -> String:
+	var held: bool = SaveGame.farm_open
+	SaveGame.farm_open = false
+	var day: float = GameClock.elapsed_days
+	var why: String = GameState.go_to_bed()
+	SaveGame.farm_open = held
+	return "" if why != "" and GameClock.elapsed_days == day else "Bed with no farm open must be refused"
 
 
 func test_no_bed_while_paused_or_with_no_farm_open() -> String:

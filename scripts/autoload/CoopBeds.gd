@@ -39,14 +39,7 @@ func together() -> bool:
 
 ## Someone has connected to the host and is still joining.
 func joining() -> bool:
-	var links: Variant = session.get("_links")
-	if not links is Dictionary:
-		return false
-	for id: Variant in links:
-		var link: Dictionary = links[id]
-		if int(id) > 1 and link.get("player", "") == "" and not link.get("gone", false):
-			return true
-	return false
+	return session.someone_joining()
 
 
 ## Why the local player can't go to bed where they are, or "".
@@ -55,15 +48,14 @@ func here_refusal() -> String:
 		return "No farm is open."
 	if clock.paused:
 		return "The clock is paused."
-	var tree: SceneTree = session.get_tree()
-	var scene: Node = tree.current_scene if tree != null else null
+	var scene: Node = session.get_tree().current_scene if session.is_inside_tree() else null
 	return scene_refusal(scene.scene_file_path if scene != null else "")
 
 
-## Beds are on the farm, not in the dome or the tunnels.
+## Beds are on the farm, and nowhere else (no scene counts as elsewhere).
 static func scene_refusal(scene_path: String) -> String:
-	if scene_path in [SceneSwitcher.DOME_SCENE, SceneSwitcher.TUNNELS_SCENE]:
-		return "Go to bed from the farm, not the dome or the tunnels."
+	if scene_path != SceneSwitcher.FARM_SCENE:
+		return "Go to bed from the farm, not the dome, the tunnels or a menu."
 	return ""
 
 

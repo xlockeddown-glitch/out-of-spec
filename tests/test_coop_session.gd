@@ -239,6 +239,20 @@ func test_a_flood_and_a_silent_connection_are_dropped() -> String:
 	return _finish("" if _until(func() -> bool: return host._links.is_empty()) else "A silent connection must be dropped")
 
 
+func test_someone_joining_is_only_until_the_handshake_ends() -> String:
+	var host: Node = _host()
+	if host.someone_joining():
+		return _finish("No one is joining a fresh host")
+	host.join_timeout_ms = 200
+	_stranger(host, false)
+	if not _until(func() -> bool: return host.someone_joining()):
+		return _finish("A connection that has not joined must count as joining")
+	if not _until(func() -> bool: return not host.someone_joining()):
+		return _finish("A silent handshake must time out and stop counting")
+	var guest: Node = _guest(host)
+	return _finish("" if guest.is_guest() and not host.someone_joining() else "A joined guest is not joining")
+
+
 func test_a_host_that_makes_no_sense_is_left() -> String:
 	for bad: Array in [[SessionScript.COMMAND, 1, "start_lab_grow", []], [SessionScript.LEFT, "player_2"],
 			[SessionScript.JOINED, ""], [SessionScript.STATE, { "o": RefCounted.new() }]]:
