@@ -97,7 +97,7 @@ func _is_done(gs: GameStateScript, id: String) -> bool:
 # --- The shipped quests ---------------------------------------------------------
 
 func test_shipped_quests_are_readable() -> String:
-	var known: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter"]
+	var known: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job"]
 	var ids: Array[String] = []
 	for quest: Dictionary in QuestEngine.quests():
 		ids.append(str(quest["id"]))
@@ -193,7 +193,8 @@ func _check_l3(gs: GameStateScript) -> String:
 ## Bought at full price (from Kestrel) before the lab was Trusted: the contract
 ## is then never offered, so L3 can never be. It is closed with nothing paid.
 func test_l3_is_closed_unpaid_when_its_standard_was_bought_first() -> String:
-	return _run(_check_l3_closed)
+	# L1 and L3 only: S3 is offered at credibility 20, with lines of its own.
+	return _run(_check_l3_closed, _shipped([L1, L3]))
 
 
 func _check_l3_closed(gs: GameStateScript) -> String:

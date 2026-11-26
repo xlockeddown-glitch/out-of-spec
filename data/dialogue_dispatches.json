@@ -231,6 +231,15 @@
         "warmly_dispatch_clean": "Your first audit is on file with nothing in it for me to relay. I had three apology templates ready and have put them back in the drawer. Warmly, Dispatch.",
         "warmly_dispatch_grace": "Your first audit is on file. The form says warning, so that is what I filed. Someone sat up with your paperwork so that it would say no more than that, and left a mug on your bench. I am told the ring comes out. I would not hurry. Warmly, Dispatch."
       }
+    },
+    "chet": {
+      "name": "Chet",
+      "quests": {
+        "certified_in_three_fonts_offer": "Chet here. Chet's Calibration, CERTIFIED in three fonts, you have seen the van. One of my customers has a gauge that will not read right however hard I eyeball it. There is an envelope under your airlock. This stays between the two of us.",
+        "certified_in_three_fonts_again": "The envelope is back under your airlock. The gauge still reads wrong, and I am still not asking anyone else.",
+        "certified_in_three_fonts_clean": "The customer says it reads right, and on the day, and the paperwork goes all the way up. I checked. I did not know it could do that. The whole envelope is yours, and I owe you one. Tell nobody.",
+        "certified_in_three_fonts_sour": "Well, it is back. Not when I said it would be, or not with paperwork I can show anyone, and I had to eyeball an excuse for the customer. Half the envelope is yours. We are square."
+      }
     }
   }
 }
