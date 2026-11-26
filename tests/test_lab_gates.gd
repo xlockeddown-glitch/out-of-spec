@@ -250,7 +250,7 @@ func test_a_save_from_before_the_gates_keeps_what_it_had() -> String:
 	for gate: String in ["tier1", "medium_lab"]:
 		if problem == "" and not loaded.lab_gate_open(gate):
 			problem = "The old farm keeps '%s' open." % gate
-	for gate: String in ["tier2", "large_lab", "job_board", "tier3"]:
+	for gate: String in ["tier2", "job_board", "tier3"]:
 		if problem == "" and loaded.lab_gate_open(gate):
 			problem = "The old farm had not '%s' open, so it waits." % gate
 	if problem == "" and loaded.lab_level() != gs.lab_level():
@@ -307,4 +307,167 @@ func test_the_provisional_way_through_pays_toward_the_level() -> String:
 	if problem == "" and gs.provisional_lab_xp(quest) != 0:
 		problem = "At the level it pays nothing extra."
 	gs.free()
+	return problem
+
+
+## A farm of the day before the gates, with an OIRM-certified Tier 2 standard and
+## the sign-off but no Tier 3 bought, written as a save without the key.
+func _old_tier_3_ready_save() -> Dictionary:
+	var gs: GameStateScript = _state()
+	GameClock.elapsed_days = 6.0
+	gs.lab_gates_kept = gs.all_lab_gate_ids()  # the setup buys past the gates
+	for id: String in gs.sensors:
+		gs.get_sensor(id).max_error = INF
+	gs.buy_standard(FM3)
+	gs.send_to_oirm(FM3)
+	gs.traceable_lab = true
+	gs.buy_standard(TW6)
+	gs.oirm_calibrate(TW6, 7)
+	var old: Dictionary = gs.farm_to_dict()
+	old.erase("lab_gates_kept")
+	var open: bool = gs.tier_problem(HB700) == ""
+	gs.free()
+	return old if open else {}
+
+
+func test_an_old_save_with_a_certified_tier_2_keeps_tier_3() -> String:
+	var saved: float = GameClock.elapsed_days
+	var old: Dictionary = _old_tier_3_ready_save()
+	var problem: String = ""
+	if old.is_empty():
+		problem = "The setup must open Tier 3 by its old condition."
+	# A boot load: nothing was loaded before, the logs are read as it loads.
+	var loaded: GameStateScript = _state()
+	if problem == "" and loaded.farm_from_dict(old) != "":
+		problem = "The old save loads."
+	for gate: String in ["tier2", "tier3"]:
+		if problem == "" and not loaded.lab_gate_open(gate):
+			problem = "The old farm keeps '%s' open: %s" % [gate, loaded.lab_gates_kept]
+	loaded.free()
+	GameClock.elapsed_days = saved
+	return problem
+
+
+func test_loading_one_save_then_another_carries_nothing_over() -> String:
+	var saved: float = GameClock.elapsed_days
+	var a: Dictionary = _old_tier_3_ready_save()
+	var fresh: GameStateScript = _state()
+	var b: Dictionary = fresh.farm_to_dict()
+	b.erase("lab_gates_kept")
+	fresh.free()
+	var gs: GameStateScript = _state()
+	var problem: String = ""
+	if gs.farm_from_dict(a) != "" or not gs.lab_gate_open("tier3"):
+		problem = "Save A keeps Tier 3 open: %s" % [gs.lab_gates_kept]
+	if problem == "" and gs.farm_from_dict(b) != "":
+		problem = "Save B loads."
+	for gate: String in ["tier2", "tier3", "oirm_account"]:
+		if problem == "" and gs.lab_gate_open(gate):
+			problem = "Save B had not '%s' open, and A's state is not B's: %s" % [gate, gs.lab_gates_kept]
+	gs.free()
+	GameClock.elapsed_days = saved
+	return problem
+
+
+func test_an_old_save_keeps_the_next_lab_and_the_first_trip() -> String:
+	var gs: GameStateScript = _state()
+	gs.owned_standards[FM3] = 0
+	gs.lab_size = 0
+	gs.contract_state = "active"
+	var old: Dictionary = gs.farm_to_dict()
+	old.erase("lab_gates_kept")
+	var loaded: GameStateScript = _state()
+	var problem: String = ""
+	if loaded.farm_from_dict(old) != "":
+		problem = "The old save loads."
+	# Growing took credits and ore and nothing else; so did the first trip.
+	for gate: String in ["medium_lab", "oirm_account", "tier1"]:
+		if problem == "" and not loaded.lab_gate_open(gate):
+			problem = "The old farm keeps '%s' open: %s" % [gate, loaded.lab_gates_kept]
+	if problem == "" and loaded.lab_gate_open("large_lab"):
+		problem = "Only the next size was open, not the one after."
+	if problem == "" and not loaded.KEPT_CONTRACT_SALE in loaded.lab_gates_kept:
+		problem = "An active contract keeps its sale: %s" % [loaded.lab_gates_kept]
+	loaded.free()
+	gs.free()
+	return problem
+
+
+func test_every_gate_id_the_game_uses_is_a_row() -> String:
+	var gs: GameStateScript = _state()
+	var have: Array[String] = gs.all_lab_gate_ids()
+	var used: Array[String] = ["oirm_account", "job_board", "accredited_jobs", "robot_1"]
+	for id: String in gs.all_standard_ids():
+		var tier: int = (gs.sensors[id] as DriftingSensor).tier
+		if tier >= 1:
+			used.append("tier%d" % tier)
+	for size: Dictionary in gs.lab_sizes().slice(1):
+		used.append(gs.lab_size_gate_id(size))
+	for job: Dictionary in DataManager.get_records(&"robots", "jobs"):
+		if job.has("lab_gate"):
+			used.append(str(job["lab_gate"]))
+	for band: Dictionary in gs._cred_bands():
+		used.append(gs.job_gate_id(str(band.get("name", ""))))
+	for count: int in [0, 1, 2, 5, 9]:
+		gs.robots.clear()
+		for n: int in count:
+			gs.robots["R-%d" % n] = {}
+		used.append(gs.robot_gate_id())
+	gs.robots.clear()
+	var problem: String = ""
+	for id: String in used:
+		if problem == "" and not id in have:
+			problem = "The game asks for the gate '%s' and the table has no row." % id
+	# The contract sale is no row: it keeps what a save had, and nothing asks it.
+	if problem == "" and gs.KEPT_CONTRACT_SALE in have:
+		problem = "The contract sale is not a table row."
+	var data: Dictionary = gs.farm_to_dict()
+	data["lab_gates_kept"] = [gs.KEPT_CONTRACT_SALE]
+	if problem == "" and gs.farm_dict_problem(data) != "":
+		problem = "A kept contract sale saves: %s" % gs.farm_dict_problem(data)
+	var quest: Dictionary = DataManager.get_record(&"quests", &"paperwork_from_orbit", "quests")
+	if problem == "" and int(quest.get("gates", {}).get("lab_level", -1)) != gs.lab_gate_level("oirm_account"):
+		problem = "The quest and the gate name different levels for the OIRM account."
+	gs.free()
+	return problem
+
+
+func test_a_gated_job_stays_off_the_board_until_its_level() -> String:
+	var gs: GameStateScript = _state()
+	gs.credibility = 9999
+	gs.refresh_job_board(1)
+	var problem: String = ""
+	if not gs.job_board.is_empty():
+		problem = "The board stays empty below the board's level."
+	_at_level(gs, gs.lab_gate_level("job_board"))
+	gs.refresh_job_board(2)
+	if problem == "" and gs.job_board.is_empty():
+		problem = "The board fills at its level."
+	for job: Dictionary in gs.job_board:
+		if problem == "" and not gs.lab_gate_open(gs.job_gate_id(str(job.get("min_band", "")))):
+			problem = "A job of a shut gate is on the board: %s" % job.get("min_band", "")
+	gs.free()
+	return problem
+
+
+func test_a_guest_sees_the_same_gates_as_the_host() -> String:
+	var host: GameStateScript = _state()
+	var problem: String = ""
+	var guest: GameStateScript = _state()
+	for level: int in [1, 20, 45]:
+		_at_level(host, level)
+		var data: Dictionary = host.farm_to_dict()
+		FarmCommands.guest = true
+		var read: String = guest.farm_from_dict(data)
+		FarmCommands.guest = false
+		if read != "":
+			problem = "The guest loads the host's farm: %s" % read
+		for id: String in host.all_lab_gate_ids():
+			if problem == "" and host.lab_gate_problem(id, "X") != guest.lab_gate_problem(id, "X"):
+				problem = "At level %d the guest reads '%s' as '%s', the host as '%s'." % [level, id, guest.lab_gate_problem(id, "X"), host.lab_gate_problem(id, "X")]
+		for id: String in [FM3, TW6, HB700]:
+			if problem == "" and host.tier_problem(id) != guest.tier_problem(id):
+				problem = "At level %d the guest reads %s differently." % [level, id]
+	guest.free()
+	host.free()
 	return problem

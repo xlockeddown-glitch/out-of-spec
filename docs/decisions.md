@@ -1839,11 +1839,18 @@ Ryan decided to turn on the section 3.4 table with its numbers as they are (all 
 - **[ASSUMPTION] The provisional way through**: the first contract's quest pays 75 % of the lab XP still missing to level 15 on top of its 400 (`lab_level/provisional_gap_share`); none if the row is kept. The OIRM account has no quest of its own to be provisional with, so it just waits for its level.
 - **Hours** (test prints them; budget 20 at 5 h, 40 at 20 h, 60 at 50 h, log-linear between): level 5 at 2.2 h, 10 at 3.4 h, 12 at 3.8 h, 15 at 4.3 h, 18 at 4.7 h, 20 at 5.0 h, 25 at 9.0 h, 30 at 12.7 h, 35 at 16.4 h, 40 at 20 h, 42 at 23 h, 45 at 27.6 h, 60 at 50 h, 65 at 57 h, 75 at 72 h, 99 at 108 h. The lab XP an hour this asks is 512 (levels 1-20), 1 168 (20-40) and 3 928 (40-60), about 20, 10 and 5 traceable calibrations an hour. Every story beat is at or below 60.
 
-### Questions for Ryan
+### Ryan decided 2026-11-26
 
-1. Is it right that the contract's HB-700 now waits for Tier 3 on a new farm (about 20 hours in), a long wait for a prize earned at 15?
-2. The first contract is offered by its old rule (Trusted credibility) even below level 15, as the provisional way. Or should it wait for 15?
-3. Robot 2 and the COLLECT SPOOL card need Robotics too; the lab levels 35 and 30 now sit beside the Robotics level. Keep both?
+1. The contract's HB-700 may wait for Tier 3 (lab level 40) on a new farm.
+2. The first contract is still offered below level 15 by its old Trusted rule (the provisional way through). This settles review finding 4.
+3. Robot 2 and COLLECT SPOOL keep both the lab level and Robotics.
+
+### Review follow-up (Opus, 2026-11-26)
+
+- **Seeding order**: `_keep_open_gates()` now runs at the end of `put_farm`, after the calibration records and certificates are rebuilt from their logs, so a boot load or a second load reads the loaded save and nothing else.
+- **Seeding keeps every gate the old rule had open at load**: also the next lab size (it needed credits and ore only), `oirm_account` for a save that owns a bought Tier 1 or higher standard, and the contract sale for a contract that is active, complete or fulfilled.
+- **The level-up refreshes**: Bram's list, the Kestrel screen and the Plan board redraw on `lab_xp_changed`, so a "needs lab level" button changes at once.
+- **Decision line (hours model, unchanged)**: the hours model is self-referential (the budget anchors 20/40/60 at 5/20/50 h and the printed hours come from that same budget, with a +50 offset in the test's curve); it shows the shape of the table, not a measured play time. Left as is.
 
 ## 2026-11-26: Quest log on the phone (build order step 7 of `docs/design/quests_levels_story.md`)
 

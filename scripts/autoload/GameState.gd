@@ -998,9 +998,6 @@ func put_farm(data: Dictionary) -> void:
 	if from_curve < 4 and not FarmCommands.guest:
 		# From when Robotics and Husbandry were the farm's and crops fed Field Ops.
 		_make_skills_personal()
-	if not data.has("lab_gates_kept") and not FarmCommands.guest:
-		# From before the lab-level gates: what it had open stays open.
-		_keep_open_gates()
 	skill_curve = SKILL_CURVE
 	_seep_days = 0.0
 	_seep_full = false
@@ -1013,6 +1010,10 @@ func put_farm(data: Dictionary) -> void:
 	certificates.clear()
 	for cert: Dictionary in certificate_log:
 		certificates[cert["standard_id"]] = cert
+	# Last: the tiers' conditions read the rebuilt certificates and logs.
+	if not data.has("lab_gates_kept") and not FarmCommands.guest:
+		# From before the lab-level gates: what it had open stays open.
+		_keep_open_gates()
 
 
 func get_sensor(instrument_id: String) -> DriftingSensor:
@@ -1920,8 +1921,14 @@ func _keep_open_gates() -> void:
 		if tier >= 2 and (owned_standards.has(id) or (not _is_contract_stock(id) and _tier_condition_problem(id) == "")):
 			had["tier%d" % tier] = true
 	var building: int = int(lab_build.get("size", 0)) if lab_build.get("kind", "") == "grow" else 0
-	for size: int in range(1, maxi(lab_size, building) + 1):
+	# The next size too: it asked for credits and ore and nothing else.
+	var top: int = mini(maxi(lab_size, building) + 1, lab_sizes().size() - 1)
+	for size: int in range(1, top + 1):
 		had["%s_lab" % lab_size_record(size).get("id", "")] = true
+	# The first trip to OIRM was open to any bought standard of tier 1 or more.
+	for id: String in owned_standards:
+		if (sensors[id] as DriftingSensor).tier >= 1:
+			had["oirm_account"] = true
 	for number: int in range(1, robots.size() + 1):
 		had["robot_%d" % number] = true
 	# The next one too, if a player could have ordered it.
@@ -1934,7 +1941,7 @@ func _keep_open_gates() -> void:
 			lab_gates_kept.append(gate)
 	# Not a row of the table: Bram sold the contract's standard with no tier
 	# gate once it was earned, and a farm that had earned it keeps that sale.
-	if contract_state == "complete":
+	if contract_state in ["active", "complete", "fulfilled"]:
 		lab_gates_kept.append(KEPT_CONTRACT_SALE)
 
 
@@ -2764,7 +2771,6 @@ func robot_job_gate(job: String, player_id: String = "") -> String:
 ## The skill levels a job's card still needs, or "".
 func _robot_job_skill_gate(job: String, player_id: String = "") -> String:
 	var gate: Dictionary = DataManager.get_record(ROBOTS_TABLE, job, "jobs").get("skill_gate", {})
-
 	var missing: PackedStringArray = []
 	for skill: Variant in gate:
 		if skill_level(str(skill), player_id) < int(gate[skill]):

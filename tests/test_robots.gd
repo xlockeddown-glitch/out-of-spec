@@ -311,3 +311,21 @@ func _check_ids(gs: GameStateScript) -> String:
 	if problem != "":
 		return problem
 	return "" if gs.robots.size() == 2 and gs.robots["TR-2"]["state"] == "commissioning" else "A new robot must not replace one."
+
+
+func test_build_and_cards_wait_for_their_lab_level() -> String:
+	return _run(_check_lab_level)
+
+
+func _check_lab_level(gs: GameStateScript) -> String:
+	gs.lab_gates_kept.clear()
+	var level: int = gs.lab_gate_level("robot_1")
+	if not gs.robot_build_problem("trellis").contains("lab level %d" % level):
+		return "The first robot waits for its lab level: '%s'" % gs.robot_build_problem("trellis")
+	var card: int = gs.lab_gate_level("collect_spool_card")
+	if not gs.robot_job_gate("collect_spool").contains("lab level %d" % card):
+		return "A COLLECT SPOOL card waits for its lab level: '%s'" % gs.robot_job_gate("collect_spool")
+	gs.lab_xp = gs.xp_for_level(maxi(level, card))
+	if gs.robot_build_problem("trellis").contains("lab level") or gs.robot_job_gate("collect_spool").contains("lab level"):
+		return "At the level the gates are open."
+	return ""

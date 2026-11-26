@@ -47,6 +47,7 @@ func _ready() -> void:
 	GameState.credits_changed.connect(_on_farm_changed.unbind(1))
 	GameState.ore_changed.connect(_on_farm_changed.unbind(1))
 	GameState.upgrades_changed.connect(_on_farm_changed)
+	GameState.lab_xp_changed.connect(_on_farm_changed)
 
 
 func _process(_delta: float) -> void:

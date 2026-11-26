@@ -199,3 +199,24 @@ func _check_two_audits(gs: GameStateScript) -> String:
 			return "One clean audit must not sign the lab off."
 		gs._run_audit(day)
 	return "" if gs.traceable_lab and gs.clean_audit_streak == 2 else "Two clean audits must: %s" % [gs.audit_log]
+
+
+func test_tier3_waits_for_its_lab_level() -> String:
+	return _run(_check_lab_level)
+
+
+func _check_lab_level(gs: GameStateScript) -> String:
+	gs.buy_standard("field_meter_dc")
+	gs.send_to_oirm("field_meter_dc")
+	gs.traceable_lab = true
+	gs.buy_standard(TW6)
+	gs.oirm_calibrate(TW6, 7)
+	# The old conditions hold; only the level is left.
+	gs.lab_gates_kept.clear()
+	var level: int = gs.lab_gate_level("tier3")
+	if not gs.tier_problem(HB700).contains("lab level %d" % level) or gs.tier_lab_note(HB700) == "":
+		return "Tier 3 waits for its lab level, with a note: '%s'" % gs.tier_problem(HB700)
+	if gs.buy_standard(HB700) == "":
+		return "It can't be bought below the level."
+	gs.lab_xp = gs.xp_for_level(level)
+	return gs.tier_problem(HB700)

@@ -31,6 +31,7 @@ func _ready() -> void:
 	GameState.jobs_changed.connect(_on_lab_changed)
 	GameState.credits_changed.connect(_refresh_if_open.unbind(1))
 	GameState.ore_changed.connect(_refresh_if_open.unbind(1))
+	GameState.lab_xp_changed.connect(_refresh_if_open)
 
 
 func _unhandled_input(event: InputEvent) -> void:
