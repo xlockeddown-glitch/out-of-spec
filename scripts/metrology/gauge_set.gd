@@ -56,48 +56,89 @@ static func grade_from_roll(roll: int) -> int:
 	return GRADE_ODDS_PERCENT.size() - 1
 
 
-## The set held by the blocks in `cells`: size index -> best grade index of the
-## pieces of that size. A second piece of a size only counts if its grade is better.
-##
-## Each block has a size drawn from the seed and its cell, but the draw is kind: the
-## cells are walked in a fixed order (x, then y, so not the order they were found),
-## and a block whose drawn size is already held takes the next free size up, wrapping
-## round. So the first 81 blocks always make 81 different sizes. Once all 81 are
-## held a block keeps its own drawn size and can only improve a grade. The result
-## depends only on the seed and the set of cells, so every PC and every reload agrees.
-static func pieces(world_seed: int, cells: Array) -> Dictionary:
-	var unique: Dictionary = {}
+## Where each block of `cells` sits in the set: cell -> { size, grade }, the size it
+## actually takes. Each block has a size drawn from the seed and its cell, but the
+## draw is kind. The blocks are walked best grade first, then by x, then by y (so
+## not in the order they were found), and a block whose drawn size is already held
+## takes the next free size up, wrapping round. The first 81 blocks in that order
+## therefore make 81 different sizes and are the best 81 found. Blocks after them
+## keep their own drawn size; none is better than a piece already placed, so they
+## add nothing to the set. It depends only on the seed and the set of cells, so
+## every PC and every reload agrees.
+static func placed(world_seed: int, cells: Array) -> Dictionary:
+	var blocks: Array = []
+	var seen: Dictionary = {}
 	for cell: Variant in cells:
-		if cell is Vector2i and not ReferenceBlock.at(world_seed, cell).is_empty():
-			unique[cell] = true
-	var ordered: Array = unique.keys()
-	ordered.sort_custom(_cell_before)
+		if cell is Vector2i and not seen.has(cell):
+			seen[cell] = true
+			var block: Dictionary = ReferenceBlock.at(world_seed, cell)
+			if not block.is_empty():
+				blocks.append(block)
+	blocks.sort_custom(_block_before)
 	var out: Dictionary = {}
+	var taken: Dictionary = {}
 	var total: int = size_count()
-	for cell: Vector2i in ordered:
-		var block: Dictionary = ReferenceBlock.at(world_seed, cell)
+	for block: Dictionary in blocks:
 		var size: int = block["size_index"]
-		while out.size() < total and out.has(size):
+		while taken.size() < total and taken.has(size):
 			size = (size + 1) % total
-		out[size] = mini(out.get(size, GRADES.size()), block["grade"])
+		taken[size] = true
+		out[block["cell"]] = { "size": size, "grade": block["grade"] }
 	return out
 
 
-static func _cell_before(a: Vector2i, b: Vector2i) -> bool:
-	return a.y < b.y if a.x == b.x else a.x < b.x
+static func _block_before(a: Dictionary, b: Dictionary) -> bool:
+	if a["grade"] != b["grade"]:
+		return a["grade"] < b["grade"]
+	var ca: Vector2i = a["cell"]
+	var cb: Vector2i = b["cell"]
+	return ca.y < cb.y if ca.x == cb.x else ca.x < cb.x
 
 
-## What finding `block` adds to the blocks in `before`: NEW size, a BETTER grade
-## of a size held, or a DUPLICATE that adds nothing. Compares the set before and
-## after, since the new block may take a free size other than its drawn one.
+## The set held by the blocks in `cells`: size index -> best grade index of the
+## pieces of that size (see `placed`). Adding a block never lowers the number of
+## sizes held, and once the set is full never lowers its grade.
+static func pieces(world_seed: int, cells: Array) -> Dictionary:
+	var out: Dictionary = {}
+	var spots: Dictionary = placed(world_seed, cells)
+	for cell: Variant in spots:
+		var spot: Dictionary = spots[cell]
+		out[spot["size"]] = mini(out.get(spot["size"], GRADES.size()), spot["grade"])
+	return out
+
+
+## The size index the block in `cell` takes among `cells` (which must include it),
+## or -1 if it is not a block there.
+static func size_taken(world_seed: int, cells: Array, cell: Vector2i) -> int:
+	var spot: Dictionary = placed(world_seed, cells).get(cell, {})
+	return spot.get("size", -1)
+
+
+## How many pieces of each grade the set holds, best grade first.
+static func grade_counts(held: Dictionary) -> Array[int]:
+	var out: Array[int] = []
+	out.resize(GRADES.size())
+	out.fill(0)
+	for size: Variant in held:
+		out[held[size]] += 1
+	return out
+
+
+## What finding `block` adds to the blocks in `before`: NEW if the set gains a size;
+## BETTER if the number of sizes is the same but the grades of the pieces are better
+## (more pieces of the best grade where they differ first), so the block has taken a
+## place; else DUPLICATE, which adds nothing to the grades. Because the best 81
+## blocks are the ones placed, a find never makes a set worse.
 static func finding(world_seed: int, before: Array, block: Dictionary) -> StringName:
 	var held: Dictionary = pieces(world_seed, before)
 	var after: Dictionary = pieces(world_seed, before + [block["cell"]])
 	if after.size() > held.size():
 		return NEW
-	for size: Variant in after:
-		if after[size] < held.get(size, GRADES.size()):
-			return BETTER
+	var was: Array[int] = grade_counts(held)
+	var now: Array[int] = grade_counts(after)
+	for grade: int in GRADES.size():
+		if now[grade] != was[grade]:
+			return BETTER if now[grade] > was[grade] else DUPLICATE
 	return DUPLICATE
 
 

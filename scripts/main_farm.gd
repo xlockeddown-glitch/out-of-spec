@@ -304,7 +304,11 @@ func _on_blocks_changed() -> void:
 				var kind: StringName = GaugeSet.finding(GameState.world_seed, _blocks_told, block)
 				_hud.push_log("FOUND A REFERENCE BLOCK: %s° angle, ±%s° (k = %s). Q checks a sensor with it." % [
 					SP811.number(block["certified"], 0), SP811.number(block["u"], 2), SP811.number(block["k"], 0)])
-				_hud.push_log("GAUGE BLOCK %s in, grade %s: %s." % [SP811.number(GaugeSet.size_in(block["size_index"]), 4),
+				var told: Array = []
+				told.assign(_blocks_told)
+				told.append(cell)
+				var took: int = GaugeSet.size_taken(GameState.world_seed, told, cell)
+				_hud.push_log("GAUGE BLOCK %s in, grade %s: %s." % [SP811.number(GaugeSet.size_in(took), 4),
 						GaugeSet.GRADES[block["grade"]], GAUGE_KIND_TEXT[kind]])
 			_blocks_told.append(cell)
 	_hud.set_gauge_set(GaugeSet.text(GameState.gauge_pieces()))
