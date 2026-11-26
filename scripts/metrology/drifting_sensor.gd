@@ -100,6 +100,10 @@ var observed_error: float:
 ## One more factor on the next zero's as-left residual, then 1.0 again: the
 ## score of a mini-game played for that zero (MinigameScore). Not saved.
 var next_residual_scale: float = 1.0
+## One factor on the operator's term of the next calibration's stated
+## uncertainty, then 1.0 again: the score of Hold the Reading played for it
+## (MinigameScore, GameState.calibrate). Not saved.
+var next_operator_scale: float = 1.0
 
 var _sign: float = 1.0
 var _rng := RandomNumberGenerator.new()

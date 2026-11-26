@@ -1164,6 +1164,9 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 	if sensor == null:
 		push_warning("GameState.calibrate: unknown instrument '%s'." % instrument_id)
 		return {}
+	# Hold the Reading's score, for this calibration only (a refusal uses it up too).
+	var operator_scale: float = clampf(sensor.next_operator_scale, 0.0, 1.0)
+	sensor.next_operator_scale = 1.0
 	var missing: String = _bench_problem(instrument_id) if use_standard else ""
 	if missing != "":
 		return {
@@ -1193,6 +1196,14 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 				instrument_name(budget["standard_id"], true), at_oirm[budget["standard_id"]]],
 		}
 	var standard: DriftingSensor = get_sensor(budget["standard_id"]) if not budget.is_empty() else null
+	# What the record states as U and TUR: the budget with the operator's term
+	# times a played Hold the Reading's factor (quests_levels_story.md section
+	# 7.2). The standard's own terms, the resolution and a robot's term are as
+	# they were. The refusal above, the acceptance limit and the verdict are the
+	# plain budget's, so a score never changes them [ASSUMPTION].
+	var stated: Dictionary = budget
+	if standard != null and operator_scale < 1.0:
+		stated = CalUncertainty.budget(sensor, standard, float(budget["u_op"]) * operator_scale, float(budget["u_robot"]))
 	var today: int = GameClock.get_day_index()
 	var on_time: bool = not sensor.is_overdue(today)
 	# Without a standard the unit is zeroed against its own idea of zero, which
@@ -1263,8 +1274,8 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 		"due_day": sensor.cal_due_day,
 		# "" and null when no standard was used (the remote zero).
 		"standard_id": budget.get("standard_id", ""),
-		"standard_uncertainty": budget.get("expanded_uncertainty"),
-		"tur": budget.get("tur"),
+		"standard_uncertainty": stated.get("expanded_uncertainty"),
+		"tur": stated.get("tur"),
 		"acceptance_limit": limit,
 		"result": result,
 		"traceable": traceable,

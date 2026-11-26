@@ -1700,3 +1700,37 @@ Part 1 is the game, its scoring, the bench hookup and the co-op path. The S1 que
 9. Where should the felt-lined case show before the collection (step 10) exists? Today it is only named on the phone.
 10. Orin's three lines are placeholders.
 11. The host does not check which blocks were picked on the screen, and takes the player's own score (only where a Wring the Blocks step is open, and only for today's length). Is that enough for co-op with friends, or should the picks be sent and checked?
+
+## 2026-11-26: Hold the Reading (build order step 16 of `docs/design/quests_levels_story.md`, mini-game 3)
+
+### Ryan chose
+
+- Step 16 as section 7 has it: mini-game 3, Hold the Reading (the reading wanders as the standard settles; hold to lift the bracket, let go to drop it; the score is the share of time inside; 10 to 15 s). Its score scales the operator's uncertainty term by Set the Zero's factors and never the standard's own uncertainty. Uncertainty slows the wander, to half speed at 99.
+
+### Agent's notes (flagged for Ryan, not his words)
+
+- **The game** (`scripts/minigames/hold_the_reading.gd`, `ui/minigames/hold_the_reading.tscn`) follows the other two: one button (Space, E, Enter, a click or a pad's A), Esc skips, `finished(score)` with 0 to 100 or `MinigameScore.SKIPPED`, the motion from a seeded generator, `advance(seconds)` for tests, fixed 1/60 s steps so the frame rate does not change a score, and the farm's clock speed does not run it.
+- **The wander** is three slow sine waves (0.11, 0.19 and 0.31 Hz, shares 0.5, 0.3, 0.2, phases from the seed) on a chart of -1 to 1, at 0.8 of the chart, calming in a straight line to 35 % by the end of the run [PLACEHOLDER, all of them]. The run is 12 s [PLACEHOLDER], inside the design's 10 to 15 s. The bracket is 0.18 of the chart each side of its middle [PLACEHOLDER]; holding lifts it and letting go drops it, with a little drag. The chart shows the trace of the last 4 s, the bracket, the word IN or OUT (so it does not rest on colour), and a bar of the time left.
+- **Uncertainty slows the wander**: the waves run at full speed at level 1 and at half speed at 99, by the same front-loaded share the other games take from their skills (`MinigameScore.sweet_share` with `uncertainty`). It is each player's own skill. It does not change the bracket's height: that is the tolerance band, and only the difficulty sets it.
+- **Section 7.5 holds**: Relaxed (bracket 50 % taller, slower wander), Sharp (shorter bracket, faster), Off (no game; one click as before); no hold over 2.5 s [PLACEHOLDER] (the game lets go, says "The hold ran out. Press again to lift.", and only a new press lifts again); nothing moves until the first press. There is no practice swing [ASSUMPTION].
+- **Which calibrations get it** [ASSUMPTION]: a unit (not a standard) whose standard today is the humidity generator or the pressure controller (`MinigameScore.SETTLING_STANDARDS`, `MinigameScore.game_for`). Today that is the hygrometer only; no unit is calibrated against the pressure controller yet (the WD-1 gauge is, and it is a standard). Every other calibration keeps Set the Zero. A standard's own calibration keeps Set the Zero because the U of that calibration goes on the standard's in-house certificate, and a score must never change a standard's uncertainty.
+- **When it appears** is as Set the Zero: the lab's first calibration of a kind, an open quest step that carries a bench game for the instrument, or CAREFUL. The hygrometer is in service on every new farm, so its first calibration opens Hold the Reading, and that may be the first mini-game a new player meets.
+- **What a score is worth.** Good, Fine and Reference leave 0.8, 0.6 and 0.4 of the operator's term (`u_op`) in the uncertainty the record states (`MinigameScore.operator_factor`, the same table as the residual's). The factor waits on `DriftingSensor.next_operator_scale` (not saved), is used by the next `GameState.calibrate` of that instrument and is 1.0 again after it, refused or not. The record's `standard_uncertainty` and `tur` come from the budget with that one term scaled. The standard's own terms, the resolution, a robot's term and k are untouched.
+- **What it never changes** [ASSUMPTION]: the TUR refusal, the acceptance limit and the pass/fail verdict are worked from the plain budget, so a score cannot pass a calibration a skip would fail or refuse. The as-found and as-left readings, the interval, the due day, audits and the standard's certificate are as a skip leaves them. A Hold the Reading unit takes no smaller as-left residual, and a Set the Zero unit no smaller operator's term: one factor each, never both.
+- **A side effect to know**: a cleaner TUR on the record can earn the Uncertainty XP that a clean TUR already earns. Tests compare the whole farm with and without a score and allow only the record's U and TUR and XP to differ.
+- **A skip and a poor try** (under 60) leave exactly the same farm, compared whole (`farm_to_dict`) in the tests.
+- **Co-op**: the host picks the game from the instrument, so a guest never says which game it played and `calibrate_at_bench` is unchanged (`CoopSession.PROTOCOL` stays 16). The host counts a guest's score only where a game could have been due (`MinigameScore.allowed`) and holds it to 0 to 100. No new farm field; `SaveGame.VERSION` stays 1.
+- **Quests**: `hold_the_reading` is a mini-game a step may carry (a count of one instrument's `cal_log` rows, as for Set the Zero). A step that names either bench game is graded by the game its instrument plays (`MinigameScore.grades_step`), so a step on the hygrometer that names `set_the_zero` would be played and graded as Hold the Reading. S1's step is on the soil probe (gravimetric kit) and stays Set the Zero. No quest was added or changed.
+- **The bench** shows "Hold score N of 100: GRADE, operator uncertainty X % of standard." and the budget view shows the terms with the operator's term at the score's factor. The phone's look is unchanged.
+- **One older test changed**: `tests/test_set_the_zero.gd` used the hygrometer; it now uses the rover's steering encoder, a Set the Zero unit that is in service on a new farm.
+- **Tests added**: `tests/test_hold_the_reading.gd` (22).
+
+### Questions for Ryan
+
+1. Which calibrations should get Hold the Reading? As built: units calibrated against the MD-2P humidity generator or the HB-700 pressure controller, so today the hygrometer only. Standards keep Set the Zero.
+2. The hygrometer is in service on a new farm, so its first calibration opens the 12 s Hold the Reading, and that may be the first mini-game a player meets, before Set the Zero (S1's soil probe step is still Set the Zero). Is that all right, or should the first game always be Set the Zero?
+3. The record states the smaller U and the higher TUR, while the acceptance limit, the verdict and the TUR refusal stay on the plain budget. Keep that, or should the limit follow the smaller U (then a score could change a verdict)?
+4. A lifted TUR can earn the clean-TUR Uncertainty XP. Fine, or should that XP be judged on the plain TUR?
+5. The numbers are placeholders: a 12 s run, a bracket of 0.18, three waves, calming to 35 %, a 2.5 s hold cap. Say if any feels wrong when played.
+6. A quest step that names either bench game is graded by the game the instrument plays. Right, or must a step's named game match exactly?
+7. No practice swing here either. Add one?
