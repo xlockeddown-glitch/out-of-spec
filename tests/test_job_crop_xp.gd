@@ -279,5 +279,12 @@ func _check_commands(gs: GameStateScript) -> String:
 	if problem == "" and commands.problem(&"plant_crop", [CELL, "", gs.OFFSET_CURRENT]) + commands.problem(&"harvest_crop", [CELL]) \
 			+ commands.problem(&"sell_harvest_to_lin", []) != "":
 		problem = "The screens' calls must still be taken."
+	# A real run: the host executes a guest's sale and the guest is credited.
+	if problem == "":
+		_grow(gs)
+		gs.harvest_crop(CELL)
+		var paid: Variant = commands.execute(GUEST, &"sell_harvest_to_lin", [])
+		if not paid is int or paid <= 0 or gs.action_count("sell_crop", GUEST) != 1 or gs.action_count("sell_crop") != 0:
+			problem = "A guest's sale run by the host must count for the guest: %s" % [paid]
 	commands.free()
 	return problem
