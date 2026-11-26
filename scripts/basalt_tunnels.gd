@@ -35,6 +35,11 @@ var _below: bool = false
 var _built_depth: int = 0
 var _built_day: int = 0
 var _depth_props: ZoneDepthProps
+## Today's vents below (ZoneHazards), the one the rover is in (told once while it is
+## hot), and the one it was last told was near.
+var _vents: Array = []
+var _in_vent: String = ""
+var _near_vent: String = ""
 
 @onready var _rover: RoverController = %Rover
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
@@ -61,6 +66,8 @@ func _ready() -> void:
 	if _below:
 		# The depth has its own finds, and none of the hub's rack, board or beacons.
 		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
+		_vents = ZoneHazards.vents_for(GameState.world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, int(ZoneDepth.local_layout.get("day", 0)))
+		_depth_props.build_vents(_vents)
 		GameState.finds_changed.connect(_on_finds_changed)
 		var wild: Node = get_node_or_null("WorldView/WorldViewport/World/WildSentinel")
 		if wild != null:
@@ -141,6 +148,39 @@ func _process(_delta: float) -> void:
 		if _hub_near.is_empty() and rover_free and not catching and ZoneDepth.near_descent(_rover.global_position):
 			_hub_near = { "kind": HATCH, "id": "" }
 	_tell_hub()
+	if _below:
+		_watch_vents(rover_free)
+
+
+## Lights the vents by the clock, tells of one the rover comes near, and, the first time
+## the rover is in a hot one, tells the host (its heat command; the host decides).
+func _watch_vents(rover_free: bool) -> void:
+	var now: float = GameClock.elapsed_days
+	_depth_props.show_heat(now)
+	var cell: Vector2i = ZoneHazards.cell_of(_rover.global_position) if rover_free else Vector2i(-1, -1)
+	var here: Dictionary = ZoneHazards.vent_at(_vents, cell)
+	var near_text: String = ""
+	var in_text: String = ""
+	for vent: Dictionary in _vents:
+		var there: Vector3 = TunnelRock.at(vent["cell"])
+		if rover_free and Vector2(there.x - _rover.global_position.x, there.z - _rover.global_position.z).length() <= ZoneDepth.REACH_M:
+			near_text = str(vent["id"])
+	if not here.is_empty() and ZoneHazards.is_hot(here, now):
+		in_text = str(here["id"])
+	if near_text != _near_vent:
+		_near_vent = near_text
+		if near_text != "":
+			_hud.push_log(ZoneHazards.hint(ZoneHazards.vent_in(_vents, near_text), now))
+	if in_text != _in_vent:
+		_in_vent = in_text
+		if in_text != "":
+			_enter_vent(in_text)
+
+
+func _enter_vent(vent_id: String) -> void:
+	var problem: String = await FarmCommands.request(&"enter_vent", [vent_id, int(ZoneDepth.local_layout.get("day", 0))])
+	if is_inside_tree() and problem != "":
+		_hud.push_log("VENT: " + problem)  # on success the host's phone line says it
 
 
 func _unhandled_input(event: InputEvent) -> void:

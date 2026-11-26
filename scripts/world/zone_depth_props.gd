@@ -10,6 +10,9 @@ const SAMPLE := Color(0.72, 0.72, 0.78)
 
 ## Find id -> the node that shows it.
 var _finds: Dictionary[String, Node3D] = {}
+## Vent id -> { "vent": the vent, "glow": the material of its glowing grate }.
+var _vents: Dictionary = {}
+const VENT_HOT := Color(1.0, 0.36, 0.08)
 
 
 ## The hatch in the hub: a dark plate with a lit rim and a sign.
@@ -40,6 +43,30 @@ func build_finds(layout_data: Dictionary, taken: Array) -> void:
 func show_taken(taken: Array) -> void:
 	for find_id: String in _finds:
 		_finds[find_id].visible = not find_id in taken
+
+
+## Below: a vent prop for each of the day's vents (ZoneHazards): a dark ring with a
+## grate that glows by its cycle (show_heat). A look only: a vent never blocks.
+func build_vents(vents: Array) -> void:
+	for vent: Dictionary in vents:
+		var node := Node3D.new()
+		node.name = "Vent_" + str(vent["id"])
+		node.position = TunnelRock.at(vent["cell"])
+		add_child(node)
+		node.add_child(LavaHubProps._part(LavaHubProps._cylinder(1.1, 0.05), Vector3(0.0, 0.025, 0.0), LavaHubProps._flat(LavaHubProps.DARK)))
+		var grate: StandardMaterial3D = LavaHubProps._glow(VENT_HOT, 0.0)
+		node.add_child(LavaHubProps._part(LavaHubProps._cylinder(0.8, 0.07), Vector3(0.0, 0.04, 0.0), grate))
+		node.add_child(LavaHubProps._label("VENT", Vector3(0.0, 1.5, 0.0)))
+		_vents[str(vent["id"])] = { "vent": vent, "glow": grate }
+
+
+## Light each vent by the clock (days, GameClock.elapsed_days): bright while hot, half
+## just before, a dull red while cool.
+func show_heat(elapsed_days: float) -> void:
+	for id: String in _vents:
+		var entry: Dictionary = _vents[id]
+		var material: StandardMaterial3D = entry["glow"]
+		material.emission_energy_multiplier = ZoneHazards.glow(entry["vent"], elapsed_days) * 3.0
 
 
 func find_node(find_id: String) -> Node3D:
