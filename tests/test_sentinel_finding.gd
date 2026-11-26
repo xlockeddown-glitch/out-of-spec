@@ -23,7 +23,7 @@ func _run(body: Callable) -> String:
 	_out(farm)
 	# A body that stops on a script error returns null, which must not pass.
 	var out: Variant = body.call(farm)
-	var problem: String = out if out is String else "The test stopped before it finished."
+	var problem: String = out if out is String else "The test stopped early or did not return a String."
 	farm.free()
 	GameClock.elapsed_days = elapsed
 	return problem

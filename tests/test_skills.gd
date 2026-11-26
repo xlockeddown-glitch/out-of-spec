@@ -20,7 +20,7 @@ func _run(body: Callable) -> String:
 		gs.get_sensor(id).max_error = INF
 	# A body that stops on a script error returns null, which must not pass.
 	var out: Variant = body.call(gs)
-	var problem: String = out if out is String else "The test stopped before it finished."
+	var problem: String = out if out is String else "The test stopped early or did not return a String."
 	gs.free()
 	GameClock.elapsed_days = saved
 	return problem

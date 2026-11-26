@@ -177,7 +177,7 @@ func _with_live(body: Callable) -> String:
 	_clean_files()
 	# A body that stops on a script error returns null, which must not pass.
 	var out: Variant = body.call()
-	var problem: String = out if out is String else "The test stopped before it finished."
+	var problem: String = out if out is String else "The test stopped early or did not return a String."
 	_clean_files()
 	var back: String = SaveGame.restore(held)
 	return problem if problem != "" else back
