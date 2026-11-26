@@ -31,6 +31,11 @@ func _ready() -> void:
 	_rover.dig_rejected.connect(_on_dig_rejected)
 	_rover.fill_rejected.connect(_on_fill_rejected)
 	_exit_pad.rover_entered.connect(_on_rover_entered_exit)
+	_hud.set_lights(GameState.rover_lights)
+	GameState.rover_lights_changed.connect(_show_lights)
+	var pause := PauseUI.new()
+	_hud.get_parent().add_child(pause)
+	_hud.get_parent().move_child(pause, 0)
 	_hud.zero_steering_pressed.connect(_on_zero_pressed)
 	_hud.slot_spool_pressed.connect(_on_slot_spool_pressed)
 	_hud.enter_dome_pressed.connect(_go_to_dome)
@@ -113,6 +118,10 @@ func _on_rover_entered_exit() -> void:
 func _can_catch() -> bool:
 	return (_rover.away_text() == "" and _rover.is_stopped() and not GameState.rover_lights
 		and GameState.sentinel_in_reach(_rover.global_position))
+
+
+func _show_lights() -> void:
+	_hud.set_lights(GameState.rover_lights)
 
 
 func _toggle_lights() -> void:
