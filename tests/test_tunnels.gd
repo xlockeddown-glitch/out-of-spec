@@ -452,10 +452,38 @@ func test_water_is_where_the_ground_is_lower_and_darker_where_deeper() -> String
 
 func test_basalt_is_lighter_than_the_first_dark_one() -> String:
 	var old := Color("#232832")
-	if TunnelRock.BASALT.get_luminance() < old.get_luminance() + 0.03:
+	var wall_min: float = TunnelRock.BASALT.get_luminance()
+	var wall_max: float = TunnelRock.BASALT.lightened(TunnelRock.WALL_LIGHTEN_MAX).get_luminance()
+	var floor_min: float = TunnelRock.BASALT_FLOOR.darkened(TunnelRock.FLOOR_DARKEN_MAX).get_luminance()
+	var floor_max: float = TunnelRock.BASALT_FLOOR.get_luminance()
+	var arch: float = TunnelRock.BASALT.darkened(TunnelRock.ARCH_DARKEN).get_luminance()
+	if arch < old.get_luminance() + 0.005:
+		return "The arch stone must still be lighter than #232832"
+	if wall_min < old.get_luminance() + 0.03:
 		return "The basalt must be lighter than #232832"
-	if TunnelRock.BASALT.get_luminance() >= TunnelRock.BASALT_FLOOR.get_luminance():
-		return "The walls must stay darker than the floor"
+	if wall_max >= floor_min:
+		return "The tinted walls (%f) must stay under the tinted floor (%f)" % [wall_max, floor_min]
+	if arch > wall_min - 0.005 or arch > floor_min - 0.01:
+		return "The pillars and arch stone must be clearly darker than the walls and floor"
+	if floor_max <= floor_min:
+		return "The floor has a tint range"
+	if StonePiecesView.BASALT != TunnelRock.BASALT or StonePiecesView.BASALT_FLOOR != TunnelRock.BASALT_FLOOR:
+		return "Stone pieces must use the tunnel's basalt"
+	return ""
+
+
+## A 1-cell arch is the narrowest: its two sides' courses must not overlap.
+func test_a_one_cell_arch_has_no_overlapping_courses() -> String:
+	var width_m: float = TunnelRock.CELL_M
+	for course: int in TunnelRock.ARCH_COURSES:
+		var reach_m: float = TunnelRock.course_reach_m(course, width_m)
+		# Each side spans reach_m in from its end of the (width + pillar) span.
+		if reach_m * 2.0 > width_m + TunnelRock.PILLAR_M + 0.0001:
+			return "Course %d reaches %f from both ends of a %f m span" % [course, reach_m, width_m + TunnelRock.PILLAR_M]
+		if reach_m <= 0.0:
+			return "Course %d has no reach" % course
+	if TunnelRock.course_reach_m(0, 20.0) != TunnelRock.PILLAR_M + TunnelRock.ARCH_STEP_M:
+		return "A wide arch keeps its full steps"
 	return ""
 
 
@@ -464,11 +492,13 @@ func test_basalt_is_lighter_than_the_first_dark_one() -> String:
 func test_a_walker_fits_through_every_arch_opening() -> String:
 	var rock: TunnelRock = _rock()
 	var problem: String = ""
+	var arches: int = 0
 	for y: int in TunnelRock.MAP.size():
 		for x: int in TunnelRock.MAP[y].length():
 			var kind: String = TunnelRock.tile(Vector2i(x, y))
 			if not kind in "AB":
 				continue
+			arches += 1
 			var along: Vector3 = Vector3.RIGHT if kind == "A" else Vector3.BACK
 			# Meters along the arch from a floor cell's middle; a pillar's inner face is
 			# 1.1 m from the middle of an end cell.
@@ -484,5 +514,33 @@ func test_a_walker_fits_through_every_arch_opening() -> String:
 						var box := (node.get_child(0) as CollisionShape3D).shape as BoxShape3D
 						if box != null and AABB((node as StaticBody3D).position - box.size * 0.5, box.size).intersects(walker):
 							problem = "%s is in a walker's way at %s" % [node.name, feet]
+	var courses: int = 0
+	var pillar_meshes: int = 0
+	var pillar_boxes: int = 0
+	for node: Node in rock.get_children():
+		if node is MeshInstance3D and (node as MeshInstance3D).mesh is BoxMesh:
+			var drawn := node as MeshInstance3D
+			var size: Vector3 = (drawn.mesh as BoxMesh).size
+			if drawn.material_override == null and (drawn.mesh as BoxMesh).material is BaseMaterial3D 					and ((drawn.mesh as BoxMesh).material as BaseMaterial3D).transparency != BaseMaterial3D.TRANSPARENCY_DISABLED:
+				courses += 1
+				if drawn.position.y - size.y * 0.5 < TunnelRock.ARCH_LOW_M - 0.0001:
+					problem = "A lintel or course at %s dips under %f m" % [drawn.position, TunnelRock.ARCH_LOW_M]
+			else:
+				pillar_meshes += 1
+		elif node is StaticBody3D and node.name.begins_with("Pillar"):
+			pillar_boxes += 1
+			var box := (node.get_child(0) as CollisionShape3D).shape as BoxShape3D
+			var matched: bool = false
+			for other: Node in rock.get_children():
+				if other is MeshInstance3D and (other as MeshInstance3D).mesh is BoxMesh:
+					var drawn := other as MeshInstance3D
+					if drawn.position.is_equal_approx((node as StaticBody3D).position) and (drawn.mesh as BoxMesh).size.is_equal_approx(box.size):
+						matched = true
+			if not matched:
+				problem = "A pillar's collision box at %s is not its drawn box" % (node as StaticBody3D).position
+	if arches == 0:
+		problem = "No arch found to check"
+	elif courses == 0 or pillar_boxes == 0 or pillar_meshes < pillar_boxes:
+		problem = "Arch pieces missing: %d courses, %d pillars, %d drawn" % [courses, pillar_boxes, pillar_meshes]
 	rock.free()
 	return problem

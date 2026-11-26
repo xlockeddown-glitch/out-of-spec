@@ -77,6 +77,11 @@ const FADE_ALPHA: float = 0.2  # [PLACEHOLDER]
 
 const BASALT := Color("#353c49")  # lighter than the first #232832 [PLACEHOLDER]
 const BASALT_FLOOR := Color("#495261")
+## Tint ranges. Invariant (tested): arch stone < wall tints < floor tints in
+## luminance, so pillars and the floor never blend and walls stay under the floor.
+const FLOOR_DARKEN_MAX: float = 0.14
+const WALL_LIGHTEN_MAX: float = 0.03
+const ARCH_DARKEN: float = 0.15
 const TEAL := Color("#38e1c6")
 const AMBER := Color("#f5a623")
 
@@ -274,10 +279,10 @@ func _build_blocks() -> void:
 						_add_hollow_blocks(part, half, rock, rock_colors)
 						continue
 					var top_m: float = 0.0
-					var color: Color = BASALT_FLOOR.darkened(pick * 0.14)
+					var color: Color = BASALT_FLOOR.darkened(pick * FLOOR_DARKEN_MAX)
 					if kind == "#":
 						top_m = 0.5 + 0.35 * pick if _hides_floor(cell) else 2.2 + 1.2 * pick
-						color = BASALT.lightened(pick * 0.07)
+						color = BASALT.lightened(pick * WALL_LIGHTEN_MAX)
 					rock.append(_block(part + Vector3.UP * (top_m - 1.0) * 0.5, Vector3(half, top_m + 1.0, half)))
 					rock_colors.append(color)
 	var stone := StandardMaterial3D.new()
@@ -298,7 +303,7 @@ func _add_hollow_blocks(middle: Vector3, width_m: float, blocks: Array[Transform
 			var part: Vector3 = middle + Vector3(x - (count - 1) * 0.5, 0.0, z - (count - 1) * 0.5) * POOL_BLOCK_M
 			var top_m: float = drawn_ground_m(Vector2(part.x, part.z))
 			blocks.append(_block(part + Vector3.UP * (top_m - 1.2) * 0.5, Vector3(POOL_BLOCK_M, top_m + 1.2, POOL_BLOCK_M)))
-			colors.append(BASALT_FLOOR.darkened(_hash(roundi(part.x * 4.0), roundi(part.z * 4.0)) * 0.14 - top_m * 0.5))
+			colors.append(BASALT_FLOOR.darkened(_hash(roundi(part.x * 4.0), roundi(part.z * 4.0)) * FLOOR_DARKEN_MAX - top_m * 0.5))
 
 
 func _block(middle: Vector3, size: Vector3) -> Transform3D:
@@ -322,6 +327,12 @@ func _add_blocks(blocks_name: String, blocks: Array[Transform3D], colors: Array[
 	add_child(node)
 
 
+## How far a stepped course reaches in from its end, never past the middle of
+## the span, so a short arch's two courses cannot overlap.
+static func course_reach_m(course: int, width_m: float) -> float:
+	return minf(PILLAR_M + ARCH_STEP_M * (course + 1), (width_m + PILLAR_M) * 0.5)
+
+
 ## An arch over a run of floor cells that starts at `cell`.
 func _build_arch(cell: Vector2i, along: Vector2i) -> void:
 	var run: int = 1
@@ -334,7 +345,7 @@ func _build_arch(cell: Vector2i, along: Vector2i) -> void:
 	_add_body("Arch", LAYER_OCCLUDER, middle + Vector3.UP * (ARCH_SIGNAL_M + ROCK_M) * 0.5,
 		step * width_m + across * 2.0 + Vector3.UP * (ROCK_M - ARCH_SIGNAL_M))
 	var stone := StandardMaterial3D.new()
-	stone.albedo_color = BASALT.lightened(0.12)
+	stone.albedo_color = BASALT.darkened(ARCH_DARKEN)
 	stone.roughness = 1.0
 	for side: float in [-1.0, 1.0]:
 		var size: Vector3 = step * PILLAR_M + across * 2.0 + Vector3.UP * ARCH_LOW_M
@@ -349,7 +360,7 @@ func _build_arch(cell: Vector2i, along: Vector2i) -> void:
 	# is solid below ARCH_LOW_M, where the rover and walkers pass.
 	var course_m: float = (ARCH_HIGH_M - ARCH_LOW_M) / (ARCH_COURSES + 1.0)
 	for course: int in ARCH_COURSES:
-		var reach_m: float = PILLAR_M + ARCH_STEP_M * (course + 1)
+		var reach_m: float = course_reach_m(course, width_m)
 		var base_m: float = ARCH_LOW_M + course_m * course
 		for side: float in [-1.0, 1.0]:
 			var edge_m: float = width_m * 0.5 + PILLAR_M * 0.5
