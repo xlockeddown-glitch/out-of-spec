@@ -203,3 +203,49 @@ func test_a_blocked_rover_takes_no_till_press() -> String:
 	RoverController.input_blocked = false
 	rover.free()
 	return "" if blocked else "A till press must not count while the menu blocks keys."
+
+
+func test_the_menu_closes_when_the_link_is_lost_and_rearms_on_a_new_guest() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var pause := PauseUI.new()
+	tree.root.add_child(pause)
+	var problem: String = ""
+	CoopSession.players = ["player_1", "player_2"]
+	pause.open()
+	pause._on_quit()
+	CoopSession.player_left.emit("player_2")
+	if pause._armed or pause._note.text != "":
+		problem = "The guest warning must reset when the guests change."
+	CoopSession.lost.emit()
+	if pause.visible or RoverController.input_blocked or tree.paused:
+		problem = "A lost link must close the menu and clear the block."
+	CoopSession.players = []
+	pause.free()
+	tree.paused = false
+	return problem
+
+
+func test_zero_steering_and_the_dig_stamp_are_gated() -> String:
+	var rover: RoverController = RoverController.new()
+	rover.rover_id = &"test_rover"
+	Input.action_press(&"rover_zero_steering")
+	RoverController.input_blocked = true
+	rover._sample_local_input(0.0)
+	var blocked_ok: bool = rover._commands.is_empty()
+	var scene: Node = (load("res://scenes/main_farm.tscn") as PackedScene).instantiate()
+	var event := InputEventAction.new()
+	event.action = &"rover_dig"
+	event.pressed = true
+	scene._input(event)
+	var stamp_ok: bool = scene._dig_pressed_msec < 0
+	RoverController.input_blocked = false
+	scene._input(event)
+	var stamp_set: bool = scene._dig_pressed_msec >= 0
+	Input.action_release(&"rover_zero_steering")
+	scene.free()
+	rover.free()
+	if not blocked_ok:
+		return "Zero steering must not queue while the menu blocks keys."
+	if not stamp_ok:
+		return "A dig press while blocked must not count as ours."
+	return "" if stamp_set else "An ordinary dig press must be stamped."

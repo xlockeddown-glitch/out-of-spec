@@ -23,12 +23,13 @@ signal ore_mined(fissure_id: StringName)
 ## A boulder was drilled, `hits` times by now.
 signal boulder_hit(hits: int)
 signal dig_rejected(reason: String)
+signal fill_rejected(reason: String)
+
 ## Set by the menu panel while the game runs on behind it (co-op): this screen
 ## then reads no driving keys, as with none held. Rover and walker both obey it.
 static var input_blocked: bool = false
 ## Said when there is no ground to dig; the screens add where to dig.
 const ROCK_REFUSAL: String = "This rock can't be dug."
-signal fill_rejected(reason: String)
 
 ## Following another player's driving: how fast it closes in, and from how far it
 ## jumps there instead; and how far ahead of the last word it runs [PLACEHOLDER].

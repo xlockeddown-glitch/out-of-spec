@@ -51,6 +51,7 @@ func _ready() -> void:
 	column.add_child(_quit_button)
 	CoopSession.player_joined.connect(_on_players_changed.unbind(1))
 	CoopSession.player_left.connect(_on_players_changed.unbind(1))
+	CoopSession.lost.connect(_on_lost)
 	hide()
 
 
@@ -89,8 +90,17 @@ func open() -> void:
 	_resume_button.grab_focus()
 
 
+## The link dropped: nothing is left to keep running for, so the menu closes.
+func _on_lost() -> void:
+	if visible:
+		close()
+
+
 func _on_players_changed() -> void:
 	if visible:
+		# The guests it warned about may be other ones now.
+		_armed = false
+		_note.text = ""
 		_apply(is_alone())
 		_text.text = _body(is_alone())
 
@@ -101,7 +111,7 @@ func _apply(alone: bool) -> void:
 	_title.text = "PAUSED" if alone else "MENU"
 	if is_inside_tree():
 		get_tree().paused = alone
-	RoverController.input_blocked = not alone
+	RoverController.input_blocked = is_inside_tree() and not alone
 
 
 func _body(alone: bool) -> String:
