@@ -2,6 +2,16 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-26: Zone data (zones step 2)
+
+Built zones.md section 13 item 2: `data/zones.json`, the `ZoneData` reader and a data check. No scene, no rule, no UI; nothing reads it yet.
+
+- **Rows:** the six zones of section 2 and the five far sites of section 11 (11 in all), with the doc's bands (Lava Tubes 5-20, Aquifer 8-24, Colony Mine 12-30, Ice Caves 18-35, Phobos 21-40, Deimos 26-50, far sites 50-99 together). Ids such as `lava_tubes` and `colony_mine` are invented for code [PLACEHOLDER]. The far-site bands are the section 11 ones and the far entrances read "Not designed yet" [PLACEHOLDER].
+- **Fields:** id, name, area (underground, moon, far), band, hazards, finds, hub_scene, entrance, tarantula_hook, notes. `hub_scene` is an empty string where there is no scene; only `lava_tubes` has one (`res://scenes/basalt_tunnels.tscn`). Ryan's section 14.1 answers for the moons (station escapees and the Larder exception, caches and test pods, new moon-adapted forms, exotic low-expansion blocks) are short strings in `tarantula_hook` and `notes`.
+- **Fixed word lists** for hazards and finds live in `ZoneData.HAZARDS` and `ZoneData.FINDS` [PLACEHOLDER words from sections 4, 5 and 11]; the check refuses anything else, so a new word is a deliberate edit. They carry no rules or numbers yet.
+- **Bands overlap** (`zones_for_level` returns every zone whose band holds the level, in table order). A band is what the content is tuned for, never a gate (section 7).
+- **Check:** `tests/test_zones.gd` runs `ZoneData.problems` on the table (types, unique ids, band min <= max within 1..99, hazard and find words, existing hub scenes) and checks the bands against the doc. The table is registered in `DataManager` like the others. No save or protocol change (SaveGame.VERSION 1, CoopSession.PROTOCOL 16).
+
 ## 2026-11-26: The recall (zones step 1)
 
 Built zones.md section 6.1 in the existing basalt tunnels. Everything below is a [PLACEHOLDER] number or an [ASSUMPTION] unless Ryan says otherwise.
