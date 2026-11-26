@@ -212,9 +212,9 @@ func refusal(action: StringName, reason: String) -> Variant:
 
 ## What a rover reports every tick. The host measures the rovers it simulates, so
 ## these are not actions: a guest can't send them, and its own rover changes nothing.
-func rover_drove(meters: float) -> void:
+func rover_drove(meters: float, rover_id: String = "") -> void:
 	if not guest:
-		_farm().add_rover_usage(meters, _farm().local_player_id)
+		_farm().add_rover_usage(meters, _farm().local_player_id, rover_id)
 
 
 func rover_uplink(rover_id: String, has_los: bool) -> void:

@@ -83,7 +83,7 @@ func _refresh() -> void:
 	for child: Node in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
-	var places: Array[Dictionary] = FastTravel.destinations(GameState.lab_level())
+	var places: Array[Dictionary] = FastTravel.destinations(GameState.lab_level(), GameState.zones_unlocked)
 	if places.is_empty():
 		_rows.add_child(PlanBoardUI._label(FastTravel.text("none"), DIM, 20))
 		return
@@ -108,11 +108,14 @@ func _on_go(place: Dictionary) -> void:
 		_status.text = "%s %s" % [warning, FastTravel.text("warn_again")]
 		return
 	_going = true
+	FastTravel.pending = true
 	var problem: String = await FarmCommands.request(&"fast_travel", [id])
 	if not is_inside_tree():
+		FastTravel.pending = false
 		return
 	if problem != "":
 		_going = false
+		FastTravel.pending = false
 		_status.text = problem
 		return
 	# A guest's copy of the farm may come after the host's yes.
@@ -120,9 +123,11 @@ func _on_go(place: Dictionary) -> void:
 	while GameState.rover_zone != id and waited < WAIT_S:
 		await get_tree().create_timer(0.1).timeout
 		if not is_inside_tree():
+			FastTravel.pending = false
 			return
 		waited += 0.1
 	_going = false
+	FastTravel.pending = false
 	if GameState.rover_zone != id:
 		_status.text = FastTravel.text("no_zone")
 		return

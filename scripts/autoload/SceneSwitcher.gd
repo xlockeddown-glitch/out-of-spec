@@ -45,7 +45,7 @@ func toggle_farm_dome() -> void:
 ## Where the dome's airlock leads. The tunnels only while a rover is there for
 ## the player: one that was sent home, or let go, leaves the farm out the door.
 func exit_path() -> String:
-	if outside == TUNNELS_SCENE and GameState.rover_zone == "":
+	if outside == TUNNELS_SCENE and (GameState.rover_zone == "" or TunnelRecall.closed(GameClock.elapsed_days)):
 		outside = FARM_SCENE
 	return outside
 

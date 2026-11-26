@@ -212,7 +212,7 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 	_reach[rover_id] = [left - distance, now]
 	_drivers[rover_id] = [player_id, now + HOLD_MS]
 	_poses[rover_id] = [pose, now]
-	farm.add_rover_usage(Vector2(to.origin.x - from.origin.x, to.origin.z - from.origin.z).length(), player_id)
+	farm.add_rover_usage(Vector2(to.origin.x - from.origin.x, to.origin.z - from.origin.z).length(), player_id, rover_id)
 	farm.park_rover(rover_id, to)
 	farm.watch_sentinel(rover_id, to.origin, pose[4])
 	# A rover in the host's own scene looks for the relay itself.
@@ -266,8 +266,14 @@ func _expire(now: int) -> void:
 
 
 func _forget() -> void:
+	# A change that is only one rover's (a field rover starting or going) leaves
+	# every other rover's lease, pose and reach alone.
+	var only: Variant = farm.get("rover_place_scope")
 	for known: Dictionary in [_drivers, _told_driver, _poses, _claimed_at, _sent_at, _said_driver, _reach, _here_at]:
-		known.clear()
+		if only is String and only != "":
+			known.erase(only)
+		else:
+			known.clear()
 
 
 func _may_drive(rover_id: String) -> bool:

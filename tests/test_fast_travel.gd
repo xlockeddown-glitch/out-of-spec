@@ -1,10 +1,9 @@
-extends RefCounted
+extends "res://tests/coop_net.gd"
 ## Fast travel (docs/design/zones.md section 8.1, build step 7): the dome console
 ## sends a player to a zone's field rover and the farm's rover stays home; the way
 ## home is the dome; a rover lent through the real entrance still works as it did.
 
-const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
-const SessionScript: GDScript = preload("res://scripts/autoload/CoopSession.gd")
+const RoversScript: GDScript = preload("res://scripts/autoload/CoopRovers.gd")
 const SyncScript: GDScript = preload("res://scripts/autoload/FarmSync.gd")
 
 const ZONE: String = "lava_tubes"
@@ -25,6 +24,7 @@ func _state() -> GameStateScript:
 	gs.build_registry()
 	gs.set_world_seed(424242)
 	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, HOME)
+	gs.zones_unlocked.append(ZONE)  # it has been there by the mouth
 	return gs
 
 
@@ -184,7 +184,6 @@ func test_a_rover_left_below_with_nobody_below_starts_again_at_the_hub() -> Stri
 	gs.rover_zone = ZONE
 	gs.rover_depth = 1
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3(0.0, -20.0, 0.0))
-	gs.player_places["player_2"] = [ZONE, 0]  # in the hub: not below
 	var epoch: int = gs.rover_epoch
 	var problem: String = ""
 	_at(12.0, func() -> String:
@@ -200,14 +199,14 @@ func test_a_rover_left_below_with_nobody_below_starts_again_at_the_hub() -> Stri
 	other.rover_zone = ZONE
 	other.rover_depth = 1
 	other.rover_transforms[other.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3(0.0, -20.0, 0.0))
-	other.player_places["player_2"] = [ZONE, 1]
+	other.player_places["player_2"] = [ZONE, 0]  # in the hub, maybe on the way down
 	var before: int = other.rover_epoch
 	var joined: String = ""
 	_at(12.0, func() -> String:
 		joined = other.fast_travel(ZONE, you)
 		return "")
 	if joined != "" or other.rover_depth != 1 or other.rover_epoch != before or other.place_of(you) != ZONE:
-		problems.append("Someone below: join at depth 1 without a re-park (%s)" % joined)
+		problems.append("Someone in the zone: join at depth 1 without a re-park (%s)" % joined)
 	other.free()
 	gs.free()
 	return "\n".join(problems)
@@ -216,8 +215,8 @@ func test_a_rover_left_below_with_nobody_below_starts_again_at_the_hub() -> Stri
 func test_the_arrival_plan() -> String:
 	if FastTravel.arrival_plan(true, 1, []) != FastTravel.RE_PARK:
 		return "Live, below, nobody below: re-park"
-	if FastTravel.arrival_plan(true, 1, [[ZONE, 0]]) != FastTravel.RE_PARK:
-		return "Standing in the hub is not below"
+	if FastTravel.arrival_plan(true, 1, [[ZONE, 0]]) != FastTravel.JOIN:
+		return "Someone in the hub may be on the way down: join"
 	if FastTravel.arrival_plan(true, 1, [[ZONE, 1]]) != FastTravel.JOIN or FastTravel.arrival_plan(true, 0, []) != FastTravel.JOIN:
 		return "Someone below, or the rover at the hub: join"
 	if FastTravel.arrival_plan(false, 0, []) != FastTravel.START:
@@ -226,7 +225,7 @@ func test_the_arrival_plan() -> String:
 
 
 func test_the_console_offers_the_zones_that_have_a_scene() -> String:
-	var rows: Array = FastTravel.destinations(1)
+	var rows: Array = FastTravel.destinations(1, [ZONE])
 	var ids: Array = []
 	for row: Dictionary in rows:
 		ids.append(str(row["id"]))
@@ -234,6 +233,8 @@ func test_the_console_offers_the_zones_that_have_a_scene() -> String:
 			return "A row without a name: %s" % [row]
 	if not ZONE in ids:
 		return "The Lava Tubes are on the console: %s" % [ids]
+	if not FastTravel.destinations(1, []).is_empty():
+		return "A zone the farm has not been to is not on the console"
 	return ""
 
 
@@ -248,6 +249,10 @@ func test_the_last_one_out_lets_the_field_rover_go_and_the_farm_rover_is_untouch
 		gs.fast_travel(ZONE, friend)
 		return "")
 	var problems: Array[String] = []
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3(-1.5, 0.05, 10.0))
+	if gs.leave_zone(me) == "":
+		problems.append("The rover is not on the pad: the host refuses")
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)
 	if gs.leave_zone(me) != "" or gs.place_of(me) != ZonePresence.DOME:
 		problems.append("The first leaves for the dome")
 	if gs.rover_zone != ZONE or not gs.rover_transforms.has(gs.TUNNEL_ROVER):
@@ -271,6 +276,7 @@ func test_a_lent_rover_goes_home_by_the_mouth_not_the_dome() -> String:
 	var me: String = gs.local_player_id
 	var lend: String = gs.move_rover(true)
 	gs.player_places[me] = [ZONE, 0]
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)
 	var problems: Array[String] = []
 	if lend != "" or not gs.rover_lent or not gs.rover_is_away(gs.ROVER) or gs.rover_is_away(gs.TUNNEL_ROVER):
 		problems.append("The mouth lends the farm rover as it always did (%s)" % lend)
@@ -347,3 +353,219 @@ func test_a_guest_in_a_zone_is_not_rescued_today() -> String:
 		problems.append("A guest's copy must not rescue")
 	gs.free()
 	return "\n".join(problems)
+
+
+# --- Review round one -----------------------------------------------------------------------
+
+func test_a_zone_the_farm_has_not_been_to_is_not_on_the_console_and_is_refused() -> String:
+	var gs: GameStateScript = _state()
+	gs.zones_unlocked.clear()
+	var me: String = _in_dome(gs)
+	var results: Dictionary = {}
+	_at(12.0, func() -> String:
+		results["locked"] = gs.fast_travel(ZONE, me)
+		return "")
+	var problems: Array[String] = []
+	if results["locked"] == "" or gs.rover_zone != "":
+		problems.append("A fresh farm cannot fast-travel before its first visit by the mouth")
+	# The first real visit opens it.
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD)
+	if gs.move_rover(true) != "" or not gs.zones_unlocked.has(ZONE):
+		problems.append("The mouth opens the zone to the console")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_the_unlocked_list_is_saved_sent_grandfathered_and_checked() -> String:
+	var gs: GameStateScript = _state()
+	var saved: Dictionary = gs.farm_to_dict()
+	var problems: Array[String] = []
+	if saved.get("zones_unlocked") != [ZONE]:
+		problems.append("zones_unlocked is saved")
+	var back: GameStateScript = GameStateScript.new()
+	back.build_registry()
+	if back.farm_from_dict(bytes_to_var(var_to_bytes(saved))) != "" or back.zones_unlocked != [ZONE]:
+		problems.append("zones_unlocked is loaded: %s" % [back.zones_unlocked])
+	var old: Dictionary = saved.duplicate(true)
+	old.erase("zones_unlocked")
+	old.erase("rover_lent")
+	old["rover_zone"] = ZONE
+	var older: GameStateScript = GameStateScript.new()
+	older.build_registry()
+	if older.farm_from_dict(bytes_to_var(var_to_bytes(old))) != "" or older.zones_unlocked != [ZONE]:
+		problems.append("A save whose rover is in the zone grandfathers it: %s" % [older.zones_unlocked])
+	var home: Dictionary = saved.duplicate(true)
+	home.erase("zones_unlocked")
+	var plain: GameStateScript = GameStateScript.new()
+	plain.build_registry()
+	if plain.farm_from_dict(bytes_to_var(var_to_bytes(home))) != "" or not plain.zones_unlocked.is_empty():
+		problems.append("A save with the rover home has no zones yet")
+	for wrong: Array in [["nowhere"], [ZONE, ZONE], [5]]:
+		var bad: Dictionary = saved.duplicate(true)
+		bad["zones_unlocked"] = wrong
+		if plain.farm_dict_problem(bad) == "":
+			problems.append("%s must be refused" % [wrong])
+	if not "zones_unlocked" in SyncScript.SHOWN_BY[&"rover_place_changed"]:
+		problems.append("A guest is shown the list")
+	plain.free()
+	older.free()
+	back.free()
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_joining_and_leaving_keep_another_player_s_lease() -> String:
+	var session: Node = _session()
+	var gs: GameStateScript = session.commands.state
+	gs.zones_unlocked.append(ZONE)
+	var rovers: Node = RoversScript.new()
+	rovers.start(session, gs)
+	var me: String = _in_dome(gs, "player_2")
+	var friend: String = _in_dome(gs, "player_3")
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, me)
+		return "")
+	rovers._drivers[gs.TUNNEL_ROVER] = [me, 1 << 60]
+	rovers._drivers[gs.ROVER] = ["player_4", 1 << 60]
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, friend)
+		return "")
+	var problems: Array[String] = []
+	if rovers.driver(gs.TUNNEL_ROVER) != me:
+		problems.append("A friend joining must not end the driver's lease")
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)
+	gs.leave_zone(friend)
+	if rovers.driver(gs.TUNNEL_ROVER) != me:
+		problems.append("A friend leaving must not end the driver's lease")
+	gs.leave_zone(me)  # the last out: the field rover goes
+	if rovers.driver(gs.TUNNEL_ROVER) != "" or rovers.driver(gs.ROVER) != "player_4":
+		problems.append("The field rover going clears its own lease and not the farm rover's")
+	rovers.free()
+	return _finish("\n".join(problems))
+
+
+func test_nobody_re_parks_the_rover_under_a_descent_in_the_fade() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = _in_dome(gs)
+	gs.rover_zone = ZONE
+	gs.rover_depth = 1
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3(0.0, -20.0, 0.0))
+	gs.player_places["player_2"] = [ZONE, 0]  # went down; the host records it late
+	var epoch: int = gs.rover_epoch
+	var problem: String = ""
+	_at(12.0, func() -> String:
+		problem = gs.fast_travel(ZONE, me)
+		return "")
+	var bad: bool = problem != "" or gs.rover_depth != 1 or gs.rover_epoch != epoch
+	gs.free()
+	return "The descent stands (%s)" % problem if bad else ""
+
+
+func test_leaving_the_zone_is_checked_on_the_host() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = _in_dome(gs)
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, me)
+		return "")
+	var problems: Array[String] = []
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3(-1.5, 0.05, 10.0))
+	if gs.leave_zone(me) == "":
+		problems.append("Off the pad: refused")
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)
+	gs.player_places[me] = [ZONE, 1]
+	if gs.leave_zone(me) == "":
+		problems.append("A player below the hub: refused")
+	gs.player_places[me] = [ZONE, 0]
+	if gs.leave_zone(me) != "":
+		problems.append("On the pad in the hub: allowed")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_rescuing_the_host_leaves_the_rover_to_a_guest_still_below() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = _in_dome(gs)
+	var guest: String = _in_dome(gs, "player_2")
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, me)
+		gs.fast_travel(ZONE, guest)
+		return "")
+	gs.recall_in_tunnels = func() -> bool: return true
+	var beds: _NoBeds = _NoBeds.new()
+	gs.recall_beds = beds
+	_at(2.0, func() -> String:
+		gs._tick_recall()
+		return "")
+	var problems: Array[String] = []
+	if beds.put_to_bed != [me]:
+		problems.append("Only the host goes to bed: %s" % [beds.put_to_bed])
+	if gs.rover_zone != ZONE or not gs.rover_transforms.has(gs.TUNNEL_ROVER) or gs.place_of(guest) != ZONE:
+		problems.append("The guest keeps the field rover and the zone")
+	# And while it is occupied the mouth stays shut.
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD)
+	if gs.move_rover(true) == "" or gs.rover_lent:
+		problems.append("The farm rover cannot be lent in while a guest is there")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_an_empty_field_rover_does_not_block_the_mouth() -> String:
+	var gs: GameStateScript = _state()
+	gs.rover_zone = ZONE  # left live with nobody
+	gs.rover_transforms[gs.TUNNEL_ROVER] = gs.TUNNEL_START
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD)
+	var problem: String = gs.move_rover(true)
+	var bad: bool = problem != "" or not gs.rover_lent
+	gs.free()
+	return "The mouth is free (%s)" % problem if bad else ""
+
+
+func test_a_rescue_takes_no_ore_and_field_driving_does_not_wear_the_farm_wheels() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = _in_dome(gs)
+	gs.crystal_ore = 7
+	_at(12.0, func() -> String:
+		gs.fast_travel(ZONE, me)
+		return "")
+	gs.crystal_ore = 90  # mined on the farm meanwhile
+	var problems: Array[String] = []
+	if gs.ore_carried_in() != 0:
+		problems.append("A fast-travel rescue takes no ore")
+	var before: float = gs.wheel_meters
+	gs.add_rover_usage(50.0, me, gs.TUNNEL_ROVER)
+	if gs.wheel_meters != before:
+		problems.append("A field rover does not wear the farm rover's wheels")
+	gs.add_rover_usage(50.0, me, gs.ROVER)
+	if gs.wheel_meters != before + 50.0:
+		problems.append("The farm rover's own driving still does")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_the_airlock_does_not_lead_to_a_zone_in_the_closed_hours() -> String:
+	var gs: GameStateScript = _state()
+	var held_outside: String = SceneSwitcher.outside
+	SceneSwitcher.outside = SceneSwitcher.TUNNELS_SCENE
+	var held_zone: String = GameState.rover_zone
+	GameState.rover_zone = ZONE
+	var held_clock: float = GameClock.elapsed_days
+	GameClock.elapsed_days = TunnelRecall.at_hour(1, 3.0)
+	var shut: String = SceneSwitcher.exit_path()
+	SceneSwitcher.outside = SceneSwitcher.TUNNELS_SCENE
+	GameClock.elapsed_days = TunnelRecall.at_hour(1, 12.0)
+	var open: String = SceneSwitcher.exit_path()
+	GameClock.elapsed_days = held_clock
+	GameState.rover_zone = held_zone
+	SceneSwitcher.outside = held_outside
+	gs.free()
+	var problems: Array[String] = []
+	if shut != SceneSwitcher.FARM_SCENE:
+		problems.append("Shut at 03:00 the airlock leads to the farm")
+	if open != SceneSwitcher.TUNNELS_SCENE:
+		problems.append("Open by day it leads to the zone")
+	return "\n".join(problems)
+
+
+func test_the_airlock_waits_while_a_trip_is_pending() -> String:
+	FastTravel.pending = false
+	return "" if not FastTravel.pending else "No request is out by default"

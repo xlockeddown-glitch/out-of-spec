@@ -58,7 +58,9 @@ func _ready() -> void:
 	console.position = Vector3(-5.6, 0, -2.4)
 	add_child(console)
 	console.clicked.connect(travel_ui.open)
-	_airlock.clicked.connect(func() -> void: SceneSwitcher.swap_to(SceneSwitcher.exit_path()))
+	_airlock.clicked.connect(func() -> void:
+		if not FastTravel.pending:
+			SceneSwitcher.swap_to(SceneSwitcher.exit_path()))
 	_terrarium_click.clicked.connect(_on_terrarium_clicked)
 	_spool.clicked.connect(_on_spool_clicked)
 	_sentinel_click.clicked.connect(_on_sentinel_clicked)

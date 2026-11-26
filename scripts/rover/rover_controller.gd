@@ -471,7 +471,7 @@ func _drive(delta: float) -> void:
 		_keep_off_edge()
 	# Horizontal displacement actually achieved; pushing into a rock adds no drift.
 	var driven: float = Vector2(global_position.x - before.x, global_position.z - before.z).length()
-	FarmCommands.rover_drove(driven)
+	FarmCommands.rover_drove(driven, rover_id)
 
 
 func _set_following(following: bool) -> void:
