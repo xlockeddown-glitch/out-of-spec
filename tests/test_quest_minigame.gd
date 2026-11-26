@@ -7,6 +7,7 @@ extends RefCounted
 
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 const CommandsScript: GDScript = preload("res://scripts/autoload/FarmCommands.gd")
+const SessionScript: GDScript = preload("res://scripts/autoload/CoopSession.gd")
 const HOST: String = "player_1"
 const GUEST: String = "player_2"
 const S1: String = "thirsty_probe"
@@ -136,6 +137,20 @@ func _check_old_farm(commands: Node) -> String:
 		return "The calibration does the step and its score is kept: %s" % [entry]
 	if QuestEngine.has_minigame_step(gs, GAME, PROBE, HOST) or MinigameScore.is_due(gs, PROBE, HOST, false):
 		return "Once the step is done the soil probe is no key moment again."
+	# The host's snapshot carries the kept score, and the guest reads the same.
+	var late: GameStateScript = _farm()
+	var bytes: PackedByteArray = FarmSync.capture(gs)
+	FarmCommands.guest = true
+	var join_problem: String = FarmSync.join(bytes, late)
+	FarmCommands.guest = false
+	var late_entry: Dictionary = late.quest_state.get(S1, {})
+	var same: bool = join_problem == "" and late_entry.get(QuestEngine.SCORES) == { "cal": 97 } \
+		and not QuestEngine.has_minigame_step(late, GAME, PROBE, GUEST) and not MinigameScore.is_due(late, PROBE, GUEST, false)
+	late.free()
+	if not same:
+		return "A guest takes a snapshot with a kept score, and the game is no longer due there: %s %s" % [join_problem, late_entry]
+	if SessionScript.PROTOCOL != 16:
+		return "An entry may now have `scores`, which a build before refuses: the protocol is 16."
 	var stale: Variant = commands.execute(HOST, BENCH, [PROBE, 100])
 	if not stale is Dictionary or int(stale.get(MinigameScore.RECORD_KEY, 0)) != MinigameScore.SKIPPED or entry[QuestEngine.SCORES] != { "cal": 97 }:
 		return "A later calibration's score counts for nothing and changes no kept score: %s" % [stale]
@@ -189,16 +204,176 @@ func _check_open_only(commands: Node) -> String:
 	# And keeps only its owner's score.
 	var step: Dictionary = _fixture("player", "own")["steps"][1]
 	var kept: Dictionary = _entry(["pay", "cal"])
-	QuestEngine._keep_score(kept, step, QuestEngine.played_game(GAME, unit, HOST, 100), GUEST)
-	QuestEngine._keep_score(kept, step, QuestEngine.played_game(GAME, "soil_probe", GUEST, 100), GUEST)
-	QuestEngine._keep_score(kept, step, QuestEngine.played_game("no_such_game", unit, GUEST, 100), GUEST)
-	QuestEngine._keep_score(kept, step, QuestEngine.played_game(GAME, unit, GUEST, 59), GUEST)
-	QuestEngine._keep_score(kept, step, {}, GUEST)
+	var mine: Dictionary = { "instrument_id": unit, "traceable": true, "performed_by": GUEST, "programmed_by": "" }
+	gs.cal_log.append(mine)
+	QuestEngine._keep_score(gs, kept, step, QuestEngine.played_game(GAME, unit, HOST, 100), GUEST)
+	QuestEngine._keep_score(gs, kept, step, QuestEngine.played_game(GAME, "soil_probe", GUEST, 100), GUEST)
+	QuestEngine._keep_score(gs, kept, step, QuestEngine.played_game("no_such_game", unit, GUEST, 100), GUEST)
+	QuestEngine._keep_score(gs, kept, step, QuestEngine.played_game(GAME, unit, GUEST, 59), GUEST)
+	QuestEngine._keep_score(gs, kept, step, {}, GUEST)
 	if kept.has(QuestEngine.SCORES):
 		return "Another player's score, another instrument's, another game's or a poor try keeps nothing: %s" % [kept]
-	QuestEngine._keep_score(kept, step, QuestEngine.played_game(GAME, unit, GUEST, 250), GUEST)
-	if kept.get(QuestEngine.SCORES) != { "cal": 100 }:
-		return "The owner's own score is kept, held to 100: %s" % [kept]
+	# The newest row must be the scored calibration: not a robot's, the
+	# manager's, another player's, another instrument's or one not traceable.
+	for change: Dictionary in [{ "programmed_by": GUEST, "performed_by": "TR-1" }, { "performed_by": MinigameScore.MANAGER },
+			{ "performed_by": HOST }, { "instrument_id": "soil_probe" }, { "traceable": false }]:
+		gs.cal_log.append(mine.merged(change, true))
+		var played: Dictionary = QuestEngine.played_game(GAME, unit, GUEST, 100)
+		QuestEngine._keep_score(gs, kept, step, played, GUEST)
+		if kept.has(QuestEngine.SCORES) or played.is_empty():
+			return "A newest row changed by %s is not the scored calibration: %s" % [change, kept]
+	gs.cal_log.clear()
+	QuestEngine._keep_score(gs, kept, step, QuestEngine.played_game(GAME, unit, GUEST, 100), GUEST)
+	if kept.has(QuestEngine.SCORES):
+		return "With no calibration on the log nothing is kept."
+	gs.cal_log.append(mine)
+	var once: Dictionary = QuestEngine.played_game(GAME, unit, GUEST, 250)
+	QuestEngine._keep_score(gs, kept, step, once, GUEST)
+	if kept.get(QuestEngine.SCORES) != { "cal": 100 } or not once.is_empty():
+		return "The owner's own score is kept, held to 100, and is then used up: %s" % [kept]
+	return ""
+
+
+# --- Any order, a standard, two quests, a player's own ------------------------------
+
+## A quest of one mini-game step for the hygrometer, done as it is calibrated.
+func _one_step(id: String, scope: String = "farm") -> Dictionary:
+	var quest: Dictionary = _fixture(scope, id)
+	(quest["steps"] as Array).remove_at(0)
+	return quest
+
+
+func test_in_any_order_a_step_behind_an_open_one_is_open() -> String:
+	var loose: Dictionary = _fixture("farm", "loose")
+	loose["any_order"] = true
+	return _run(_check_any_order, [loose])
+
+
+func _check_any_order(commands: Node) -> String:
+	var gs: GameStateScript = commands.state
+	var unit: String = gs.HYGROMETER_ID
+	gs.credits = 0
+	GameClock.elapsed_days = 1.0
+	gs.update_quests()
+	var entry: Dictionary = gs.quest_state.get("loose", {})
+	if entry.is_empty() or not entry["steps_done"].is_empty():
+		return "The test's quest is accepted with both steps open: %s" % [entry]
+	if not QuestEngine.has_minigame_step(gs, GAME, unit, HOST):
+		return "In a quest done in any order the mini-game step is open while the first is."
+	commands.execute(HOST, BENCH, [unit, 85])
+	if entry["steps_done"] != ["cal"] or entry.get(QuestEngine.SCORES) != { "cal": 85 } or int(entry["done"]) >= 0:
+		return "The step is done out of order and its score kept: %s" % [entry]
+	if QuestEngine.has_minigame_step(gs, GAME, unit, HOST):
+		return "Done, it opens nothing, with the other step still open."
+	return ""
+
+
+func test_a_step_for_a_standard_still_needs_careful() -> String:
+	return _run(_check_standard, [_one_step("std")])
+
+
+func _check_standard(commands: Node) -> String:
+	var gs: GameStateScript = commands.state
+	var standard: String = gs.standard_ids()[0]
+	var quest: Dictionary = DataManager.get_record(&"quests", "std", "quests")
+	quest["steps"][0]["where"] = { "instrument_id": standard }
+	if QuestEngine.data_problem(quest) != "":
+		return "The test's quest is right: %s" % QuestEngine.data_problem(quest)
+	gs.quest_state["std"] = _entry([])
+	if not QuestEngine.has_minigame_step(gs, GAME, standard, HOST):
+		return "The test's step is open for the standard."
+	if MinigameScore.is_due(gs, standard, HOST, true) or MinigameScore.may_count(gs, standard, HOST):
+		return "A quest step does not open the game for a standard without the CAREFUL level."
+	return ""
+
+
+func test_one_calibration_grades_one_quest() -> String:
+	return _run(_check_one_quest, [_one_step("first"), _one_step("second")])
+
+
+func _check_one_quest(commands: Node) -> String:
+	var gs: GameStateScript = commands.state
+	GameClock.elapsed_days = 1.0
+	gs.update_quests()
+	if not gs.quest_state.has("first") or not gs.quest_state.has("second"):
+		return "The test's two quests are accepted: %s" % [gs.quest_state.keys()]
+	var before: int = gs.credits
+	commands.execute(HOST, BENCH, [gs.HYGROMETER_ID, 100])
+	var first: Dictionary = gs.quest_state["first"]
+	var second: Dictionary = gs.quest_state["second"]
+	if int(first["done"]) < 0 or int(second["done"]) < 0:
+		return "One calibration does the step of both quests: %s %s" % [first, second]
+	if first.get(QuestEngine.SCORES) != { "cal": 100 } or second.has(QuestEngine.SCORES):
+		return "The score is kept in the first quest only: %s %s" % [first, second]
+	if gs.credits != before + 120 + 100 or _lines(gs, BONUS_LINE) != 1:
+		return "Two quests of 100 CR pay one bonus of 20 CR, got %d: %s" % [gs.credits - before, gs.phone_log]
+	return ""
+
+
+func test_a_players_own_quest_keeps_its_owners_score() -> String:
+	return _run(_check_own_quest, [_one_step("own", "player")])
+
+
+func _check_own_quest(commands: Node) -> String:
+	var gs: GameStateScript = commands.state
+	var unit: String = gs.HYGROMETER_ID
+	CoopSession.players.assign([HOST, GUEST])
+	GameClock.elapsed_days = 1.0
+	gs.update_quests()
+	var hosts: Dictionary = (gs.player_quest_state.get(HOST, {}) as Dictionary).get("own", {})
+	var guests: Dictionary = (gs.player_quest_state.get(GUEST, {}) as Dictionary).get("own", {})
+	if hosts.is_empty() or guests.is_empty() or not gs.quest_state.is_empty():
+		return "Each player has the quest as their own: %s" % [gs.player_quest_state]
+	if not QuestEngine.has_minigame_step(gs, GAME, unit, GUEST) or not MinigameScore.may_count(gs, unit, GUEST):
+		return "The guest's own open step is a key moment for the guest."
+	var before: int = gs.credits
+	var answer: Variant = commands.execute(GUEST, BENCH, [unit, 90])
+	if not answer is Dictionary or int(answer.get(MinigameScore.RECORD_KEY, -1)) != 90:
+		return "The host counts the guest's score: %s" % [answer]
+	if int(guests["done"]) < 0 or guests.get(QuestEngine.SCORES) != { "cal": 90 }:
+		return "The guest's own step is done and keeps the guest's score: %s" % [guests]
+	# The log is the farm's, so the host's own step is done by it too, as a
+	# plain calibration would: with no score and no bonus.
+	if hosts.has(QuestEngine.SCORES) or hosts.keys() != QuestEngine.PLAYER_ENTRY_KEYS:
+		return "The host's own entry is given nothing of the guest's score: %s" % [hosts]
+	if _lines(gs, BONUS_LINE) != 1 or gs.credits != before + 100 + 110:
+		return "Only the guest's quest pays the Fine bonus, got %d CR: %s" % [gs.credits - before, gs.phone_log]
+	return ""
+
+
+func test_a_calibration_that_is_not_traceable_leaves_the_step_open() -> String:
+	return _run(_check_untraceable)
+
+
+func _check_untraceable(commands: Node) -> String:
+	var gs: GameStateScript = commands.state
+	var entry: Dictionary = _accept(gs)
+	var kit: DriftingSensor = gs.get_sensor(gs.get_sensor(PROBE).calibrated_by)
+	if kit == null:
+		return "The test's soil probe has no standard."
+	# The kit is overdue: the zero happens and is no link in the chain.
+	var due: int = kit.cal_due_day
+	kit.cal_due_day = GameClock.get_day_index() - 1
+	var answer: Variant = commands.execute(HOST, BENCH, [PROBE, 100])
+	if not answer is Dictionary or not answer.has("as_left") or answer.get("traceable", true):
+		return "The test's calibration with an overdue kit is not an untraceable one: %s" % [answer]
+	if int(answer.get(MinigameScore.RECORD_KEY, -1)) != 100:
+		return "The game was due, so the host counted the score for the zero itself: %s" % [answer]
+	if entry["steps_done"] != ["kit"] or entry.has(QuestEngine.SCORES):
+		return "A calibration that is not traceable does no step and keeps no score: %s" % [entry]
+	if not QuestEngine.has_minigame_step(gs, GAME, PROBE, HOST) or not MinigameScore.is_due(gs, PROBE, HOST, false):
+		return "The step is still open, so the game is due again."
+	# With the kit away at OIRM nothing is calibrated at all.
+	kit.cal_due_day = due
+	gs.at_oirm[kit.instrument_id] = GameClock.get_day_index() + 3
+	var refused: Variant = commands.execute(HOST, BENCH, [PROBE, 100])
+	if not refused is Dictionary or refused.has("as_left") or entry["steps_done"] != ["kit"] or entry.has(QuestEngine.SCORES):
+		return "With the kit at OIRM nothing is calibrated and nothing kept: %s" % [refused]
+	gs.at_oirm.clear()
+	# In date again, the next try does the step and is the one graded.
+	commands.execute(HOST, BENCH, [PROBE, 82])
+	if entry["steps_done"] != ["kit", "cal"] or entry.get(QuestEngine.SCORES) != { "cal": 82 }:
+		return "The traceable try does the step and keeps its own score: %s" % [entry]
 	return ""
 
 
@@ -351,8 +526,8 @@ func test_a_mini_game_step_must_be_one_instruments_calibration() -> String:
 			return "A mini-game step changed by %s must be refused." % [change]
 	var lone: Dictionary = good.duplicate(true)
 	lone["steps"][0]["minigame_line"] = "Well played."
-	if QuestEngine.data_problem(lone) == "":
-		return "A mini-game line on a step with no mini-game must be refused."
+	if not QuestEngine.data_problem(lone).contains("a mini-game line and no mini-game"):
+		return "A mini-game line on a step with no mini-game must be refused, and said so: %s" % QuestEngine.data_problem(lone)
 	var said: Dictionary = good.duplicate(true)
 	said["steps"][1]["minigame_line"] = "Well played."
 	return "" if QuestEngine.data_problem(said) == "" else "A mini-game line in the giver's own words is right: %s" % QuestEngine.data_problem(said)

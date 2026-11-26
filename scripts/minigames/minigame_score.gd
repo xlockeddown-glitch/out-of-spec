@@ -109,14 +109,16 @@ static func may_count(farm: Node, instrument_id: String, player_id: String) -> b
 ## Whether the game opens for this player (never "") at the bench: a key moment
 ## of section 7.4. With the CAREFUL unlock and `careful`, the player's own
 ## switch, any bench calibration is one, a standard's too. Without, only a
-## unit's first calibration of its kind.
+## unit's first calibration of its kind, or a unit's calibration while an open
+## quest step carries this game for it (every try, until the step is done).
 static func is_due(farm: Node, instrument_id: String, player_id: String, careful: bool) -> bool:
 	var sensor: DriftingSensor = farm.get_sensor(instrument_id)
 	if sensor == null:
 		return false
 	# An open quest step that carries this game for the instrument is a key
-	# moment, on an old farm that has calibrated its kind before too.
-	if QuestEngine.has_minigame_step(farm, SET_THE_ZERO, instrument_id, player_id):
+	# moment, on an old farm that has calibrated its kind before too. Not for a
+	# standard: its game still needs CAREFUL, as before.
+	if sensor.role != "standard" and QuestEngine.has_minigame_step(farm, SET_THE_ZERO, instrument_id, player_id):
 		return true
 	if careful and farm.has_skill_unlock(CAREFUL_UNLOCK, player_id):
 		return true

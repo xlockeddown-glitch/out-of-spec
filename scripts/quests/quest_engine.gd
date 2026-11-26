@@ -165,7 +165,7 @@ static func _update_one(farm: Node, quest: Dictionary, state: Dictionary, presen
 			moved = true
 		if have >= need:
 			done.append(step_id)
-			_keep_score(entry, step, played, owner)
+			_keep_score(farm, entry, step, played, owner)
 			finished.append(str(step.get("text", "")))
 			for player: String in present:
 				if not player in entry["players"]:
@@ -324,8 +324,10 @@ static func data_problem(quest: Dictionary) -> String:
 		if not id is String or id == "" or id in ids:
 			return "a step has no id, or two steps have the same id."
 		ids.append(id)
-		if step.has("minigame") or step.has(MINIGAME_LINE):
-			if not step.get("minigame") is String or not step["minigame"] in MINIGAMES:
+		if step.has(MINIGAME_LINE) and not step.has("minigame"):
+			return "step '%s' has a mini-game line and no mini-game." % id
+		if step.has("minigame"):
+			if not step["minigame"] is String or not step["minigame"] in MINIGAMES:
 				return "step '%s' has a mini-game this build does not have." % id
 			if step_instrument(step) == "":
 				return "step '%s' has a mini-game and is not a count of one instrument's cal_log rows." % id
@@ -573,7 +575,8 @@ static func step_instrument(step: Dictionary) -> String:
 
 ## True while an accepted quest that is not done has an open step carrying
 ## `minigame` for this instrument: a key moment, however often the lab has
-## calibrated that kind before. The farm's quests count for every player, and a
+## calibrated that kind before (a standard's own calibration is left to
+## MinigameScore). The farm's quests count for every player, and a
 ## player's own quests for that player. It only reads quest_state and
 ## player_quest_state, which a guest has as the host's copy, so it answers the
 ## same on a guest. In a quest done in order only the first step not done is open.
@@ -609,17 +612,31 @@ static func played_game(minigame: String, instrument_id: String, player_id: Stri
 ## A step was done in the look after `played`: its score is kept if the game was
 ## this step's and it earned a grade. A skip, a poor try and a calibration with
 ## no game keep nothing, so their entry is the same as it always was. A
-## player's own quest (`owner`) keeps only that player's score.
-static func _keep_score(entry: Dictionary, step: Dictionary, played: Dictionary, owner: String) -> void:
+## player's own quest (`owner`) keeps only that player's score. The newest
+## cal_log row must be the scored calibration itself: the player's own by hand,
+## traceable, and a row the step counts, so a robot's or the manager's row that
+## did the step is never given a player's grade. One calibration grades one
+## quest: the first whose step it does (`played` is emptied once it is kept).
+static func _keep_score(farm: Node, entry: Dictionary, step: Dictionary, played: Dictionary, owner: String) -> void:
 	if played.is_empty() or str(step.get("minigame", "")) == "" or str(step.get("minigame", "")) != str(played.get("minigame", "")):
 		return
-	if step_instrument(step) != str(played.get("instrument_id", "")) or (owner != "" and owner != str(played.get("player_id", ""))):
+	var player: String = str(played.get("player_id", ""))
+	if step_instrument(step) != str(played.get("instrument_id", "")) or (owner != "" and owner != player):
 		return
 	var score: int = mini(int(played.get("score", MinigameScore.SKIPPED)), MinigameScore.MAX_SCORE)
 	if not MinigameScore.is_graded(score):
 		return
+	var log: Array = farm.cal_log
+	var row: Variant = log[-1] if not log.is_empty() else null
+	if not row is Dictionary or not bool(row.get("traceable", false)) or str(row.get("performed_by", "")) != player or str(row.get("programmed_by", "")) != "":
+		return
+	var where: Dictionary = step["where"]
+	for key: Variant in where:
+		if not _same(row.get(key), where[key]):
+			return
 	var scores: Dictionary = entry.get_or_add(SCORES, {})
 	scores[str(step.get("id", ""))] = score
+	played.clear()
 
 
 ## The quest's score for its grade (section 7.2): the lowest kept among its
