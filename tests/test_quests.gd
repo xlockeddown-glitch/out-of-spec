@@ -44,6 +44,15 @@ func _run(body: Callable, fixtures: Array = []) -> String:
 	return out if out is String else "The test stopped early or did not return a String."
 
 
+## The shipped quests with these ids, for a test that is about only them.
+func _shipped(ids: Array) -> Array:
+	var out: Array = []
+	for quest: Dictionary in QuestEngine.quests():
+		if str(quest["id"]) in ids:
+			out.append(quest)
+	return out
+
+
 func _farm() -> GameStateScript:
 	var gs: GameStateScript = GameStateScript.new()
 	gs.build_registry()
@@ -112,7 +121,7 @@ func test_shipped_quests_are_readable() -> String:
 
 
 func test_l1_is_offered_at_once_and_paid_by_a_clean_audit() -> String:
-	return _run(_check_l1)
+	return _run(_check_l1, _shipped([L1, L3]))
 
 
 func _check_l1(gs: GameStateScript) -> String:
@@ -221,7 +230,7 @@ func _check_l3_closed(gs: GameStateScript) -> String:
 ## A save from before quests that already did both shows them done, is paid
 ## once [ASSUMPTION], and is not paid again when it is saved and loaded.
 func test_an_old_save_is_done_and_paid_once() -> String:
-	return _run(_check_old_save)
+	return _run(_check_old_save, _shipped([L1, L3]))
 
 
 func _check_old_save(gs: GameStateScript) -> String:

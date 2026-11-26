@@ -103,5 +103,9 @@
   "twin_column_air_dryer": {
     "display_name": "Twin-Column Air Dryer",
     "description": "A compressor with two desiccant columns that dry its air."
+  },
+  "mug_ring": {
+    "display_name": "Mug Ring",
+    "description": "A ring of dried coffee on the bench top. Somebody worked here overnight, and it was not you."
   }
 }
