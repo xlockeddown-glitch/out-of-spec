@@ -49,6 +49,8 @@ const ROCKS: Dictionary[Vector2i, Rock] = {
 	Vector2i(63, 47): Rock.SHELF, Vector2i(63, 49): Rock.DECK,
 	Vector2i(45, -33): Rock.SHELF, Vector2i(47, -33): Rock.DECK, Vector2i(49, -33): Rock.ENDCAP,
 	Vector2i(-31, 47): Rock.BLUFF, Vector2i(-31, 49): Rock.DECK, Vector2i(-31, 51): Rock.ENDCAP,
+	# A row at the plateau's east edge, where the rim is 1.6 m to 1.9 m high [PLACEHOLDER].
+	Vector2i(77, 45): Rock.ENDCAP, Vector2i(77, 47): Rock.DECK, Vector2i(77, 49): Rock.SHELF,
 }
 ## The terrace pieces stand in short rows with their backs to a hillside, stepped
 ## ends at one end, and face downhill toward the camera: +X is 3, +Z is 2 [ASSUMPTION].
@@ -57,7 +59,12 @@ const ROCK_TURNS: Dictionary[Vector2i, int] = {
 	Vector2i(63, 47): 3, Vector2i(63, 49): 3,
 	Vector2i(45, -33): 2, Vector2i(47, -33): 2, Vector2i(49, -33): 3,
 	Vector2i(-31, 47): 3, Vector2i(-31, 49): 3, Vector2i(-31, 51): 2,
+	Vector2i(77, 45): 0, Vector2i(77, 47): 1, Vector2i(77, 49): 1,
 }
+## The least ground height a rock may stand on. It was 2 m, which kept rows off the
+## plateau's rim (1.5 m, up to 1.9 m near the east hill); the hills are no steeper
+## for this change [PLACEHOLDER].
+const ROCK_MIN_HEIGHT_M: float = 1.0
 ## Cells this near a rock can't be dug [PLACEHOLDER].
 const ROCK_MARGIN_M: float = 0.5
 ## A rover whose middle is this near a rock is inside it, and one this far

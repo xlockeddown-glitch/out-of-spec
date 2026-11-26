@@ -56,7 +56,7 @@ func test_rocks_stand_clear_on_high_ground() -> String:
 	for rock: Vector2i in HillDressing.ROCKS:
 		var at := Vector2(rock)
 		var half: Vector2 = HillDressing.rock_half_m(rock)
-		if Terrain.height(at, _none) < 2.0:
+		if Terrain.height(at, _none) < HillDressing.ROCK_MIN_HEIGHT_M:
 			return "The rock at %s is not on high ground." % rock
 		# A rover passes between it and level ground or another rock.
 		for corner: Vector2 in _footprint(at, half + Vector2.ONE * ROVER_M * 2.0):
@@ -78,6 +78,25 @@ func test_rocks_stand_clear_on_high_ground() -> String:
 		if buried_m > 0.6:
 			return "The rock at %s is buried by %.2f m." % [rock, buried_m]
 	return ""
+
+
+## The 2 m rule is relaxed: a terrace row stands out at the plateau's edge, and the
+## hills are no steeper (the steepest step between neighbors stays as it was).
+func test_a_terrace_row_reaches_the_plateau_edge() -> String:
+	var nearest_m: float = 1000.0
+	for rock: Vector2i in HillDressing.ROCKS:
+		if HillDressing.ROCK_TURNS.has(rock):
+			nearest_m = minf(nearest_m, Terrain.HALF_M - float(maxi(absi(rock.x), absi(rock.y))) - HillDressing.rock_half_m(rock).x)
+	return "" if nearest_m <= 3.0 else "No terrace row reaches the plateau edge (nearest is %.1f m)." % nearest_m
+
+
+func test_hills_are_no_steeper_than_before() -> String:
+	var steepest: float = 0.0
+	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M):
+		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M):
+			var here: float = Terrain.height(Vector2(x, z), _none)
+			steepest = maxf(steepest, maxf(absf(Terrain.height(Vector2(x + 1, z), _none) - here), absf(Terrain.height(Vector2(x, z + 1), _none) - here)))
+	return "" if steepest <= 0.7618 else "The steepest step is %.4f m per meter." % steepest
 
 
 ## From level ground every line to the relay's dish misses every rock.
