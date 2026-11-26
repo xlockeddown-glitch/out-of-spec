@@ -39,10 +39,11 @@ const SHOWN_BY: Dictionary = {
 	&"blocks_changed": ["found_blocks"],
 	&"pockets_changed": ["found_pockets", "new_pockets", "pocket_pending"],
 	&"stone_changed": ["stone", "stone_pieces"],
-	&"rover_place_changed": ["rover_zone"],
+	&"rover_place_changed": ["rover_zone", "rover_depth", "rover_epoch"],
 	&"sentinel_changed": ["sentinel_out", "sentinel_days_unseen"],
 	&"rover_lights_changed": ["rover_lights"],
 	&"beacons_changed": ["beacons_placed"],
+	&"finds_changed": ["finds_taken"],
 	&"wheels_changed": ["wheel_meters"],
 }
 ## These also show the day.

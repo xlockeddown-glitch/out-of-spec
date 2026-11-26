@@ -312,7 +312,7 @@ func test_a_save_with_the_beacon_step_done_but_too_few_beacons_is_refused() -> S
 
 
 func test_the_protocol_moved_with_the_beacon_command_and_field() -> String:
-	return "" if CoopSession.PROTOCOL >= 18 else "place_beacon and beacons_placed are new on the wire: PROTOCOL must be 18 or more."
+	return "" if CoopSession.PROTOCOL >= 19 else "finds and beacons are new on the wire: PROTOCOL must be 19 or more."
 
 
 func test_the_host_allows_a_little_slack_on_the_reach() -> String:

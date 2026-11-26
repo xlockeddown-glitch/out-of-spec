@@ -14,6 +14,8 @@ signal sentinel_changed
 signal rover_lights_changed
 ## A beacon was set down in the Lava Tubes.
 signal beacons_changed
+## A find was taken below the Lava Tubes.
+signal finds_changed
 signal relay_changed(slotted: bool)
 signal calibration_recorded(record: Dictionary)
 signal phone_message(text: String)
@@ -184,6 +186,9 @@ var rover_lights: bool = true
 ## The Lava Tubes beacon spots (LavaHub.SPOTS) that have one, in the order they
 ## were placed. Shared by the farm.
 var beacons_placed: Array[String] = []
+## The finds taken below the Lava Tubes: zone id -> { "day", "ids" } (ZoneDepth).
+## Only today's count; a record of a past day is dropped. Shared by the farm.
+var finds_taken: Dictionary = {}
 var optical_silk_spools: int = 0
 var relay_slotted: bool = false
 ## Species that spun the spool now in the relay (its lag_reduction_pct stacks).
@@ -268,7 +273,26 @@ var rover_transforms: Dictionary = {}
 ## Where the one rover is: "" on the farm, else a zone id (data/zones.json;
 ## only "lava_tubes", the tunnels, has a scene yet). It has an id in each place,
 ## so neither scene's place is taken for the other's. Change it with move_rover().
-var rover_zone: String = ""
+var rover_zone: String = "":
+	set(value):
+		var old: String = rover_zone
+		rover_zone = value
+		# Depth is only below the Lava Tubes: it goes when the rover really leaves them
+		# (setting the same zone again, as a load does, keeps it).
+		if value != old and value != TUNNELS_ZONE:
+			rover_depth = 0
+## How far below the hub the one rover is: 0 is the hub, 1 the first depth
+## (ZoneDepth). The rover has one depth, so every screen in the tunnels shows it:
+## nobody is at another depth than the rover. Saved, and sent to guests with
+## rover_zone. Change it with change_depth().
+var rover_depth: int = 0
+## Counts every change of where the rover is put by the host (change_depth, a
+## re-park). Sent with rover_depth; a guest stamps its poses with it and the host
+## drops a pose from an older one, so a pose that was in flight when the rover was
+## moved cannot undo the move.
+var rover_epoch: int = 0
+## Host: a re-park was due while someone drove the rover; CoopRovers asks again.
+var settle_due: bool = false
 ## The same word as a yes or no: in the tunnels. Computed from rover_zone, not
 ## saved; setting it true means "lava_tubes" and false means the farm.
 var rover_in_tunnels: bool:
@@ -632,14 +656,14 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
-	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed"]
+	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
 	"_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry",
-	"rover_in_tunnels", "player_places",
+	"rover_in_tunnels", "player_places", "settle_due",
 ]
 
 
@@ -654,6 +678,8 @@ func farm_to_dict() -> Dictionary:
 	for field: String in SAVED_FIELDS + SAVED_LATER:
 		var value: Variant = get(field)
 		out[field] = value.duplicate(true) if value is Array or value is Dictionary else value
+	# A find taken on a past day is gone: it is not kept.
+	out["finds_taken"] = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	return out
 
 
@@ -683,6 +709,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 					return "'%s' has an entry of the wrong type." % field
 	if data.has("beacons_placed") and LavaHub.placed_problem(data["beacons_placed"]) != "":
 		return LavaHub.placed_problem(data["beacons_placed"])
+	if data.has("finds_taken") and ZoneDepth.taken_problem(data["finds_taken"]) != "":
+		return ZoneDepth.taken_problem(data["finds_taken"])
 	var beacon_steps: String = LavaHub.steps_problem(QuestEngine.quests(), data.get("quest_state", {}), (data.get("beacons_placed", []) as Array).size())
 	if beacon_steps != "":
 		return beacon_steps
@@ -741,6 +769,13 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var zone: Variant = data.get("rover_zone", "")
 	if zone is String and zone != "" and not ZoneData.is_playable(StringName(zone)):
 		return "'rover_zone' is not a zone with a scene."
+	if data.has("rover_epoch") and data["rover_epoch"] is int and data["rover_epoch"] < 0:
+		return "'rover_epoch' is out of range."
+	var depth: Variant = data.get("rover_depth", 0)
+	if depth is int and (depth < 0 or depth > ZoneDepth.DEPTH):
+		return "'rover_depth' is out of range."
+	if depth is int and depth > 0 and data.get("rover_zone", "") != TUNNELS_ZONE:
+		return "'rover_depth' is set for a rover that is not in the Lava Tubes."
 	# Saves before zones say it as a yes or no.
 	if not data.get("rover_in_tunnels", false) is bool:
 		return "'rover_in_tunnels' is not a yes or no."
@@ -942,6 +977,8 @@ func farm_from_dict(data: Dictionary) -> String:
 	if problem != "":
 		return problem
 	put_farm(data)
+	finds_taken = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
+	settle_rover_depth(false)
 	sentinel_sighted = false
 	player_places.clear()
 	_recall_warned_day = 0
@@ -3335,6 +3372,8 @@ func _grow_pockets(day: int) -> void:
 
 
 func _on_day_started(day: int) -> void:
+	# A rover below stands on the new day's floor.
+	settle_rover_depth()
 	# Judged before the refill: the level only falls during the day, so empty
 	# now means it ran dry and the crops had no water.
 	var watered: bool = cistern_liters > 0.0
@@ -4077,6 +4116,67 @@ func clear_other_places() -> void:
 		player_places[local_player_id] = mine
 
 
+## Host: the rover below is on today's floor. A save loaded on another day, or the
+## morning, has the layout change under it: a rover whose body is not on floor
+## (every corner of its footprint, not just its middle) starts the depth again; one
+## that is stays where it is. Never one that someone drives: that is left to the
+## next check (`settle_due`, asked again by CoopRovers). A re-park is a new epoch.
+## `refresh` asks the screen's rover where it is first (not on a load). Returns true
+## if it was moved.
+func settle_rover_depth(refresh: bool = true) -> bool:
+	if FarmCommands.guest or rover_depth <= 0:
+		settle_due = false
+		return false
+	if refresh:
+		SaveGame.saving.emit()
+	if CoopRovers.driver(TUNNEL_ROVER) != "":
+		settle_due = true
+		return false
+	settle_due = false
+	var map: PackedStringArray = ZoneDepth.grid_for(rover_depth, world_seed, GameClock.get_day_index())
+	if rover_transforms.has(TUNNEL_ROVER) and TunnelRock.holds_body_in(map, parked_rover_transform(TUNNEL_ROVER)):
+		return false
+	rover_transforms[TUNNEL_ROVER] = ZoneDepth.start_transform()
+	rover_epoch += 1
+	rover_place_changed.emit()
+	return true
+
+
+## Host: the rover goes down the hatch (to 1) or up the way up (to 0), for the
+## player who drives it, or for the host or solo player when nobody does. `player_id`
+## is filled in from the connection (FarmCommands). Returns "" or why not. The rover
+## is in the Lava Tubes and, going down, within reach of the hatch in the hub or,
+## going up, of the way up below (today's layout); the depth is one that exists and
+## one step away. The rover then starts at the new depth (below: the start cell; up:
+## beside the hatch), and every screen rebuilds the tunnels from rover_depth.
+func change_depth(target_depth: int, player_id: String = "") -> String:
+	if rover_zone != TUNNELS_ZONE:
+		return "The rover is not in the Lava Tubes."
+	var driver: String = CoopRovers.driver(rover_here())
+	if driver == "":
+		# Nobody holds the lease (it ends half a second after the rover stops): the
+		# host and solo player, or a player who is in the tunnels at the rover's depth.
+		var here: bool = place_of(player_id) == TUNNELS_ZONE and depth_of(player_id) == rover_depth
+		if not player_id in ["", local_player_id] and not here:
+			return "Only someone with the rover can take it up or down."
+	elif driver != player_id:
+		return "Someone else is driving the rover."
+	if target_depth < 0 or target_depth > ZoneDepth.DEPTH or absi(target_depth - rover_depth) != 1:
+		return "There is no way there from here."
+	SaveGame.saving.emit()  # the rover on this screen says where it is
+	var known: bool = rover_transforms.has(TUNNEL_ROVER)
+	var at: Vector3 = parked_rover_transform(TUNNEL_ROVER).origin
+	var there: Vector3 = ZoneDepth.descent_position() if target_depth > rover_depth else ZoneDepth.ascent_position()
+	var reason: String = ZoneDepth.reach_problem(there, rover_zone, known, at)
+	if reason != "":
+		return reason
+	rover_depth = target_depth
+	rover_transforms[TUNNEL_ROVER] = ZoneDepth.pose_for_depth(target_depth)
+	rover_epoch += 1
+	rover_place_changed.emit()
+	return ""
+
+
 ## The id the rover goes by where it is now.
 func rover_here() -> String:
 	return TUNNEL_ROVER if rover_in_tunnels else ROVER
@@ -4100,6 +4200,8 @@ func move_rover(into_tunnels: bool, player_id: String = "") -> String:
 	var pad: Vector3 = TUNNEL_PAD if into_tunnels else TUNNEL_EXIT
 	if not rover_transforms.has(rover_here()) or parked_rover_transform(rover_here()).origin.distance_to(pad) > TUNNEL_PAD_REACH_M:
 		return "The rover is not on the pad."
+	if not into_tunnels and rover_depth > 0:
+		return "The rover must come up first."
 	if into_tunnels:
 		park_rover(TUNNEL_ROVER, TUNNEL_START)
 		_ore_at_entry = crystal_ore
@@ -4671,6 +4773,8 @@ func set_rover_lights(on: bool, player_id: String = "") -> String:
 ## screen's prompt.
 func place_beacon(spot_id: String, player_id: String = "") -> String:
 	var reason: String = LavaHub.place_problem(spot_id, beacons_placed, place_of(player_id))
+	if reason == "" and (rover_depth != 0 or depth_of(player_id) != 0):
+		reason = "Beacons go down in the hub, not below it."
 	if reason == "":
 		reason = LavaHub.job_problem(quest_state)
 	if reason == "":
@@ -4684,11 +4788,49 @@ func place_beacon(spot_id: String, player_id: String = "") -> String:
 	return ""
 
 
+## Host: a find is taken below the Lava Tubes (ZoneDepth, depth 1), for the player
+## there. `player_id` is filled in from the connection (FarmCommands). Returns ""
+## or why not. The player is at that depth, the find is one of today's and not
+## taken, and the farm's tunnel rover, which is at that depth, is within reach of it.
+## `layout_day` is the day the player's screen drew its finds from: after 06:00 a
+## screen still on yesterday's layout has an id that is another find today, so a
+## day that is not today is refused. It pays into the shared stock [PLACEHOLDER
+## amounts].
+func take_find(find_id: String, layout_day: int, player_id: String = "") -> String:
+	var day: int = GameClock.get_day_index()
+	if layout_day != day:
+		return "That was yesterday's floor. Look again."
+	finds_taken = ZoneDepth.prune(finds_taken, day)
+	var today: Dictionary = ZoneDepth.layout(world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, day)
+	var taken: Array = ZoneDepth.taken_today(finds_taken, ZoneDepth.ZONE, day)
+	var reason: String = ""
+	if rover_depth != ZoneDepth.DEPTH:
+		reason = "The rover is not down there."
+	if reason == "":
+		reason = ZoneDepth.take_problem(find_id, today.get("finds", []), taken, place_of(player_id), depth_of(player_id))
+	if reason == "":
+		SaveGame.saving.emit()  # the rover on this screen says where it is
+		var find: Dictionary = ZoneDepth.find_in(today, find_id)
+		reason = ZoneDepth.reach_problem(TunnelRock.at_in(today["grid"], find["cell"]), rover_zone, rover_transforms.has(TUNNEL_ROVER), parked_rover_transform(TUNNEL_ROVER).origin)
+	if reason != "":
+		return reason
+	var pay: Dictionary = ZoneDepth.reward(str(ZoneDepth.find_in(today, find_id)["kind"]))
+	finds_taken = ZoneDepth.with_taken(finds_taken, ZoneDepth.ZONE, day, find_id)
+	if pay.has("crystal_ore"):
+		crystal_ore += int(pay["crystal_ore"])
+		ore_changed.emit(crystal_ore)
+	if pay.has("credits"):
+		add_credits(int(pay["credits"]))
+	finds_changed.emit()
+	SaveGame.saving.emit()
+	return ""
+
+
 ## The rover's place and speed, from whoever drives it. Lit, fast or on top of it,
 ## it scares the Sentinel.
 func watch_sentinel(rover_id: String, at: Vector3, speed_mps: float) -> void:
-	if FarmCommands.guest or not sentinel_out or rover_id != TUNNEL_ROVER or not rover_in_tunnels:
-		return
+	if FarmCommands.guest or not sentinel_out or rover_id != TUNNEL_ROVER or not rover_in_tunnels or rover_depth != 0:
+		return  # the Sentinel is in the hub; below, its coordinates mean nothing
 	var away: float = at.distance_to(SENTINEL_AT)
 	if away > SENTINEL_SEES_M:
 		return
@@ -6081,6 +6223,8 @@ func _lift_to_ground() -> void:
 	for id: Variant in rover_transforms:
 		if rover_is_away(id):
 			continue  # a pose in the tunnels is not on the farm
+		if id == TUNNEL_ROVER:
+			continue  # never lifted by the farm's ground, wherever it is
 		var pose: Transform3D = rover_transforms[id]
 		var ground_m: float = Terrain.height(Vector2(pose.origin.x, pose.origin.z), dug)
 		if pose.origin.y < ground_m:

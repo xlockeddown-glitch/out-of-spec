@@ -4,7 +4,8 @@ extends Node
 ## The host says who drives, checks where they say it is, counts the distance and
 ## tells everyone. Alone nothing here does anything. Autoloaded as `CoopRovers`.
 ##
-## A pose is [x, y, z, yaw, speed in m/s, whether it sees the relay].
+## A pose is [x, y, z, yaw, speed in m/s, whether it sees the relay], and from either side
+## one more number: the rover epoch (GameState.rover_epoch) it has been told.
 
 ## A driver is done this long after the rover stops, or is last heard from
 ## [PLACEHOLDER].
@@ -70,7 +71,10 @@ func _process(_delta: float) -> void:
 ## Six values, the last whether it sees the relay: what the sender must get right,
 ## or be dropped.
 func is_shape(pose: Array) -> bool:
-	if pose.size() != 6 or typeof(pose[5]) != TYPE_BOOL:
+	if (pose.size() != 6 and pose.size() != 7) or typeof(pose[5]) != TYPE_BOOL:
+		return false
+	# A guest's pose may end with the epoch it knows the rover's place by.
+	if pose.size() == 7 and typeof(pose[6]) != TYPE_INT:
 		return false
 	for i: int in 5:
 		if typeof(pose[i]) != TYPE_FLOAT:
@@ -130,7 +134,7 @@ func moved(rover_id: String, at: Transform3D, speed_mps: float, has_los: bool, n
 	var pose: Array = [at.origin.x, at.origin.y, at.origin.z, at.basis.get_euler().y, speed_mps, has_los]
 	_poses[rover_id] = [pose, now]
 	if _is_guest() and _is_due(rover_id, now, MOVING_MS):
-		session.drive(rover_id, pose)
+		session.drive(rover_id, pose + [farm.rover_epoch])
 
 
 ## Where the rover is as last heard, moved on by its speed for `lead_s` at most.
@@ -153,6 +157,8 @@ func speed(rover_id: String) -> float:
 ## Host: says where the rovers are.
 func tick(now: int) -> void:
 	_expire(now)
+	if "settle_due" in farm and farm.settle_due:
+		farm.settle_rover_depth()
 	if not together():
 		# Where it was with friends in isn't where it is when the next one joins.
 		for known: Dictionary in [_drivers, _poses, _sent_at, _said_driver, _reach]:
@@ -173,7 +179,7 @@ func tick(now: int) -> void:
 			_sent_at.erase(rover_id)
 		if _is_due(rover_id, now, STILL_MS if who == "" else MOVING_MS):
 			_said_driver[rover_id] = who
-			session.tell_rover(rover_id, who, _poses[rover_id][0])
+			session.tell_rover(rover_id, who, _poses[rover_id][0] + [farm.rover_epoch])
 
 
 ## Host: a guest says where the rover it drives is.
@@ -183,6 +189,11 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 		return
 	if not driver(rover_id) in ["", player_id] or not together() or CoopWalkers.is_out(player_id):
 		return
+	# A pose sent before the guest knew the rover was moved is old news, not a fault.
+	if pose.size() == 7 and rover_id == farm.TUNNEL_ROVER and pose[6] != farm.rover_epoch:
+		return
+	if pose.size() == 7:
+		pose = pose.slice(0, 6)
 	if not is_sane(pose):
 		_refuse(player_id, rover_id, "a rover at %s" % [pose], now)
 		return
@@ -195,7 +206,7 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 		_refuse(player_id, rover_id, "a rover %.1f m away, %.1f m allowed" % [distance, left], now)
 		return
 	# In the rock nobody could get it out again.
-	if not _in_bounds(rover_id, to.origin) or (rover_id == farm.TUNNEL_ROVER and not TunnelRock.holds(to.origin)):
+	if not _in_bounds(rover_id, to.origin) or (rover_id == farm.TUNNEL_ROVER and not TunnelRock.holds_in(ZoneDepth.grid_for(farm.rover_depth, farm.world_seed, GameClock.get_day_index()), to.origin)):
 		_refuse(player_id, rover_id, "a rover out of bounds at %s" % [to.origin], now)
 		return
 	_reach[rover_id] = [left - distance, now]
@@ -225,6 +236,15 @@ func _refuse(player_id: String, rover_id: String, what: String, now: int) -> voi
 func _on_told(rover_id: String, driver_id: String, pose: Array, now: int = Time.get_ticks_msec()) -> void:
 	if not farm.rover_transforms.has(rover_id) or farm.rover_is_away(rover_id):
 		return
+	# A pose the host sent before it moved the rover (a late hub pose after the descent)
+	# is old news: it must not refill the cache and beat the new parking spot.
+	# Under protocol 20 a tunnel-rover pose has an epoch; one without, or from an epoch
+	# this guest has not been told yet (it may be for a depth it has not loaded), is
+	# not applied: the next pose replaces it.
+	if rover_id == farm.TUNNEL_ROVER and (pose.size() != 7 or pose[6] != farm.rover_epoch):
+		return
+	if pose.size() == 7:
+		pose = pose.slice(0, 6)
 	_told_driver[rover_id] = driver_id
 	var own: String = farm.local_player_id
 	if _drivers.has(rover_id) and driver_id != own and (driver_id != "" or now - _claimed_at.get(rover_id, 0) > CLAIM_MS):

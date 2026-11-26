@@ -108,8 +108,10 @@ func continue_farm(path: String = DEFAULT_PATH) -> String:
 	# A farm from before a quest existed is offered it now, not at a command.
 	if farm_open:
 		GameState.update_quests()
-	# A farm that opens on the farm has its rover there, where it went in.
-	if farm_open and open_scene == SceneSwitcher.FARM_SCENE and GameState.rover_in_tunnels:
+	# A farm that opens on the farm has its rover there, where it went in. A rover
+	# below belongs to its depth (saved with it) and stays there: depth is never reset
+	# as a side effect of continuing.
+	if farm_open and open_scene == SceneSwitcher.FARM_SCENE and GameState.rover_in_tunnels and GameState.rover_depth == 0:
 		GameState.rover_in_tunnels = false
 		GameState.rover_place_changed.emit()
 	return problem

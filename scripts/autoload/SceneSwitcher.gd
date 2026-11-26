@@ -49,10 +49,21 @@ func go_to(path: String) -> void:
 	swap_to(path)
 
 
+## True while a swap is in progress (a second one is ignored).
+func is_busy() -> bool:
+	return _busy
+
+
 func swap_to(path: String) -> void:
 	if _busy:
 		return
 	_busy = true
+	if path != TUNNELS_SCENE:
+		# Anywhere but the tunnels, no screen is below them.
+		ZoneDepth.set_local(0, {})
+	else:
+		# The tunnels show the depth the one rover is at.
+		ZoneDepth.follow(GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
 	_note_outside(path)
 	var tween: Tween = create_tween()
 	tween.tween_property(_fade, "color:a", 1.0, FADE_SECONDS)
