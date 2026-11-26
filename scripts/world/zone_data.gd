@@ -90,6 +90,38 @@ static func hub_scene(id: StringName) -> String:
 	return str(zone(id).get("hub_scene", ""))
 
 
+# --- The soft-gate warning (docs/design/zones.md section 7.1) -------------------
+# A hub is never hard-gated by level: under the band's start the player is told
+# what the zone is tuned for and may go in anyway. The words are in data/zones.json
+# ("warning") [PLACEHOLDER]; the strings below are only a fallback.
+
+const WARNING_LINE: String = "Recommended lab level %s. You are level %s. %s Go anyway?"
+const WARNING_SOFT: String = "The hazards here are harder than you are used to."
+const WARNING_HARD: String = "Deeper levels need a lab level of %s."
+
+
+## What a player of `lab_level` is told at the way into zone `id`, or "" when
+## they need no warning (at or above the band's start, or no such zone).
+static func warning_text(id: StringName, lab_level: int) -> String:
+	var row: Dictionary = zone(id)
+	var deep: Dictionary = DataManager.get_record(&"skills", StringName(str(row.get("deep_gate", ""))), "lab_gates")
+	return warning_for(row, lab_level, int(deep.get("level", 0)))
+
+
+## The same for a row and the lab level of its hard gate deeper down (0: the
+## zone has none yet, so the line is the soft one). Pure, so a later hub can
+## reuse it and a test can feed it any row.
+static func warning_for(row: Dictionary, lab_level: int, deep_level: int = 0) -> String:
+	var start: int = band_of(row).x
+	if start <= 0 or lab_level >= start:
+		return ""
+	var line: String = str(DataManager.get_value(TABLE, "warning/line", WARNING_LINE))
+	var extra: String = str(DataManager.get_value(TABLE, "warning/soft", WARNING_SOFT))
+	if deep_level > 0:
+		extra = str(DataManager.get_value(TABLE, "warning/hard", WARNING_HARD)) % SP811.integer(deep_level)
+	return line % [SP811.integer(start), SP811.integer(lab_level), extra]
+
+
 ## What is wrong with a list of rows: one line each, empty when it is sound.
 ## Types are checked with JSON in mind (numbers arrive as floats).
 static func problems(table: Array) -> Array[String]:
