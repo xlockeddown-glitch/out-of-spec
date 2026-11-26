@@ -161,13 +161,13 @@ func test_only_the_open_step_of_an_accepted_quest_counts() -> String:
 	return _run(_check_open_only, [_fixture("farm"), _fixture("player", "own")])
 
 
-## A quest with a plain step and then a mini-game step for the hygrometer.
+## A quest with a plain step and then a mini-game step for the steering encoder (a Set the Zero unit).
 func _fixture(scope: String, id: String = "two") -> Dictionary:
 	return { "id": id, "kind": "story", "giver": "lin", "title": "Test " + id, "scope": scope, "gates": {},
 		"steps": [
 			{ "id": "pay", "text": "Have 100 CR.", "check": "stat_at_least", "stat": "credits", "at_least": 100 },
-			{ "id": "cal", "text": "Calibrate the hygrometer.", "check": "count", "log": "cal_log",
-				"where": { "instrument_id": "hygrometer" }, "minigame": GAME }],
+			{ "id": "cal", "text": "Calibrate the steering encoder.", "check": "count", "log": "cal_log",
+				"where": { "instrument_id": "rover_steering_encoder" }, "minigame": GAME }],
 		"rewards": { "credits": 100 } }
 
 
@@ -177,9 +177,9 @@ func _entry(steps_done: Array, done: int = -1) -> Dictionary:
 
 func _check_open_only(commands: Node) -> String:
 	var gs: GameStateScript = commands.state
-	var unit: String = gs.HYGROMETER_ID
-	if unit != "hygrometer":
-		return "The test's fixture names the hygrometer by another id than the farm's."
+	var unit: String = gs.STEERING_ID
+	if unit != "rover_steering_encoder":
+		return "The test's fixture names the steering encoder by another id than the farm's."
 	if QuestEngine.has_minigame_step(gs, GAME, unit, HOST):
 		return "A quest not accepted opens nothing."
 	gs.quest_state["two"] = _entry([])
@@ -236,7 +236,7 @@ func _check_open_only(commands: Node) -> String:
 
 # --- Any order, a standard, two quests, a player's own ------------------------------
 
-## A quest of one mini-game step for the hygrometer, done as it is calibrated.
+## A quest of one mini-game step for the steering encoder, done as it is calibrated.
 func _one_step(id: String, scope: String = "farm") -> Dictionary:
 	var quest: Dictionary = _fixture(scope, id)
 	(quest["steps"] as Array).remove_at(0)
@@ -251,7 +251,7 @@ func test_in_any_order_a_step_behind_an_open_one_is_open() -> String:
 
 func _check_any_order(commands: Node) -> String:
 	var gs: GameStateScript = commands.state
-	var unit: String = gs.HYGROMETER_ID
+	var unit: String = gs.STEERING_ID
 	gs.credits = 0
 	GameClock.elapsed_days = 1.0
 	gs.update_quests()
@@ -298,7 +298,7 @@ func _check_one_quest(commands: Node) -> String:
 	if not gs.quest_state.has("first") or not gs.quest_state.has("second"):
 		return "The test's two quests are accepted: %s" % [gs.quest_state.keys()]
 	var before: int = gs.credits
-	commands.execute(HOST, BENCH, [gs.HYGROMETER_ID, 100])
+	commands.execute(HOST, BENCH, [gs.STEERING_ID, 100])
 	var first: Dictionary = gs.quest_state["first"]
 	var second: Dictionary = gs.quest_state["second"]
 	if int(first["done"]) < 0 or int(second["done"]) < 0:
@@ -316,7 +316,7 @@ func test_a_players_own_quest_keeps_its_owners_score() -> String:
 
 func _check_own_quest(commands: Node) -> String:
 	var gs: GameStateScript = commands.state
-	var unit: String = gs.HYGROMETER_ID
+	var unit: String = gs.STEERING_ID
 	CoopSession.players.assign([HOST, GUEST])
 	GameClock.elapsed_days = 1.0
 	gs.update_quests()
@@ -517,7 +517,7 @@ func test_a_mini_game_step_must_be_one_instruments_calibration() -> String:
 	var changes: Array = [
 		{ "minigame": "no_such_game" }, { "minigame": 3 }, { "minigame": "" },
 		{ "check": "stat_at_least", "stat": "credits", "at_least": 1 }, { "log": "work_orders" },
-		{ "where": {} }, { "where": { "instrument_id": "" } }, { "where": { "instrument_id": 3 } }, { "where": "hygrometer" },
+		{ "where": {} }, { "where": { "instrument_id": "" } }, { "where": { "instrument_id": 3 } }, { "where": "rover_steering_encoder" },
 		{ "minigame_line": 3 }, { "minigame_line": "" }]
 	for change: Dictionary in changes:
 		var quest: Dictionary = good.duplicate(true)

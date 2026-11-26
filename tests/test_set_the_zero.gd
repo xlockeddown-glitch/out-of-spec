@@ -23,7 +23,7 @@ func _free(commands: Node) -> void:
 	commands.free()
 
 
-## One bench calibration of the hygrometer by a guest on a fresh farm, with
+## One bench calibration of the rover's steering encoder (a Set the Zero unit) by a guest on a fresh farm, with
 ## `tail` after the command's own argument. The unit, its standard and the clock
 ## start the same every time, so two answers differ only by what the score did.
 ## `earlier` plain calibrations come first; with `skilled` the guest has the
@@ -32,7 +32,7 @@ func _bench(tail: Array, earlier: int = 0, skilled: bool = false) -> Dictionary:
 	var saved: float = GameClock.elapsed_days
 	var commands: Node = _make()
 	var gs: Node = commands.state
-	var id: String = gs.HYGROMETER_ID
+	var id: String = gs.STEERING_ID
 	if skilled:
 		gs.player_skill_xp[GUEST] = { MinigameScore.SKILL: gs.xp_for_level(5) }
 	for i: int in earlier:
@@ -193,7 +193,7 @@ func test_the_host_cuts_a_guests_score_to_its_range() -> String:
 		if cut.get(MinigameScore.RECORD_KEY) != 0 or not _same(cut, plain):
 			return "A score under 0 counts as 0, the plain result."
 	var commands: Node = _make()
-	var id: String = commands.state.HYGROMETER_ID
+	var id: String = commands.state.STEERING_ID
 	var bad: PackedStringArray = []
 	for arguments: Array in [[id, 99.5], [id, "100"], [id, true], [id, 50, 50], [id, [100]], [id, NAN]]:
 		if commands.problem(&"calibrate_at_bench", arguments) == "":
@@ -223,7 +223,7 @@ func test_the_host_counts_a_score_only_at_a_key_moment() -> String:
 		return "At the CAREFUL level a later calibration's score counts."
 	var commands: Node = _make()
 	var gs: Node = commands.state
-	var unit: String = gs.HYGROMETER_ID
+	var unit: String = gs.STEERING_ID
 	var standard: String = gs.standard_ids()[0]
 	var problem: String = ""
 	if not MinigameScore.is_due(gs, unit, GUEST, false) or MinigameScore.may_count(gs, standard, GUEST) \
@@ -387,18 +387,18 @@ func test_the_bench_opens_the_game_at_a_key_moment() -> String:
 	var root: Window = (Engine.get_main_loop() as SceneTree).root
 	var bench: CalBenchUI = (load("res://ui/cal_bench_ui.tscn") as PackedScene).instantiate()
 	root.add_child(bench)
-	bench.open(GameState.HYGROMETER_ID)
+	bench.open(GameState.STEERING_ID)
 	var game: SetTheZero = bench.get_node("%ZeroGame")
 	var careful: CheckButton = bench.get_node("%CarefulCheck")
 	var problem: String = ""
 	if careful.disabled == GameState.has_skill_unlock(MinigameScore.CAREFUL_UNLOCK) or game.visible:
 		problem = "CAREFUL is locked until its level, and no game is open."
 	MinigameSettings.set_mode(MinigameSettings.Mode.OFF)
-	if problem == "" and bench._zero_game_due(GameState.HYGROMETER_ID):
+	if problem == "" and bench._zero_game_due(GameState.STEERING_ID):
 		problem = "With the games off, none is due."
 	MinigameSettings.set_mode(MinigameSettings.Mode.STANDARD)
-	if problem == "" and not bench._zero_game_due(GameState.HYGROMETER_ID):
-		problem = "The lab's first hygrometer calibration is a key moment."
+	if problem == "" and not bench._zero_game_due(GameState.STEERING_ID):
+		problem = "The lab's first steering encoder calibration is a key moment."
 	bench._on_calibrate_pressed()
 	if problem == "" and (not game.is_playing() or not game.visible or not GameState.cal_log.is_empty()):
 		problem = "ZERO / CALIBRATE opens the game first, and nothing is calibrated yet."
@@ -439,7 +439,7 @@ func test_the_factor_is_taken_back_when_nothing_is_calibrated() -> String:
 	var waits: bool = GameClock.morning_waits
 	var commands: Node = _make()
 	var gs: Node = commands.state
-	var id: String = gs.HYGROMETER_ID
+	var id: String = gs.STEERING_ID
 	# No time left tonight: the bench refuses.
 	GameClock.morning_waits = true
 	GameClock.elapsed_days = floorf(saved) + 1.0 - GameClock.BEFORE_MORNING_DAYS
@@ -469,7 +469,7 @@ func test_a_request_carries_the_score() -> String:
 	var saved: float = GameClock.elapsed_days
 	var commands: Node = _make()
 	var gs: Node = commands.state
-	var id: String = gs.HYGROMETER_ID
+	var id: String = gs.STEERING_ID
 	var bad: PackedStringArray = []
 	# As a guest nothing is done here; a bad score is refused before it is sent.
 	commands.guest = true

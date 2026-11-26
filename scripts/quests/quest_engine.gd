@@ -113,8 +113,11 @@ const SOLD_IN_SPEC: String = "crops_sold_in_spec"
 ## The mini-games a step may carry in `minigame`. A Set the Zero step is a
 ## `count` of `cal_log` rows whose `where` names one instrument: the one the game
 ## is for. A Wring the Blocks step is a `counter` of built stacks
-## (GameState.BLOCK_STACK_COUNT): the game is the build itself.
-const MINIGAMES: Array[String] = ["set_the_zero", "wring_the_blocks"]
+## (GameState.BLOCK_STACK_COUNT): the game is the build itself. A Hold the
+## Reading step has a Set the Zero step's shape; the bench plays the game the
+## instrument has that day (MinigameScore.game_for), whichever of the two the
+## step names, and that play grades the step.
+const MINIGAMES: Array[String] = ["set_the_zero", "hold_the_reading", "wring_the_blocks"]
 ## A `counter` that is not a source of data/skills.json: the reference blocks the
 ## farm has dug up. As a counter it counts from when its step opened, so it is
 ## "find three more".
@@ -588,6 +591,12 @@ static func data_problem(quest: Dictionary) -> String:
 					return "step '%s' has Wring the Blocks and is not a counter of built stacks." % id
 			elif step_instrument(step) == "":
 				return "step '%s' has a mini-game and is not a count of one instrument's cal_log rows." % id
+			else:
+				# The instrument picks the bench game (MinigameScore.game_for): a step
+				# must name one its instrument plays, or it would never be offered.
+				var plays: Array[String] = MinigameScore.games_in_data(step_instrument(step))
+				if not plays.is_empty() and not step["minigame"] in plays:
+					return "step '%s' names %s and its instrument plays %s." % [id, step["minigame"], " or ".join(plays)]
 			if step.has(MINIGAME_LINE) and (not step[MINIGAME_LINE] is String or step[MINIGAME_LINE] == ""):
 				return "step '%s' has a mini-game line that is not text." % id
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:
@@ -984,7 +993,7 @@ static func played_game(minigame: String, instrument_id: String, player_id: Stri
 ## did the step is never given a player's grade. One calibration grades one
 ## quest: the first whose step it does (`played` is emptied once it is kept).
 static func _keep_score(farm: Node, entry: Dictionary, step: Dictionary, played: Dictionary, owner: String) -> void:
-	if played.is_empty() or str(step.get("minigame", "")) == "" or str(step.get("minigame", "")) != str(played.get("minigame", "")):
+	if played.is_empty() or not MinigameScore.grades_step(str(step.get("minigame", "")), str(played.get("minigame", ""))):
 		return
 	var player: String = str(played.get("player_id", ""))
 	if owner != "" and owner != player:

@@ -106,7 +106,7 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	# look, for a quest step that carries the game (section 7.2's quest grade).
 	var played: Dictionary = {}
 	if scored and score != MinigameScore.SKIPPED and result is Dictionary and result.has("as_left"):
-		played = QuestEngine.played_game(MinigameScore.SET_THE_ZERO, str(passed[0]), player_id, score)
+		played = QuestEngine.played_game(MinigameScore.game_for(_farm(), str(passed[0])), str(passed[0]), player_id, score)
 	# Wring the Blocks: the stack's score is the action's own argument, and the
 	# farm's answer holds it cut to 0 to 100, or as a skip where the player has
 	# no open step for it (above) or played another length than today's. A skip

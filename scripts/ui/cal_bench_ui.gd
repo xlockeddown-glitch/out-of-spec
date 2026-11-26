@@ -10,8 +10,9 @@ extends Control
 ## that calibrates them. Each instrument shows its traceability chain under the standard line.
 ## Accepted customer jobs are listed too ("job:" ids): CALIBRATE FOR CUSTOMER
 ## runs GameState.complete_job() against the best standard for the job.
-## At a key moment (MinigameScore.is_due) ZERO / CALIBRATE opens Set the Zero
-## first, and its score goes with the command. The CAREFUL switch and the game's
+## At a key moment (MinigameScore.is_due) ZERO / CALIBRATE opens the bench game
+## first: Set the Zero, or Hold the Reading for a unit whose standard settles
+## (MinigameScore.game_for). Its score goes with the command. The CAREFUL switch and the game's
 ## difficulty are this player's own (MinigameSettings).
 
 signal closed
@@ -45,6 +46,10 @@ var _limit: float = 0.0
 ## Standards only: sends the selected one to OIRM.
 var _send_button := Button.new()
 
+## After the U and TUR of a record a Hold the Reading score made smaller.
+const STEADY_HOLD_NOTE: String = "U and TUR with your steady hold"
+const STEADY_HOLD_MARGINAL: String = "%s; without it TUR %s:1, marginal, under %s:1"
+
 @onready var _instrument_option: OptionButton = %InstrumentOption
 @onready var _found_value: Label = %FoundValue
 @onready var _found_band: Label = %FoundBand
@@ -60,6 +65,7 @@ var _send_button := Button.new()
 @onready var _careful_check: CheckButton = %CarefulCheck
 @onready var _game_option: OptionButton = %GameOption
 @onready var _zero_game: SetTheZero = %ZeroGame
+@onready var _hold_game: HoldTheReading = %HoldGame
 
 
 func _ready() -> void:
@@ -100,6 +106,7 @@ func open(instrument_id: String = "hygrometer") -> void:
 	_visit += 1
 	# A game still open from before ends with no score, and nothing is calibrated.
 	_zero_game.skip()
+	_hold_game.skip()
 	_rebuild_list()
 	_show_game_choices()
 	show()
@@ -124,6 +131,7 @@ func close() -> void:
 	_visit += 1
 	# A game left open ends with no score, and nothing is calibrated.
 	_zero_game.skip()
+	_hold_game.skip()
 	hide()
 	closed.emit()
 
@@ -136,7 +144,7 @@ func _show_game_choices() -> void:
 	_careful_check.disabled = not unlocked
 	_careful_check.set_pressed_no_signal(unlocked and MinigameSettings.careful())
 	_careful_check.text = "CAREFUL" if unlocked else "CAREFUL (Calibration %d)" % level
-	_careful_check.tooltip_text = "Play Set the Zero on every bench calibration, for a smaller as-left residual."
+	_careful_check.tooltip_text = "Play the bench game on every bench calibration: Set the Zero for a smaller as-left residual, or Hold the Reading for a smaller operator uncertainty."
 	_game_option.select(_game_option.get_item_index(MinigameSettings.mode()))
 
 
@@ -144,7 +152,7 @@ func _on_game_mode_picked(index: int) -> void:
 	MinigameSettings.set_mode(_game_option.get_item_id(index))
 
 
-## Whether ZERO / CALIBRATE opens Set the Zero for the instrument shown.
+## Whether ZERO / CALIBRATE opens the bench game for the instrument shown.
 func _zero_game_due(instrument_id: String) -> bool:
 	if MinigameSettings.mode() == MinigameSettings.Mode.OFF or _budget.get("refused", false):
 		return false
@@ -408,9 +416,15 @@ func _on_calibrate_pressed() -> void:
 		_calibrate_button.disabled = true
 		# The clock is in the seed: opening the bench again is not the same sweep.
 		var motion_seed: int = hash([id, GameState.cal_log.size(), Time.get_ticks_usec()])
-		var share: float = MinigameScore.sweet_share(GameState, GameState.local_player_id)
-		_zero_game.play(share, MinigameSettings.mode(), motion_seed, GameState.instrument_name(id, true))
-		var score: int = await _zero_game.finished
+		var score: int = MinigameScore.SKIPPED
+		if MinigameScore.game_for(GameState, id) == MinigameScore.HOLD_THE_READING:
+			var slowing: float = MinigameScore.sweet_share(GameState, GameState.local_player_id, MinigameScore.HOLD_SKILL)
+			_hold_game.play(slowing, MinigameSettings.mode(), motion_seed, GameState.instrument_name(id, true))
+			score = await _hold_game.finished
+		else:
+			var share: float = MinigameScore.sweet_share(GameState, GameState.local_player_id)
+			_zero_game.play(share, MinigameSettings.mode(), motion_seed, GameState.instrument_name(id, true))
+			score = await _zero_game.finished
 		# Closed with the game open: nothing is calibrated.
 		if _visit != visit:
 			return
@@ -479,7 +493,8 @@ func _on_calibrate_pressed() -> void:
 	_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
 	# The score the host counted. If one was sent and the host counted none (the
 	# kind was no longer new by the time it arrived), that is said too.
-	var zero_text: String = MinigameScore.result_text(int(record.get(MinigameScore.RECORD_KEY, MinigameScore.SKIPPED)))
+	var zero_text: String = MinigameScore.result_text(int(record.get(MinigameScore.RECORD_KEY, MinigameScore.SKIPPED)),
+		MinigameScore.game_for(GameState, id))
 	if zero_text == "" and arguments.size() > 1:
 		zero_text = MinigameScore.NOT_COUNTED_TEXT
 	if zero_text != "":
@@ -491,7 +506,9 @@ func _on_calibrate_pressed() -> void:
 
 
 ## The budget the host recorded. Its terms are not recorded: they stay only if
-## the shown budget came to the same U.
+## the shown budget came to the same U. A counted Hold the Reading score made
+## the recorded U smaller by the operator's term alone: then the shown terms
+## stay if they come to the recorded U with that term at the score's factor.
 func _recorded_budget(record: Dictionary) -> Dictionary:
 	if record["standard_id"] == "":
 		return {}
@@ -501,11 +518,24 @@ func _recorded_budget(record: Dictionary) -> Dictionary:
 		"tur": record["tur"],
 		"acceptance_limit": record["acceptance_limit"],
 		"refused": false,
-		"clean": float(record["tur"]) >= CalUncertainty.tur_clean(),
+		# "Marginal" is judged on the plain TUR, as the XP is; a steady hold's
+		# smaller U is labelled as that (_standard_text).
+		"clean": float(record.get("plain_tur", record["tur"])) >= CalUncertainty.tur_clean(),
+		"steady_hold": float(record["tur"]) > float(record.get("plain_tur", record["tur"])),
+		"plain_tur": float(record.get("plain_tur", record["tur"])),
 	}
-	if _budget.get("standard_id", "") == budget["standard_id"] \
-			and is_equal_approx(_budget["expanded_uncertainty"], budget["expanded_uncertainty"]):
-		budget.merge(_budget)
+	var shown: Dictionary = _budget
+	var score: int = int(record.get(MinigameScore.RECORD_KEY, MinigameScore.SKIPPED))
+	if MinigameScore.is_graded(score) and shown.get("standard_id", "") == budget["standard_id"] \
+			and MinigameScore.game_for(GameState, str(record.get("instrument_id", ""))) == MinigameScore.HOLD_THE_READING:
+		var unit: DriftingSensor = GameState.get_sensor(str(record.get("instrument_id", "")))
+		var standard: DriftingSensor = GameState.get_sensor(str(budget["standard_id"]))
+		if unit != null and standard != null:
+			shown = CalUncertainty.budget(unit, standard,
+				float(shown.get("u_op", 0.0)) * MinigameScore.operator_factor(score), float(shown.get("u_robot", 0.0)))
+	if shown.get("standard_id", "") == budget["standard_id"] \
+			and is_equal_approx(shown["expanded_uncertainty"], budget["expanded_uncertainty"]):
+		budget.merge(shown)
 	return budget
 
 
@@ -609,6 +639,12 @@ func _standard_text(instrument_id: String, budget: Dictionary) -> String:
 	var tur: float = budget["tur"]
 	var tur_note: String = "REFUSED, under %s:1" % SP811.number(CalUncertainty.tur_floor(), 0) if budget["refused"] \
 		else ("" if budget["clean"] else "marginal, under %s:1" % SP811.number(CalUncertainty.tur_clean(), 0))
+	# A counted Hold the Reading score: the U and TUR are the steady-hold
+	# figures, and say so. The limit (and the verdict) are the plain budget's,
+	# and "marginal" is said of the plain TUR, which is then shown too.
+	if budget.get("steady_hold", false):
+		tur_note = STEADY_HOLD_NOTE if tur_note == "" else STEADY_HOLD_MARGINAL % [
+			STEADY_HOLD_NOTE, SP811.number(budget.get("plain_tur", tur), 1), SP811.number(CalUncertainty.tur_clean(), 0)]
 	return "Standard: %s   U ±%s   TUR %s:1%s   Limit ±%s" % [
 		GameState.instrument_name(budget["standard_id"], true),
 		_unsigned_precise(sensor, budget["expanded_uncertainty"]),
