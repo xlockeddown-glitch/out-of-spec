@@ -1,7 +1,7 @@
 class_name WalkerModel
 extends Node3D
-## The Remote Operator on foot, original voxels in code: a colored suit, dark
-## boots and pack, teal visor [PLACEHOLDER]. Feet at the origin, facing -Z.
+## The Remote Operator on foot, original voxels in code: a colored suit, gray
+## boots, a dark pack, teal visor [PLACEHOLDER]. Feet at the origin, facing -Z.
 
 const VOXEL_M: float = 0.2
 ## The host's suit, and the solo one.
@@ -10,6 +10,8 @@ const SUIT := Color("#d9772b")
 ## as well as hue, and none is teal, amber or red, which the HUD uses.
 const GUEST_SUITS: Array[Color] = [Color("#2b4fb0"), Color("#d9b8f2"), Color("#2f7a3a"), Color("#e8e6df")]
 const DARK := Color("#1d222b")
+## Boots, lighter than the dark gear so they read against the ground [PLACEHOLDER].
+const BOOT := Color("#6b7686")
 const VISOR := Color("#38e1c6")
 const GEAR := Color("#3a4250")
 const MAST := Color("#c8ccd2")
@@ -33,7 +35,7 @@ func _init() -> void:
 	# Place and size in voxels: 4 wide, 8 tall, 3 deep.
 	for x: float in [-1.0, 1.0]:
 		var leg: MeshInstance3D = _box(Vector3(x * 0.75, 1.5, 0.0), Vector3(1.0, 3.0, 1.0), SUIT)
-		leg.add_child(_made(Vector3(0.0, -1.0, -0.1), Vector3(1.1, 1.0, 1.3), DARK))
+		leg.add_child(_made(Vector3(0.0, -1.0, -0.1), Vector3(1.1, 1.0, 1.3), BOOT))
 		_legs.append(leg)
 		# The arm hangs from the shoulder, so it swings about it.
 		var arm := Node3D.new()
