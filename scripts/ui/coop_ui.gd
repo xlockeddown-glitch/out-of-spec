@@ -103,11 +103,16 @@ func _refresh() -> void:
 		_about.text = _problem if _problem != "" else "Hosting lets friends join this farm while you play. Anyone who knows your address can join, so share it only with friends."
 	_bed.visible = true
 	_bed.text = "GET UP" if GameState.local_player_id in CoopBeds.in_bed else "GO TO BED"
-	if CoopBeds.together():
+	var here: String = CoopBeds.here_refusal()
+	_bed.disabled = here != "" and not GameState.local_player_id in CoopBeds.in_bed
+	if FarmCommands.guest or CoopBeds.together():
 		_about.text += "\n\nThe day ends when everyone is in bed, and waits at 06:00 for anyone still up."
 	else:
-		_about.text += "\n\nGOING TO BED ends the day."
-	if _problem != "" and (CoopBeds.together() or FarmCommands.guest):
+		_about.text += "\n\nGO TO BED ends the day."
+	if _bed.disabled:
+		_about.text += " " + here
+	# Not hosting, the problem is already the whole text above.
+	if _problem != "" and (FarmCommands.guest or CoopSession.is_hosting()):
 		_about.text += "\n\n" + _problem
 	# A farm run on its own, not from the title menu, is nobody's to share.
 	_action.disabled = not FarmCommands.guest and not SaveGame.farm_open

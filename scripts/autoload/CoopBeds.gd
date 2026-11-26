@@ -6,6 +6,11 @@ extends Node
 
 ## On a guest, as the host last said.
 var in_bed: Array[String] = []
+## A repeat solo request inside this many real milliseconds is ignored, so a
+## double click does not sleep two days.
+const SOLO_COOLDOWN_MS: int = 1000
+var cooldown_ms: int = SOLO_COOLDOWN_MS
+var _last_solo_msec: int = -1000000
 ## Only tests set others.
 var session: Node
 var clock: Node
@@ -32,6 +37,36 @@ func together() -> bool:
 	return session.players.size() > 1
 
 
+## Someone has connected to the host and is still joining.
+func joining() -> bool:
+	var links: Variant = session.get("_links")
+	if not links is Dictionary:
+		return false
+	for id: Variant in links:
+		var link: Dictionary = links[id]
+		if int(id) > 1 and link.get("player", "") == "" and not link.get("gone", false):
+			return true
+	return false
+
+
+## Why the local player can't go to bed where they are, or "".
+func here_refusal() -> String:
+	if not FarmCommands.guest and not SaveGame.farm_open:
+		return "No farm is open."
+	if clock.paused:
+		return "The clock is paused."
+	var tree: SceneTree = session.get_tree()
+	var scene: Node = tree.current_scene if tree != null else null
+	return scene_refusal(scene.scene_file_path if scene != null else "")
+
+
+## Beds are on the farm, not in the dome or the tunnels.
+static func scene_refusal(scene_path: String) -> String:
+	if scene_path in [SceneSwitcher.DOME_SCENE, SceneSwitcher.TUNNELS_SCENE]:
+		return "Go to bed from the farm, not the dome or the tunnels."
+	return ""
+
+
 ## Host or alone: "" or why not. Alone, the day ends at once; with friends in,
 ## it ends when the last one is in bed.
 func go_to_bed(player_id: String) -> String:
@@ -40,8 +75,11 @@ func go_to_bed(player_id: String) -> String:
 	if not together():
 		if not session.players.is_empty() and not player_id in session.players:
 			return "That player is not on this farm."
-		in_bed.clear()
-		clock.skip_to_next_morning()
+		if joining():
+			return "Someone is joining. Try again in a moment."
+		if Time.get_ticks_msec() - _last_solo_msec < cooldown_ms:
+			return "You already went to bed."
+		_sleep_alone()
 		return ""
 	if not session.is_hosting() or not player_id in session.players:
 		return "That player is not on this farm."
@@ -64,9 +102,20 @@ func still_up() -> Array[String]:
 	return up
 
 
+func _sleep_alone() -> void:
+	_last_solo_msec = Time.get_ticks_msec()
+	in_bed.clear()
+	clock.morning_waits = false
+	clock.skip_to_next_morning()
+
+
 func _look() -> void:
 	if not together():
+		# The last friend left: if all who remain are in bed, the day ends.
+		var all_in: bool = session.is_hosting() and not in_bed.is_empty() and still_up().is_empty()
 		in_bed.clear()
+		if all_in:
+			_sleep_alone()
 	clock.morning_waits = session.is_hosting() and together()
 	if not clock.morning_waits:
 		return

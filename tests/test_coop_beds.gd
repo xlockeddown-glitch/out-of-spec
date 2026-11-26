@@ -95,9 +95,59 @@ func test_whoever_leaves_is_not_waited_for() -> String:
 		beds.go_to_bed("player_1")
 		one.leave()
 		_until(func() -> bool: return host.players.size() == 1)
-		if clock.elapsed_days != 1.0 or not beds.in_bed.is_empty() or clock.morning_waits:
-			return "Alone again: no bed, and the day doesn't wait"
+		if clock.elapsed_days != 2.0 or not beds.in_bed.is_empty() or clock.morning_waits:
+			return "The host was in bed and the last friend left, so the day must end: %s" % clock.format_now()
 		return "")
+
+
+func test_a_leaving_friend_with_the_host_up_does_not_end_the_day() -> String:
+	return _farm(func(host: Node, beds: Node, clock: Node) -> String:
+		var one: Node = _guest(host)
+		beds.go_to_bed("player_2")
+		one.leave()
+		_until(func() -> bool: return host.players.size() == 1)
+		if clock.elapsed_days != 0.0 or not beds.in_bed.is_empty() or clock.morning_waits:
+			return "Only the friend was in bed: no day ends, and nothing waits"
+		return "")
+
+
+func test_a_double_click_alone_sleeps_one_day() -> String:
+	return _farm(func(_host_side: Node, beds: Node, clock: Node) -> String:
+		beds._look()
+		if beds.go_to_bed("player_1") != "" or beds.go_to_bed("player_1") == "" or clock.get_day_index() != 2:
+			return "A repeat request right after must be refused: day %d" % clock.get_day_index()
+		beds.cooldown_ms = 0
+		if beds.go_to_bed("player_1") != "" or clock.get_day_index() != 3:
+			return "After the cooldown, bed works again"
+		return "")
+
+
+func test_someone_joining_holds_a_solo_bed() -> String:
+	return _farm(func(host: Node, beds: Node, clock: Node) -> String:
+		host._links[7] = { "player": "" }
+		if not beds.joining() or beds.go_to_bed("player_1") == "" or clock.elapsed_days != 0.0:
+			return "While someone is joining, bed must not skip the day"
+		host._links[7]["gone"] = true
+		return "" if beds.go_to_bed("player_1") == "" else "A dropped joiner must not block bed")
+
+
+func test_beds_are_not_in_the_dome_or_tunnels() -> String:
+	if BedsScript.scene_refusal(SceneSwitcher.DOME_SCENE) == "" or BedsScript.scene_refusal(SceneSwitcher.TUNNELS_SCENE) == "":
+		return "No bed in the dome or tunnels"
+	return "" if BedsScript.scene_refusal(SceneSwitcher.FARM_SCENE) == "" else "The farm has the bed"
+
+
+func test_no_bed_while_paused_or_with_no_farm_open() -> String:
+	return _farm(func(_host_side: Node, beds: Node, clock: Node) -> String:
+		var held: bool = SaveGame.farm_open
+		SaveGame.farm_open = false
+		var closed: String = beds.here_refusal()
+		SaveGame.farm_open = true
+		clock.paused = true
+		var paused: String = beds.here_refusal()
+		clock.paused = false
+		SaveGame.farm_open = held
+		return "" if closed != "" and paused != "" else "No farm open or paused must refuse")
 
 
 func test_doing_something_gets_a_player_up() -> String:
