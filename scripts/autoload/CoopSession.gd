@@ -162,7 +162,6 @@ func is_hosting() -> bool:
 	return _hosting
 
 
-## Let in by a host, and still connected.
 ## Host: a connection is still joining (it has no player yet). A silent or
 ## refused one is dropped after join_timeout_ms, so this never holds for long.
 func someone_joining() -> bool:
@@ -172,6 +171,7 @@ func someone_joining() -> bool:
 	return false
 
 
+## Let in by a host, and still connected.
 func is_guest() -> bool:
 	return _accepted
 
