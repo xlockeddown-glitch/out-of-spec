@@ -68,6 +68,10 @@ const DRIFT_TABLE: StringName = &"sensor_drift_config"
 const DISPATCH_TABLE: StringName = &"dialogue_dispatches"
 const CROPS_TABLE: StringName = &"crops"
 const SKILLS_TABLE: StringName = &"skills"
+## 2 is the 99-level geometric curve (docs/design/quests_levels_story.md section 2).
+const SKILL_CURVE: int = 2
+## The most XP a converted skill holds: CoopProfile.MOST_XP.
+const MOST_SKILL_XP: int = 1000000000
 const SOIL_PROBE_ID: String = "soil_probe"
 ## Who did a calibration when it wasn't a player: the manager's grace cal.
 ## Player ids must never be this or LEGACY_LOCAL_PERFORMER.
@@ -320,6 +324,14 @@ var next_player_number: int = 2
 var guest_ids: Dictionary = {}
 ## Skill id -> XP, for the skills the whole farm shares.
 var farm_skill_xp: Dictionary = {}
+## Owner ("" for the farm, else a player id) -> { skill id: share, 0 to 1 }: how
+## much of its effects' full cut a skill had in a save from the 10-level curve.
+## An effect uses the larger of this and its level's share. Only converting an
+## old save writes it, so a new farm has none and it never rises.
+var skill_effect_floor: Dictionary = {}
+## The curve the XP above is counted on. A save without it is from the 10-level
+## curve, and is converted as it loads (_convert_old_skills).
+var skill_curve: int = SKILL_CURVE
 ## Robot id ("TR-1") -> { frame, name, state (ROBOT_STATES), done_day,
 ## ordered_by }. Assembled robots' sensors are in `sensors` as "sensor@robot".
 var robots: Dictionary = {}
@@ -503,7 +515,8 @@ const MAX_KNOWN_GUESTS: int = 64
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
-	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending"]
+	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
+	"skill_effect_floor", "skill_curve"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -652,6 +665,16 @@ func farm_dict_problem(data: Dictionary) -> String:
 			return "'guest_ids' has an entry that is not a player."
 	if not _holds_only_ints(data.get("farm_skill_xp", {})):
 		return "'farm_skill_xp' has XP that is not a whole number."
+	if data.get("skill_curve", SKILL_CURVE) != SKILL_CURVE:
+		return "'skill_curve' is not a curve this game knows."
+	var floors: Dictionary = data.get("skill_effect_floor", {})
+	for owner_id: Variant in floors:
+		if not owner_id is String or typeof(floors[owner_id]) != TYPE_DICTIONARY:
+			return "'skill_effect_floor' has an entry that is not a player's or the farm's."
+		for skill: Variant in floors[owner_id]:
+			var share: Variant = floors[owner_id][skill]
+			if not skill is String or not share is float or share < 0.0 or share > 1.0:
+				return "'skill_effect_floor' has a share that is not from 0 to 1."
 	var robot_problem: String = _robots_dict_problem(data.get("robots", {}))
 	if robot_problem != "":
 		return robot_problem
@@ -813,6 +836,9 @@ func put_farm(data: Dictionary) -> void:
 		pocket_pending.clear()
 		for cell: Vector2i in found_pockets:
 			pocket_pending[cell] = GameClock.get_day_index() + OrePocket.REGROW_DAYS
+	if not data.has("skill_curve"):
+		# From the 10-level curve.
+		_convert_old_skills()
 	_seep_days = 0.0
 	_seep_full = false
 	_morning = false
@@ -1338,13 +1364,40 @@ func skill_level(skill_id: String, player_id: String = "") -> int:
 
 
 ## What is left of a base amount at the player's level: 1.0 at level 1, less
-## `per_level` for each level above it, never under `floor` (data/skills.json).
+## the level's share of the effect's `full` cut, never under `floor`
+## (data/skills.json). A converted save's floor share counts if it is larger.
 func skill_factor(effect_id: String, player_id: String = "") -> float:
 	var effect: Dictionary = DataManager.get_record(SKILLS_TABLE, effect_id, "effects")
 	if effect.is_empty():
 		return 1.0
-	var above: int = skill_level(str(effect["skill"]), player_id) - 1
-	return maxf(float(effect.get("floor", 0.0)), 1.0 - float(effect["per_level"]) * above)
+	var skill: String = str(effect["skill"])
+	var share: float = maxf(effect_share(skill_level(skill, player_id)), effect_floor(skill, player_id))
+	return maxf(float(effect.get("floor", 0.0)), 1.0 - float(effect["full"]) * share)
+
+
+## The share (0 to 1) of an effect's full cut that `level` has: straight lines
+## between the rows of level_curve/effect_share, which start at level 1.
+func effect_share(level: int) -> float:
+	var rows: Variant = DataManager.get_value(SKILLS_TABLE, "level_curve/effect_share", [])
+	if not rows is Array:
+		return 0.0
+	var last_level: float = 1.0
+	var last_share: float = 0.0
+	for row: Dictionary in rows:
+		var at: float = float(row["level"])
+		var share: float = float(row["share"])
+		if level <= at:
+			return share if at <= last_level else lerpf(last_share, share, (level - last_level) / (at - last_level))
+		last_level = at
+		last_share = share
+	return last_share
+
+
+## The share a save from the 10-level curve keeps for this skill, or 0.
+func effect_floor(skill_id: String, player_id: String = "") -> float:
+	var owner_id: String = "" if is_farm_skill(skill_id) else (local_player_id if player_id == "" else player_id)
+	var own: Dictionary = skill_effect_floor.get(owner_id, {})
+	return clampf(float(own.get(skill_id, 0.0)), 0.0, 1.0)
 
 
 func has_skill_unlock(unlock_id: String, player_id: String = "") -> bool:
@@ -1369,7 +1422,7 @@ func skill_effects_text(skill_id: String, player_id: String = "") -> String:
 	for effect: Dictionary in DataManager.get_records(SKILLS_TABLE, "effects"):
 		if effect["skill"] == skill_id:
 			parts.append("%s %s %% of base" % [effect["display_name"],
-				SP811.number(skill_factor(str(effect["id"]), player_id) * 100.0, 0)])
+				SP811.number(skill_factor(str(effect["id"]), player_id) * 100.0, 1)])
 	for unlock: Dictionary in DataManager.get_records(SKILLS_TABLE, "unlocks"):
 		if unlock["skill"] == skill_id:
 			parts.append(str(unlock["display_name"]) if has_skill_unlock(str(unlock["id"]), player_id)
@@ -1378,7 +1431,7 @@ func skill_effects_text(skill_id: String, player_id: String = "") -> String:
 
 
 func max_skill_level() -> int:
-	return int(DataManager.get_number(SKILLS_TABLE, "level_curve/max_level", 10.0))
+	return int(DataManager.get_number(SKILLS_TABLE, "level_curve/max_level", 99.0))
 
 
 ## Host: the player this guest is, new or back again, or "" if already in. Each
@@ -1414,31 +1467,92 @@ func _forget_a_guest(players: Array[String]) -> void:
 		if not player_id in players:
 			guest_ids.erase(hashed)
 			player_skill_xp.erase(player_id)
+			skill_effect_floor.erase(player_id)
 			return
 
 
-## Total XP that reaches `level`: base × (level − 1) × level / 2.
+## Total XP that reaches `level`. Going from level n to n + 1 costs
+## base × growth^(n − 1), so the total is base × (growth^(level − 1) − 1) / (growth − 1).
 func xp_for_level(level: int) -> int:
-	return roundi(DataManager.get_number(SKILLS_TABLE, "level_curve/base_xp", 50.0) * (level - 1) * level / 2.0)
+	if level <= 1:
+		return 0
+	var base: float = DataManager.get_number(SKILLS_TABLE, "level_curve/base_xp", 50.0)
+	var growth: float = DataManager.get_number(SKILLS_TABLE, "level_curve/growth", 1.1)
+	if growth <= 1.0:
+		return roundi(base * (level - 1))
+	return roundi(base * (pow(growth, level - 1) - 1.0) / (growth - 1.0))
 
 
 func _level_for_xp(xp: int) -> int:
+	var top: int = max_skill_level()
+	var base: float = DataManager.get_number(SKILLS_TABLE, "level_curve/base_xp", 50.0)
+	var growth: float = DataManager.get_number(SKILLS_TABLE, "level_curve/growth", 1.1)
 	var level: int = 1
-	while level < max_skill_level() and xp >= xp_for_level(level + 1):
+	if xp > 0 and base > 0.0 and growth > 1.0:
+		# The curve turned round; the two loops settle the rounding.
+		level = clampi(int(log(xp * (growth - 1.0) / base + 1.0) / log(growth)) + 1, 1, top)
+	while level < top and xp >= xp_for_level(level + 1):
+		level += 1
+	while level > 1 and xp < xp_for_level(level):
+		level -= 1
+	return level
+
+
+## A save from the 10-level curve (docs/design/quests_levels_story.md section
+## 2.5): XP is multiplied by old_curve/xp_factor, which never lowers a level, and
+## each skill keeps the share of its effects it had, so nobody can do less.
+func _convert_old_skills() -> void:
+	skill_effect_floor.clear()
+	_convert_old_xp(farm_skill_xp, "")
+	for player: Variant in player_skill_xp:
+		_convert_old_xp(player_skill_xp[player], str(player))
+
+
+func _convert_old_xp(xp_by_skill: Dictionary, owner_id: String) -> void:
+	var factor: float = DataManager.get_number(SKILLS_TABLE, "old_curve/xp_factor", 5.0)
+	for skill: Variant in xp_by_skill.keys():
+		var old_xp: int = clampi(int(xp_by_skill[skill]), 0, MOST_SKILL_XP)
+		xp_by_skill[skill] = mini(roundi(old_xp * factor), MOST_SKILL_XP)
+		var share: float = _old_effect_share(str(skill), _old_level(old_xp))
+		if share > 0.0:
+			var own: Dictionary = skill_effect_floor.get_or_add(owner_id, {})
+			own[str(skill)] = share
+
+
+## The level `xp` was on the 10-level curve: base × (level − 1) × level / 2.
+func _old_level(xp: int) -> int:
+	var top: int = int(DataManager.get_number(SKILLS_TABLE, "old_curve/max_level", 10.0))
+	var base: float = DataManager.get_number(SKILLS_TABLE, "old_curve/base_xp", 50.0)
+	var level: int = 1
+	while level < top and xp >= roundi(base * level * (level + 1) / 2.0):
 		level += 1
 	return level
 
 
-## Gives the XP of one source in data/skills.json to the acting player, or to
-## the farm for a farm skill. The manager earns none.
-func _award_xp(source_id: String, player_id: String = "") -> void:
+## The largest share of its full cut that any effect of `skill_id` had at
+## `old_level`, when each old level cut `old_per_level` down to the floor.
+func _old_effect_share(skill_id: String, old_level: int) -> float:
+	var best: float = 0.0
+	for effect: Dictionary in DataManager.get_records(SKILLS_TABLE, "effects"):
+		if effect["skill"] != skill_id:
+			continue
+		var room: float = 1.0 - float(effect.get("floor", 0.0))
+		var full: float = minf(room, float(effect["full"]))
+		if full > 0.0:
+			best = maxf(best, minf(room, float(effect.get("old_per_level", 0.0)) * (old_level - 1)) / full)
+	return minf(best, 1.0)
+
+
+## Gives the XP of one source in data/skills.json, times `scale`, to the acting
+## player, or to the farm for a farm skill. The manager earns none.
+func _award_xp(source_id: String, player_id: String = "", scale: float = 1.0) -> void:
 	if player_id == MANAGER_ID:
 		return
 	if player_id == "":
 		player_id = local_player_id
 	var source: Dictionary = DataManager.get_record(SKILLS_TABLE, source_id, "xp_sources")
 	var skill: String = str(source.get("skill", ""))
-	var gained: int = int(source.get("xp", 0))
+	var gained: int = roundi(float(source.get("xp", 0)) * scale)
 	if gained <= 0 or DataManager.get_record(SKILLS_TABLE, skill, "skills").is_empty():
 		return
 	var farm: bool = is_farm_skill(skill)
@@ -1456,31 +1570,43 @@ func _award_xp(source_id: String, player_id: String = "") -> void:
 		skill_leveled.emit(owner_id, skill, level)
 
 
-## XP for a calibration (section 2.2). An untraceable one, or one made before
+## XP for a calibration (section 2.2), times the standard's tier scale. An untraceable one, or one made before
 ## the instrument has run half its interval, gives none, so it can't be repeated
 ## for XP.
 func _xp_after_calibration(record: Dictionary) -> void:
 	if not record["traceable"] or int(record["days_in_service"]) < ceili(int(record["previous_interval_days"]) / 2.0):
 		return
 	var player: String = record["performed_by"]
+	var scale: float = calibration_xp_scale(str(record.get("standard_id", "")))
 	if record.get("programmed_by", "") != "":
 		# A robot's work trains no one's hands: only Robotics XP [ASSUMPTION].
 		if robot_of(record["instrument_id"]) != "":
-			_award_xp("calibrate_robot", record["programmed_by"])
+			_award_xp("calibrate_robot", record["programmed_by"], scale)
 		return
 	if robot_of(record["instrument_id"]) != "":
-		_award_xp("calibrate_robot", player)
-		_award_xp("calibrate_robot_player", player)
+		_award_xp("calibrate_robot", player, scale)
+		_award_xp("calibrate_robot_player", player, scale)
 	else:
-		_award_xp("calibrate_player", player)
+		_award_xp("calibrate_player", player, scale)
 	if not record["as_found_in_tolerance"]:
-		_award_xp("calibrate_found_oot", player)
+		_award_xp("calibrate_found_oot", player, scale)
 	if record["on_time"]:
-		_award_xp("calibrate_on_time", player)
+		_award_xp("calibrate_on_time", player, scale)
 	if float(record["tur"]) >= CalUncertainty.tur_clean():
-		_award_xp("calibrate_clean_tur", player)
+		_award_xp("calibrate_clean_tur", player, scale)
 	if get_sensor(record["instrument_id"]).role == "standard":
-		_award_xp("calibrate_standard", player)
+		_award_xp("calibrate_standard", player, scale)
+
+
+## What a calibration's XP is multiplied by: the entry of calibration_tier_xp
+## for the tier of the standard used. 1 if there is no such standard or entry.
+func calibration_xp_scale(standard_id: String) -> float:
+	var standard: DriftingSensor = get_sensor(standard_id)
+	var scales: Variant = DataManager.get_value(SKILLS_TABLE, "calibration_tier_xp", [])
+	if standard == null or not scales is Array or (scales as Array).is_empty():
+		return 1.0
+	var scale: Variant = scales[clampi(standard.tier, 0, (scales as Array).size() - 1)]
+	return float(scale) if scale is float or scale is int else 1.0
 
 
 ## A clean audit is everyone's: each player on the farm gets its XP [ASSUMPTION].

@@ -162,10 +162,10 @@ func _check_soil(gs: GameStateScript) -> String:
 	_tick(gs, 7.3)
 	if not _near(gs, target + 0.08) or absf(gs.soil_moisture(CELL) - target) > EPS:
 		return "It must trim the drift out, with no line of sight too."
-	if gs.skill_xp("robotics") != xp + 1 or not gs.phone_log.any(func(t: String) -> bool: return t.contains("1 plot by")):
-		return "A job that trims earns Robotics 1 and is reported."
+	if gs.skill_xp("robotics") != xp + int(DataManager.get_record(&"skills", "robot_job", "xp_sources")["xp"]) or not gs.phone_log.any(func(t: String) -> bool: return t.contains("1 plot by")):
+		return "A job that trims earns the robot_job XP and is reported."
 	_tick(gs, 7.4)
-	return "" if gs.skill_xp("robotics") == xp + 1 else "Once trimmed, it stops."
+	return "" if gs.skill_xp("robotics") == xp + int(DataManager.get_record(&"skills", "robot_job", "xp_sources")["xp"]) else "Once trimmed, it stops."
 
 
 func test_drifted_robot_probe_trims_wrongly() -> String:

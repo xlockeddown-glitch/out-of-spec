@@ -16,8 +16,8 @@ func _run(body: Callable) -> String:
 	return JobsTest.new()._run(func(gs: GameStateScript) -> String:
 		for id: String in gs.robot_sensor_ids(ROBOT):
 			gs.get_sensor(id).error = 0.0
-		gs.farm_skill_xp["robotics"] = gs.xp_for_level(4)
-		gs.player_skill_xp[gs.local_player_id] = { "calibration": gs.xp_for_level(3) }
+		gs.farm_skill_xp["robotics"] = gs.xp_for_level(15)
+		gs.player_skill_xp[gs.local_player_id] = { "calibration": gs.xp_for_level(10) }
 		for id: String in gs.unit_ids():
 			gs.get_sensor(id).cal_due_day = 1000
 		return body.call(gs))
@@ -41,14 +41,14 @@ func _check_gates(gs: GameStateScript) -> String:
 		return "Each job has its own triggers."
 	if gs.robot_calibrate_targets(ROBOT).is_empty():
 		return "There must be something to calibrate."
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(4) - 1
-	if not gs.add_robot_calibrate_card(ROBOT, TARGET).contains("Robotics level 4"):
-		return "It needs Robotics 4: %s %d" % [gs.robot_job_gate(gs.JOB_CALIBRATE), gs.skill_level("robotics")]
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(4)
-	gs.player_skill_xp[gs.local_player_id]["calibration"] = gs.xp_for_level(3) - 1
-	if not gs.add_robot_calibrate_card(ROBOT, TARGET).contains("Calibration level 3"):
-		return "It needs Calibration 3."
-	gs.player_skill_xp[gs.local_player_id]["calibration"] = gs.xp_for_level(3)
+	gs.farm_skill_xp["robotics"] = gs.xp_for_level(15) - 1
+	if not gs.add_robot_calibrate_card(ROBOT, TARGET).contains("Robotics level 15"):
+		return "It needs Robotics 15: %s %d" % [gs.robot_job_gate(gs.JOB_CALIBRATE), gs.skill_level("robotics")]
+	gs.farm_skill_xp["robotics"] = gs.xp_for_level(15)
+	gs.player_skill_xp[gs.local_player_id]["calibration"] = gs.xp_for_level(10) - 1
+	if not gs.add_robot_calibrate_card(ROBOT, TARGET).contains("Calibration level 10"):
+		return "It needs Calibration 10."
+	gs.player_skill_xp[gs.local_player_id]["calibration"] = gs.xp_for_level(10)
 	var sensor: DriftingSensor = gs.get_sensor(TARGET)
 	var mpe: float = sensor.mpe
 	sensor.mpe = float(gs.calibration_budget(TARGET)["u_res"])
@@ -117,7 +117,7 @@ func _check_due(gs: GameStateScript) -> String:
 		return "The record must be the robot's: %s" % [record]
 	if absf(record["as_found"] - 0.2 * sensor.mpe) > 1e-4:
 		return "The robot's error must go into the reading: %s" % record["as_found"]
-	if gs.skill_xp("calibration") != xp or gs.skill_xp("robotics") != robotics + 1 or gs.player_skill_xp.has(ROBOT):
+	if gs.skill_xp("calibration") != xp or gs.skill_xp("robotics") != robotics + int(DataManager.get_record(&"skills", "robot_job", "xp_sources")["xp"]) or gs.player_skill_xp.has(ROBOT):
 		return "It earns the robot_job XP alone."
 	if gs.get_sensor(ENCODER).error == 0.0:
 		return "It wears the joint encoder."

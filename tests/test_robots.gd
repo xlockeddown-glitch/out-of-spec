@@ -39,6 +39,10 @@ func _own(gs: GameStateScript, id: String) -> void:
 		gs.get_sensor(other).cal_due_day = 1000
 
 
+func _xp(source: String) -> int:
+	return int(DataManager.get_record(&"skills", source, "xp_sources").get("xp", 0))
+
+
 func _built(gs: GameStateScript) -> void:
 	gs.build_robot("trellis")
 	GameClock.elapsed_days = 7.0
@@ -93,7 +97,7 @@ func _check_gates(gs: GameStateScript) -> String:
 	_built(gs)
 	if not "Robotics" in gs.robot_build_problem("trellis"):
 		return "A second robot needs more Robotics."
-	gs.farm_skill_xp["robotics"] = gs.xp_for_level(3)
+	gs.farm_skill_xp["robotics"] = gs.xp_for_level(10)
 	return gs.robot_build_problem("trellis")
 
 
@@ -122,7 +126,7 @@ func _check_assembly(gs: GameStateScript) -> String:
 			return "%s: name or TUR is wrong." % id
 		if not id in gs.bench_unit_ids() or id in gs.unit_ids() or not gs.is_commissioning(id):
 			return "%s is on the bench but not audited." % id
-	return "" if gs.skill_xp("robotics") == 50 else "Building gives Robotics 50."
+	return "" if gs.skill_xp("robotics") == 250 else "Building gives Robotics 250."
 
 
 func test_release() -> String:
@@ -141,10 +145,16 @@ func _check_release(gs: GameStateScript) -> String:
 		return problem
 	if gs.contract_run != 0:
 		return "Commissioning isn't part of the contract run."
-	if gs.skill_xp("robotics") != robotics + 20:
-		return "Each robot sensor gives Robotics 5."
-	if gs.skill_xp("calibration") - calibration >= 4 * 10 + 4 * 5:
-		return "A robot sensor gives 5 in place of 10."
+	# Each sensor gives the two robot sources, times its standard's tier scale.
+	var each: int = 0
+	for id: String in SENSORS:
+		each += roundi(_xp("calibrate_robot") * gs.calibration_xp_scale(gs.last_cal_records[id]["standard_id"]))
+	if _xp("calibrate_robot") != _xp("calibrate_robot_player") or _xp("calibrate_robot_player") >= _xp("calibrate_player"):
+		return "A robot sensor gives the bench less than a unit does."
+	if gs.skill_xp("robotics") != robotics + each:
+		return "Each robot sensor gives the calibrate_robot XP: %d" % (gs.skill_xp("robotics") - robotics)
+	if gs.skill_xp("calibration") != calibration + each:
+		return "A robot sensor gives calibrate_robot_player in place of calibrate_player."
 	gs.suspect_units[SENSORS[0]] = 6
 	if not "suspect" in gs.robot_release_problem("TR-1"):
 		return "A suspect sensor holds it back."
@@ -166,7 +176,7 @@ func _check_release(gs: GameStateScript) -> String:
 	for id: String in SENSORS:
 		if not id in gs.unit_ids():
 			return "%s is audited after release." % id
-	return "" if gs.skill_xp("robotics") == robotics + 45 else "Releasing gives Robotics 25."
+	return "" if gs.skill_xp("robotics") == robotics + each + _xp("commission_robot") else "Releasing gives the commission_robot XP."
 
 
 func test_unreleased_sensors_are_not_audited() -> String:

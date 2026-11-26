@@ -72,7 +72,7 @@ func _check_collects(gs: GameStateScript) -> String:
 	if gs.get_sensor(GRIP).error == 0.0 or gs.get_sensor("robot_joint_encoder@TR-1").error == 0.0 \
 			or gs.get_sensor("robot_tank_pressure@TR-1").error != 0.0:
 		return "Only the grip and the encoder wear."
-	if gs.farm_skill_xp["robotics"] != xp[0] + 1 or gs.farm_skill_xp.get("husbandry", 0) != xp[1]:
+	if gs.farm_skill_xp["robotics"] != xp[0] + int(DataManager.get_record(&"skills", "robot_job", "xp_sources")["xp"]) or gs.farm_skill_xp.get("husbandry", 0) != xp[1]:
 		return "A robot's work earns Robotics XP only."
 	# Another one can be collected the same day.
 	_molt(gs)

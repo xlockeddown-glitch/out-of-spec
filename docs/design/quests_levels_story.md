@@ -184,7 +184,7 @@ Straight lines between the rows. A new player feels the skill move early. A leve
 
 ### 2.5 Existing saves
 
-On first load after the change, XP is multiplied by the same 5 and the level is read off the new curve. Nobody drops below what they can already do: anything a save has unlocked stays unlocked, and the lab level is credited from the farm's `cal_log`, `job_log` and `audit_log` (decided, §10, 5).
+On first load after the change, XP is multiplied by a conversion factor and the level is read off the new curve. The factor is `old_curve/xp_factor` in `data/skills.json`, 5 for now [PLACEHOLDER]. It matches the first-band table in §2.3 only. When the sources are re-tuned from the hour budget, the factor is set again with them. Whatever it becomes, it must never lower a level. Nobody drops below what they can already do: anything a save has unlocked stays unlocked, and the lab level is credited from the farm's `cal_log`, `job_log` and `audit_log` (decided, §10, 5).
 
 **Effects are kept too.** The level number alone would not keep the promise. A level 10 save today has 2 250 XP. Times 5 is 11 250, which is about level 34 on the new curve, and level 34 gives about 53 % of the full effect (§2.4). Today that save has 100 %. So conversion also stores a floor:
 
@@ -229,13 +229,13 @@ The amounts in that table are 25 to 500 per action. The curve asks for 137 901 l
 
 Three changes keep it true:
 
-1. **Lab XP grows with the lab.** Every lab XP amount is multiplied by the lab's size: small ×1, medium ×3, large ×8 [PLACEHOLDER]. A bigger lab does bigger work. This stacks with the tier multiplier, so a Tier 3 calibration in a large lab pays 25 × 4 × 8 = 800 lab XP against 25 for the first one.
+1. **Lab XP grows with the lab.** Every lab XP amount is multiplied by the lab's size: small ×1, medium ×3, large ×8 [PLACEHOLDER]. A bigger lab does bigger work. This stacks with the tier multiplier, so a Tier 3 calibration in a large lab pays 25 × 4 × 8 = 800 lab XP against 25 for the first one. The size multiplier applies to the feeds in the table above only. It does **not** apply to a quest's lump of lab XP: a quest pays the amount written on it, in any lab.
 2. **No story beat sits above lab level 60.** The unlock table (§3.4) is reordered. Levels 61 to 99 hold robots, board size and cosmetics only. A farm that never passes 60 misses no episode.
 3. **Lab XP is set from a budget of hours, like skill XP (§2.3).** Target [PLACEHOLDER]: lab level 20 by about 5 hours of farm play, 40 by about 20 hours, 60 by about 50 hours. Lab level 99 is a prestige goal with no deadline. The whole farm, robots included, feeds one bar, so more players reach it sooner.
 
 Even with these, the table's amounts are not proven to hit the target. They need the same spreadsheet pass as §2.3 before the lab-level gates turn on (§9, step 9).
 
-**A second way through every gate.** If a farm meets a row's "also needs" condition and is short of the lab level, the giver of that row's lab quest offers a "provisional" version: the row opens early for that quest only, and finishing the quest pays enough lab XP to close most of the gap [ASSUMPTION]. So a level number alone never holds a story beat shut.
+**A provisional way through a lab-level gate.** If a farm meets a row's "also needs" condition and is short of the lab level, the giver of that row's lab quest offers a "provisional" version: the row opens early for that quest only, and finishing the quest pays enough lab XP to close most of the gap [ASSUMPTION]. So a level number alone never holds a story beat shut.
 
 ### 3.3 Which skills move to the lab
 
@@ -697,11 +697,11 @@ A guest who finishes a story quest on a friend's farm keeps the quest point. The
 
 ## 9. Build order (small PRs, one job each)
 
-1. **The curve.** `data/skills.json` gets the geometric curve, top level 99 and source values set from the hour budget (§2.3). Effects respread. **Save conversion, stage 1:** every skill's XP converts, farm skills included, and each skill's `effect_floor` is stored (§2.5). Instrumentation stays a farm skill for now, with its converted XP. No lab level yet.
+1. **The curve.** `data/skills.json` gets the geometric curve, top level 99 and source values set from the hour budget (§2.3). Effects respread. **Save conversion, stage 1:** every skill's XP converts, farm skills included, and each skill's `effect_floor` is stored (§2.5). Instrumentation stays a farm skill for now, with its converted XP. No lab level yet. **Built (2026-11-25):** the curve, the ×5 table and the tier multiplier of §2.3, the spread of §2.4 and the floor of §2.5. The hour budget is met for the first band only; the rest waits for jobs, crops and quests to give XP (steps 2 and 5) and for the spreadsheet pass. The robot gates in `data/robots.json` moved to the levels that cost about the same XP as before (`docs/decisions.md`).
 2. **XP for jobs and crops.** The logged open item. Adds the per-player action counter. Agronomy does not exist yet, so crop XP goes to Field Ops for now (where `till` is today). The counter records how much came from crop sources.
 3. **The lab level.** Lab XP, its feeds and the size multiplier, shown on the SKILLS view and phone. No gates yet. **Save conversion, stage 2:** the lab level is credited from `cal_log`, `job_log` and `audit_log`, and the farm's Instrumentation XP is added to lab XP one for one. Then Instrumentation is removed and its two sources feed lab XP.
 4. **Robotics and Husbandry go personal; Agronomy and Earthworks arrive.** As decided in §10, 1 and 2. Each player gets the farm's old Robotics and Husbandry XP once. Crop XP earned as Field Ops since step 2 moves to Agronomy, by the counter. `till`, `dig` and the rest move to their new skills from here on.
-5. **Quest engine.** `data/quests.json`, `quest_state` in the save, the checks in §5.3, and the plain reward kinds: credits, skill XP, lab XP, quest points, a phone line. Quest points are kept per player id in the host's save from this step on, guests included. Two quests ship: L1 and L3. Progress goes to the phone as plain lines.
+5. **Quest engine.** `data/quests.json`, `quest_state` in the save, the checks in §5.3, and the plain reward kinds: credits, skill XP, lab XP, quest points, a phone line. Quest points are kept per player id in the host's save from this step on, guests included. Two quests ship: L1 and L3. Progress goes to the phone as plain lines. A quest's own `gates` (§5.2) apply from this step: a quest is offered only when they hold. The unlock-table gates (§3.4) are a different thing and wait for step 9.
 6. **The XP certificate.** The pick-a-skill reward and its small picker. S1 ships here, without its mini-game.
 7. **Quest log on the phone.**
 8. **Co-op for quests.** Personal quest state and quest points also go into the guest's own file, so they travel. Until this step a guest's points live only on the host's save. Lab quests join the farm sync.

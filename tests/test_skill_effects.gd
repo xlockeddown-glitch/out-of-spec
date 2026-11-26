@@ -43,7 +43,7 @@ func _check_factors(gs: GameStateScript) -> String:
 		if gs.skill_factor(id) != 1.0:
 			return "%s must change nothing at level 1." % id
 		_level(gs, effect["skill"], 2)
-		if absf(gs.skill_factor(id) - (1.0 - float(effect["per_level"]))) > EPS:
+		if absf(gs.skill_factor(id) - (1.0 - float(effect["full"]) * gs.effect_share(2))) > EPS or gs.skill_factor(id) >= 1.0:
 			return "%s at level 2: %s" % [id, gs.skill_factor(id)]
 		_level(gs, effect["skill"], gs.max_skill_level())
 		if gs.skill_factor(id) <= 0.0 or gs.skill_factor(id) < float(effect.get("floor", 0.0)):
