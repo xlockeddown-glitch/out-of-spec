@@ -1282,3 +1282,5 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - A reference block whose cell is now under or beside a terrace piece can't be dug up, as beside the other rocks. A rover moved out of a rock now ends clear of every rock, not only the last one.
 - Players getting out of the rover each try a side of their own first, by their place in the roster (left, right, behind, in front), so two who press F at once don't stand on one spot unless a side is blocked: the next one tried may be the other's own. A spot someone stands on is used only if no other is clear.
 - The edge of the land stops a driving rover, one wheelbase in, where a load already put it. Before, it could drive off and fall, and beyond 500 m down the host's word of it ended every guest's session. The 500 m limit stays.
+
+- Pit seep (Ryan, Nov 25): a pit no longer fills at once. Ground water rises 0.25 m a day [PLACEHOLDER] from the pit floor and stops at the level the pit would reach in the end. The host works it out on its clock (every 0.005 day; a long sleep fills at once) and saves it as `pit_seep`; guests are told. An old save starts with full pits.

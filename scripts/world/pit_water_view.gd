@@ -18,6 +18,7 @@ var _built_levels: Array[float] = []
 ## What the water was last worked out from: the dug steps and the channel cells.
 var _seen_dug: Dictionary[Vector2i, int] = {}
 var _seen_channels: Dictionary[Vector2i, bool] = {}
+var _seen_seep: Dictionary[Vector2i, float] = {}
 var _worked: bool = false
 var _asked: bool = false
 ## How often the water was worked out, and how often a look was put off to the end of
@@ -32,6 +33,7 @@ func _ready() -> void:
 	add_child(_deep)
 	GameState.terrain_changed.connect(_ask)
 	GameState.stone_changed.connect(_ask)
+	GameState.pit_seep_changed.connect(_ask)
 	# At once, so the water is there before the first physics step of a loaded farm.
 	_refresh()
 
@@ -59,13 +61,14 @@ func _refresh() -> void:
 	var channels: Dictionary[Vector2i, bool] = {}
 	for cell: Vector2i in StonePieces.channel_cells(GameState.stone_pieces):
 		channels[cell] = true
-	if _worked and GameState.dug == _seen_dug and channels == _seen_channels:
+	if _worked and GameState.dug == _seen_dug and channels == _seen_channels and GameState.pit_seep == _seen_seep:
 		return
 	_worked = true
 	worked_count += 1
 	_seen_dug = GameState.dug.duplicate()
 	_seen_channels = channels
-	PitWater.use(PitWater.work_out(GameState.dug, GameState.stone_pieces), GameState.dug)
+	_seen_seep = GameState.pit_seep.duplicate()
+	PitWater.use(PitWater.work_out(GameState.dug, GameState.stone_pieces, GameState.pit_seep), GameState.dug)
 	var keep: Dictionary[int, bool] = {}
 	for stretch: Array[Vector2i] in _stretches_of(PitWater.levels(), PitWater.film()):
 		var key: int = _signature(stretch)

@@ -32,6 +32,8 @@ signal crops_changed
 signal soil_tilled(cell: Vector3i)
 ## Ground was dug or filled.
 signal terrain_changed
+## Ground water rose in a pit (or a pit stopped holding it).
+signal pit_seep_changed
 ## A reference block was dug up.
 signal blocks_changed
 ## The ore pockets dug up changed.
@@ -324,6 +326,13 @@ var robots: Dictionary = {}
 const CISTERN_CAPACITY_L: float = 600.0
 const CISTERN_DRAW_L_PER_PLOT_HOUR: float = 0.16
 var cistern_liters: float = CISTERN_CAPACITY_L
+## How high the ground water has risen in each dug pit, by cell (PitWater.seep). Only
+## the host moves it; a guest is told. A pit never holds more than it would in the end.
+var pit_seep: Dictionary[Vector2i, float] = {}
+## In-game days of seep not yet worked out: the pits are looked at every 0.005 day
+## (about 3.6 s of play) [PLACEHOLDER], not every frame.
+const SEEP_STEP_DAYS: float = 0.005
+var _seep_days: float = 0.0
 ## Passed as plant_crop's offset to mean "use planting_offset_steps now".
 const OFFSET_CURRENT: int = -2147483648
 
@@ -483,11 +492,11 @@ const MAX_KNOWN_GUESTS: int = 64
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
-	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters"]
+	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
-	"world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
+	"_seep_days", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
 ]
 
@@ -566,6 +575,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 		if not (boulder is String or boulder is StringName) or not StringName(boulder) in BOULDERS \
 				or not hits[boulder] is int or hits[boulder] < 1 or hits[boulder] > BOULDER_HITS:
 			return "'boulder_hits' has a boulder that can't be hit like that."
+	for cell: Variant in data.get("pit_seep", {}):
+		if not cell is Vector2i or not Terrain.can_dig(cell):
+			return "'pit_seep' has a cell that can't hold water."
 	var liters: Variant = data.get("cistern_liters", CISTERN_CAPACITY_L)
 	if not liters is float or liters < 0.0 or liters > CISTERN_CAPACITY_L:
 		return "'cistern_liters' is out of range."
@@ -728,6 +740,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	lab_changed.emit()
 	robots_changed.emit()
 	terrain_changed.emit()
+	pit_seep_changed.emit()
 	boulders_changed.emit()
 	blocks_changed.emit()
 	pockets_changed.emit()
@@ -776,6 +789,10 @@ func put_farm(data: Dictionary) -> void:
 		for boulder: StringName in BOULDERS:
 			if is_boulder_broken(boulder):
 				stone += StonePieces.PER_BOULDER
+	if not data.has("pit_seep"):
+		# From before the seep: its pits were full.
+		pit_seep.assign(PitWater.work_out(dug, stone_pieces)["levels"])
+	_seep_days = 0.0
 	_morning = false
 	_morning_notes.clear()
 	# These hold the logs' own entries (a recall marks a record suspect in both).
@@ -1152,12 +1169,31 @@ func calibrate_at_bench(instrument_id: String, performed_by: String = "") -> Dic
 	return record
 
 
+## Lets the ground water rise in the pits as time passes: the host's clock only, in
+## steps of SEEP_STEP_DAYS, so a long sleep fills them at once.
+func _seep_pits(delta_days: float) -> void:
+	if FarmCommands.guest or dug.is_empty():
+		return
+	_seep_days += delta_days
+	if _seep_days >= SEEP_STEP_DAYS:
+		_set_seep(PitWater.seep(pit_seep, dug, _seep_days))
+		_seep_days = 0.0
+
+
+## Takes this as the ground water, and says so if it is not what it was.
+func _set_seep(next: Dictionary[Vector2i, float]) -> void:
+	if next != pit_seep:
+		pit_seep = next
+		pit_seep_changed.emit()
+
+
 func _on_time_advanced(delta_days: float) -> void:
 	_hold_relay_lock()
 	for id: Variant in sensors:
 		if is_in_service(str(id)) and not is_relay_locked(str(id)):
 			(sensors[id] as DriftingSensor).advance_days(delta_days)
 	_draw_cistern(delta_days)
+	_seep_pits(delta_days)
 	_note_soil_excursions()
 	# At 06:00 the cards wait for _on_day_started, so what they change counts
 	# toward the new day.
@@ -4403,6 +4439,7 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 		problem = STONE_IN_THE_WAY
 	if problem == "":
 		dug[at] = dug.get(at, 0) + 1
+		_set_seep(PitWater.seep(pit_seep, dug, 0.0))
 		terrain_changed.emit()
 		if not found_blocks.has(at) and not ReferenceBlock.at(world_seed, at).is_empty():
 			found_blocks[at] = true
@@ -4495,6 +4532,7 @@ func fill(cell: Vector3i, player_id: String = "") -> String:
 		dug[at] -= 1
 		if dug[at] == 0:
 			dug.erase(at)
+		_set_seep(PitWater.seep(pit_seep, dug, 0.0))
 		terrain_changed.emit()
 	return problem
 
