@@ -19,6 +19,7 @@ var _armed_id: String = ""
 
 
 func _ready() -> void:
+	add_to_group(QuestsUI.MODAL_GROUP)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	# Centered in the area left of the phone, not the whole screen.

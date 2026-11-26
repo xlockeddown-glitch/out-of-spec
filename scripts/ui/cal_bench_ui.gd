@@ -69,6 +69,7 @@ const STEADY_HOLD_MARGINAL: String = "%s; without it TUR %s:1, marginal, under %
 
 
 func _ready() -> void:
+	add_to_group(QuestsUI.MODAL_GROUP)
 	hide()
 	_rebuild_list()
 	_instrument_option.item_selected.connect(_on_row_picked)
