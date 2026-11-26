@@ -317,7 +317,7 @@ func test_state_reaches_guests_only() -> String:
 	var vectors: Array[Vector3] = []
 	var by_vector: Dictionary[Vector3, int] = {}
 	var ints: Array[int] = []
-	for odd: Variant in [vectors, by_vector, "﻿mark", &"﻿mark"]:
+	for odd: Variant in [vectors, by_vector, String.chr(0xFEFF) + "mark", StringName(String.chr(0xFEFF) + "mark")]:
 		if host.send_state({ "odd": odd }) or SessionScript._end_of(var_to_bytes(odd), 0) >= 0:
 			return _finish("%s must not be sent" % [odd])
 	if not host.send_state({ "ints": ints }):
@@ -346,7 +346,10 @@ func test_no_script_hides_a_byte_order_mark() -> String:
 	var mark: String = String.chr(0xFEFF)
 	if SessionScript.is_plain([mark + "text"]) or not SessionScript.is_plain(["text", ""]):
 		return "is_plain() must refuse only text that starts with a byte order mark"
-	var pending: Array[String] = ["res://scripts"]
+	# The reader keeps a mark inside text (not at its start), or the scan below would pass on anything.
+	if mark not in ("x" + mark).to_utf8_buffer().get_string_from_utf8():
+		return "a byte order mark does not survive being read back"
+	var pending: Array[String] = ["res://scripts", "res://tests"]
 	while not pending.is_empty():
 		var dir: String = pending.pop_back()
 		for sub: String in DirAccess.get_directories_at(dir):
