@@ -28,6 +28,7 @@ const VERDICT_UNCLEAR: String = "unclear"
 ## u, k, true_value, size_index, grade } in degrees. true_value is hidden from the
 ## player. size_index and grade (0 is best) make it a piece of the GaugeSet; they
 ## are rolled after the angle, so the angle and its true value are as they were.
+## size_index is the block's first choice only: GaugeSet.pieces moves it to a free size.
 static func at(world_seed: int, cell: Vector2i) -> Dictionary:
 	if not Terrain.can_dig(cell):
 		return {}

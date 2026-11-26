@@ -5,6 +5,10 @@ extends RefCounted
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 const CommandsScript: GDScript = preload("res://scripts/autoload/FarmCommands.gd")
 const SEED: int = 424242
+const PIN_X: int = -39
+const PIN_Y: int = -25
+const PIN_ANGLE: float = 15.0
+const PIN_TRUE: float = 14.993210481014103
 
 
 func _make(seed_value: int = SEED) -> Node:
@@ -24,21 +28,6 @@ func _block_cells(seed_value: int = SEED) -> Array[Vector2i]:
 			if Terrain.dig_problem(cell, none) == "" and not ReferenceBlock.at(seed_value, cell).is_empty():
 				out.append(cell)
 	return out
-
-
-## Two block cells of one size, the first of the better (or equal) grade; {} if none.
-func _pair(cells: Array[Vector2i], better_second: bool) -> Array[Vector2i]:
-	for i: int in cells.size():
-		for j: int in range(i + 1, cells.size()):
-			var a: Dictionary = ReferenceBlock.at(SEED, cells[i])
-			var b: Dictionary = ReferenceBlock.at(SEED, cells[j])
-			if a["size_index"] != b["size_index"]:
-				continue
-			if better_second and b["grade"] < a["grade"]:
-				return [cells[i], cells[j]]
-			if not better_second and b["grade"] >= a["grade"]:
-				return [cells[i], cells[j]]
-	return []
 
 
 func test_the_set_is_the_81_piece_inch_set() -> String:
@@ -119,37 +108,44 @@ func test_grading_is_the_worst_piece() -> String:
 
 func test_a_duplicate_adds_nothing_unless_it_is_better() -> String:
 	var cells: Array[Vector2i] = _block_cells()
-	var same: Array[Vector2i] = _pair(cells, false)
-	var up: Array[Vector2i] = _pair(cells, true)
 	var problems: PackedStringArray = []
-	if same.is_empty() or up.is_empty():
-		return "The scan must hold a duplicate of each kind (%d blocks)." % cells.size()
-	var first: Dictionary = ReferenceBlock.at(SEED, same[0])
-	var second: Dictionary = ReferenceBlock.at(SEED, same[1])
-	if GaugeSet.finding(SEED, [], first) != GaugeSet.NEW:
+	if cells.size() < 100:
+		return "The scan must hold more than 81 blocks (%d)." % cells.size()
+	# With the set full, a later block keeps its own size: duplicate or better.
+	var full: Array = cells.slice(0, 81)
+	var held: Dictionary = GaugeSet.pieces(SEED, full)
+	var same: Vector2i = Vector2i(-9999, 0)
+	var up: Vector2i = Vector2i(-9999, 0)
+	for cell: Vector2i in cells.slice(81):
+		var block: Dictionary = ReferenceBlock.at(SEED, cell)
+		if block["grade"] >= held[block["size_index"]] and same.x == -9999:
+			same = cell
+		if block["grade"] < held[block["size_index"]] and up.x == -9999:
+			up = cell
+	if same.x == -9999 or up.x == -9999:
+		return "The scan must hold a duplicate of each kind."
+	var dup_block: Dictionary = ReferenceBlock.at(SEED, same)
+	var up_block: Dictionary = ReferenceBlock.at(SEED, up)
+	if GaugeSet.finding(SEED, [], ReferenceBlock.at(SEED, cells[0])) != GaugeSet.NEW:
 		problems.append("A size not held is new.")
-	if GaugeSet.finding(SEED, [same[0]], second) != GaugeSet.DUPLICATE:
-		problems.append("The same size at no better a grade is a duplicate.")
-	var low: Dictionary = ReferenceBlock.at(SEED, up[0])
-	var high: Dictionary = ReferenceBlock.at(SEED, up[1])
-	if GaugeSet.finding(SEED, [up[0]], high) != GaugeSet.BETTER:
+	if GaugeSet.finding(SEED, full, dup_block) != GaugeSet.DUPLICATE:
+		problems.append("A size held at no worse a grade is a duplicate.")
+	if GaugeSet.finding(SEED, full, up_block) != GaugeSet.BETTER:
 		problems.append("A better grade of a size held is better.")
-	var held: Dictionary = GaugeSet.pieces(SEED, [same[0], same[1]])
-	if held.size() != 1:
-		problems.append("Two blocks of one size are one piece of the set.")
-	held = GaugeSet.pieces(SEED, [up[0], up[1]])
-	if held[low["size_index"]] != high["grade"]:
+	if GaugeSet.pieces(SEED, full + [same]) != held:
+		problems.append("A duplicate must leave the set as it was.")
+	var better: Dictionary = GaugeSet.pieces(SEED, full + [up])
+	if better.size() != 81 or better[up_block["size_index"]] != up_block["grade"]:
 		problems.append("The better block must take the piece's place.")
-	if GaugeSet.pieces(SEED, [up[1], up[0]]) != held:
-		problems.append("The order of finding must not change the set.")
 	# Digging them all: the duplicate is kept (found_blocks) and the set is the same.
 	var gs: Node = _make()
-	for cell: Vector2i in same:
+	for cell: Vector2i in full + [same]:
 		gs.dig(Vector3i(cell.x, 0, cell.y))
-	if gs.found_blocks.size() != 2 or gs.gauge_pieces().size() != 1:
-		problems.append("Both blocks are kept, as one piece.")
+	if gs.found_blocks.size() != 82 or gs.gauge_pieces() != held:
+		problems.append("The duplicate is kept, as one piece (%d blocks kept)." % gs.found_blocks.size())
 	gs.free()
-	return "\n".join(problems)
+	return "
+".join(problems)
 
 
 func test_the_set_is_kept_and_saved() -> String:
@@ -168,7 +164,6 @@ func test_the_set_is_kept_and_saved() -> String:
 	var back: Node = _make(SEED + 7)
 	if back.farm_from_dict(str_to_var(var_to_str(gs.farm_to_dict()))) != "":
 		problems.append("A saved set must load.")
-	back.set_world_seed(SEED)
 	if back.gauge_pieces() != held:
 		problems.append("The set must come back after a load.")
 	var old: Dictionary = gs.farm_to_dict()
@@ -206,7 +201,6 @@ func test_a_guest_is_told_the_set_and_cant_make_one() -> String:
 	var guest: Node = _make(SEED + 1)
 	if guest.farm_from_dict(str_to_var(var_to_str(host.farm_to_dict()))) != "":
 		problems.append("A guest must be able to take the host's farm.")
-	guest.set_world_seed(SEED)
 	if guest.gauge_pieces() != host.gauge_pieces():
 		problems.append("A guest must see the host's set.")
 	# What a guest sends in place of the farm is checked: a made-up block is refused.
@@ -221,3 +215,115 @@ func test_a_guest_is_told_the_set_and_cant_make_one() -> String:
 	host.free()
 	commands.free()
 	return "\n".join(problems)
+
+
+## Sorts of cell lists the tests walk: the cells reversed, and shuffled by a fixed rng.
+func _orders(cells: Array[Vector2i]) -> Array:
+	var reversed: Array = cells.duplicate()
+	reversed.reverse()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	var shuffled: Array = cells.duplicate()
+	for i: int in range(shuffled.size() - 1, 0, -1):
+		var j: int = rng.randi() % (i + 1)
+		var swap: Variant = shuffled[i]
+		shuffled[i] = shuffled[j]
+		shuffled[j] = swap
+	return [reversed, shuffled]
+
+
+func test_n_blocks_give_n_sizes_and_81_complete_the_set() -> String:
+	var cells: Array[Vector2i] = _block_cells()
+	var problems: PackedStringArray = []
+	if cells.size() < 81:
+		return "The scan must hold 81 blocks, found %d." % cells.size()
+	for n: int in [1, 2, 10, 40, 80]:
+		var held: Dictionary = GaugeSet.pieces(SEED, cells.slice(0, n))
+		if held.size() != n:
+			problems.append("%d blocks must give %d sizes, not %d." % [n, n, held.size()])
+	var full: Dictionary = GaugeSet.pieces(SEED, cells.slice(0, 81))
+	if not GaugeSet.is_complete(full):
+		problems.append("81 blocks must make a complete set, not %d sizes." % full.size())
+	# Spread cells, not a prefix of the scan, and a farm with another seed, do the same.
+	var spread: Array = []
+	for i: int in range(0, cells.size(), 2):
+		spread.append(cells[i])
+		if spread.size() == 81:
+			break
+	if spread.size() == 81 and not GaugeSet.is_complete(GaugeSet.pieces(SEED, spread)):
+		problems.append("Any 81 blocks must make a complete set.")
+	var other: Array[Vector2i] = _block_cells(SEED + 1)
+	if other.size() >= 81 and not GaugeSet.is_complete(GaugeSet.pieces(SEED + 1, other.slice(0, 81))):
+		problems.append("Another farm's first 81 blocks must make a complete set too.")
+	# More blocks after the set is full only keep or improve it.
+	var more: Dictionary = GaugeSet.pieces(SEED, cells)
+	if more.size() != 81:
+		problems.append("Every block of the scan together must still be 81 sizes, not %d." % more.size())
+	return "
+".join(problems)
+
+
+func test_the_set_does_not_depend_on_the_order_of_finding() -> String:
+	var cells: Array[Vector2i] = _block_cells()
+	var problems: PackedStringArray = []
+	for n: int in [5, 30, 81, cells.size()]:
+		var part: Array[Vector2i] = cells.slice(0, n)
+		var want: Dictionary = GaugeSet.pieces(SEED, part)
+		for order: Array in _orders(part):
+			if GaugeSet.pieces(SEED, order) != want:
+				problems.append("The same %d cells in another order gave another set." % n)
+		if GaugeSet.pieces(SEED, part + part) != want:
+			problems.append("A cell listed twice must count once (%d cells)." % n)
+	return "
+".join(problems)
+
+
+func test_finding_says_what_the_block_adds_whatever_the_draw() -> String:
+	var cells: Array[Vector2i] = _block_cells()
+	var problems: PackedStringArray = []
+	var before: Array = []
+	for i: int in 100:
+		var block: Dictionary = ReferenceBlock.at(SEED, cells[i])
+		var held: Dictionary = GaugeSet.pieces(SEED, before)
+		var after: Dictionary = GaugeSet.pieces(SEED, before + [cells[i]])
+		var kind: StringName = GaugeSet.finding(SEED, before, block)
+		if (kind == GaugeSet.NEW) != (after.size() > held.size()):
+			problems.append("Block %d: NEW must mean the set grew." % i)
+		if i < 81 and kind != GaugeSet.NEW:
+			problems.append("Block %d of the first 81 must be a new size, not %s." % [i, kind])
+		if kind == GaugeSet.DUPLICATE and after != held:
+			problems.append("Block %d: a duplicate must leave the set as it was." % i)
+		before.append(cells[i])
+	return "
+".join(problems)
+
+
+func test_every_size_can_be_reached() -> String:
+	var seen: Dictionary = {}
+	for cell: Vector2i in _block_cells():
+		seen[ReferenceBlock.at(SEED, cell)["size_index"]] = true
+	# A block's own draw reaches most sizes; the free-size walk supplies the rest.
+	var held: Dictionary = GaugeSet.pieces(SEED, _block_cells())
+	var problems: PackedStringArray = []
+	for size: int in GaugeSet.size_count():
+		if not held.has(size):
+			problems.append("Size %d was never reached." % size)
+			break
+	if seen.size() < 50:
+		problems.append("Blocks' own draws should reach most sizes: %d of 81." % seen.size())
+	return "
+".join(problems)
+
+
+## The angle and true value of a known block are pinned so the size draw, which comes
+## after them, can never move them.
+func test_a_known_blocks_angle_and_true_value_are_pinned() -> String:
+	var cell: Vector2i = _block_cells()[0]
+	var block: Dictionary = ReferenceBlock.at(SEED, cell)
+	var problems: PackedStringArray = []
+	if cell != Vector2i(PIN_X, PIN_Y):
+		problems.append("The first block of the scan is %s." % [cell])
+	if block["certified"] != PIN_ANGLE or absf(block["true_value"] - PIN_TRUE) > 1e-12:
+		problems.append("The angle and true value moved: %s, %s" % [block["certified"], str(block["true_value"])])
+	return "
+".join(problems)
