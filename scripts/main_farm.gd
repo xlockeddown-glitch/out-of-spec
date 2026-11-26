@@ -1016,7 +1016,7 @@ func _enter_tunnels() -> void:
 	# asked on its own screen before the command goes to the host.
 	# Skipped when the host will refuse anyway (the mouth is closed after the
 	# rescue hour, or someone else drives): the player then sees only that refusal.
-	var refused: bool = TunnelRecall.closed(GameClock.elapsed_days) 			or not CoopRovers.driver(GameState.rover_here()) in ["", GameState.local_player_id]
+	var refused: bool = TunnelRecall.closed(GameClock.elapsed_days) \n			or not CoopRovers.driver(GameState.rover_here()) in ["", GameState.local_player_id]
 	var warning: String = "" if refused else ZoneData.warning_text(TUNNELS_ZONE, GameState.lab_level())
 	if warning != "" and _tunnel_warned_day != int(GameClock.elapsed_days):
 		_tunnel_warned_day = int(GameClock.elapsed_days)
