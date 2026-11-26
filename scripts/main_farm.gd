@@ -20,6 +20,7 @@ const INSPECT_SECONDS_PER_CHAR: float = 0.04
 ## The prop whose inspect text also carries the plot's soil readings.
 const SOIL_PROBE_PROP: String = "soil_moisture_probe"
 const CISTERN_PROP: String = "water_cistern"
+const WRING_SCENE: PackedScene = preload("res://ui/minigames/wring_the_blocks.tscn")
 
 ## Within this far of the relay mast the Q check reads the dish; elsewhere, the
 ## rover's own steering encoder [PLACEHOLDER].
@@ -48,6 +49,8 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 @onready var _tunnel_pad: ParkingPad = %TunnelPad
 
 var _robots_ui: RobotsUI
+## Wring the Blocks, made the first time J opens it.
+var _wring_game: WringTheBlocks
 ## Sum of the dug depths when last looked at, to tell a dig from a fill.
 var _dug_depth: int = 0
 ## When this screen last pressed dig, so a snapshot or the other player's dig isn't ours.
@@ -426,6 +429,58 @@ func _check_with_block() -> void:
 		SP811.number(record["error_u"], 2), verdict, SP811.number(record["mpe"], 2)])
 
 
+## J: wrings a stack of gauge blocks to a length (Wring the Blocks, quests
+## design section 7.1). The host builds it whatever the score: a skip, the
+## game switched off and a poor try all send the same build.
+func _build_block_stack() -> void:
+	if _wring_game != null and _wring_game.is_playing():
+		return
+	if _rover.away_text() != "":
+		_say_if_away()
+		return
+	if not _rover.is_stopped():
+		_hud.push_log("BLOCK STACK: stop the rover first.")
+		return
+	var stack: Dictionary = GameState.block_stack_target(GameState.local_player_id)
+	if stack.is_empty():
+		_hud.push_log("BLOCK STACK: a stack takes two gauge blocks. Dig for more.")
+		return
+	var score: int = MinigameScore.SKIPPED
+	if MinigameSettings.mode() != MinigameSettings.Mode.OFF:
+		if _wring_game == null:
+			_wring_game = WRING_SCENE.instantiate()
+			_hud.get_parent().add_child(_wring_game)
+		var was_blocked: bool = RoverController.input_blocked
+		RoverController.input_blocked = true
+		# The clock is in the seed: the same length again is not the same slide.
+		var motion_seed: int = hash([int(stack["target"]), Time.get_ticks_usec()])
+		var share: float = MinigameScore.sweet_share(GameState, GameState.local_player_id, MinigameScore.WRING_SKILL)
+		_wring_game.play(share, MinigameSettings.mode(), motion_seed, stack, "Orin's length: %s" % GaugeStack.length_text(int(stack["target"])))
+		score = await _wring_game.finished
+		RoverController.input_blocked = was_blocked
+		if not is_inside_tree():
+			return
+	# The length played goes with the score: the host builds today's, and counts
+	# no score earned on another (the day can turn at 06:00 mid-game).
+	var record: Dictionary = await FarmCommands.request(&"build_block_stack", [int(stack["target"]), score])
+	if record.is_empty() or not is_inside_tree():
+		return
+	if record.get("refused", false):
+		_hud.push_log("BLOCK STACK REFUSED: %s" % str(record["reason"]))
+		return
+	if record.get("changed", false):
+		_hud.push_log("BLOCK STACK: the length asked for changed while you worked. %s was built from %s blocks, and the try is not graded." % [
+			GaugeStack.length_text(int(record["target"])), SP811.integer((record["sizes"] as Array).size())])
+		return
+	var graded: String = MinigameScore.grade_text(WringTheBlocks.GAME_NAME, int(record["score"]))
+	if graded == "" and score >= 0:
+		# No open ask of Orin's carries the game: the host kept no score.
+		graded = MinigameScore.grade_text(WringTheBlocks.GAME_NAME, score) + " Practice: nothing is kept."
+	_hud.push_log("BLOCK STACK: %s from %s blocks.%s" % [
+		GaugeStack.length_text(int(record["target"])), SP811.integer((record["sizes"] as Array).size()),
+		"" if graded == "" else " " + graded])
+
+
 ## Digging that finds nothing used to be silent. Blocks and ore pockets are
 ## announced by their own lines, which follow this one.
 func _say_dug() -> void:
@@ -463,7 +518,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_get_out_or_in()
 	elif CoopWalkers.on_foot():
 		if (FARM_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key))
-				or [KEY_B, KEY_L, KEY_N, KEY_Q, KEY_T, KEY_V].any(func(key: Key) -> bool: return _is_key(event, key))):
+				or [KEY_B, KEY_J, KEY_L, KEY_N, KEY_Q, KEY_T, KEY_V].any(func(key: Key) -> bool: return _is_key(event, key))):
 			get_viewport().set_input_as_handled()
 			_refuse_on_foot()
 	elif away and event.is_action_pressed(&"interact"):
@@ -502,6 +557,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif _is_key(event, KEY_Q):
 		get_viewport().set_input_as_handled()
 		_check_with_block()
+	elif _is_key(event, KEY_J):
+		get_viewport().set_input_as_handled()
+		_build_block_stack()
 	elif _is_key(event, KEY_V):
 		get_viewport().set_input_as_handled()
 		_survey()

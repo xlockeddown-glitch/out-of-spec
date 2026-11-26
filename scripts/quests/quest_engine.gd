@@ -64,9 +64,15 @@ extends RefCounted
 ## what travels in a guest's file (travelling, take_brought), and neither is
 ## its certificate, which can be given as often as the ask is done.
 ##
+## A player's own quest may pay "keepsake" (section 5.4): the id of one in the
+## data's `keepsakes`. A keepsake is for show and gives no power. Nothing is
+## saved for it: a player holds the keepsakes of their own quests that are done
+## (keepsakes_of), so one comes with its quest in a guest's file and can't be
+## held twice.
+##
 ## Not built yet: accept and turn-in by the player (the quest log, build step 7;
 ## until then an offered quest is accepted at once and paid when its last step
-## holds) and item rewards (step 10).
+## holds), item rewards and a place to look at keepsakes (step 10).
 
 const TABLE: StringName = &"quests"
 const SECTION: String = "quests"
@@ -104,9 +110,21 @@ const XP_CERTIFICATE: String = "xp_certificate"
 ## A `counter` that is not a source of data/skills.json: what Lin has bought in
 ## spec, of the crop `where.crop_id` names or of every crop.
 const SOLD_IN_SPEC: String = "crops_sold_in_spec"
-## The mini-games a step may carry in `minigame`. Such a step is a `count` of
-## `cal_log` rows whose `where` names one instrument: the one the game is for.
-const MINIGAMES: Array[String] = ["set_the_zero"]
+## The mini-games a step may carry in `minigame`. A Set the Zero step is a
+## `count` of `cal_log` rows whose `where` names one instrument: the one the game
+## is for. A Wring the Blocks step is a `counter` of built stacks
+## (GameState.BLOCK_STACK_COUNT): the game is the build itself.
+const MINIGAMES: Array[String] = ["set_the_zero", "wring_the_blocks"]
+## A `counter` that is not a source of data/skills.json: the reference blocks the
+## farm has dug up. As a counter it counts from when its step opened, so it is
+## "find three more".
+const BLOCKS_FOUND: String = "blocks_found"
+## A `counter` that ends with this adds up every count whose name starts with
+## what is before it: "check_with_block:*" is a check of any instrument.
+const ANY_SUFFIX: String = "*"
+## A reward of a keepsake: its id in the data's KEEPSAKES. Cosmetic only.
+const KEEPSAKE: String = "keepsake"
+const KEEPSAKES: String = "keepsakes"
 ## An entry's one key that is not always there: step id -> the score kept.
 const SCORES: String = "scores"
 ## On a quest: its endings (section 8, S2), a list of { id, when and that check's
@@ -433,11 +451,27 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 		farm.post_phone("XP CERTIFICATE: %s XP in a skill of your choice, for each player who took part. Open SKILLS (K) to spend it." % SP811.integer(certificate))
 	# Section 7.2: a mini-game step played to Fine or better adds to the quest's
 	# credits. A skip or a poor try kept no score, and is paid as written.
+	# The same share more of its skill XP [ASSUMPTION], so a quest that pays no
+	# credits has a bonus too.
 	var score: int = quest_score(quest, entry)
+	var more: Array[String] = []
 	var bonus: int = roundi(int(rewards.get("credits", 0)) * MinigameScore.quest_bonus(score))
 	if bonus > 0:
 		farm.add_credits(bonus)
-		farm.post_phone("QUEST BONUS: %s, played to %s. %s CR more." % [str(quest["title"]), MinigameScore.grade_name(score).to_upper(), SP811.integer(bonus)])
+		more.append("%s CR" % SP811.integer(bonus))
+	for key: Variant in rewards:
+		var skill: String = _reward_skill(str(key))
+		var extra: int = roundi(int(rewards[key]) * MinigameScore.quest_bonus(score)) if skill != "" else 0
+		if extra <= 0:
+			continue
+		var paid: Array[String] = players
+		if farm.is_farm_skill(skill):
+			paid = [str(farm.local_player_id)]
+		for player: String in paid:
+			farm.give_skill_xp(skill, extra, player)
+		more.append("%s %s XP" % [SP811.integer(extra), str(DataManager.get_record(&"skills", skill, "skills").get("display_name", skill))])
+	if not more.is_empty():
+		farm.post_phone("QUEST BONUS: %s, played to %s. %s more." % [str(quest["title"]), MinigameScore.grade_name(score).to_upper(), ", ".join(more)])
 	if line != "":
 		farm.post_phone("%s: %s" % [giver_name(quest), line])
 	# The best grade also has a line from the giver, one for each such step.
@@ -466,7 +500,27 @@ static func reward_text(quest: Dictionary) -> String:
 		parts.append("%s quest %s" % [SP811.integer(points), "point" if points == 1 else "points"])
 	if int(rewards.get(XP_CERTIFICATE, 0)) > 0:
 		parts.append("an XP certificate (%s XP)" % SP811.integer(int(rewards[XP_CERTIFICATE])))
+	if keepsake_name(str(rewards.get(KEEPSAKE, ""))) != "":
+		parts.append("a keepsake (%s)" % keepsake_name(str(rewards[KEEPSAKE])))
 	return ", ".join(parts)
+
+
+## A keepsake's name, or "" for none the data has.
+static func keepsake_name(keepsake_id: String) -> String:
+	if keepsake_id == "" or not DataManager.has_record(TABLE, keepsake_id, KEEPSAKES):
+		return ""
+	return str(DataManager.get_record(TABLE, keepsake_id, KEEPSAKES).get("display_name", keepsake_id))
+
+
+## The keepsakes a player holds: those of their own quests that are done, here
+## or brought done from another farm. Ids, in the data's order. For show only.
+static func keepsakes_of(farm: Node, player_id: String) -> Array[String]:
+	var out: Array[String] = []
+	for quest: Dictionary in quests():
+		var keepsake: String = str((quest.get("rewards", {}) as Dictionary).get(KEEPSAKE, ""))
+		if keepsake != "" and data_problem(quest) == "" and not keepsake in out and is_done(farm, str(quest["id"]), player_id):
+			out.append(keepsake)
+	return out
 
 
 ## The skill a reward key names, or "" (the certificate names none).
@@ -529,13 +583,24 @@ static func data_problem(quest: Dictionary) -> String:
 		if step.has("minigame"):
 			if not step["minigame"] is String or not step["minigame"] in MINIGAMES:
 				return "step '%s' has a mini-game this build does not have." % id
-			if step_instrument(step) == "":
+			if step["minigame"] == MinigameScore.WRING_THE_BLOCKS:
+				if not is_stack_step(step):
+					return "step '%s' has Wring the Blocks and is not a counter of built stacks." % id
+			elif step_instrument(step) == "":
 				return "step '%s' has a mini-game and is not a count of one instrument's cal_log rows." % id
 			if step.has(MINIGAME_LINE) and (not step[MINIGAME_LINE] is String or step[MINIGAME_LINE] == ""):
 				return "step '%s' has a mini-game line that is not text." % id
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:
 		if quest.has(key) and not quest[key] is Dictionary:
 			return "'%s' is not a dictionary." % key
+	var keepsake: Variant = (quest.get("rewards", {}) as Dictionary).get(KEEPSAKE)
+	if keepsake != null:
+		if not keepsake is String or not DataManager.has_record(TABLE, keepsake, KEEPSAKES):
+			return "its keepsake is not one the data has."
+		# Held by having done the quest: so only a player's own, done once, and
+		# never one that can be closed with nothing paid.
+		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_PLAYER or is_daily(quest) or quest.has("closed_when"):
+			return "a keepsake is for a player's own quest that is not a daily ask and has no closed_when."
 	if is_daily(quest):
 		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_PLAYER:
 			return "a daily ask is not a player's own (scope player)."
@@ -631,6 +696,10 @@ static func gates_hold(farm: Node, gates: Dictionary, present: Array[String], ow
 				for id: Variant in (gate if gate is Array else [gate]):
 					if not is_done(farm, str(id), owner):
 						return false
+			"found_blocks":
+				# The farm's: blocks are shared, whoever dug them up.
+				if (farm.found_blocks as Dictionary).size() < int(gate):
+					return false
 			_:
 				return false
 	return true
@@ -782,12 +851,15 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 		"counter":
 			if str(step.get("counter", "")) == SOLD_IN_SPEC:
 				return _sold_in_spec(farm, step.get("where", {}))
+			# The farm's, whoever dug them up: the blocks are shared.
+			if str(step.get("counter", "")) == BLOCKS_FOUND:
+				return (farm.found_blocks as Dictionary).size()
 			# `whose` farm: every player's doing counts, in a player's own quest too.
 			if owner != "" and str(step.get("whose", "")) != WHOSE_FARM:
-				return farm.action_count(str(step.get("counter", "")), owner)
+				return _action_count(farm, str(step.get("counter", "")), owner)
 			var total: int = 0
 			for player: String in farm._known_players():
-				total += farm.action_count(str(step.get("counter", "")), player)
+				total += _action_count(farm, str(step.get("counter", "")), player)
 			return total
 		"quest_job":
 			return int(farm.has_quest_job(str(step.get("quest", ""))))
@@ -798,6 +870,19 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 		"fissures_open":
 			return farm.open_fissures()
 	return 0
+
+
+## A player's count of `counter`, or with ANY_SUFFIX of every count that starts
+## with what is before it.
+static func _action_count(farm: Node, counter: String, player_id: String) -> int:
+	if not counter.ends_with(ANY_SUFFIX):
+		return farm.action_count(counter, player_id)
+	var start: String = counter.trim_suffix(ANY_SUFFIX)
+	var total: int = 0
+	for source: Variant in (farm.action_counts as Dictionary).get(player_id, {}):
+		if start != "" and str(source).begins_with(start):
+			total += farm.action_count(str(source), player_id)
+	return total
 
 
 static func _sold_in_spec(farm: Node, where: Variant) -> int:
@@ -845,6 +930,12 @@ static func step_instrument(step: Dictionary) -> String:
 	return instrument if instrument is String else ""
 
 
+## True for a step that counts built stacks of gauge blocks: the one kind of
+## step Wring the Blocks may be carried by.
+static func is_stack_step(step: Dictionary) -> bool:
+	return str(step.get("check", "")) == "counter" and str(step.get("counter", "")) == "build_block_stack"
+
+
 ## True while an accepted quest that is not done has an open step carrying
 ## `minigame` for this instrument: a key moment, however often the lab has
 ## calibrated that kind before (a standard's own calibration is left to
@@ -852,8 +943,11 @@ static func step_instrument(step: Dictionary) -> String:
 ## player's own quests for that player. It only reads quest_state and
 ## player_quest_state, which a guest has as the host's copy, so it answers the
 ## same on a guest. In a quest done in order only the first step not done is open.
+## Wring the Blocks has no instrument: its step is one that counts built stacks,
+## and `instrument_id` is "" for it.
 static func has_minigame_step(farm: Node, minigame: String, instrument_id: String, player_id: String) -> bool:
-	if instrument_id == "":
+	var stack: bool = minigame == MinigameScore.WRING_THE_BLOCKS
+	if instrument_id == "" and not stack:
 		return false
 	for quest: Dictionary in quests():
 		if data_problem(quest) != "":
@@ -868,7 +962,7 @@ static func has_minigame_step(farm: Node, minigame: String, instrument_id: Strin
 		for step: Variant in quest["steps"]:
 			if str(step.get("id", "")) in entry.get("steps_done", []):
 				continue
-			if str(step.get("minigame", "")) == minigame and step_instrument(step) == instrument_id:
+			if str(step.get("minigame", "")) == minigame and (is_stack_step(step) if stack else step_instrument(step) == instrument_id):
 				return true
 			if in_order:
 				break
@@ -893,10 +987,20 @@ static func _keep_score(farm: Node, entry: Dictionary, step: Dictionary, played:
 	if played.is_empty() or str(step.get("minigame", "")) == "" or str(step.get("minigame", "")) != str(played.get("minigame", "")):
 		return
 	var player: String = str(played.get("player_id", ""))
-	if step_instrument(step) != str(played.get("instrument_id", "")) or (owner != "" and owner != player):
+	if owner != "" and owner != player:
 		return
 	var score: int = mini(int(played.get("score", MinigameScore.SKIPPED)), MinigameScore.MAX_SCORE)
 	if not MinigameScore.is_graded(score):
+		return
+	if is_stack_step(step):
+		# Wring the Blocks: the build that did the step is the game itself, and
+		# only a player's build is counted (GameState.build_block_stack).
+		if str(played.get("minigame", "")) != MinigameScore.WRING_THE_BLOCKS:
+			return
+		(entry.get_or_add(SCORES, {}) as Dictionary)[str(step.get("id", ""))] = score
+		played.clear()
+		return
+	if step_instrument(step) == "" or step_instrument(step) != str(played.get("instrument_id", "")):
 		return
 	var log: Array = farm.cal_log
 	var row: Variant = log[-1] if not log.is_empty() else null

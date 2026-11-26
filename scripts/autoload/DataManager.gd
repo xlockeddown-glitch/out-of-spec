@@ -66,6 +66,7 @@ const RECORD_SECTIONS: Dictionary = {
 	},
 	&"quests": {
 		"quests": ["kind", "giver", "title", "steps"],
+		"keepsakes": ["display_name", "text"],
 	},
 }
 

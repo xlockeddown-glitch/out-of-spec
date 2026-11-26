@@ -67,6 +67,9 @@ const STEERING_ID: String = "rover_steering_encoder"
 ## What a check against a block is counted under in action_counts, before the
 ## instrument's id ("check_with_block:rover_steering_encoder"). Kept in saves.
 const BLOCK_CHECK_COUNT: String = "check_with_block:"
+## What a built stack of gauge blocks is counted under in action_counts
+## (build_block_stack). Kept in saves.
+const BLOCK_STACK_COUNT: String = "build_block_stack"
 const HYGROMETER_ID: String = "hygrometer"
 const TIRE_ID: String = "rover_tire_pressure"
 const THERMOMETER_ID: String = "terrarium_thermometer"
@@ -5463,6 +5466,42 @@ func check_with_block(instrument_id: String, player_id: String = "") -> Dictiona
 		var done: Dictionary = (action_counts.get_or_add(_player(player_id), {}) as Dictionary).get_or_add(BLOCK_CHECK_COUNT + instrument_id, { "count": 0, "xp": 0 })
 		done["count"] = int(done["count"]) + 1
 	return result
+
+
+## The length a player ("" = the local player) is asked to build from the gauge
+## set today (GaugeStack.target), or {} with fewer than two pieces. Worked out
+## from the farm's seed, the day, the player and the pieces held, so a guest's
+## screen gets the host's answer and nothing is saved.
+func block_stack_target(player_id: String = "") -> Dictionary:
+	return GaugeStack.target(gauge_pieces().keys(),
+		GaugeStack.stack_seed(world_seed, GameClock.get_day_index(), _player(player_id)))
+
+
+## Builds today's length from the gauge set: { target, sizes, score }, or
+## { refused, reason }. `score` is Wring the Blocks' (0 to 100), or
+## MinigameScore.SKIPPED with no game: FarmCommands hands a graded one to the
+## quests, and nothing here reads it. `target` is the length the player's screen
+## showed. The day may have turned at 06:00, or a find reached the farm, while
+## they played: then the length built is today's, the answer has `changed`, and
+## the score is a skip's, as it was earned on another length. The blocks picked
+## on the screen are not sent and not checked: picking is the game's own, and
+## the host builds the length from the pieces it holds. A build is counted for who did it
+## (action_counts, as BLOCK_STACK_COUNT, with no XP), and that count is all it
+## changes: the blocks, every instrument and every log stay as they were, so a
+## poor try and a skip leave the same farm.
+func build_block_stack(target: int, score: int, player_id: String = "") -> Dictionary:
+	var stack: Dictionary = block_stack_target(player_id)
+	if stack.is_empty():
+		return { "refused": true, "reason": "A stack takes two gauge blocks. Dig for more." }
+	if _player(player_id) != MANAGER_ID:
+		var done: Dictionary = (action_counts.get_or_add(_player(player_id), {}) as Dictionary).get_or_add(BLOCK_STACK_COUNT, { "count": 0, "xp": 0 })
+		done["count"] = int(done["count"]) + 1
+	var built: Dictionary = { "target": int(stack["target"]), "sizes": stack["sizes"],
+		"score": clampi(score, MinigameScore.SKIPPED, MinigameScore.MAX_SCORE) }
+	if target != int(stack["target"]):
+		built["score"] = MinigameScore.SKIPPED
+		built["changed"] = true
+	return built
 
 
 ## Surveys for ore from where the rover is, as OrePocket.survey() says, or

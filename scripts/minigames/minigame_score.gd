@@ -17,6 +17,9 @@ const SKILL: String = "calibration"
 const MANAGER: String = "Manager"
 ## This game's id, as a quest step's `minigame` names it (data/quests.json).
 const SET_THE_ZERO: String = "set_the_zero"
+## Mini-game 2 (section 7.1), and the skill that widens its green (section 7.3).
+const WRING_THE_BLOCKS: String = "wring_the_blocks"
+const WRING_SKILL: String = "earthworks"
 
 ## Section 7.2, best first: at `from` and over, the as-left residual is times
 ## `residual`. Under the last row a try is Standard, the same as a skip.
@@ -146,7 +149,15 @@ static func disarm(farm: Node, instrument_id: String) -> void:
 		sensor.next_residual_scale = 1.0
 
 
-## How much of the sweet spot's widening (section 7.3) this player's Calibration
-## has, 0 to 1: the same front-loaded share as a skill's effects.
-static func sweet_share(farm: Node, player_id: String) -> float:
-	return maxf(farm.effect_share(farm.skill_level(SKILL, player_id)), farm.effect_floor(SKILL, player_id))
+## How much of the sweet spot's widening (section 7.3) this player's skill has,
+## 0 to 1: the same front-loaded share as a skill's effects. Calibration for Set
+## the Zero; WRING_SKILL for Wring the Blocks.
+static func sweet_share(farm: Node, player_id: String, skill: String = SKILL) -> float:
+	return maxf(farm.effect_share(farm.skill_level(skill, player_id)), farm.effect_floor(skill, player_id))
+
+
+## "Wring score 97 of 100: REFERENCE." for a game with no residual to speak of.
+static func grade_text(game_name: String, score: int) -> String:
+	if score < 0:
+		return ""
+	return "%s score %d of %d: %s." % [game_name, score, MAX_SCORE, grade_name(score).to_upper()]

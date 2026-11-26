@@ -7,7 +7,7 @@ extends Node
 ## the argument types, and its player argument is filled in here.
 const ACTIONS: Array[StringName] = [
 	&"accept_job", &"add_robot_calibrate_card", &"add_robot_card", &"add_robot_collect_card",
-	&"adjust_setpoint", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
+	&"adjust_setpoint", &"build_block_stack", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
 	&"calibrate_at_bench", &"catch_sentinel", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
 	&"harvest_crop", &"hit_boulder", &"mine_fissure", &"move_rover", &"place_stone", &"plant_crop", &"release_robot", &"remove_robot_card",
 	&"sell_harvest_to_lin", &"send_to_oirm", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay", &"spend_xp_certificate",
@@ -80,6 +80,13 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	if sent:
 		# Never the sender's number as it came: the host's cut of it.
 		score = MinigameScore.allowed(_farm(), str(passed[0]), player_id, passed.pop_back())
+	if action == &"build_block_stack" and not QuestEngine.has_minigame_step(_farm(), MinigameScore.WRING_THE_BLOCKS, "", player_id):
+		# Wring the Blocks' score is the sender's own number: the host does not
+		# play the game again, and does not see the blocks picked on the screen
+		# (it builds the length from the pieces it holds). So it is taken only
+		# where it can count, for a player with an open step that carries the
+		# game. Anywhere else the build is a skip, whatever was sent.
+		passed[1] = MinigameScore.SKIPPED
 	if _player_index(action) >= 0:
 		passed.append(player_id)
 	if scored:
@@ -100,6 +107,12 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	var played: Dictionary = {}
 	if scored and score != MinigameScore.SKIPPED and result is Dictionary and result.has("as_left"):
 		played = QuestEngine.played_game(MinigameScore.SET_THE_ZERO, str(passed[0]), player_id, score)
+	# Wring the Blocks: the stack's score is the action's own argument, and the
+	# farm's answer holds it cut to 0 to 100, or as a skip where the player has
+	# no open step for it (above) or played another length than today's. A skip
+	# (or a refusal) tells nothing.
+	if action == &"build_block_stack" and result is Dictionary and int(result.get("score", MinigameScore.SKIPPED)) >= 0:
+		played = QuestEngine.played_game(MinigameScore.WRING_THE_BLOCKS, "", player_id, int(result["score"]))
 	var none: Array[String] = []
 	_farm().update_quests(none, false, played)
 	return result

@@ -523,3 +523,39 @@ func test_a_guest_refuses_a_host_on_another_skill_curve() -> String:
 		if guest.player_skill_xp != mine:
 			return "A refused farm gives no XP: %s" % [guest.player_skill_xp]
 		return _differs(before, guest.farm_to_dict(), "after a refused farm"))
+
+
+func test_a_guest_has_the_hosts_gauge_pieces_in_the_hosts_order() -> String:
+	return _as_guest(func(host: GameStateScript, guest: GameStateScript, bytes: PackedByteArray) -> String:
+		if FarmSync.join(bytes, guest) != "":
+			return "The guest must take the host's farm."
+		# Blocks dug far apart and out of order, so the order found is not the cells'.
+		var none: Dictionary[Vector2i, int] = {}
+		var found: int = 0
+		for x: int in range(39, -40, -1):
+			for z: int in range(-40, 40):
+				var cell := Vector2i(x, z)
+				if found >= 6 or host.found_blocks.has(cell) or ReferenceBlock.at(host.world_seed, cell).is_empty():
+					continue
+				if Terrain.dig_problem(cell, host.dug) != "" or Terrain.dig_problem(cell, none) != "":
+					continue
+				var before: int = host.found_blocks.size()
+				host.dig(Vector3i(cell.x, 0, cell.y))
+				found += host.found_blocks.size() - before
+		if host.gauge_pieces().size() < 2:
+			return "The test's host needs two gauge pieces: %s" % [host.gauge_pieces()]
+		if FarmSync.update(FarmSync.capture(host), guest) != "":
+			return "The guest must take the finds."
+		if guest.found_blocks.keys() != host.found_blocks.keys():
+			return "The guest's finds are the host's, in the host's order."
+		if var_to_str(guest.gauge_pieces()) != var_to_str(host.gauge_pieces()) or guest.gauge_pieces().keys() != host.gauge_pieces().keys():
+			return "The guest's gauge pieces are the host's, in the host's order: %s, not %s" % [guest.gauge_pieces().keys(), host.gauge_pieces().keys()]
+		for player: String in [host.local_player_id, "player_2"]:
+			if guest.block_stack_target(player) != host.block_stack_target(player) or host.block_stack_target(player).is_empty():
+				return "The guest's screen names the host's length for %s." % player
+		# And a guest that joins now gets the same.
+		var late: GameStateScript = _make_state(9)
+		var problem: String = FarmSync.join(FarmSync.capture(host), late)
+		var same: bool = var_to_str(late.gauge_pieces()) == var_to_str(host.gauge_pieces())
+		late.free()
+		return "" if problem == "" and same else "A guest who joins later has the host's pieces. %s" % problem)

@@ -253,7 +253,10 @@
       "name": "Old Orin",
       "quests": {
         "daily_row_offer": "Till me a row by the beacon.",
-        "daily_row_done": "A straight row. The beacon has something to look at now."
+        "daily_row_done": "A straight row. The beacon has something to look at now.",
+        "missing_blocks_offer": "Those blocks you keep turning up were a set once. Mine. Somebody buried it a piece at a time and I never asked who. Find me three more and we will see what they still add up to.",
+        "missing_blocks_done": "That is a length, and it holds. The case is yours. It has been empty long enough.",
+        "missing_blocks_reference": "You wrung that like someone who has done it ten thousand times. I have. I know the look of it."
       }
     }
   }
