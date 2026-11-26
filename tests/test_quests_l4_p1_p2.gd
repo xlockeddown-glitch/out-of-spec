@@ -8,6 +8,7 @@ extends RefCounted
 
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 const ProfileScript: GDScript = preload("res://scripts/autoload/CoopProfile.gd")
+const CommandsScript: GDScript = preload("res://scripts/autoload/FarmCommands.gd")
 const KEY: String = "abcdef0123456789abcdef0123456789"
 const HOST: String = "player_1"
 const L4: String = "greenhouse_four"
@@ -19,6 +20,9 @@ const WATCH: String = "pocket_watch"
 const FM3: String = "field_meter_dc"
 const WD1: String = "reference_gauge"
 const FISSURES: Array[StringName] = [&"FissureA", &"FissureB", &"FissureC", &"FissureD", &"FissureE", &"FissureF", &"FissureG"]
+
+
+var _nodes: Array[Node] = []
 
 
 ## Runs `body` on a new farm that has only the quest `id` (as shipped).
@@ -33,6 +37,9 @@ func _run(id: String, body: Callable) -> String:
 	var gs: GameStateScript = _farm()
 	# A body that stops on a script error returns null, which must not pass.
 	var out: Variant = body.call(gs)
+	for node: Node in _nodes:
+		node.free()
+	_nodes.clear()
 	gs.free()
 	table["quests"] = shipped
 	FarmCommands.guest = false
@@ -115,13 +122,13 @@ func test_the_three_quests_ship_as_designed_and_are_sound() -> String:
 	var ids: Array = []
 	for step: Dictionary in l4["steps"]:
 		ids.append(step["id"])
-	if ids != ["credits", "ore", "move_in", "fit"] or bool(l4.get("any_order", false)):
-		return "L4's steps, in order: %s" % [ids]
+	if ids != ["grow", "move_in", "fit"] or not bool(l4.get("any_order", false)):
+		return "L4's steps, in any order (a fit made while the lab builds counts): %s" % [ids]
 	if int(l4["rewards"]["lab_xp"]) != 500 or l4["rewards"]["one_use"] != REFIT:
 		return "L4 pays 500 lab XP and the free refit: %s" % [l4["rewards"]]
 	var p1: Dictionary = _shipped(P1)
-	if p1["giver"] != "bram" or p1["kind"] != "personal" or p1["scope"] != "player" or not (p1["gates"] as Dictionary).is_empty():
-		return "P1 is Bram's own quest for each player, with no gate: %s" % [p1]
+	if p1["giver"] != "bram" or p1["kind"] != "personal" or p1["scope"] != "player" or p1["gates"] != { "lab_level": 5.0 }:
+		return "P1 is Bram's own quest for each player, at lab level 5 (Tier 1 standards open): %s" % [p1]
 	if p1["rewards"]["one_use"] != DISCOUNT or int(p1["rewards"]["quest_points"]) != 1 or int(p1["rewards"]["xp_field_ops"]) <= 0:
 		return "P1 pays Field Ops XP, 1 quest point and the discount: %s" % [p1["rewards"]]
 	var p2: Dictionary = _shipped(P2)
@@ -166,75 +173,114 @@ func test_l4_waits_for_lab_level_20() -> String:
 		return "" if _lines(gs, "New quest, Greenhouse Four.") == 1 else "It is offered once.")
 
 
+## Fits one new space for any discipline that can take one. True if it did.
+func _fit_one(gs: GameStateScript) -> bool:
+	for discipline: String in gs.job_disciplines():
+		if gs.lab_fit_problem(discipline) == "" and gs.fit_lab_area(discipline) == "":
+			return true
+	return false
+
+
 func test_l4_follows_the_grow_and_pays_the_free_refit_once() -> String:
 	return _run(L4, _check_l4)
 
 
 func _check_l4(gs: GameStateScript) -> String:
 	_open_l4(gs)
-	# Money first: 600 CR and 4 ore, each its own step.
-	gs.credits = 599
-	gs.crystal_ore = 4
-	gs.update_quests()
-	if not _steps(gs, L4).is_empty():
-		return "599 CR is not 600: %s" % [_entry(gs, L4)]
+	# Nothing is done before the grow: money alone is not a step.
 	gs.credits = 600
-	gs.crystal_ore = 3
-	gs.update_quests()
-	if _steps(gs, L4) != ["credits"]:
-		return "600 CR does the first step, 3 ore not the second: %s" % [_entry(gs, L4)]
 	gs.crystal_ore = 4
 	gs.update_quests()
-	if _steps(gs, L4) != ["credits", "ore"] or _lines(gs, "Start the grow and move into the medium lab.") != 1:
-		return "4 ore does the second, and the phone names the next: %s" % [gs.phone_log]
-	# The grow is paid for and started; the lab is not medium until it is ready.
+	if not _steps(gs, L4).is_empty() or _lines(gs, "Start the medium lab's grow (600 CR and 4 crystal ore).") != 1:
+		return "The first step is the grow, named with its cost: %s %s" % [_entry(gs, L4), gs.phone_log]
 	var started: String = gs.start_lab_grow()
 	if started != "" or gs.lab_build.is_empty():
 		return "The test could not start the grow: %s" % started
 	gs.update_quests()
-	if _steps(gs, L4) != ["credits", "ore"] or gs.lab_size != 0:
-		return "Starting the grow is not moving in: %s" % [_entry(gs, L4)]
+	if _steps(gs, L4) != ["grow"] or gs.lab_size != 0:
+		return "A grow under way is the first step, and not moving in: %s" % [_entry(gs, L4)]
 	gs._finish_lab_build(int(gs.lab_build.get("done_day", 99999)))
 	gs.update_quests()
-	if gs.lab_size != 1 or _steps(gs, L4) != ["credits", "ore", "move_in"] or _lines(gs, "Fit out one new lab space.") != 1:
-		return "The medium lab ready does the third step: size %d, %s" % [gs.lab_size, _entry(gs, L4)]
-	if gs.one_use_count(REFIT) != 0:
-		return "Nothing is paid before the last step."
-	# One new space fitted out is the last step.
-	var fitted: bool = false
-	for discipline: String in gs.job_disciplines():
-		if gs.lab_fit_problem(discipline) == "" and gs.fit_lab_area(discipline) == "":
-			fitted = true
-			break
-	if not fitted:
+	if _steps(gs, L4) != ["grow", "move_in"] or gs.one_use_count(REFIT) != 0:
+		return "The medium lab ready is the second step, and nothing is paid yet: %s" % [_entry(gs, L4)]
+	if not _fit_one(gs):
 		return "The test could not fit a new space in the medium lab."
 	var credits: int = gs.credits
 	var lab_xp: int = gs.lab_xp
 	gs.update_quests()
-	if not _done(gs, L4) or gs.lab_xp < lab_xp + 500 or gs.credits != credits:
-		return "L4 pays 500 lab XP and no credits: %d XP, %d CR." % [gs.lab_xp - lab_xp, gs.credits - credits]
+	if gs.lab_size != 1 or not _done(gs, L4) or gs.lab_xp < lab_xp + 500 or gs.credits != credits:
+		return "The medium lab ready ends L4, paying 500 lab XP and no credits: size %d, %s" % [gs.lab_size, _entry(gs, L4)]
 	if gs.one_use_count(REFIT) != 1 or gs.one_use_held.size() != 1 or not gs.one_use_held.has(gs.FARM_HOLDER):
 		return "The free refit is the farm's, once: %s" % [gs.one_use_held]
 	if _lines(gs, "QUEST DONE: Greenhouse Four.") != 1 or _lines(gs, _said("BRAM", "npcs/bram/quests/greenhouse_four_done")) != 1 \
 			or _lines(gs, QuestEngine.one_use_held_line(REFIT)) != 1:
 		return "The phone says it is done, Bram has his word, and the refit is announced: %s" % [gs.phone_log]
-	# Not paid again by a later look or a morning.
 	var xp_after: int = gs.lab_xp
 	_morning(gs, 5)
 	gs.update_quests()
 	return "" if gs.one_use_count(REFIT) == 1 and gs.lab_xp == xp_after and _lines(gs, "QUEST DONE: Greenhouse Four.") == 1 else "L4 is paid once."
 
 
-func test_l4_on_a_farm_that_is_already_medium_still_needs_a_new_space() -> String:
+## The bug a review found: the lab level and the grow on the same day, before the
+## morning offers L4. The money is spent, the quest then asks for none of it, and
+## the spaces fitted after the offer need no refit.
+func test_l4_offered_after_the_grow_was_bought_needs_no_money_again() -> String:
 	return _run(L4, func(gs: GameStateScript) -> String:
-		gs.lab_size = 1
-		_open_l4(gs)
+		gs.give_lab_xp(gs.xp_for_level(20) - gs.lab_xp)  # no offering look yet
 		gs.credits = 600
 		gs.crystal_ore = 4
+		if gs.start_lab_grow() != "":
+			return "The test could not start the grow."
+		if gs.credits != 0 or gs.crystal_ore != 0:
+			return "The grow costs the 600 CR and 4 ore."
 		gs.update_quests()
-		if _steps(gs, L4) != ["credits", "ore", "move_in"] or _done(gs, L4):
-			return "An already medium lab has moved in but still has a space to fit: %s" % [_entry(gs, L4)]
+		if _steps(gs, L4) != ["grow"]:
+			return "The grow bought before the offer does the first step: %s" % [_entry(gs, L4)]
+		gs._finish_lab_build(int(gs.lab_build.get("done_day", 99999)))
+		if not _fit_one(gs):
+			return "The test could not fit a new space."
+		gs.update_quests()
+		if not _done(gs, L4) or gs.one_use_count(REFIT) != 1:
+			return "No money and no refit needed: %s" % [_entry(gs, L4)]
 		return "")
+
+
+func test_l4_on_a_farm_that_is_already_medium_says_what_the_fit_needs() -> String:
+	return _run(L4, func(gs: GameStateScript) -> String:
+		gs.lab_size = 1
+		gs.credits = 100000
+		gs.crystal_ore = 100
+		while _fit_one(gs):
+			pass  # every space of the lab is fitted, as on an old save
+		if gs.lab_free_spaces() != 0:
+			return "The test needs a full lab."
+		_open_l4(gs)
+		if _steps(gs, L4) != ["grow", "move_in"] or _done(gs, L4):
+			return "An already medium lab has done the grow and the move-in, and not the fit: %s" % [_entry(gs, L4)]
+		var fit_text: String = str(_shipped(L4)["steps"][2]["text"])
+		if not fit_text.contains("never had") or not fit_text.contains("clear"):
+			return "The step says a full lab must clear a space: %s" % fit_text
+		# Clearing a space and fitting another area is a new space for that area,
+		# so the quest can be finished without a bigger lab.
+		var cleared: String = ""
+		for discipline: String in gs.job_disciplines():
+			if gs.lab_space(discipline) > 0 and gs.clear_lab_area(discipline) == "":
+				cleared = discipline
+				break
+		if cleared == "":
+			return "The test could not clear a space."
+		gs._finish_lab_build(int(gs.lab_build.get("done_day", 99999)))
+		var fitted: bool = false
+		for discipline: String in gs.job_disciplines():
+			if discipline != cleared and gs.lab_fit_problem(discipline) == "" and int(gs.lab_areas_paid.get(discipline, 0)) <= gs.lab_space(discipline):
+				fitted = gs.fit_lab_area(discipline) == ""
+				if fitted:
+					break
+		if not fitted:
+			return "The test could not fit another area into the cleared space."
+		gs.update_quests()
+		return "" if _done(gs, L4) else "A moved space is new for the area it goes to: %s" % [_entry(gs, L4)]
+	)
 
 
 func test_a_guest_runs_no_l4() -> String:
@@ -257,8 +303,25 @@ func test_a_guest_runs_no_l4() -> String:
 
 # --- P1 ---------------------------------------------------------------------------
 
-func test_p1_is_offered_from_the_start() -> String:
+## Lab level 5, where Tier 1 standards open and P1's discount can be used.
+func _lab5(gs: GameStateScript) -> void:
+	gs.give_lab_xp(gs.xp_for_level(5) - gs.lab_xp)
+
+
+func test_p1_waits_for_lab_level_5() -> String:
 	return _run(P1, func(gs: GameStateScript) -> String:
+		gs.give_lab_xp(gs.xp_for_level(4) - gs.lab_xp)
+		gs.update_quests()
+		if not (gs.player_quest_state.get(HOST, {}) as Dictionary).is_empty() or _lines(gs, "New quest, Bram's Ore Run.") != 0:
+			return "P1 is not offered below lab level 5."
+		_lab5(gs)
+		gs.update_quests()
+		return "" if (gs.player_quest_state.get(HOST, {}) as Dictionary).has(P1) else "P1 is offered at lab level 5.")
+
+
+func test_p1_is_offered_with_its_words() -> String:
+	return _run(P1, func(gs: GameStateScript) -> String:
+		_lab5(gs)
 		gs.update_quests()
 		if not (gs.player_quest_state.get(HOST, {}) as Dictionary).has(P1) or _done(gs, P1, HOST):
 			return "P1 has no gate: it is offered at the start: %s" % [gs.player_quest_state]
@@ -273,6 +336,7 @@ func test_p1_counts_the_players_own_fissures_from_the_offer() -> String:
 	return _run(P1, func(gs: GameStateScript) -> String:
 		# One mined before Bram asks does not count.
 		gs.mine_fissure(FISSURES[6], HOST)
+		_lab5(gs)
 		gs.update_quests()
 		for index: int in 4:
 			gs.mine_fissure(FISSURES[index], HOST)
@@ -293,6 +357,7 @@ func test_p1_counts_the_players_own_fissures_from_the_offer() -> String:
 
 func test_p1_pays_once_with_the_discount_to_the_player_alone() -> String:
 	return _run(P1, func(gs: GameStateScript) -> String:
+		_lab5(gs)
 		gs.update_quests()
 		var ore: int = gs.crystal_ore
 		for index: int in 5:
@@ -325,12 +390,23 @@ func test_each_player_has_their_own_p1_and_a_guest_runs_none() -> String:
 		if id == "":
 			return "The guest was not let in."
 		CoopSession.players.assign([HOST, id])
+		_lab5(host)
 		host.update_quests()
 		if not (host.player_quest_state.get(id, {}) as Dictionary).has(P1) or not (host.player_quest_state.get(HOST, {}) as Dictionary).has(P1):
 			return "Each player is offered P1: %s" % [host.player_quest_state]
+		# Through the real command path, which hands the guest's id to the mining.
+		var commands: Node = CommandsScript.new()
+		commands.state = host
+		_nodes.append(commands)
+		var host_xp: int = host.skill_xp("field_ops", HOST)
+		var guest_xp: int = host.skill_xp("field_ops", id)
 		for index: int in 5:
-			host.mine_fissure(FISSURES[index], id)
+			var result: Variant = commands.execute(id, &"mine_fissure", [FISSURES[index]])
+			if result is Dictionary and result.get("refused", false):
+				return "The guest's mining was refused: %s" % [result]
 		host.update_quests()
+		if host.skill_xp("field_ops", HOST) != host_xp or host.skill_xp("field_ops", id) < guest_xp + int(_shipped(P1)["rewards"]["xp_field_ops"]):
+			return "The guest, not the host, gets the Field Ops XP: host %d, guest %d." % [host.skill_xp("field_ops", HOST) - host_xp, host.skill_xp("field_ops", id) - guest_xp]
 		if not _done(host, P1, id) or _done(host, P1, HOST) or host.one_use_count(DISCOUNT, id) != 1 or host.one_use_count(DISCOUNT, HOST) != 0:
 			return "The guest's five are the guest's, and so is the discount: %s %s" % [host.player_quest_state, host.one_use_held]
 		# A guest's copy runs nothing: the host's mining does not move it.
@@ -470,3 +546,66 @@ func test_a_guest_runs_no_p2() -> String:
 		FarmCommands.guest = false
 		guest.free()
 		return out)
+
+
+# --- Old saves and guests who bring a quest -----------------------------------------
+
+func test_p1_with_counters_already_past_five_does_not_finish_at_once() -> String:
+	return _run(P1, func(gs: GameStateScript) -> String:
+		gs.action_counts[HOST] = { "mine_fissure": { "count": 9, "xp": 0 } }
+		_lab5(gs)
+		gs.update_quests()
+		if not (gs.player_quest_state.get(HOST, {}) as Dictionary).has(P1) or _done(gs, P1, HOST) or gs.one_use_count(DISCOUNT, HOST) != 0:
+			return "An old save's nine fissures are not Bram's five: %s" % [gs.player_quest_state]
+		return "")
+
+
+func test_p2_with_counters_already_past_five_does_not_finish_at_once() -> String:
+	return _run(P2, func(gs: GameStateScript) -> String:
+		gs.action_counts[HOST] = { "calibrate_on_time": { "count": 9, "xp": 0 } }
+		gs.player_skill_xp[HOST] = { "uncertainty": gs.xp_for_level(5) }
+		gs.update_quests()
+		if _entry(gs, P2, HOST).is_empty() or _done(gs, P2, HOST) or not QuestEngine.keepsakes_of(gs, HOST).is_empty():
+			return "An old save's nine on-time calibrations are not Vance's five: %s" % [gs.player_quest_state]
+		return "")
+
+
+## A record a guest brings, as CoopProfile writes it.
+func _brought(entries: Dictionary) -> Dictionary:
+	var record: Dictionary = ProfileScript.no_record()
+	record["quests"] = entries
+	return record
+
+
+func test_a_guest_bringing_a_done_p1_gets_no_discount() -> String:
+	return _run(P1, func(host: GameStateScript) -> String:
+		_lab5(host)
+		var id: String = host.let_in_guest(KEY, {}, [HOST] as Array[String], _brought({ P1: { "done": true } }))
+		if id == "":
+			return "The guest was not let in."
+		CoopSession.players.assign([HOST, id])
+		host.update_quests()
+		if not _done(host, P1, id) or host.one_use_count(DISCOUNT, id) != 0 or host.quest_point_total(id) != 0:
+			return "A quest done elsewhere pays nothing here: %s %s" % [host.player_quest_state, host.one_use_held]
+		return "")
+
+
+func test_a_guest_bringing_four_of_five_gets_one_discount_when_done_here() -> String:
+	return _run(P1, func(host: GameStateScript) -> String:
+		_lab5(host)
+		var id: String = host.let_in_guest(KEY, {}, [HOST] as Array[String], _brought({ P1: { "counts": { "mine": 4 } } }))
+		if id == "":
+			return "The guest was not let in."
+		CoopSession.players.assign([HOST, id])
+		host.update_quests()
+		if _done(host, P1, id) or host.one_use_count(DISCOUNT, id) != 0:
+			return "Four of five is not done: %s" % [host.player_quest_state]
+		host.mine_fissure(FISSURES[0], id)
+		host.update_quests()
+		if not _done(host, P1, id) or host.one_use_count(DISCOUNT, id) != 1:
+			return "The fifth, with four brought, finishes it with one discount: %s %s" % [host.player_quest_state, host.one_use_held]
+		# Coming again with the same record, or a later look, gives no second.
+		host.update_quests()
+		host.let_in_guest(KEY, {}, [HOST] as Array[String], _brought({ P1: { "done": true } }))
+		host.update_quests()
+		return "" if host.one_use_count(DISCOUNT, id) == 1 else "One discount only: %d." % host.one_use_count(DISCOUNT, id))

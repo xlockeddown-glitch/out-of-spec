@@ -182,21 +182,20 @@
       "gates": { "lab_level": 20 },
       "offer": { "when": "always" },
       "offer_line": "npcs/bram/quests/greenhouse_four_offer",
+      "any_order": true,
       "steps": [
-        { "id": "credits", "text": "Have 600 CR for the medium lab.",
-          "check": "stat_at_least", "stat": "credits", "at_least": 600 },
-        { "id": "ore", "text": "Have 4 crystal ore for the medium lab.",
-          "check": "stat_at_least", "stat": "crystal_ore", "at_least": 4 },
-        { "id": "move_in", "text": "Start the grow and move into the medium lab.",
+        { "id": "grow", "text": "Start the medium lab's grow (600 CR and 4 crystal ore).",
+          "check": "lab_size", "with_grow": true, "at_least": 1 },
+        { "id": "move_in", "text": "Move into the medium lab (it is ready two days after the grow starts).",
           "check": "lab_size", "at_least": 1 },
-        { "id": "fit", "text": "Fit out one new lab space.",
+        { "id": "fit", "text": "Fit out one space an area never had before (a lab with every space fitted must clear one, and fit another area).",
           "check": "counter", "counter": "lab_area" }
       ],
       "rewards": { "lab_xp": 500, "one_use": "free_lab_refit", "phone": "npcs/bram/quests/greenhouse_four_done" }
     },
     {
       "id": "brams_ore_run", "kind": "personal", "giver": "bram", "title": "Bram's Ore Run", "scope": "player",
-      "gates": {},
+      "gates": { "lab_level": 5 },
       "offer": { "when": "always" },
       "offer_line": "npcs/bram/quests/brams_ore_run_offer",
       "steps": [
