@@ -43,15 +43,22 @@ static func phase(elapsed_days: float, warned_day: int, rescued_day: int) -> Str
 	return NOTHING
 
 
-## What a rescue costs, given the shared wallet and the ore carried: { credits,
+## Driving in after the rescue hour (until 06:00) would be rescued at once and
+## charged for nothing, so the mouth is closed then.
+static func closed(elapsed_days: float) -> bool:
+	return phase(elapsed_days, 0, 0) == RESCUE
+
+
+## What a rescue costs, given the shared wallet and the ore gained in the tunnels: { credits,
 ## ore, waived }. The fee never takes the wallet below 0: the crew takes what
 ## there is and `waived` is the rest. The ore is a share of what is carried,
 ## rounded down, so a little ore costs nothing [PLACEHOLDER].
 static func cost(wallet: int, ore: int) -> Dictionary:
 	var fee: int = maxi(int(number("fee_credits", 50.0)), 0)
 	var taken: int = clampi(wallet, 0, fee)
-	var share: Array = DataManager.get_value(TABLE, PATH + "ore_share", [1, 3])
-	var numerator: int = maxi(int(share[0]), 0) if share.size() == 2 else 1
-	var denominator: int = maxi(int(share[1]), 1) if share.size() == 2 else 3
+	var share: Variant = DataManager.get_value(TABLE, PATH + "ore_share", [1, 3])
+	var ok: bool = share is Array and (share as Array).size() == 2
+	var numerator: int = maxi(int((share as Array)[0]), 0) if ok else 1
+	var denominator: int = maxi(int((share as Array)[1]), 1) if ok else 3
 	var lost: int = clampi(floori(float(maxi(ore, 0) * numerator) / float(denominator)), 0, maxi(ore, 0))
 	return { "credits": taken, "ore": lost, "waived": fee - taken }

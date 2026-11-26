@@ -9,6 +9,15 @@ const ClockScript: GDScript = preload("res://scripts/autoload/GameClock.gd")
 const WARN_LINE: String = "Recall in 2 hours"
 
 
+## Stands in for CoopBeds where a test only needs to know who was put to bed.
+class _NoBeds:
+	extends RefCounted
+	var put_to_bed: Array[String] = []
+
+	func recall_to_bed(player_id: String) -> void:
+		put_to_bed.append(player_id)
+
+
 func _state(credits: int, ore: int) -> GameStateScript:
 	var gs: GameStateScript = GameStateScript.new()
 	gs.build_registry()
@@ -97,6 +106,7 @@ func test_the_clock_warns_at_midnight_and_rescues_at_two() -> String:
 
 func test_the_warning_comes_once_to_a_player_in_the_tunnels() -> String:
 	var gs: GameStateScript = _state(500, 4)
+	gs.rover_in_tunnels = true
 	gs.recall_in_tunnels = func() -> bool: return true
 	var problem: String = _at(0.5, func() -> String:
 		gs._tick_recall()
@@ -115,6 +125,8 @@ func test_the_warning_comes_once_to_a_player_in_the_tunnels() -> String:
 
 func test_two_oclock_marks_the_rescue_and_it_is_not_repeated() -> String:
 	var gs: GameStateScript = _state(500, 4)
+	gs.rover_in_tunnels = true
+	gs.recall_beds = _NoBeds.new()
 	gs.recall_in_tunnels = func() -> bool: return true
 	var problem: String = _at(2.0, func() -> String:
 		gs._tick_recall()
@@ -155,6 +167,7 @@ func test_a_guests_copy_never_runs_the_rule() -> String:
 
 func test_a_rescue_takes_the_fee_and_a_third_of_the_ore_and_keeps_the_finds() -> String:
 	var gs: GameStateScript = _state(200, 7)
+	gs._ore_at_entry = 1
 	gs.found_blocks[Vector2i(3, 4)] = true
 	gs.sentinel_out = true
 	gs.rover_in_tunnels = true
@@ -167,7 +180,7 @@ func test_a_rescue_takes_the_fee_and_a_third_of_the_ore_and_keeps_the_finds() ->
 		problem = "Finds that are not ore are kept"
 	elif gs.sensors_to_dict() != drift_before:
 		problem = "No extra drift for a rescue"
-	elif gs._rescue_notes.size() != 1 or not gs._rescue_notes[0].contains("50 CR") or not gs._rescue_notes[0].contains("2 crystal ore"):
+	elif gs._rescue_notes.size() != 1 or not gs._rescue_notes[0].contains("50 CR") or not gs._rescue_notes[0].contains("You") or not gs._rescue_notes[0].contains("2 crystal ore"):
 		problem = "The morning line says what it cost: %s" % [gs._rescue_notes]
 	gs.free()
 	return problem
@@ -221,6 +234,7 @@ func test_a_rover_already_home_is_not_announced_again() -> String:
 
 func test_the_morning_says_what_the_rescue_cost() -> String:
 	var gs: GameStateScript = _state(200, 6)
+	gs._ore_at_entry = 0
 	var held: float = GameClock.elapsed_days
 	gs.rescue_from_tunnels()
 	GameClock.elapsed_days = 1.0
@@ -228,7 +242,7 @@ func test_the_morning_says_what_the_rescue_cost() -> String:
 	gs._on_day_started(2)
 	GameClock.elapsed_days = held
 	var lines: String = "\n".join(gs.phone_log.slice(before))
-	var said: bool = lines.contains("Recovery fee: 50 CR") and lines.contains("2 crystal ore")
+	var said: bool = lines.contains("Recovery fee for") and lines.contains("50 CR") and lines.contains("2 crystal ore")
 	var cleared: bool = gs._rescue_notes.is_empty()
 	gs.free()
 	return "" if said and cleared else "The morning must say the fee once: %s" % lines
@@ -300,3 +314,110 @@ func test_a_guests_copy_cannot_put_anyone_to_bed_by_recall() -> String:
 	beds.free()
 	clock.free()
 	return _finish(problem)
+
+
+func test_the_pile_already_in_the_farm_is_never_taken() -> String:
+	var gs: GameStateScript = _state(200, 30)
+	gs.rover_in_tunnels = true
+	gs._ore_at_entry = 30
+	var none: Dictionary = gs.rescue_from_tunnels()
+	var kept: int = gs.crystal_ore
+	var unknown: GameStateScript = _state(200, 30)
+	unknown.rover_in_tunnels = true
+	var also: Dictionary = unknown.rescue_from_tunnels()
+	var kept_too: int = unknown.crystal_ore
+	gs.free()
+	unknown.free()
+	if none["ore"] != 0 or kept != 30:
+		return "Nothing gained in the tunnels, nothing taken: %s, %d" % [none, kept]
+	if also["ore"] != 0 or kept_too != 30:
+		return "A farm that loaded in the tunnels takes no ore: %s, %d" % [also, kept_too]
+	return ""
+
+
+func test_the_rover_going_in_notes_the_ore_in_the_pile() -> String:
+	var gs: GameStateScript = _state(0, 12)
+	gs.rover_transforms[GameStateScript.ROVER] = Transform3D(Basis.IDENTITY, GameStateScript.TUNNEL_PAD)
+	var problem: String = _at(12.0, func() -> String:
+		return gs.move_rover(true, "player_1"))
+	var entry: int = gs._ore_at_entry
+	var inside: bool = gs.rover_in_tunnels
+	gs.free()
+	if inside and entry == 12:
+		return ""
+	return "Going in notes 12 ore (in: %s, entry %d, said: %s)" % [inside, entry, problem]
+
+
+func test_a_free_rescue_says_there_was_no_fee() -> String:
+	var gs: GameStateScript = _state(0, 0)
+	gs.rover_in_tunnels = true
+	gs.rescue_from_tunnels()
+	var line: String = gs._rescue_notes[0] if gs._rescue_notes.size() == 1 else ""
+	gs.free()
+	return "" if line.contains("No recovery fee") and not line.contains("0 CR") else "A fee of nothing is said plainly: %s" % line
+
+
+func test_a_rover_not_in_the_tunnels_means_no_recall() -> String:
+	var gs: GameStateScript = _state(500, 4)
+	gs.recall_in_tunnels = func() -> bool: return true
+	gs.recall_beds = _NoBeds.new()
+	var far: Transform3D = Transform3D(Basis.IDENTITY, Vector3(-40.0, 0.0, 40.0))
+	gs.rover_transforms[GameStateScript.ROVER] = far
+	var problem: String = _at(0.5, func() -> String:
+		gs._tick_recall()
+		return "")
+	problem += _at(2.5, func() -> String:
+		gs._tick_recall()
+		return "")
+	gs.bring_rover_home()
+	var calm: bool = _warnings(gs) == 0 and gs.credits == 500 and gs.crystal_ore == 4 and gs._rescue_notes.is_empty() and gs.recall_beds.put_to_bed.is_empty()
+	var left: bool = gs.rover_transforms[GameStateScript.ROVER] == far
+	gs.free()
+	if problem != "" or not calm:
+		return "No rover in the tunnels: no warning, no rescue, no bill"
+	return "" if left else "A rover that is out is not moved by the crew"
+
+
+func test_the_tunnels_are_closed_to_the_rover_between_the_rescue_and_the_morning() -> String:
+	var gs: GameStateScript = _state(0, 0)
+	gs.rover_transforms[GameStateScript.ROVER] = Transform3D(Basis.IDENTITY, GameStateScript.TUNNEL_PAD)
+	var said_in: Array[String] = [""]
+	var problem: String = _at(3.0, func() -> String:
+		said_in[0] = gs.move_rover(true, "player_1")
+		return "")
+	var said: String = said_in[0]
+	var in_tunnels: bool = gs.rover_in_tunnels
+	gs.free()
+	if problem != "" or in_tunnels or not said.contains("closed"):
+		return "At 03:00 the rover is refused with a Dispatch line: %s" % said
+	if TunnelRecall.closed(TunnelRecall.at_hour(1, 1.0)) or TunnelRecall.closed(TunnelRecall.at_hour(1, 12.0)):
+		return "Open before 02:00 and by day"
+	return "" if TunnelRecall.closed(TunnelRecall.at_hour(1, 5.5)) else "Closed until 06:00"
+
+
+func test_the_whole_carry_out_charges_moves_the_rover_and_puts_the_player_to_bed() -> String:
+	var gs: GameStateScript = _state(200, 9)
+	gs.rover_in_tunnels = true
+	gs._ore_at_entry = 3
+	gs.recall_in_tunnels = func() -> bool: return true
+	var beds: _NoBeds = _NoBeds.new()
+	gs.recall_beds = beds
+	var problem: String = _at(2.0, func() -> String:
+		gs._tick_recall()
+		return "")
+	var done: bool = gs.credits == 150 and gs.crystal_ore == 7 and not gs.rover_in_tunnels and beds.put_to_bed == [gs.local_player_id] and gs._rescue_notes.size() == 1
+	var got: String = "%d CR, %d ore, tunnels %s, bed %s" % [gs.credits, gs.crystal_ore, gs.rover_in_tunnels, beds.put_to_bed]
+	gs.free()
+	return problem if problem != "" else ("" if done else "Charged, rover home, in bed: %s" % got)
+
+
+func test_a_new_or_loaded_farm_forgets_the_nights_recall() -> String:
+	var gs: GameStateScript = _state(100, 0)
+	gs._recall_warned_day = 3
+	gs._recall_rescued_day = 3
+	gs._rescue_notes.append("left over")
+	gs._ore_at_entry = 5
+	var problem: String = gs.farm_from_dict(gs.farm_to_dict())
+	var clear: bool = gs._recall_warned_day == 0 and gs._recall_rescued_day == 0 and gs._rescue_notes.is_empty() and gs._ore_at_entry == -1
+	gs.free()
+	return problem if problem != "" else ("" if clear else "Loading a farm starts the recall fresh")

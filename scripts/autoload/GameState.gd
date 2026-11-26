@@ -620,7 +620,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
-	"_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels",
+	"_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry",
 ]
 
 
@@ -913,6 +913,10 @@ func farm_from_dict(data: Dictionary) -> String:
 		return problem
 	put_farm(data)
 	sentinel_sighted = false
+	_recall_warned_day = 0
+	_recall_rescued_day = 0
+	_rescue_notes.clear()
+	_ore_at_entry = -1
 	farm_loaded.emit()
 	lab_xp_changed.emit()
 	quests_changed.emit()
@@ -3321,14 +3325,14 @@ func _on_day_started(day: int) -> void:
 	# After the audit, so the board matches the band the lab ends the morning in.
 	refresh_job_board(day)
 	update_quests()
+	for note: String in _rescue_notes:
+		post_phone(note)
+	_rescue_notes.clear()
 	# The morning's cancellations go last, as one line, so neither the audit's
 	# lines nor the board's are newer and one cancellation can't hide another.
 	if not _morning_notes.is_empty():
 		post_phone(" ".join(_morning_notes))
 		_morning_notes.clear()
-	for note: String in _rescue_notes:
-		post_phone(note)
-	_rescue_notes.clear()
 	_roll_sentinel()
 
 
@@ -4009,6 +4013,8 @@ func rover_is_away(rover_id: String) -> bool:
 func move_rover(into_tunnels: bool, player_id: String = "") -> String:
 	if into_tunnels == rover_in_tunnels:
 		return "The rover is already there."
+	if into_tunnels and TunnelRecall.closed(GameClock.elapsed_days):
+		return TunnelRecall.text("closed_text")
 	if not CoopRovers.driver(rover_here()) in ["", player_id]:
 		return "Someone else is driving the rover."
 	SaveGame.saving.emit()  # it says where it is
@@ -4017,6 +4023,7 @@ func move_rover(into_tunnels: bool, player_id: String = "") -> String:
 		return "The rover is not on the pad."
 	if into_tunnels:
 		park_rover(TUNNEL_ROVER, TUNNEL_START)
+		_ore_at_entry = crystal_ore
 	rover_in_tunnels = into_tunnels
 	rover_place_changed.emit()
 	return ""
@@ -4030,8 +4037,14 @@ var _recall_warned_day: int = 0
 var _recall_rescued_day: int = 0
 ## What the last rescues cost, said on the phone in the morning.
 var _rescue_notes: Array[String] = []
+## The crystal ore the farm held when the rover went into the tunnels (-1: not
+## known, e.g. a farm that loaded in them). Ore gained since is what a rescue
+## can take; the rest of the pile is the farm's and is never touched [ASSUMPTION].
+var _ore_at_entry: int = -1
 ## Only tests set it: where the local player is (true: in the tunnels).
 var recall_in_tunnels: Callable = Callable()
+## Only tests set it: stands in for CoopBeds, and makes the rescue run at once.
+var recall_beds: Object = null
 
 
 ## The local player stands in the basalt tunnels. The host cannot see where a
@@ -4046,7 +4059,8 @@ func _local_in_tunnels() -> bool:
 ## Host: warns the player in the tunnels at the warning hour and has them
 ## carried out at the rescue hour, once each a day. Guests never run this.
 func _tick_recall() -> void:
-	if FarmCommands.guest or not _local_in_tunnels():
+	# Rover not in the tunnels: the player walks out with E as today [ASSUMPTION].
+	if FarmCommands.guest or not rover_in_tunnels or not _local_in_tunnels():
 		return
 	var day: int = GameClock.get_day_index()
 	match TunnelRecall.phase(GameClock.elapsed_days, _recall_warned_day, _recall_rescued_day):
@@ -4057,7 +4071,10 @@ func _tick_recall() -> void:
 			_recall_warned_day = day
 			_recall_rescued_day = day
 			# Not inside the clock's own signal: the day may end and the scene change.
-			_carry_out.call_deferred(local_player_id)
+			if recall_beds != null:
+				_carry_out(local_player_id)
+			else:
+				_carry_out.call_deferred(local_player_id)
 
 
 ## The crew carries `player_id` out of the tunnels: the cost is paid, the rover
@@ -4065,7 +4082,7 @@ func _tick_recall() -> void:
 ## they are the local player, the farm scene opens.
 func _carry_out(player_id: String) -> void:
 	rescue_from_tunnels(player_id)
-	CoopBeds.recall_to_bed(player_id)
+	(recall_beds if recall_beds != null else CoopBeds).recall_to_bed(player_id)
 	if is_inside_tree() and player_id == local_player_id:
 		SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE)
 
@@ -4076,8 +4093,10 @@ func _carry_out(player_id: String) -> void:
 ## player found (tarantulas, blocks, parts, samples) is not touched, and nothing
 ## drifts for it. The morning's phone line says what it cost.
 func rescue_from_tunnels(player_id: String = "") -> Dictionary:
+	if FarmCommands.guest:
+		return TunnelRecall.cost(0, 0)  # the host decides and applies it
 	var who: String = performer_name(_player(player_id))
-	var bill: Dictionary = TunnelRecall.cost(credits, crystal_ore)
+	var bill: Dictionary = TunnelRecall.cost(credits, ore_carried_in())
 	if bill["credits"] > 0:
 		add_credits(-int(bill["credits"]))
 	if bill["ore"] > 0:
@@ -4085,27 +4104,37 @@ func rescue_from_tunnels(player_id: String = "") -> Dictionary:
 		ore_changed.emit(crystal_ore)
 	bring_rover_home()
 	post_phone(TunnelRecall.text("rescue_text") % who.to_lower())
-	var line: String = TunnelRecall.text("cost_text") % [
-		SP811.integer(int(bill["credits"])), SP811.integer(int(bill["ore"]))]
-	if bill["waived"] > 0:
+	var line: String
+	if bill["credits"] == 0 and bill["ore"] == 0:
+		line = TunnelRecall.text("cost_none_text") % who
+	else:
+		line = TunnelRecall.text("cost_text") % [
+			who, SP811.integer(int(bill["credits"])), SP811.integer(int(bill["ore"]))]
+	if bill["waived"] > 0 and bill["credits"] > 0:
 		line += " " + TunnelRecall.text("cost_waived_text") % SP811.integer(int(bill["credits"]))
 	_rescue_notes.append(line)
 	return bill
 
 
+## The ore gained since the rover went into the tunnels: all a rescue can take.
+func ore_carried_in() -> int:
+	return maxi(crystal_ore - _ore_at_entry, 0) if _ore_at_entry >= 0 else 0
+
+
 ## The rover is on the farm pad where it went in, whatever it was doing in the
-## tunnels (a rescue never strands it).
+## tunnels (a rescue never strands it). A rover that is not in the tunnels (a
+## guest drove it out) is left where it is.
 func bring_rover_home() -> void:
-	if FarmCommands.guest:
+	if FarmCommands.guest or not rover_in_tunnels:
 		return
 	var home: Transform3D = parked_rover_transform(ROVER, Transform3D(Basis.IDENTITY, TUNNEL_PAD))
 	if home.origin.distance_to(TUNNEL_PAD) > TUNNEL_PAD_REACH_M:
 		home = Transform3D(Basis.IDENTITY, TUNNEL_PAD)
 	rover_transforms[ROVER] = home
 	rover_transforms.erase(TUNNEL_ROVER)
-	if rover_in_tunnels:
-		rover_in_tunnels = false
-		rover_place_changed.emit()
+	rover_in_tunnels = false
+	_ore_at_entry = -1
+	rover_place_changed.emit()
 
 
 ## Remembers where a rover is parked, so it is still there when the farm scene
