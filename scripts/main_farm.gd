@@ -291,26 +291,39 @@ func _on_fill_rejected(reason: String) -> void:
 
 const GAUGE_KIND_TEXT: Dictionary = {
 	GaugeSet.NEW: "a new size for the set",
-	GaugeSet.BETTER: "better than the one held, so it takes its place",
+	GaugeSet.BETTER: "it improves the set",
 	GaugeSet.DUPLICATE: "a duplicate, kept as a spare",
 }
 
 
+## More new blocks than this at once are summed up in one log line.
+const BLOCKS_TOLD_ONE_BY_ONE: int = 3
+
+
 func _on_blocks_changed() -> void:
+	var fresh: Array[Vector2i] = []
 	for cell: Vector2i in GameState.found_blocks:
 		if not cell in _blocks_told:
-			var block: Dictionary = ReferenceBlock.at(GameState.world_seed, cell)
-			if not block.is_empty():
-				var kind: StringName = GaugeSet.finding(GameState.world_seed, _blocks_told, block)
-				_hud.push_log("FOUND A REFERENCE BLOCK: %s° angle, ±%s° (k = %s). Q checks a sensor with it." % [
-					SP811.number(block["certified"], 0), SP811.number(block["u"], 2), SP811.number(block["k"], 0)])
-				var told: Array = []
-				told.assign(_blocks_told)
-				told.append(cell)
-				var took: int = GaugeSet.size_taken(GameState.world_seed, told, cell)
-				_hud.push_log("GAUGE BLOCK %s in, grade %s: %s." % [SP811.number(GaugeSet.size_in(took), 4),
-						GaugeSet.GRADES[block["grade"]], GAUGE_KIND_TEXT[kind]])
-			_blocks_told.append(cell)
+			fresh.append(cell)
+	if fresh.size() > BLOCKS_TOLD_ONE_BY_ONE:
+		# A farm that arrived all at once (a load or a join): one line, not a
+		# line and three set placements per block.
+		_hud.push_log("%d REFERENCE BLOCKS ON RECORD." % fresh.size())
+		_blocks_told.append_array(fresh)
+		fresh.clear()
+	for cell: Vector2i in fresh:
+		var block: Dictionary = ReferenceBlock.at(GameState.world_seed, cell)
+		if not block.is_empty():
+			var kind: StringName = GaugeSet.finding(GameState.world_seed, _blocks_told, block)
+			_hud.push_log("FOUND A REFERENCE BLOCK: %s° angle, ±%s° (k = %s). Q checks a sensor with it." % [
+				SP811.number(block["certified"], 0), SP811.number(block["u"], 2), SP811.number(block["k"], 0)])
+			var told: Array = []
+			told.assign(_blocks_told)
+			told.append(cell)
+			var took: int = GaugeSet.size_taken(GameState.world_seed, told, cell)
+			_hud.push_log("GAUGE BLOCK %s in, grade %s: %s." % [SP811.number(GaugeSet.size_in(took), 4),
+					GaugeSet.GRADES[block["grade"]], GAUGE_KIND_TEXT[kind]])
+		_blocks_told.append(cell)
 	_hud.set_gauge_set(GaugeSet.text(GameState.gauge_pieces()))
 
 
