@@ -88,16 +88,23 @@ func _process(_delta: float) -> void:
 	_hud.set_clock(GameClock.format_now())
 	_hud.set_molt(GameState.molt_text() if GameState.has_skill_unlock("molt_on_phone") else "")
 	var reach: bool = _can_catch()
-	if reach and not _told_reach:
+	var rover_free: bool = _rover.away_text() == ""
+	# A held beacon and an empty spot in reach: the spot wins over the Sentinel's
+	# catch, so the prompt and E agree on one target.
+	var spot_wins: bool = reach and rover_free and _holding_beacon \
+			and not LavaHub.nearest(_rover.global_position, GameState.beacons_placed, true).is_empty()
+	var catching: bool = reach and not spot_wins
+	if catching and not _told_reach:
 		_told_reach = true
 		_hud.push_log("SENTINEL: in reach. Press E for the catch cup.")
-	if not reach and _cup.visible:
+	if not catching and _cup.visible:
 		_cup.hide()
-	_in_reach = reach
-	if not reach:
+	_in_reach = catching
+	if not catching:
 		_told_reach = false
-	# One target for the prompt and for E: the Sentinel's catch comes first.
-	_hub_near = LavaHub.nearest(_rover.global_position, GameState.beacons_placed) if _rover.away_text() == "" and not reach else {}
+	# One target for the prompt and for E: the Sentinel's catch comes first, unless
+	# a held beacon has an empty spot in reach.
+	_hub_near = LavaHub.nearest(_rover.global_position, GameState.beacons_placed, spot_wins) if rover_free and not catching else {}
 	_tell_hub()
 
 

@@ -313,3 +313,43 @@ func test_a_save_with_the_beacon_step_done_but_too_few_beacons_is_refused() -> S
 
 func test_the_protocol_moved_with_the_beacon_command_and_field() -> String:
 	return "" if CoopSession.PROTOCOL >= 18 else "place_beacon and beacons_placed are new on the wire: PROTOCOL must be 18 or more."
+
+
+func test_the_host_allows_a_little_slack_on_the_reach() -> String:
+	var gs: GameStateScript = _state()
+	_go(gs, "spot_west")
+	var spot: Vector3 = LavaHub.spot_position("spot_west")
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, spot + Vector3(LavaHub.REACH_M + LavaHub.HOST_REACH_SLACK_M + 0.1, 0.0, 0.0))
+	var too_far: String = gs.place_beacon("spot_west", HOST)
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, spot + Vector3(LavaHub.REACH_M + LavaHub.HOST_REACH_SLACK_M - 0.1, 0.0, 0.0))
+	var lagging: String = gs.place_beacon("spot_west", HOST)
+	gs.free()
+	if too_far == "":
+		return "A rover just past the slack was accepted."
+	return lagging
+
+
+func test_a_save_with_the_run_done_but_a_spot_empty_is_refused() -> String:
+	var gs: GameStateScript = _state()
+	_go(gs, "spot_west")
+	gs.place_beacon("spot_west", HOST)
+	gs.quest_state["beacon_run"]["done"] = 3
+	var short: String = gs.farm_dict_problem(gs.farm_to_dict())
+	gs.quest_state["beacon_run"]["done"] = -1
+	for spot_id: String in ["spot_east", "spot_north"]:
+		_go(gs, spot_id)
+		gs.place_beacon(spot_id, HOST)
+	gs.quest_state["beacon_run"]["done"] = 3
+	var full: String = gs.farm_dict_problem(gs.farm_to_dict())
+	gs.free()
+	if short == "":
+		return "A finished Beacon Run with one beacon down was accepted."
+	return full
+
+
+func test_only_spots_leaves_out_the_rack_and_the_board() -> String:
+	var at: Vector3 = LavaHub.rack_position()
+	if LavaHub.nearest(at, [], true).get("kind") == LavaHub.RACK:
+		return "The rack was found when only spots were asked for."
+	var spot: Dictionary = LavaHub.nearest(LavaHub.spot_position("spot_north"), [], true)
+	return "" if spot.get("id") == "spot_north" else "The north spot was not found: %s" % [spot]

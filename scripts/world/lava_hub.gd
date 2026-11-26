@@ -20,6 +20,9 @@ const RACK_CELL := Vector2i(13, 18)
 const BOARD_CELL := Vector2i(8, 18)
 ## How near the rover must be to use one [PLACEHOLDER]. A cell is 3 m wide.
 const REACH_M: float = 4.0
+## Extra metres the host allows on top of REACH_M [PLACEHOLDER]: the reliable place
+## command can arrive before the guest's latest (unreliable) rover position does.
+const HOST_REACH_SLACK_M: float = 1.5
 ## The quest that hands out the beacons (data/quests.json).
 const QUEST: String = "beacon_run"
 ## What `nearest` calls what it found.
@@ -66,7 +69,7 @@ static func reach_problem(spot_id: String, zone: String, known: bool, at: Vector
 	if zone != ZONE or not known:
 		return "The rover is not in the Lava Tubes."
 	var there: Vector3 = spot_position(spot_id)
-	if Vector2(there.x - at.x, there.z - at.z).length() > REACH_M:
+	if Vector2(there.x - at.x, there.z - at.z).length() > REACH_M + HOST_REACH_SLACK_M:
 		return "The rover is too far from that spot."
 	return ""
 
@@ -91,7 +94,13 @@ static func steps_problem(quests: Array, quest_state: Variant, placed: int) -> S
 		if not quest is Dictionary or not quest.get("steps") is Array:
 			continue
 		var entry: Variant = quest_state.get(str(quest.get("id", "")))
-		if not entry is Dictionary or not entry.get("steps_done") is Array:
+		if not entry is Dictionary:
+			continue
+		# A finished Beacon Run needs all its beacons down: with fewer, the spots
+		# could never be filled again (job_problem refuses a done run).
+		if str(quest.get("id", "")) == QUEST and int(entry.get("done", -1)) >= 0 and placed < SPOTS.size():
+			return "'%s' is done and its beacons are not all placed." % QUEST
+		if not entry.get("steps_done") is Array:
 			continue
 		for step: Variant in quest["steps"]:
 			if step is Dictionary and str(step.get("check", "")) == "beacons_placed" \
@@ -115,13 +124,15 @@ static func placed_problem(placed: Array) -> String:
 ## What a rover at `at` can use: { "kind": RACK, BOARD or SPOT, "id": spot id or
 ## "" } for the nearest one within REACH_M, or {}. A spot that has a beacon is
 ## nothing to use.
-static func nearest(at: Vector3, placed: Array) -> Dictionary:
+## `only_spots` leaves the rack and the board out (a holder of a beacon asking
+## whether an empty spot is in reach).
+static func nearest(at: Vector3, placed: Array, only_spots: bool = false) -> Dictionary:
 	var found: Dictionary = {}
 	var best: float = REACH_M
-	var options: Array[Dictionary] = [
-		{ "kind": RACK, "id": "", "at": rack_position() },
-		{ "kind": BOARD, "id": "", "at": board_position() },
-	]
+	var options: Array[Dictionary] = []
+	if not only_spots:
+		options.append({ "kind": RACK, "id": "", "at": rack_position() })
+		options.append({ "kind": BOARD, "id": "", "at": board_position() })
 	for spot_id: String in SPOTS:
 		if not spot_id in placed:
 			options.append({ "kind": SPOT, "id": spot_id, "at": spot_position(spot_id) })

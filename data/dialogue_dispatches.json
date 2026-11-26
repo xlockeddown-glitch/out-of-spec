@@ -275,7 +275,7 @@
       "hub": {
         "rack_take": "One beacon, off the rack. Now set it down further in.",
         "rack_holding": "You have one in your hand already. Put it down first.",
-        "rack_no_job": "Take the job from the notice board first. Then the beacons are yours to set.",
+        "rack_no_job": "The beacon run is not open yet. Check back in a moment.",
         "rack_empty":"The rack is bare. Every beacon I had is lit somewhere in there.",
         "spot_placed": "That one is lit. I can see it from here, or I could if I were there.",
         "spot_needs_beacon": "Nothing in your hands. The rack by the mouth has the beacons."
