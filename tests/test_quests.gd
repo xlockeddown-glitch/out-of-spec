@@ -105,9 +105,9 @@ func test_shipped_quests_are_readable() -> String:
 		for step: Dictionary in quest["steps"]:
 			if str(step.get("id", "")) == "" or str(step.get("text", "")) == "" or not str(step.get("check", "")) in known:
 				return "%s has a step with no id, no text or a check this build can't read." % quest["id"]
-		var line: String = str(quest.get("rewards", {}).get("phone", ""))
-		if line.contains("/") and QuestEngine.phone_line(line) == line:
-			return "%s's phone line is a path with no text at it." % quest["id"]
+		for line: String in [str(quest.get("rewards", {}).get("phone", "")), str(quest.get("offer_line", ""))]:
+			if line.contains("/") and QuestEngine.phone_line(line) == line:
+				return "%s's phone line or offer line is a path with no text at it." % quest["id"]
 	return "" if L1 in ids and L3 in ids else "L1 and L3 must ship: %s" % [ids]
 
 
@@ -550,7 +550,7 @@ func _check_rewards(gs: GameStateScript) -> String:
 		return "The quest point is the player's: %s" % [gs.quest_points]
 	if gs.action_counts.has(HOST):
 		return "A quest's lump is not counted as an action."
-	var said: String = "QUEST DONE: Test paid. Reward: %s CR, 60 lab XP, 30 Calibration XP, 1 quest point." % SP811.integer(1500)
+	var said: String = "QUEST DONE: Test paid. Reward: %s CR, 60 lab XP, 30 Calibration XP, 1 quest point, an XP certificate (200 XP)." % SP811.integer(1500)
 	if not _has_line(gs, said) or not _has_line(gs, "LIN: Good work."):
 		return "The reward is said on the phone: %s" % [gs.phone_log]
 	# A second look, more credits, and a save and load: nothing more.

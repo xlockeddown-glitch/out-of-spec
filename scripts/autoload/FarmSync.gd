@@ -16,6 +16,7 @@ const SENDER: String = "The host's farm"
 const SHOWN_BY: Dictionary = {
 	&"lab_xp_changed": ["lab_xp"],
 	&"quests_changed": ["quest_state", "quest_points"],
+	&"xp_certificates_changed": ["xp_certificates"],
 	&"molt_changed": ["dome_species_id", "molt_progress", "molt_stage", "exuvia_until_day"],
 	&"enclosures_changed": ["enclosures"],
 	&"silk_changed": ["optical_silk_spools", "_spool_species", "_spool_damaged"],

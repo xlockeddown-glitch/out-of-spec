@@ -58,6 +58,8 @@ signal skill_leveled(player_id: String, skill_id: String, level: int)
 signal lab_xp_changed
 ## A quest was offered, moved on or finished (quest_state, quest_points).
 signal quests_changed
+## A player was given an XP certificate or spent one (xp_certificates).
+signal xp_certificates_changed
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -376,6 +378,18 @@ var quest_state: Dictionary = {}
 ## Player id -> quest id -> the quest points that quest paid them. Kept here for
 ## every player, guests too; a guest's own file gets them at build step 8.
 var quest_points: Dictionary = {}
+## Player id -> { certificate id: XP }: the XP certificates each player holds and
+## has not spent (docs/design/quests_levels_story.md section 4.4). A quest gives
+## one to each player who took part; its id is the quest's and a number
+## ("thirsty_probe#3"). Kept here for every player, guests too.
+## give_xp_certificate() and spend_xp_certificate() write it.
+var xp_certificates: Dictionary = {}
+## How many certificates this farm has ever given. The next one's number is one
+## more, so an id is never used again, not after a spend either.
+var xp_certificates_given: int = 0
+## Crop id -> how many of that crop Lin has bought in spec, from the whole farm.
+## sell_harvest_to_lin() is the only writer; a quest counts it.
+var crops_sold_in_spec: Dictionary = {}
 ## Robot id ("TR-1") -> { frame, name, state (ROBOT_STATES), done_day,
 ## ordered_by }. Assembled robots' sensors are in `sensors` as "sensor@robot".
 var robots: Dictionary = {}
@@ -561,7 +575,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
-	"quest_state", "quest_points"]
+	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -740,6 +754,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var quest_problem: String = QuestEngine.state_problem(data.get("quest_state", {}))
 	if quest_problem == "":
 		quest_problem = QuestEngine.points_problem(data.get("quest_points", {}))
+	if quest_problem == "":
+		quest_problem = xp_certificates_problem(data.get("xp_certificates", {}), data.get("xp_certificates_given", 0))
+	if quest_problem == "" and not QuestEngine._text_to_counts(data.get("crops_sold_in_spec", {})):
+		quest_problem = "'crops_sold_in_spec' has a count that is not a whole number."
 	if quest_problem != "":
 		return quest_problem
 	var robot_problem: String = _robots_dict_problem(data.get("robots", {}))
@@ -831,6 +849,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	farm_loaded.emit()
 	lab_xp_changed.emit()
 	quests_changed.emit()
+	xp_certificates_changed.emit()
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
 	silk_changed.emit(optical_silk_spools)
@@ -1574,6 +1593,7 @@ func _forget_a_guest(players: Array[String]) -> void:
 			skill_effect_floor.erase(player_id)
 			action_counts.erase(player_id)
 			quest_points.erase(player_id)
+			xp_certificates.erase(player_id)
 			for entry: Variant in quest_state.values():
 				if entry is Dictionary and entry.get("players") is Array:
 					(entry["players"] as Array).erase(player_id)
@@ -1876,6 +1896,100 @@ func players_present() -> Array[String]:
 	if not local_player_id in out:
 		out.append(local_player_id)
 	return out
+
+
+# --- XP certificates (docs/design/quests_levels_story.md section 4.4) ------------
+
+## Gives `player_id` an unspent certificate worth `xp` in any one skill they
+## pick. `source` names it (the quest's id). Its id is the source and the farm's
+## next certificate number, "source#3", which no other certificate of this farm
+## has or will have. Returns the id, or "" if nothing was given. On the host
+## only: the quest engine calls it.
+func give_xp_certificate(player_id: String, source: String, xp: int) -> String:
+	if player_id == "" or player_id == MANAGER_ID or source == "" or xp <= 0:
+		return ""
+	var held: Dictionary = xp_certificates.get_or_add(player_id, {})
+	xp_certificates_given += 1
+	var id: String = "%s#%d" % [source, xp_certificates_given]
+	held[id] = mini(xp, MOST_SKILL_XP)
+	xp_certificates_changed.emit()
+	return id
+
+
+## The certificates `player_id` ("" = the local player) holds: id -> XP. A copy.
+func held_xp_certificates(player_id: String = "") -> Dictionary:
+	return (xp_certificates.get(_player(player_id), {}) as Dictionary).duplicate()
+
+
+## The level `skill_id` would reach if `player_id` ("" = the local player) spent
+## `xp` on it. The same XP lifts a low level a lot and a high level a little:
+## each level costs 10 % more than the one before (data/skills.json).
+func level_with_xp(skill_id: String, xp: int, player_id: String = "") -> int:
+	return _level_for_xp(skill_xp(skill_id, player_id) + maxi(xp, 0))
+
+
+## Why `player_id` can't spend this certificate on this skill, or "".
+func xp_certificate_problem(certificate_id: String, skill_id: String, player_id: String = "") -> String:
+	if not (xp_certificates.get(_player(player_id), {}) as Dictionary).has(certificate_id):
+		return "You hold no such XP certificate."
+	if not skill_id in skill_ids() or is_farm_skill(skill_id):
+		return "That is not a skill of your own."
+	if skill_level(skill_id, player_id) >= max_skill_level():
+		return "%s is at the top level." % DataManager.get_record(SKILLS_TABLE, skill_id, "skills").get("display_name", skill_id)
+	return ""
+
+
+## Spends one of `player_id`'s certificates on one of their own skills: all its
+## XP goes there and the certificate is gone. Returns "" or why not. Counted for
+## no source, as a quest's lump is.
+func spend_xp_certificate(certificate_id: String, skill_id: String, player_id: String = "") -> String:
+	player_id = _player(player_id)
+	var problem: String = xp_certificate_problem(certificate_id, skill_id, player_id)
+	if problem != "":
+		return problem
+	var held: Dictionary = xp_certificates[player_id]
+	var xp: int = int(held[certificate_id])
+	# Gone before it pays, so nothing the XP sets off can spend it again.
+	held.erase(certificate_id)
+	if held.is_empty():
+		xp_certificates.erase(player_id)
+	give_skill_xp(skill_id, xp, player_id)
+	xp_certificates_changed.emit()
+	return ""
+
+
+## "" or why saved xp_certificates can't be loaded: player id -> id -> XP, with
+## `given`, the farm's count of certificates ever given. Each id ends in its
+## number, from 1 to `given`, and no two have the same.
+static func xp_certificates_problem(held: Dictionary, given: Variant = 0) -> String:
+	if not given is int or given < 0:
+		return "'xp_certificates_given' is not a count."
+	var numbers: Array[int] = []
+	for player: Variant in held:
+		var own: Variant = held[player]
+		if not player is String or player == "" or typeof(own) != TYPE_DICTIONARY:
+			return "'xp_certificates' has an entry that is not a player's certificates."
+		for id: Variant in own:
+			if not id is String or not own[id] is int or own[id] < 1 or own[id] > MOST_SKILL_XP:
+				return "'xp_certificates' has a certificate that is not worth whole XP."
+			var number: int = xp_certificate_number(id)
+			if number < 1 or number > given or number in numbers:
+				return "'xp_certificates' has a certificate with no number of its own."
+			numbers.append(number)
+	return ""
+
+
+## The number at the end of a certificate's id ("thirsty_probe#3" is 3), or 0.
+static func xp_certificate_number(certificate_id: String) -> int:
+	var at: int = certificate_id.rfind("#")
+	var number: String = certificate_id.substr(at + 1)
+	return maxi(int(number), 0) if at > 0 and number.is_valid_int() and str(int(number)) == number else 0
+
+
+## The source a certificate's id names ("thirsty_probe#3" is "thirsty_probe").
+static func xp_certificate_source(certificate_id: String) -> String:
+	var at: int = certificate_id.rfind("#")
+	return certificate_id.substr(0, at) if at > 0 else certificate_id
 
 
 ## A player's quest points on this farm ("" = the local player).
@@ -5409,6 +5523,9 @@ func sell_harvest_to_lin(player_id: String = "") -> int:
 		priced += crop_sale_price(entry)
 		if not entry.get("in_spec", false):
 			off_spec += 1
+		else:
+			var crop_id: String = str(entry.get("crop_id", ""))
+			crops_sold_in_spec[crop_id] = int(crops_sold_in_spec.get(crop_id, 0)) + 1
 		advanced += mini(int(entry.get("advance", 0)), lin_pays(entry, player_id))
 	harvest_bin.clear()
 	add_credits(total)

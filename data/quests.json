@@ -1,5 +1,5 @@
 {
-  "_note": "Quests (docs/design/quests_levels_story.md section 5). Every number is a [PLACEHOLDER]. Read by scripts/quests/quest_engine.gd, which only watches what GameState already keeps. A quest: kind (story, lab, personal, daily), giver (a cast id), title, scope (farm; player waits for build step 8), gates (lab_level, band, skill {id, level}, total_level, quest_points, quest_done: all must hold), offer (when: always, day_at_least with day, or any step check with its fields), steps (in order unless any_order is true) and rewards (credits, lab_xp, xp_<skill id>, quest_points, phone: a path in dialogue_dispatches.json or the line itself). A step: id, text, check and its fields, at_least (1 if left out). The count and counter checks count from the day the quest was accepted unless ever is true. Checks: stat_at_least (stat), flag (flag), band_at_least (band), owns_standard (standard_id), lab_size, count (log, where), state_is (state, is: one value or a list), level (skill: a skill id, lab or total), counter (counter: a source id of data/skills.json). Lab and daily quests pay no quest points. closed_when (when: a step check with its fields): a quest that was never offered is marked done with nothing paid once this holds, for an offer that can no longer come. A quest id and a step id are kept in saves and must never be renamed; a quest must have steps, each a dictionary with its own id. Quests are offered each morning and when a farm is opened, not after a command. The lab-level gates of the design's unlock table are not here: they wait for build step 9.",
+  "_note": "Quests (docs/design/quests_levels_story.md section 5). Every number is a [PLACEHOLDER]. Read by scripts/quests/quest_engine.gd, which only watches what GameState already keeps. A quest: kind (story, lab, personal, daily), giver (a cast id), title, scope (farm; player waits for build step 8), gates (lab_level, band, skill {id, level}, total_level, quest_points, quest_done: all must hold), offer (when: always, day_at_least with day, or any step check with its fields), offer_line (what the giver says with the offer: a path in dialogue_dispatches.json or the line itself), steps (in order unless any_order is true) and rewards (credits, lab_xp, xp_<skill id>, quest_points, xp_certificate, phone: a path in dialogue_dispatches.json or the line itself). xp_certificate is the XP one certificate is worth: each player who took part is given one and spends it on one skill of their own (SKILLS, K). It is sized to the quest, not the player, so the 10 % curve makes it lift a low level a lot and a high level a little. A step: id, text, check and its fields, at_least (1 if left out). The count and counter checks count from the day the quest was accepted unless ever is true. In a quest done in order, a later count or counter step counts from when the step before it was done (unless ever is true), so what is done early is not counted for a later step. Checks: stat_at_least (stat), flag (flag), band_at_least (band), owns_standard (standard_id), lab_size, count (log, where), state_is (state, is: one value or a list), level (skill: a skill id, lab or total), counter (counter: a source id of data/skills.json, or crops_sold_in_spec with where { crop_id }: what Lin has bought in spec). A step may carry minigame (a mini-game's id): nothing reads it until build step 11, and the step is done by its check alone. Lab and daily quests pay no quest points. closed_when (when: a step check with its fields): a quest that was never offered is marked done with nothing paid once this holds, for an offer that can no longer come. A quest id and a step id are kept in saves and must never be renamed; a quest must have steps, each a dictionary with its own id. Quests are offered each morning and when a farm is opened, not after a command. The lab-level gates of the design's unlock table are not here: they wait for build step 9.",
   "quests": [
     {
       "id": "every_sticker_counts",
@@ -30,6 +30,26 @@
           "count_from": "contract_run" }
       ],
       "rewards": { "lab_xp": 400, "phone": "npcs/oirm/quests/first_contract_done" }
+    },
+    {
+      "id": "thirsty_probe",
+      "kind": "story",
+      "giver": "lin",
+      "title": "The Thirsty Probe",
+      "scope": "farm",
+      "gates": {},
+      "offer": { "when": "day_at_least", "day": 2 },
+      "offer_line": "npcs/lin/quests/thirsty_probe_offer",
+      "steps": [
+        { "id": "kit", "text": "Own the gravimetric kit.",
+          "check": "owns_standard", "standard_id": "gravimetric_kit" },
+        { "id": "cal", "text": "Calibrate the soil probe against the gravimetric kit.",
+          "check": "count", "log": "cal_log", "where": { "instrument_id": "soil_probe", "traceable": true },
+          "minigame": "set_the_zero" },
+        { "id": "sell", "text": "Sell Lin a crate of in-spec dust turnip.",
+          "check": "counter", "counter": "crops_sold_in_spec", "where": { "crop_id": "dust_turnip" } }
+      ],
+      "rewards": { "credits": 150, "quest_points": 1, "xp_certificate": 200, "phone": "npcs/lin/quests/thirsty_probe_done" }
     }
   ]
 }

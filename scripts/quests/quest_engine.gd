@@ -11,7 +11,9 @@ extends RefCounted
 ## A farm's entry in quest_state, by quest id:
 ##   accepted    the day it was accepted
 ##   steps_done  ids of the steps that are done
-##   base        step id -> what a counting check read on that day
+##   base        step id -> what a counting check read when its step opened: on
+##               that day, or, in a quest done in order, when the step before
+##               it was done
 ##   shown       step id -> the highest count a counting step has reached; the
 ##               phone is told when it grows, and it never goes back
 ##   players     who was on the farm when any step was done (they took part)
@@ -23,8 +25,8 @@ extends RefCounted
 ##
 ## Not built yet: accept and turn-in by the player (the quest log, build step 7;
 ## until then an offered quest is accepted at once and paid when its last step
-## holds), player-scope quests (step 8), the XP certificate (step 6), mini-game
-## steps (step 11) and item rewards (step 10).
+## holds), player-scope quests (step 8), mini-game steps (step 11: a step may
+## carry "minigame", which nothing reads yet) and item rewards (step 10).
 
 const TABLE: StringName = &"quests"
 const SECTION: String = "quests"
@@ -41,6 +43,12 @@ const LOGS: Dictionary = { "cal_log": "cal_log", "job_log": "job_log", "audit_lo
 const COUNTING: Array[String] = ["count", "counter"]
 ## A reward of skill XP is "xp_<skill id>".
 const XP_PREFIX: String = "xp_"
+## A reward of an XP certificate: the XP it is worth in the one skill its holder
+## picks (section 4.4). Sized to the quest, never to the player.
+const XP_CERTIFICATE: String = "xp_certificate"
+## A `counter` that is not a source of data/skills.json: what Lin has bought in
+## spec, of the crop `where.crop_id` names or of every crop.
+const SOLD_IN_SPEC: String = "crops_sold_in_spec"
 
 
 static func quests() -> Array[Dictionary]:
@@ -95,13 +103,21 @@ static func _update_one(farm: Node, quest: Dictionary, present: Array[String], o
 	var done: Array = entry["steps_done"]
 	var moved: bool = is_new
 	var finished: Array[String] = []
+	var in_order: bool = not bool(quest.get("any_order", false))
+	# The step before this one was done in this look.
+	var opened: bool = false
 	for step: Variant in steps:
 		var step_id: String = str(step.get("id", ""))
 		if step_id in done:
 			continue
+		var counts: bool = str(step.get("check", "")) in COUNTING
+		# In order, a step counts from when it opened: what was done while an
+		# earlier step was still open is not this step's.
+		if opened and in_order and counts and not bool(step.get("ever", false)):
+			entry["base"][step_id] = check_value(farm, step, present)
+		opened = false
 		var have: int = step_count(farm, step, entry, present)
 		var need: int = step_need(step)
-		var counts: bool = str(step.get("check", "")) in COUNTING
 		var grew: bool = counts and have > int(entry["shown"].get(step_id, 0))
 		if grew:
 			entry["shown"][step_id] = have
@@ -113,18 +129,21 @@ static func _update_one(farm: Node, quest: Dictionary, present: Array[String], o
 				if not player in entry["players"]:
 					(entry["players"] as Array).append(player)
 			moved = true
+			opened = true
 			continue
 		# A count that grew is told once; a contract's run has its own line.
 		if need > 1 and grew:
 			farm.post_phone("QUEST %s: %d of %d. %s" % [title, have, need, str(step.get("text", ""))])
-		if not bool(quest.get("any_order", false)):
+		if in_order:
 			break
 	if done.size() >= steps.size():
 		_finish(farm, quest, entry, present)
 		return true
 	var next: String = current_step_text(quest, entry)
 	if is_new:
-		farm.post_phone("%s: New quest, %s. %s" % [giver_name(quest), title, next])
+		# `offer_line`: what the giver says with the offer, a path or the words.
+		var said: String = phone_line(str(quest.get("offer_line", "")))
+		farm.post_phone("%s: New quest, %s. %s%s" % [giver_name(quest), title, "" if said == "" else said + " ", next])
 	elif not finished.is_empty():
 		farm.post_phone("QUEST %s: step done. Next: %s" % [title, next])
 	return moved
@@ -169,6 +188,12 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 	if int(rewards.get("quest_points", 0)) > 0:
 		for player: String in players:
 			(farm.quest_points.get_or_add(player, {}) as Dictionary)[str(quest["id"])] = int(rewards["quest_points"])
+	# One each, held until its player spends it (GameState.spend_xp_certificate).
+	var certificate: int = int(rewards.get(XP_CERTIFICATE, 0))
+	if certificate > 0 and not players.is_empty():
+		for player: String in players:
+			farm.give_xp_certificate(player, str(quest["id"]), certificate)
+		farm.post_phone("XP CERTIFICATE: %s XP in a skill of your choice, for each player who took part. Open SKILLS (K) to spend it." % SP811.integer(certificate))
 	var line: String = phone_line(str(rewards.get("phone", "")))
 	if line != "":
 		farm.post_phone("%s: %s" % [giver_name(quest), line])
@@ -190,10 +215,12 @@ static func reward_text(quest: Dictionary) -> String:
 	var points: int = int(rewards.get("quest_points", 0))
 	if points > 0:
 		parts.append("%s quest %s" % [SP811.integer(points), "point" if points == 1 else "points"])
+	if int(rewards.get(XP_CERTIFICATE, 0)) > 0:
+		parts.append("an XP certificate (%s XP)" % SP811.integer(int(rewards[XP_CERTIFICATE])))
 	return ", ".join(parts)
 
 
-## The skill a reward key names, or "" (the certificate is build step 6).
+## The skill a reward key names, or "" (the certificate names none).
 static func _reward_skill(key: String) -> String:
 	if not key.begins_with(XP_PREFIX):
 		return ""
@@ -341,8 +368,8 @@ static func step_need(step: Dictionary) -> int:
 	return maxi(int(step.get("at_least", 1)), 1)
 
 
-## What a step has: its check's reading, less what it read on the day the quest
-## was accepted for a counting check that is not `ever`. A count never goes
+## What a step has: its check's reading, less what it read when the step opened
+## (`base`) for a counting check that is not `ever`. A count never goes
 ## back: the highest it has reached is kept (a forgotten guest's actions leave
 ## the farm's counters).
 static func step_count(farm: Node, step: Dictionary, entry: Dictionary, present: Array[String]) -> int:
@@ -403,11 +430,23 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String]) ->
 		"level":
 			return _best_level(farm, str(step.get("skill", "")), present)
 		"counter":
+			if str(step.get("counter", "")) == SOLD_IN_SPEC:
+				return _sold_in_spec(farm, step.get("where", {}))
 			var total: int = 0
 			for player: String in farm._known_players():
 				total += farm.action_count(str(step.get("counter", "")), player)
 			return total
 	return 0
+
+
+static func _sold_in_spec(farm: Node, where: Variant) -> int:
+	var sold: Dictionary = farm.crops_sold_in_spec
+	if where is Dictionary and where.has("crop_id"):
+		return int(sold.get(str(where["crop_id"]), 0))
+	var total: int = 0
+	for count: Variant in sold.values():
+		total += int(count)
+	return total
 
 
 static func _count_rows(farm: Node, log_name: String, where: Variant) -> int:

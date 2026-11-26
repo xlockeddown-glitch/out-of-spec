@@ -202,6 +202,13 @@
         "When a solar flare hits, park the bots and stay indoors. Saves me welding your bumper back on."
       ]
     },
+    "lin": {
+      "name": "Dr. Lin",
+      "quests": {
+        "thirsty_probe_offer": "Your irrigation thinks the bed is at 40 %. Your turnip disagrees. I trust the turnip.",
+        "thirsty_probe_done": "Your probe is lying to you. Was. Better."
+      }
+    },
     "vance": {
       "name": "Inspector Vance",
       "quests": {
