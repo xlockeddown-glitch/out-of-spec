@@ -1282,3 +1282,11 @@ Ryan: "Hills then tunnels for growth if we can do digging and destruction in par
 - A reference block whose cell is now under or beside a terrace piece can't be dug up, as beside the other rocks. A rover moved out of a rock now ends clear of every rock, not only the last one.
 - Players getting out of the rover each try a side of their own first, by their place in the roster (left, right, behind, in front), so two who press F at once don't stand on one spot unless a side is blocked: the next one tried may be the other's own. A spot someone stands on is used only if no other is clear.
 - The edge of the land stops a driving rover, one wheelbase in, where a load already put it. Before, it could drive off and fall, and beyond 500 m down the host's word of it ended every guest's session. The 500 m limit stays.
+
+## Cobalt Sentinel: real care numbers (2026-11-25)
+- Ryan: the Sentinel (real species Cyriopagopus lividus, formerly Haplopelma lividum) uses real cobalt blue tarantula care figures instead of invented ones. Sources and URLs are in `_source` in `data/tarantula_species.json`.
+- Temperature: three keeper sources overlap at 24 to 26 °C (the others read 20 to 26, 23.9 to 27.8 and 23.3 to 27.8). The game has one ideal, so it is the midpoint, 25 °C (was 22 [PLACEHOLDER]).
+- Humidity: 75 to 85 % in two sources (a third says 70 to 80 %). Ideal is the midpoint, 80 %, unchanged but now sourced.
+- Tolerances (±3 °C, ±8 %) are still the art bible's; no source gives them.
+- Molt: only one source gives an interval, 1 to 7 months, stored as `molt_interval_days_range` [30, 210], and it is not used by the game yet. No source gives days by life stage or a premolt length, so `molt_days` and `premolt_days` stay unset [PLACEHOLDER]. The tank still molts on the playtest pace (`GameState.PLAYTEST_MOLT_DAYS`).
+- Left for GameState.gd (another PR touches it): the comment on `PLAYTEST_MOLT_DAYS` says to use the species' molt_days; it stays correct until a sourced value exists.

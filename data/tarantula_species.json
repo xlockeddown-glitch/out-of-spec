@@ -47,21 +47,23 @@
   {
     "id": "cobalt_sentinel",
     "common_name": "Cobalt Sentinel",
-    "scientific_name": null,
+    "scientific_name": "Cyriopagopus lividus",
     "tier": "alien",
     "source": "worldbuilding_art_bible",
     "substrate": "Damp frontier moss & slate",
-    "ideal_temp_c": 22,
+    "ideal_temp_c": 25,
     "temp_tolerance_c": 3.0,
     "ideal_humidity_pct": 80,
     "humidity_tolerance_pct": 8,
     "molt_days": null,
+    "molt_interval_days_range": [30, 210],
+    "premolt_days": null,
     "silk_grade": null,
     "optical_silk_yield": null,
     "lag_reduction_pct": 25,
     "output": "Standard optical silk",
     "unlock": "Cuts Day 1 tractor input lag when slotted into the dish (bible: 25 %).",
-    "_note": "ideal_temp_c and ideal_humidity_pct: invented [PLACEHOLDER]. null is not set yet."
+    "_source": "Real cobalt blue tarantula (Cyriopagopus lividus, formerly Haplopelma lividum) care, read 2026-11-25. Temperature: The Tarantula Collective 20-26 C (https://www.thetarantulacollective.com/caresheets/cyriopagopus-lividus); Exotics Source 75-82 F = 23.9-27.8 C (https://exoticssource.com/blogs/exotic-topics/cobalt-blue-tarantula-cyriopagopus-lividum-complete-care-guide); The Defiant Forest 74-82 F = 23.3-27.8 C (https://www.thedefiantforest.com/blogs/news/cobalt-blue-tarantula-care-guide-cobalt-blue-tarantulas-cyriopagopus-lividus-size-origin-temperament-and-care). They overlap at 24-26 C, so ideal_temp_c is its midpoint, 25. Humidity: Exotics Source 75-85 % and The Tarantula Collective 75-85 % (breeding section); The Defiant Forest 70-80 %. ideal_humidity_pct is the midpoint of 75-85, 80 (unchanged). The tolerances (+-3 C, +-8 %) are still the art bible's, not from these sources. Molt: only Bantam Earth gives an interval, one to seven months (30-210 days, https://bantam.earth/cobalt-blue-tarantula-cyriopagopus-lividus/), and says it lengthens with age; no source gives days by life stage or a premolt length. molt_days (the game's tank molt) and premolt_days stay unset [PLACEHOLDER]; the tank still molts on the playtest pace."
   },
   {
     "id": "terracotta_knee",

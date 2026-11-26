@@ -135,3 +135,20 @@ func test_its_silk_cuts_the_lag_to_030_and_may_replace_the_curlyhairs() -> Strin
 		if gs._take_spool(true)[0] != curlyhair:
 			return "The Sentinel's spool must be kept back."
 		return "")
+
+
+func test_the_sentinel_uses_real_cobalt_blue_care_figures() -> String:
+	return _run(func(gs: GameStateScript) -> String:
+		var species: Dictionary = DataManager.tarantulas.get(SENTINEL, {})
+		if species.is_empty():
+			return "The Sentinel must be in the species data."
+		if absf(float(species.get("ideal_temp_c", NAN)) - 25.0) > 0.001 or absf(float(species.get("ideal_humidity_pct", NAN)) - 80.0) > 0.001:
+			return "Ideal should be 25 C and 80 % (midpoints of the cited care ranges)."
+		if str(species.get("scientific_name", "")) != "Cyriopagopus lividus" or not str(species.get("_source", "")).contains("https://"):
+			return "The species must name Cyriopagopus lividus and cite its sources."
+		var interval: Array = species.get("molt_interval_days_range", [])
+		if interval.size() != 2 or float(interval[0]) >= float(interval[1]):
+			return "The molt interval range must be a min and a max."
+		if species.get("premolt_days") != null:
+			return "No source gives a premolt length, so it stays unset."
+		return "")
