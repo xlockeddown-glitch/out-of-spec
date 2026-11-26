@@ -347,6 +347,14 @@ func test_a_save_with_the_run_done_but_a_spot_empty_is_refused() -> String:
 	return full
 
 
+func test_a_done_that_is_not_a_number_is_left_to_the_quest_check() -> String:
+	var quests: Array = [{ "id": LavaHub.QUEST, "steps": [] }]
+	for bad: Variant in [{}, [], "3", null]:
+		if LavaHub.steps_problem(quests, { LavaHub.QUEST: { "done": bad } }, 0) != "":
+			return "steps_problem judged a 'done' of %s instead of leaving it." % str(bad)
+	return ""
+
+
 func test_only_spots_leaves_out_the_rack_and_the_board() -> String:
 	var at: Vector3 = LavaHub.rack_position()
 	if LavaHub.nearest(at, [], true).get("kind") == LavaHub.RACK:

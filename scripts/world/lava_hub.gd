@@ -98,7 +98,10 @@ static func steps_problem(quests: Array, quest_state: Variant, placed: int) -> S
 			continue
 		# A finished Beacon Run needs all its beacons down: with fewer, the spots
 		# could never be filled again (job_problem refuses a done run).
-		if str(quest.get("id", "")) == QUEST and int(entry.get("done", -1)) >= 0 and placed < SPOTS.size():
+		# A `done` that is not a number is the quest validator's to report.
+		var done: Variant = entry.get("done", -1)
+		if str(quest.get("id", "")) == QUEST and (done is int or done is float) \
+				and int(done) >= 0 and placed < SPOTS.size():
 			return "'%s' is done and its beacons are not all placed." % QUEST
 		if not entry.get("steps_done") is Array:
 			continue
