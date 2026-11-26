@@ -1796,3 +1796,33 @@ Torque to Spec (section 7.1 row 4) needs a rover repair action to plug into, and
 6. The host does not check the rover is in the bay, the same as for wide treads. Tighten both, or leave both?
 7. When Torque to Spec is built, what should a good score be worth: more XP on the service (as the spool does), a longer distance to the next one, or only a quest grade?
 8. The key is Y and Bram's words are placeholders. Change any?
+
+## 2026-11-26: Torque to Spec (build order step 16 of `docs/design/quests_levels_story.md`, mini-game 4)
+
+Built from section 7 of the design (7.1 row 4, 7.2 to 7.6), on Bram's wheel service. It follows Thread the Spool's pattern throughout. Every number is a placeholder and is a named constant in `scripts/minigames/torque_to_spec.gd` or a row of `MinigameScore.GRADES`.
+
+- **The game**: five wheel nuts, tightened in star order (top, then two places on each time). The wheel shows which nut is next by a ring, a pointer and its number, not by colour alone. For each nut the player presses and holds one button while the torque climbs a bar, and lets go at the click line. The game moves in whole steps of 1/60 s with the remainder carried, so the frame rate does not change a score.
+- **Seeded**: the seed sets each nut's click line (60 to 85 % of the bar), how long a steady climb takes to reach it (0.9 to 1.5 s on Standard) and where the climb's surge starts. The climb swells and eases by 30 % but never stops or runs back. The same seed and the same presses give the same score.
+- **Nothing moves before a press**: each nut waits for a press of its own, with no clock on the wait. [ASSUMPTION: the design says nothing moves before the first press; waiting before every nut is kinder and costs nothing.]
+- **The hold cap**: no hold runs over 2.5 s (section 7.5 allows 3 s). At the cap, or at the bar's end, the game lets go and that is the nut's torque: by then it is over the line on every difficulty. A key still held down does not start the next nut.
+- **The score**: a nut's closeness is 100 on the line, 95 at the sweet spot's edge, and falls in a line to 0 at eight half-widths; under and over count the same. The score is the mean of the five, 0 to 100.
+- **Calibration** (section 7.3): widens the sweet spot, to twice as wide at level 99, by `MinigameScore.sweet_share`, the same front-loaded curve the other games use. The base sweet spot is 4 % of the bar each side. Relaxed is 50 % wider with a climb at 0.7 speed; Sharp is 25 % narrower at 1.2 speed; Off opens no game.
+- **When it plays** (section 7.4): only while this player has an open quest step that carries `torque_to_spec`, the nuts are due, the rover is in Bram's bay and stopped, and the player is in it. Such a step must be a counter of `service_wheels`, or the quest does not load. Skip, the game switched off, and a farm with no such step all service the wheels as before.
+- **The quest**: `to_the_click` (Bram, kind lab, farm-wide), offered on a morning with the nuts due; one step, a wheel service; 60 CR and 100 lab XP. Kind lab and farm-wide because the rover is the farm's, as the relay is for `a_clean_line`. The offer uses one new check, `wheels_due`, which reads `GameState.wheels_due()`. Its words and pay are placeholders.
+- **What a score does**: the host hands its cut of the score to `GameState.service_wheels(player_id, score)`, which reads it in one place: that service's Robotics XP and lab XP are times 1.15 (Good), 1.3 (Fine) or 1.5 (Reference). The score is also kept with the quest step, so the quest pays its Fine or Reference bonus and Bram has a Reference line. The meters reset, the distance to the next service and everything else are the same at every score. A test lists the saved farm fields that may differ (XP, credits, the quest's state, the phone) and fails on any other.
+- **Not built, on purpose**: section 7.2 says a repair's score "scales how long the repair lasts". Here the next service is due after the same 1500 m at any score, and no wear or penalty was added.
+- **Skip and a poor try**: a score under 60 leaves the farm exactly as a skip leaves it. A test compares the whole saved farm and the phone log.
+- **The host's cut**: `service_wheels` is now in `FarmCommands.SCORED`, so the score rides as the command's last argument: the protocol is still 16 and the save version still 1. No farm field was added. With no open step for the sender the score becomes SKIPPED; otherwise it is held to 0 to 100. A refused service (not due, on foot, in the tunnels) takes no score.
+- **The phone**: no look was changed. The game is its own overlay scene, copied from Hold the Reading's.
+- **Not built**: the practice swing (section 7.5).
+
+### Questions for Ryan
+
+1. Should a good torque make the service last longer (section 7.2)? Today the score changes only XP and the quest's grade; the next service is always 1500 m on. This also answers question 7 of the wheel service: for now, more XP and a quest grade.
+2. "To the Click" is offered once, so the game is played once per farm, as with "A Clean Line". Should it come back at every service (a repeating ask from Bram), or play at every service with no quest at all?
+3. Quests are offered in the morning. If the nuts come due and are serviced the same day, Bram never asks that time; he asks on the next morning they are due. All right?
+4. Each nut waits for its own press, so the player can rest between nuts. Or should the five run on one clock after the first press?
+5. Over the line counts the same as under. Should an over-torqued nut score worse (it is the worse fault on a real wheel)?
+6. The numbers: click lines at 60 to 85 % of the bar, climbs of 0.9 to 1.5 s, a 30 % surge, a sweet spot of 4 % each side (8 % at Calibration 99), a 2.5 s hold cap. Say if any feels wrong when played.
+7. Bram's three lines, 60 CR and 100 lab XP are placeholders. Change any?
+8. No practice swing here either. Add one?

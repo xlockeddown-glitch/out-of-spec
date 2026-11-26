@@ -26,6 +26,9 @@ const HOLD_SKILL: String = "uncertainty"
 ## Mini-game 5 (section 7.1), and the skill that slows its sway (section 7.3).
 const THREAD_THE_SPOOL: String = "thread_the_spool"
 const THREAD_SKILL: String = "husbandry"
+## Mini-game 4 (section 7.1), played as Bram's wheel service. The skill that
+## widens its sweet spot is Calibration (SKILL), as for Set the Zero.
+const TORQUE_TO_SPEC: String = "torque_to_spec"
 ## The games played at the bench before ZERO / CALIBRATE. Which one an
 ## instrument gets is game_for(); a quest step may name either.
 const BENCH_GAMES: Array[String] = [SET_THE_ZERO, HOLD_THE_READING]
@@ -39,8 +42,8 @@ const SETTLING_STANDARDS: Array[String] = ["humidity_generator", "pressure_contr
 ## `quest_bonus` is the quest grade's "bonus": that share of the quest's credits
 ## more [ASSUMPTION: the design gives no size; these are its paid-job bonus,
 ## 10 % and 20 %]. `giver_line`: the giver has a line for it. `xp` is section
-## 7.2's XP multiplier for the action; only Thread the Spool uses it so far
-## (xp_factor).
+## 7.2's XP multiplier for the action; Thread the Spool and Torque to Spec use
+## it (xp_factor).
 const GRADES: Array[Dictionary] = [
 	{ "from": 95, "name": "Reference", "residual": 0.4, "xp": 1.5, "quest_bonus": 0.2, "giver_line": true },
 	{ "from": 80, "name": "Fine", "residual": 0.6, "xp": 1.3, "quest_bonus": 0.1, "giver_line": false },
@@ -232,6 +235,18 @@ static func seat_allowed(farm: Node, player_id: String, score: int) -> int:
 	return clampi(score, 0, MAX_SCORE)
 
 
+## The host's cut of a score that came with a wheel service (Torque to Spec):
+## SKIPPED unless this player has an open quest step that carries the game
+## (section 7.4), else held to 0 to MAX_SCORE. As for the seat, the number is
+## the sender's word and is worth XP: at most the service's own XP times the
+## table's best `xp`, and only while that step is open (the service that counts
+## closes it).
+static func service_allowed(farm: Node, player_id: String, score: int) -> int:
+	if not QuestEngine.has_minigame_step(farm, TORQUE_TO_SPEC, "", player_id):
+		return SKIPPED
+	return clampi(score, 0, MAX_SCORE)
+
+
 ## Sets the factor the instrument's next calibration takes: on its as-left
 ## residual for Set the Zero, on the operator's uncertainty term for Hold the
 ## Reading, never both. A skip sets 1.0.
@@ -275,3 +290,15 @@ static func seat_text(score: int) -> String:
 	if factor > 1.0:
 		gain = ", %d %% more XP for the seat" % roundi((factor - 1.0) * 100.0)
 	return "Seat score %d of %d: %s%s." % [score, MAX_SCORE, grade_name(score).to_upper(), gain]
+
+
+## "Torque score 97 of 100: REFERENCE, 50 % more XP for the service." A poor
+## try: "..., standard result."
+static func service_text(score: int) -> String:
+	if score < 0:
+		return ""
+	var factor: float = xp_factor(score)
+	var gain: String = ", standard result"
+	if factor > 1.0:
+		gain = ", %d %% more XP for the service" % roundi((factor - 1.0) * 100.0)
+	return "Torque score %d of %d: %s%s." % [score, MAX_SCORE, grade_name(score).to_upper(), gain]

@@ -2,8 +2,10 @@ extends RefCounted
 ## Bram's wheel service (docs/decisions.md, 2026-11-26): the rover's wheel nuts
 ## come due after so many meters driven, and Bram re-torques them for Robotics
 ## XP and lab XP. Nothing is worse while they are overdue. Torque to Spec
-## (docs/design/quests_levels_story.md section 7.1) will plug into this action;
-## it is not built, and no score is taken here.
+## (docs/design/quests_levels_story.md section 7.1) plugs into this action: its
+## score rides as the command's last argument, and tests/test_torque_to_spec.gd
+## has what the host does with one. Here no quest step is open, so a score is
+## a skip.
 
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 const CommandsScript: GDScript = preload("res://scripts/autoload/FarmCommands.gd")
@@ -148,9 +150,9 @@ func test_bram_refuses_with_a_reason() -> String:
 			return "On foot is refused: %s" % [on_foot]
 		if commands.execute("", ACTION, []) == "":
 			return "No player named is refused."
-		# No game is built, so no player may send a score.
-		if ACTION in CommandsScript.SCORED or commands.problem(ACTION, [100]) == "" or commands.execute(HOST, ACTION, [100]) == "":
-			return "A score is not taken until Torque to Spec is built."
+		# Torque to Spec's score is one whole number, or there is none.
+		if not ACTION in CommandsScript.SCORED or commands.problem(ACTION, ["100"]) == "" or commands.problem(ACTION, [90, 90]) == "":
+			return "A score is one whole number or none."
 		if gs.skill_xp(SKILL, HOST) != 0 or gs.lab_xp != 0 or not gs.wheels_due() or gs.action_count(SOURCE, HOST) != 0:
 			return "A refusal changes nothing."
 		return "")
@@ -186,16 +188,22 @@ func test_a_service_gives_robotics_xp_and_lab_xp() -> String:
 		return "")
 
 
-func test_the_score_argument_is_not_read_yet() -> String:
+func test_a_score_with_no_quest_step_is_a_skip() -> String:
 	return _run(func() -> String:
-		var skip: Node = _farm().state
-		var best: Node = _farm().state
-		for gs: Node in [skip, best]:
-			gs.add_rover_usage(gs.wheel_service_due_m(), HOST)
-		if skip.service_wheels(HOST) != "" or best.service_wheels(HOST, 100) != "":
+		# No morning has gone by, so no quest carries Torque to Spec.
+		var skip: Node = _farm()
+		var best: Node = _farm()
+		for commands: Node in [skip, best]:
+			commands.state.add_rover_usage(commands.state.wheel_service_due_m(), HOST)
+		if skip.execute(HOST, ACTION, []) != "" or best.execute(HOST, ACTION, [100]) != "":
 			return "Both are serviced."
-		if var_to_str(skip.farm_to_dict()) != var_to_str(best.farm_to_dict()):
-			return "Until the game is built a score changes nothing."
+		if var_to_str(skip.state.farm_to_dict()) != var_to_str(best.state.farm_to_dict()):
+			return "With no quest step open the host makes a score a skip."
+		# The farm's own function takes the score as given: the host's cut is in FarmCommands.
+		var direct: Node = _farm().state
+		direct.add_rover_usage(direct.wheel_service_due_m(), HOST)
+		if direct.service_wheels(HOST, 100) != "" or direct.action_xp(SOURCE, HOST) != roundi(25 * 1.5) or direct.wheel_meters != 0.0:
+			return "A graded score multiplies the service's XP and nothing else: %d." % direct.action_xp(SOURCE, HOST)
 		return "")
 
 

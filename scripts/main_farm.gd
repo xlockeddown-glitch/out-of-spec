@@ -22,6 +22,7 @@ const SOIL_PROBE_PROP: String = "soil_moisture_probe"
 const CISTERN_PROP: String = "water_cistern"
 const WRING_SCENE: PackedScene = preload("res://ui/minigames/wring_the_blocks.tscn")
 const SPOOL_SCENE: PackedScene = preload("res://ui/minigames/thread_the_spool.tscn")
+const TORQUE_SCENE: PackedScene = preload("res://ui/minigames/torque_to_spec.tscn")
 
 ## Within this far of the relay mast the Q check reads the dish; elsewhere, the
 ## rover's own steering encoder [PLACEHOLDER].
@@ -53,6 +54,7 @@ var _robots_ui: RobotsUI
 ## Wring the Blocks, made the first time J opens it.
 var _wring_game: WringTheBlocks
 var _spool_game: ThreadTheSpool
+var _torque_game: TorqueToSpec
 ## Sum of the dug depths when last looked at, to tell a dig from a fill.
 var _dug_depth: int = 0
 ## When this screen last pressed dig, so a snapshot or the other player's dig isn't ours.
@@ -858,15 +860,51 @@ func _try_trade() -> void:
 	_refresh_bram()
 
 
-## Bram re-torques the wheel nuts: one press, and only when they are due.
+## Bram re-torques the wheel nuts: one press, and only when they are due. While
+## this player has an open quest step that carries Torque to Spec, the player
+## does the five nuts first; the service is the same whatever the score.
 func _try_wheel_service() -> void:
 	if _refuse_on_foot():
 		return
 	if not _bram_bay.rover_inside:
 		return
+	if _torque_game != null and _torque_game.is_playing():
+		return
 	_armed_standard = ""
-	var problem: String = await FarmCommands.request(&"service_wheels")
-	if not is_inside_tree() or not _bram_bay.rover_inside:
+	var arguments: Array = []
+	var torque: String = ""
+	var due: bool = QuestEngine.has_minigame_step(GameState, MinigameScore.TORQUE_TO_SPEC, "", GameState.local_player_id)
+	if due and GameState.wheels_due() and not GameState.rover_in_tunnels and MinigameSettings.mode() != MinigameSettings.Mode.OFF:
+		# The game takes the rover's controls: a rover that is rolling through
+		# the bay is stopped first, as for Thread the Spool.
+		if _rover.away_text() == "" and not _rover.is_stopped():
+			_bram_line = "Stop the rover first."
+			_hud.push_log("BRAM: Stop the rover first.")
+			_refresh_bram()
+			return
+		if _torque_game == null:
+			_torque_game = TORQUE_SCENE.instantiate()
+			_hud.get_parent().add_child(_torque_game)
+		var was_blocked: bool = RoverController.input_blocked
+		RoverController.input_blocked = true
+		# The clock is in the seed: the next service's nuts do not click the same.
+		var motion_seed: int = hash([roundi(GameState.wheel_meters), Time.get_ticks_usec()])
+		var share: float = MinigameScore.sweet_share(GameState, GameState.local_player_id)
+		_torque_game.play(share, MinigameSettings.mode(), motion_seed, "The rover's wheel nuts")
+		var score: int = await _torque_game.finished
+		RoverController.input_blocked = was_blocked
+		if not is_inside_tree():
+			return
+		if score >= 0:
+			# With no game played nothing more is sent: the service is as it always was.
+			arguments = [score]
+			torque = " " + MinigameScore.service_text(score)
+	var problem: String = await FarmCommands.request(&"service_wheels", arguments)
+	if not is_inside_tree():
+		return
+	if problem.is_empty() and torque != "":
+		_hud.push_log("WHEEL NUTS:%s" % torque)
+	if not _bram_bay.rover_inside:
 		return
 	if problem.is_empty():
 		_bram_line = "Five nuts, star order, each to the click. You're good for another %s m." % SP811.integer(roundi(GameState.wheel_service_due_m()))

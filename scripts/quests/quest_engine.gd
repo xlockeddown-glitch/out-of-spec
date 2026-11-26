@@ -99,7 +99,7 @@ const LOGS: Dictionary = { "cal_log": "cal_log", "job_log": "job_log", "audit_lo
 const COUNTING: Array[String] = ["count", "counter"]
 ## The checks check_value() knows: what a step's `check` may be, and with
 ## `always` and `day_at_least` (WHENS) what a `when` may be.
-const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open"]
+const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due"]
 ## A `when` that is not a step check (offer_holds).
 const WHENS: Array[String] = ["always", "day_at_least"]
 ## A reward of skill XP is "xp_<skill id>".
@@ -118,8 +118,10 @@ const SOLD_IN_SPEC: String = "crops_sold_in_spec"
 ## instrument has that day (MinigameScore.game_for), whichever of the two the
 ## step names, and that play grades the step. A Thread the Spool step is a
 ## `counter` of spools seated in the relay (the `slot_spool` source): the game
-## is played as the spool goes in.
-const MINIGAMES: Array[String] = ["set_the_zero", "hold_the_reading", "wring_the_blocks", "thread_the_spool"]
+## is played as the spool goes in. A Torque to Spec step is a `counter` of
+## Bram's wheel services (the `service_wheels` source): the game is played as
+## the nuts are done.
+const MINIGAMES: Array[String] = ["set_the_zero", "hold_the_reading", "wring_the_blocks", "thread_the_spool", "torque_to_spec"]
 ## A `counter` that is not a source of data/skills.json: the reference blocks the
 ## farm has dug up. As a counter it counts from when its step opened, so it is
 ## "find three more".
@@ -594,6 +596,9 @@ static func data_problem(quest: Dictionary) -> String:
 			elif step["minigame"] == MinigameScore.THREAD_THE_SPOOL:
 				if not is_seat_step(step):
 					return "step '%s' has Thread the Spool and is not a counter of seated spools." % id
+			elif step["minigame"] == MinigameScore.TORQUE_TO_SPEC:
+				if not is_service_step(step):
+					return "step '%s' has Torque to Spec and is not a counter of wheel services." % id
 			elif step_instrument(step) == "":
 				return "step '%s' has a mini-game and is not a count of one instrument's cal_log rows." % id
 			else:
@@ -883,6 +888,8 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 			return farm.untilled_cells()
 		"fissures_open":
 			return farm.open_fissures()
+		"wheels_due":
+			return int(farm.wheels_due())
 	return 0
 
 
@@ -956,15 +963,23 @@ static func is_seat_step(step: Dictionary) -> bool:
 	return str(step.get("check", "")) == "counter" and str(step.get("counter", "")) == "slot_spool"
 
 
+## True for a step that counts Bram's wheel services: the one kind of step
+## Torque to Spec may be carried by.
+static func is_service_step(step: Dictionary) -> bool:
+	return str(step.get("check", "")) == "counter" and str(step.get("counter", "")) == "service_wheels"
+
+
 ## True where `step` is the kind a game with no instrument is carried by: a
 ## counter of built stacks for Wring the Blocks, of seated spools for Thread
-## the Spool. False for a bench game.
+## the Spool, of wheel services for Torque to Spec. False for a bench game.
 static func is_bare_step(step: Dictionary, minigame: String) -> bool:
 	match minigame:
 		MinigameScore.WRING_THE_BLOCKS:
 			return is_stack_step(step)
 		MinigameScore.THREAD_THE_SPOOL:
 			return is_seat_step(step)
+		MinigameScore.TORQUE_TO_SPEC:
+			return is_service_step(step)
 	return false
 
 
@@ -975,10 +990,11 @@ static func is_bare_step(step: Dictionary, minigame: String) -> bool:
 ## player's own quests for that player. It only reads quest_state and
 ## player_quest_state, which a guest has as the host's copy, so it answers the
 ## same on a guest. In a quest done in order only the first step not done is open.
-## Wring the Blocks and Thread the Spool have no instrument: their step is one
-## that counts built stacks or seated spools, and `instrument_id` is "" for them.
+## Wring the Blocks, Thread the Spool and Torque to Spec have no instrument:
+## their step is one that counts built stacks, seated spools or wheel services,
+## and `instrument_id` is "" for them.
 static func has_minigame_step(farm: Node, minigame: String, instrument_id: String, player_id: String) -> bool:
-	var bare: bool = minigame in [MinigameScore.WRING_THE_BLOCKS, MinigameScore.THREAD_THE_SPOOL]
+	var bare: bool = minigame in [MinigameScore.WRING_THE_BLOCKS, MinigameScore.THREAD_THE_SPOOL, MinigameScore.TORQUE_TO_SPEC]
 	if instrument_id == "" and not bare:
 		return false
 	for quest: Dictionary in quests():
@@ -1024,10 +1040,11 @@ static func _keep_score(farm: Node, entry: Dictionary, step: Dictionary, played:
 	var score: int = mini(int(played.get("score", MinigameScore.SKIPPED)), MinigameScore.MAX_SCORE)
 	if not MinigameScore.is_graded(score):
 		return
-	if is_stack_step(step) or is_seat_step(step):
+	if is_stack_step(step) or is_seat_step(step) or is_service_step(step):
 		# Wring the Blocks: the build that did the step is the game itself, and
 		# only a player's build is counted (GameState.build_block_stack). Thread
 		# the Spool: the seat that did the step is the one the game was played for.
+		# Torque to Spec: the same, for the wheel service.
 		if not is_bare_step(step, str(played.get("minigame", ""))):
 			return
 		(entry.get_or_add(SCORES, {}) as Dictionary)[str(step.get("id", ""))] = score
