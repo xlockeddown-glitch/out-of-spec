@@ -30,13 +30,18 @@ func _xp(source: String, scale: float = 1.0) -> int:
 	return roundi(DataManager.get_record(&"skills", source, "xp_sources").get("xp", 0) * scale)
 
 
+## What a lab XP source gives in the small lab these tests have.
+func _lab_xp(source: String, scale: float = 1.0) -> int:
+	return roundi(DataManager.get_record(&"skills", source, "lab_xp_sources").get("xp", 0) * scale)
+
+
 func test_data_is_whole() -> String:
 	return _run(_check_data)
 
 
 func _check_data(gs: GameStateScript) -> String:
-	if gs.skill_ids() != (["calibration", "uncertainty", "instrumentation", "robotics", "husbandry", "field_ops"] as Array[String]):
-		return "The six skills: %s" % [gs.skill_ids()]
+	if gs.skill_ids() != (["calibration", "uncertainty", "robotics", "husbandry", "field_ops"] as Array[String]):
+		return "The five skills: %s" % [gs.skill_ids()]
 	for skill: Dictionary in DataManager.get_records(&"skills", "skills"):
 		if not skill["scope"] in ["player", "farm"]:
 			return "Skill %s is neither a player's nor the farm's." % skill["id"]
@@ -44,9 +49,12 @@ func _check_data(gs: GameStateScript) -> String:
 		if not source["skill"] in gs.skill_ids():
 			return "Source %s names an unknown skill." % source["id"]
 	for used: String in ["calibrate_player", "calibrate_found_oot", "calibrate_on_time", "calibrate_clean_tur",
-			"clean_audit", "buy_standard", "calibrate_standard", "collect_spool", "slot_spool", "mine_fissure", "till"]:
+			"clean_audit", "collect_spool", "slot_spool", "mine_fissure", "till"]:
 		if _xp(used) <= 0:
 			return "No XP for '%s'." % used
+	for used: String in ["buy_standard", "calibrate_standard"]:
+		if _lab_xp(used) <= 0 or _xp(used) != 0:
+			return "'%s' feeds the lab, not a skill." % used
 	return ""
 
 
@@ -115,7 +123,7 @@ func _check_mining(gs: GameStateScript) -> String:
 		return "A fissure gives XP once while it is mined out."
 	gs.buy_standard(FM3)
 	gs.buy_standard(FM3)
-	return "" if gs.skill_xp("instrumentation") == _xp("buy_standard") else "Buying a standard gives XP once."
+	return "" if gs.lab_xp == _lab_xp("buy_standard", gs.calibration_xp_scale(FM3)) and gs.lab_xp > 0 else "Buying a standard gives the lab XP once."
 
 
 func test_calibration_xp() -> String:
@@ -168,12 +176,15 @@ func _check_standard(gs: GameStateScript) -> String:
 	gs.owned_standards[HB700] = 7
 	gs.oirm_calibrate(HB700, 7)
 	gs.calibrate(WD1)
-	if gs.skill_xp("instrumentation") != _xp("buy_standard"):
-		return "Too soon after it was bought."
+	var bought: int = _lab_xp("buy_standard", gs.calibration_xp_scale(WD1))
+	if bought <= 0 or gs.lab_xp != bought + _lab_xp("lab_certificate"):
+		return "Too soon after it was bought: %d" % gs.lab_xp
 	GameClock.elapsed_days += ceili(gs.get_sensor(WD1).cal_interval_days / 2.0)
 	gs.calibrate(WD1)
 	# The HB-700 it is checked against sets the scale.
-	return "" if gs.skill_xp("instrumentation") == _xp("buy_standard") + _xp("calibrate_standard", gs.calibration_xp_scale(HB700)) else "A standard on the bench: %s" % gs.farm_skill_xp
+	var scale: float = gs.calibration_xp_scale(HB700)
+	return "" if gs.lab_xp == bought + _lab_xp("lab_certificate") + _lab_xp("lab_calibration", scale) + _lab_xp("calibrate_standard", scale) \
+		else "A standard on the bench: %d" % gs.lab_xp
 
 
 func test_clean_audit() -> String:
@@ -196,15 +207,15 @@ func test_xp_survives_a_save() -> String:
 
 func _check_save(gs: GameStateScript) -> String:
 	gs.till(Vector3i(1, 0, 1), "player_2")
-	gs.buy_standard(FM3)
+	gs._award_xp("slot_spool")
 	var data: Dictionary = gs.farm_to_dict()
 	gs.player_skill_xp.clear()
 	gs.farm_skill_xp.clear()
-	if gs.farm_from_dict(data) != "" or gs.skill_xp("field_ops", "player_2") != _xp("till") or gs.skill_xp("instrumentation") != _xp("buy_standard"):
+	if gs.farm_from_dict(data) != "" or gs.skill_xp("field_ops", "player_2") != _xp("till") or gs.skill_xp("husbandry") != _xp("slot_spool"):
 		return "XP must survive a save."
 	data.erase("player_skill_xp")
 	data.erase("farm_skill_xp")
-	return "" if gs.farm_from_dict(data) == "" and gs.skill_xp("instrumentation") == 0 else "An older save starts at no XP."
+	return "" if gs.farm_from_dict(data) == "" and gs.skill_xp("husbandry") == 0 else "An older save starts at no XP."
 
 
 func test_xp_is_announced_and_keyed_by_player() -> String:
@@ -216,8 +227,8 @@ func _check_announced(gs: GameStateScript) -> String:
 	gs.skill_xp_changed.connect(func(player: String, skill: String) -> void: seen.append([player, skill]))
 	gs.local_player_id = "player_2"
 	gs.till(Vector3i(1, 0, 1))
-	gs.buy_standard(FM3)
-	if seen != [["player_2", "field_ops"], ["", "instrumentation"]]:
+	gs._award_xp("slot_spool")
+	if seen != [["player_2", "field_ops"], ["", "husbandry"]]:
 		return "Each gain must be announced: %s" % [seen]
 	var data: Dictionary = gs.farm_to_dict()
 	gs.local_player_id = "player_1"

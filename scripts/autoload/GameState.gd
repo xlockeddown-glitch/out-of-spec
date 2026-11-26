@@ -54,6 +54,8 @@ signal robots_changed
 signal skill_xp_changed(player_id: String, skill_id: String)
 ## A skill reached a new level. `player_id` is "" for a farm skill.
 signal skill_leveled(player_id: String, skill_id: String, level: int)
+## The lab's XP changed (lab_xp).
+signal lab_xp_changed
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -68,8 +70,14 @@ const DRIFT_TABLE: StringName = &"sensor_drift_config"
 const DISPATCH_TABLE: StringName = &"dialogue_dispatches"
 const CROPS_TABLE: StringName = &"crops"
 const SKILLS_TABLE: StringName = &"skills"
-## 2 is the 99-level geometric curve (docs/design/quests_levels_story.md section 2).
-const SKILL_CURVE: int = 2
+## What a save's skills are counted on (docs/design/quests_levels_story.md).
+## 2 is the 99-level geometric curve (section 2). 3 is that curve with the lab
+## level (section 3): Instrumentation is gone and the lab has its XP.
+const SKILL_CURVE: int = 3
+## The curves a save may say: one without the lab level is given it as it loads.
+const KNOWN_CURVES: Array[int] = [2, 3]
+## The farm skill that became the lab level.
+const OLD_LAB_SKILL: String = "instrumentation"
 ## The most XP a converted skill holds: CoopProfile.MOST_XP.
 const MOST_SKILL_XP: int = 1000000000
 const SOIL_PROBE_ID: String = "soil_probe"
@@ -336,8 +344,16 @@ var skill_effect_floor: Dictionary = {}
 ## will count (docs/design/quests_levels_story.md section 5.3).
 var action_counts: Dictionary = {}
 ## The curve the XP above is counted on. A save without it is from the 10-level
-## curve, and is converted as it loads (_convert_old_skills).
+## curve, and is converted as it loads (_convert_old_skills). One that says 2 is
+## from before the lab level, and is given it as it loads (_credit_lab_from_logs).
 var skill_curve: int = SKILL_CURVE
+## The lab's XP, on the skills' curve: the whole farm's, earned by work done in
+## the lab (lab_xp_sources in data/skills.json). It never goes down.
+## _award_lab_xp is the only writer in play.
+var lab_xp: int = 0
+## Discipline -> the most spaces its lab area has had that the lab has its XP
+## for (lab_area). A space cleared and fitted again gives none.
+var lab_areas_paid: Dictionary = {}
 ## Robot id ("TR-1") -> { frame, name, state (ROBOT_STATES), done_day,
 ## ordered_by }. Assembled robots' sensors are in `sensors` as "sensor@robot".
 var robots: Dictionary = {}
@@ -522,7 +538,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"_spool_damaged", "slotted_spool_damaged", "phone_count", "next_player_number", "guest_ids", "dug",
 	"boulder_hits", "found_blocks", "found_pockets", "rover_in_tunnels", "enclosures", "stone", "stone_pieces",
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
-	"skill_effect_floor", "skill_curve", "action_counts"]
+	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -571,7 +587,7 @@ func farm_dict_problem(data: Dictionary) -> String:
 					return "'%s' has an entry of the wrong type." % field
 	if data.has("_spool_damaged") and data["_spool_damaged"].size() > data["_spool_species"].size():
 		return "'_spool_damaged' has more entries than there are spools."
-	for needs: Array in [["at_oirm", TYPE_INT], ["suspect_units", TYPE_INT], ["mined_fissures", TYPE_INT], ["lab_areas", TYPE_INT],
+	for needs: Array in [["at_oirm", TYPE_INT], ["suspect_units", TYPE_INT], ["mined_fissures", TYPE_INT], ["lab_areas", TYPE_INT], ["lab_areas_paid", TYPE_INT],
 			["offence_counts", TYPE_INT], ["rover_uplinks", TYPE_BOOL], ["rover_transforms", TYPE_TRANSFORM3D]]:
 		var values: Dictionary = data.get(needs[0], {})
 		for key: Variant in values:
@@ -671,8 +687,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 			return "'guest_ids' has an entry that is not a player."
 	if not _holds_only_ints(data.get("farm_skill_xp", {})):
 		return "'farm_skill_xp' has XP that is not a whole number."
-	if data.get("skill_curve", SKILL_CURVE) != SKILL_CURVE:
+	if not data.get("skill_curve", SKILL_CURVE) in KNOWN_CURVES:
 		return "'skill_curve' is not a curve this game knows."
+	if data.get("lab_xp", 0) < 0 or data.get("lab_xp", 0) > MOST_SKILL_XP:
+		return "'lab_xp' is not XP a lab can have."
 	var floors: Dictionary = data.get("skill_effect_floor", {})
 	for owner_id: Variant in floors:
 		if not owner_id is String or typeof(floors[owner_id]) != TYPE_DICTIONARY:
@@ -777,6 +795,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	put_farm(data)
 	sentinel_sighted = false
 	farm_loaded.emit()
+	lab_xp_changed.emit()
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
 	silk_changed.emit(optical_silk_spools)
@@ -854,6 +873,13 @@ func put_farm(data: Dictionary) -> void:
 	if not data.has("skill_curve"):
 		# From the 10-level curve.
 		_convert_old_skills()
+	if not data.has("lab_areas_paid"):
+		# From before areas were marked: the spaces it has are not paid for again.
+		lab_areas_paid = lab_areas.duplicate()
+	if skill_curve != SKILL_CURVE or not data.has("skill_curve"):
+		# From before the lab level.
+		_credit_lab_from_logs()
+	skill_curve = SKILL_CURVE
 	_seep_days = 0.0
 	_seep_full = false
 	_morning = false
@@ -1346,7 +1372,7 @@ func buy_from_kestrel(standard_id: String, player_id: String = "") -> String:
 		contract_state = "fulfilled"
 		credibility_changed.emit(credibility)
 		post_phone("OIRM CONTRACT closed: the %s is already on the colony." % instrument_name(standard_id))
-	_award_xp("buy_standard", player_id)
+	_award_lab_xp("buy_standard", player_id, calibration_xp_scale(standard_id))
 	upgrades_changed.emit()
 	oirm_changed.emit()
 	return ""
@@ -1559,6 +1585,101 @@ func _old_effect_share(skill_id: String, old_level: int) -> float:
 	return minf(best, 1.0)
 
 
+# --- The lab level (docs/design/quests_levels_story.md section 3) ---------------
+
+## 1 to the top level, on the skills' curve. It gates nothing yet.
+func lab_level() -> int:
+	return _level_for_xp(lab_xp)
+
+
+## What every lab XP source is multiplied by: the entry of lab_level/size_xp for
+## the lab's size (section 3.2.1). 1 if there is none.
+func lab_xp_scale() -> float:
+	var scales: Variant = DataManager.get_value(SKILLS_TABLE, "lab_level/size_xp", {})
+	if not scales is Dictionary:
+		return 1.0
+	var scale: Variant = (scales as Dictionary).get(str(lab_size_record().get("id", "")), 1.0)
+	return float(scale) if (scale is float or scale is int) and scale > 0.0 else 1.0
+
+
+## What one lab XP source gives (lab_xp_sources in data/skills.json), times
+## `scale`, before the lab's size.
+func _lab_source_xp(source_id: String, scale: float = 1.0) -> float:
+	return maxf(float(DataManager.get_record(SKILLS_TABLE, source_id, "lab_xp_sources").get("xp", 0)) * scale, 0.0)
+
+
+## Gives the lab the XP of one of its sources, times `scale` and the lab's size,
+## rounded to a whole XP. Anyone's work counts, the manager's and a robot's too.
+## It is counted for `player_id` (action_counts) when `counted`: who did it, or
+## for a robot's work who programmed or ordered it. Never for the manager, and
+## not for what no one player did: an audit, a certificate that comes back, the
+## lab grown.
+func _award_lab_xp(source_id: String, player_id: String = "", scale: float = 1.0, counted: bool = true) -> void:
+	var gained: int = roundi(_lab_source_xp(source_id, scale) * lab_xp_scale())
+	if gained <= 0:
+		return
+	if player_id == "":
+		player_id = local_player_id
+	if counted and player_id != MANAGER_ID:
+		var done: Dictionary = (action_counts.get_or_add(player_id, {}) as Dictionary).get_or_add(source_id, { "count": 0, "xp": 0 })
+		done["count"] = int(done["count"]) + 1
+		done["xp"] = int(done["xp"]) + gained
+	var before: int = lab_level()
+	lab_xp = mini(lab_xp + gained, MOST_SKILL_XP)
+	lab_xp_changed.emit()
+	if lab_level() > before:
+		post_phone("LAB LEVEL UP: %s." % lab_phone_text())
+
+
+## Line for the skills view: "Lab level 2  (60 XP, 105 for level 3)  farm".
+func lab_text() -> String:
+	var level: int = lab_level()
+	var progress: String = ("%s XP, top level" % SP811.integer(lab_xp) if level >= max_skill_level()
+		else "%s XP, %s for level %s" % [SP811.integer(lab_xp), SP811.integer(xp_for_level(level + 1)), SP811.integer(level + 1)])
+	return "Lab level %s  (%s)  farm" % [SP811.integer(level), progress]
+
+
+## Under it on the skills view: what feeds the level, and the lab's size.
+func lab_effects_text() -> String:
+	return "Earned by work done in the lab, by anyone. %s: lab XP × %s" % [lab_size_name(), SP811.number(lab_xp_scale(), 1)]
+
+
+## For the phone's row: "level 2".
+func lab_phone_text() -> String:
+	return "level %s" % SP811.integer(lab_level())
+
+
+## A save from before the lab level (section 9, step 3). The lab is credited for
+## what its logs show: each traceable calibration that was not too soon, each
+## paid job and each clean audit, at today's source values, the standard's tier
+## counted and the lab's size not (the logs do not say how big the lab was). The
+## farm's Instrumentation XP is added one for one, and that skill is dropped.
+func _credit_lab_from_logs() -> void:
+	var credited: float = float(clampi(int(farm_skill_xp.get(OLD_LAB_SKILL, 0)), 0, MOST_SKILL_XP))
+	for record: Dictionary in cal_log:
+		if not record.get("traceable", str(record.get("standard_id", "")) != "") \
+				or int(record.get("days_in_service", 0)) < ceili(int(record.get("previous_interval_days", 0)) / 2.0):
+			continue
+		var by_robot: bool = str(record.get("programmed_by", "")) != ""
+		credited += roundi(_lab_source_xp("lab_robot_calibration" if by_robot else "lab_calibration",
+			calibration_xp_scale(str(record.get("standard_id", "")))))
+	for result: Dictionary in job_log:
+		var paid: Variant = result.get("pay", 0)
+		if (paid is int or paid is float) and is_finite(paid):
+			credited += roundi(_lab_source_xp("lab_job", maxf(float(paid), 0.0)))
+	for report: Dictionary in audit_log:
+		# An audit from before reports were marked clean was clean if it passed.
+		var clean: Variant = report.get("clean", report.get("passed", false))
+		if clean is bool and clean:
+			credited += roundi(_lab_source_xp("lab_clean_audit"))
+	lab_xp = int(clampf(lab_xp + credited, 0.0, MOST_SKILL_XP))
+	farm_skill_xp.erase(OLD_LAB_SKILL)
+	if skill_effect_floor.has(""):
+		(skill_effect_floor[""] as Dictionary).erase(OLD_LAB_SKILL)
+		if (skill_effect_floor[""] as Dictionary).is_empty():
+			skill_effect_floor.erase("")
+
+
 ## Gives the XP of one source in data/skills.json, times `scale`, to the acting
 ## player, or to the farm for a farm skill, and counts it for that player
 ## (action_counts). The manager earns none.
@@ -1620,6 +1741,7 @@ func crop_xp(player_id: String = "") -> int:
 ## when it was on time and traceable.
 func _xp_after_job(result: Dictionary, player_id: String) -> void:
 	var paid: float = float(result["pay"])
+	_award_lab_xp("lab_job", player_id, paid)
 	_award_xp("job_done", player_id, paid)
 	if result["on_time"] and result["traceable"]:
 		_award_xp("job_clean", player_id, paid)
@@ -1633,7 +1755,11 @@ func _xp_after_calibration(record: Dictionary) -> void:
 		return
 	var player: String = record["performed_by"]
 	var scale: float = calibration_xp_scale(str(record.get("standard_id", "")))
-	if record.get("programmed_by", "") != "":
+	var by_robot: bool = record.get("programmed_by", "") != ""
+	_award_lab_xp("lab_robot_calibration" if by_robot else "lab_calibration", record["programmed_by"] if by_robot else player, scale)
+	if not by_robot and get_sensor(record["instrument_id"]).role == "standard":
+		_award_lab_xp("calibrate_standard", player, scale)
+	if by_robot:
 		# A robot's work trains no one's hands: only Robotics XP [ASSUMPTION].
 		if robot_of(record["instrument_id"]) != "":
 			_award_xp("calibrate_robot", record["programmed_by"], scale)
@@ -1649,8 +1775,6 @@ func _xp_after_calibration(record: Dictionary) -> void:
 		_award_xp("calibrate_on_time", player, scale)
 	if float(record["tur"]) >= CalUncertainty.tur_clean():
 		_award_xp("calibrate_clean_tur", player, scale)
-	if get_sensor(record["instrument_id"]).role == "standard":
-		_award_xp("calibrate_standard", player, scale)
 
 
 ## What a calibration's XP is multiplied by: the entry of calibration_tier_xp
@@ -1671,6 +1795,7 @@ func _award_clean_audit_xp() -> void:
 		players.append(local_player_id)
 	for player: Variant in players:
 		_award_xp("clean_audit", str(player))
+	_award_lab_xp("lab_clean_audit", "", 1.0, false)
 
 
 # --- Robots (docs/design/equipment_skills_robots.md section 3) ------------------
@@ -1778,7 +1903,6 @@ func robot_build_problem(frame_id: String, player_id: String = "") -> String:
 			return "%s is still being assembled." % robots[id]["name"]
 	var needs: Dictionary = {
 		"robotics": int(frame.get("robotics_level", 1)) + robots.size() * int(frame.get("extra_robot_levels", 0)),
-		"instrumentation": int(frame.get("instrumentation_level", 1)),
 	}
 	for skill: String in needs:
 		if skill_level(skill, player_id) < needs[skill]:
@@ -1845,6 +1969,7 @@ func _finish_robot_builds(day: int) -> void:
 		robot["state"] = "commissioning"
 		_sync_robot_sensors(robots)
 		_award_xp("build_robot", robot["ordered_by"])
+		_award_lab_xp("lab_robot", robot["ordered_by"])
 		post_phone("ROBOT: %s is assembled. Calibrate its %s sensors at the bench, then release it at Bram's bay." % [
 			robot["name"], SP811.integer(robot_sensor_ids(str(id)).size())])
 		robots_changed.emit()
@@ -1893,6 +2018,7 @@ func release_robot(robot_id: String, player_id: String = "") -> String:
 		return problem
 	robots[robot_id]["state"] = "released"
 	_award_xp("commission_robot", player_id)
+	_award_lab_xp("lab_robot", player_id)
 	post_phone("ROBOT: %s is commissioned and released. Its sensors are on the audit list." % robots[robot_id]["name"])
 	robots_changed.emit()
 	return ""
@@ -2858,6 +2984,7 @@ func oirm_calibrate(standard_id: String, day: int) -> Dictionary:
 			oirm_trips[i]["return_day"] = day
 			break
 	var cert: Dictionary = _issue_certificate(standard_id, day, zeroed["as_found"], zeroed["as_left"], false)
+	_award_lab_xp("lab_certificate", "", 1.0, false)
 	post_phone("OIRM: %s returned with certificate %s. As-found %s (%s). Due day %d." % [
 		instrument_name(standard_id, true), cert["id"], sensor.format_value(zeroed["as_found"], 3),
 		"in tolerance" if cert["as_found_in_tolerance"] else "OUT OF TOLERANCE", cert["due_day"]])
@@ -3258,7 +3385,7 @@ func buy_standard(standard_id: String, player_id: String = "") -> String:
 	if standard_id == contract_standard_id() and contract_state == "complete":
 		contract_state = "fulfilled"
 		credibility_changed.emit(credibility)
-	_award_xp("buy_standard", player_id)
+	_award_lab_xp("buy_standard", player_id, calibration_xp_scale(standard_id))
 	upgrades_changed.emit()
 	oirm_changed.emit()
 	return ""
@@ -3415,6 +3542,7 @@ func collect_spool(player_id: String = "", by_robot: bool = false, damaged: bool
 	molt_progress = 0.0
 	molt_stage = MoltStage.ACTIVE
 	_award_xp("robot_job" if by_robot else "collect_spool", player_id)
+	_award_lab_xp("lab_spool", player_id)
 	silk_changed.emit(optical_silk_spools)
 	molt_changed.emit(molt_progress, molt_stage)
 	return true
@@ -3655,6 +3783,7 @@ func collect_enclosure_spool(species_id: String, player_id: String = "") -> bool
 	enclosures[species_id] = { "molt_progress": 0.0, "molt_stage": int(MoltStage.ACTIVE),
 		"exuvia_until_day": GameClock.get_day_index() + EXUVIA_LINGER_DAYS }
 	_award_xp("collect_spool", player_id)
+	_award_lab_xp("lab_spool", player_id)
 	silk_changed.emit(optical_silk_spools)
 	enclosures_changed.emit()
 	return true
@@ -3685,6 +3814,7 @@ func slot_spool_into_relay(player_id: String = "") -> bool:
 	slotted_spool_damaged = taken[1]
 	relay_slotted = true
 	_award_xp("slot_spool", player_id)
+	_award_lab_xp("lab_spool", player_id)
 	silk_changed.emit(optical_silk_spools)
 	relay_changed.emit(relay_slotted)
 	return true
@@ -4455,7 +4585,7 @@ func lab_fit_problem(discipline: String) -> String:
 
 
 ## Gives a free space to `discipline` (free of charge). Returns "" or why not.
-func fit_lab_area(discipline: String) -> String:
+func fit_lab_area(discipline: String, player_id: String = "") -> String:
 	var problem: String = lab_fit_problem(discipline)
 	if problem != "":
 		return problem
@@ -4466,6 +4596,10 @@ func fit_lab_area(discipline: String) -> String:
 	var plural: String = "" if spaces == 1 else "s"
 	post_phone("LAB: the %s area has %s space%s (%s): up to %s job%s at once." % [discipline,
 		SP811.integer(spaces), plural, lab_area_size(spaces).to_upper(), SP811.integer(spaces), plural])
+	if spaces > int(lab_areas_paid.get(discipline, 0)):
+		# Only a space this area never had: clearing and fitting again gives none.
+		lab_areas_paid[discipline] = spaces
+		_award_lab_xp("lab_area", player_id)
 	lab_changed.emit()
 	return ""
 
@@ -4533,6 +4667,7 @@ func _finish_lab_build(day: int) -> void:
 		var free_spaces: int = lab_free_spaces()
 		post_phone("LAB: the %s is ready. %s free space%s to fit out at the dome plan board." % [
 			lab_size_name().to_lower(), SP811.integer(free_spaces), "" if free_spaces == 1 else "s"])
+		_award_lab_xp("lab_grown", "", 1.0, false)
 	else:
 		post_phone("LAB: the %s space is cleared. Fit it out at the dome plan board." % build.get("discipline", "?"))
 	_sync_lab_layout()
@@ -4555,6 +4690,7 @@ func reset_lab() -> void:
 			if owned_standards.has(str(id)):
 				lab_areas[str(discipline)] = 1
 				break
+	lab_areas_paid = lab_areas.duplicate()
 	_sync_lab_layout()
 	lab_changed.emit()
 

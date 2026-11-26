@@ -1,6 +1,6 @@
 class_name SkillsUI
 extends Control
-## The skills view: each skill's level, XP and what it does. K opens and closes
+## The skills view: the lab's level, then each skill's level, XP and what it does. K opens and closes
 ## it on the farm and in the dome.
 
 const TEAL: Color = Color("38E1C6")
@@ -33,6 +33,7 @@ func _ready() -> void:
 	_close_button.pressed.connect(hide)
 	column.add_child(_close_button)
 	GameState.skill_xp_changed.connect(_on_xp_changed)
+	GameState.lab_xp_changed.connect(_on_xp_changed.bind("", ""))
 	hide()
 
 
@@ -67,6 +68,8 @@ func _refresh() -> void:
 	for child: Node in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
+	_rows.add_child(PlanBoardUI._label(GameState.lab_text(), TEXT, 20))
+	_rows.add_child(PlanBoardUI._label("    " + GameState.lab_effects_text(), DIM, 16))
 	for id: String in GameState.skill_ids():
 		_rows.add_child(PlanBoardUI._label(GameState.skill_text(id), TEXT, 20))
 		_rows.add_child(PlanBoardUI._label("    " + GameState.skill_effects_text(id), DIM, 16))

@@ -11,8 +11,11 @@ const MOST_XP: int = 1000000000
 const MOST_SKILLS: int = 16
 const MAX_FILE_BYTES: int = 8192
 ## Written to the file as "curve": the XP in it is counted on the 99-level curve
-## (GameState.SKILL_CURVE). A file without it is from the 10-level curve.
+## (2 of GameState.KNOWN_CURVES; the lab level changed no player's XP, so it is
+## still 2). A file without it is from the 10-level curve.
 const CURVE: int = 2
+## Skills there once were. A file that has one loads without it.
+const GONE_SKILLS: Array[String] = ["instrumentation"]
 
 ## Only tests set others. "" keeps no file.
 var path: String = PATH
@@ -123,6 +126,8 @@ static func _parse(bytes: PackedByteArray) -> Dictionary:
 	var factor: float = 1.0 if json.data.has("curve") else DataManager.get_number(&"skills", "old_curve/xp_factor", 5.0)
 	var whole: Dictionary = {}
 	for skill: Variant in skills:
+		if skill in GONE_SKILLS:
+			continue
 		if not skills[skill] is float or skills[skill] < 0.0 or skills[skill] > MOST_XP:
 			return {}
 		whole[skill] = mini(roundi(skills[skill] * factor), MOST_XP)
