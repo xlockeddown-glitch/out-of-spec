@@ -14,6 +14,8 @@ signal sentinel_changed
 signal rover_lights_changed
 ## A beacon was set down in the Lava Tubes.
 signal beacons_changed
+## A find was taken below the Lava Tubes.
+signal finds_changed
 signal relay_changed(slotted: bool)
 signal calibration_recorded(record: Dictionary)
 signal phone_message(text: String)
@@ -184,6 +186,9 @@ var rover_lights: bool = true
 ## The Lava Tubes beacon spots (LavaHub.SPOTS) that have one, in the order they
 ## were placed. Shared by the farm.
 var beacons_placed: Array[String] = []
+## The finds taken below the Lava Tubes: zone id -> { "day", "ids" } (ZoneDepth).
+## Only today's count; a record of a past day is dropped. Shared by the farm.
+var finds_taken: Dictionary = {}
 var optical_silk_spools: int = 0
 var relay_slotted: bool = false
 ## Species that spun the spool now in the relay (its lag_reduction_pct stacks).
@@ -632,7 +637,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
-	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed"]
+	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -654,6 +659,8 @@ func farm_to_dict() -> Dictionary:
 	for field: String in SAVED_FIELDS + SAVED_LATER:
 		var value: Variant = get(field)
 		out[field] = value.duplicate(true) if value is Array or value is Dictionary else value
+	# A find taken on a past day is gone: it is not kept.
+	out["finds_taken"] = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	return out
 
 
@@ -683,6 +690,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 					return "'%s' has an entry of the wrong type." % field
 	if data.has("beacons_placed") and LavaHub.placed_problem(data["beacons_placed"]) != "":
 		return LavaHub.placed_problem(data["beacons_placed"])
+	if data.has("finds_taken") and ZoneDepth.taken_problem(data["finds_taken"]) != "":
+		return ZoneDepth.taken_problem(data["finds_taken"])
 	var beacon_steps: String = LavaHub.steps_problem(QuestEngine.quests(), data.get("quest_state", {}), (data.get("beacons_placed", []) as Array).size())
 	if beacon_steps != "":
 		return beacon_steps
@@ -942,6 +951,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	if problem != "":
 		return problem
 	put_farm(data)
+	finds_taken = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	sentinel_sighted = false
 	player_places.clear()
 	_recall_warned_day = 0
@@ -4671,6 +4681,8 @@ func set_rover_lights(on: bool, player_id: String = "") -> String:
 ## screen's prompt.
 func place_beacon(spot_id: String, player_id: String = "") -> String:
 	var reason: String = LavaHub.place_problem(spot_id, beacons_placed, place_of(player_id))
+	if reason == "" and depth_of(player_id) != 0:
+		reason = "Beacons go down in the hub, not below it."
 	if reason == "":
 		reason = LavaHub.job_problem(quest_state)
 	if reason == "":
@@ -4680,6 +4692,35 @@ func place_beacon(spot_id: String, player_id: String = "") -> String:
 		return reason
 	beacons_placed.append(spot_id)
 	beacons_changed.emit()
+	SaveGame.saving.emit()
+	return ""
+
+
+## Host: a find is taken below the Lava Tubes (ZoneDepth, depth 1), for the player
+## there. `player_id` is filled in from the connection (FarmCommands). Returns ""
+## or why not. The player is at that depth, the find is one of today's and not
+## taken, and the farm's tunnel rover is within reach of it. It pays into the
+## shared stock [PLACEHOLDER amounts].
+func take_find(find_id: String, player_id: String = "") -> String:
+	var day: int = GameClock.get_day_index()
+	finds_taken = ZoneDepth.prune(finds_taken, day)
+	var today: Dictionary = ZoneDepth.layout(world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, day)
+	var taken: Array = ZoneDepth.taken_today(finds_taken, ZoneDepth.ZONE, day)
+	var reason: String = ZoneDepth.take_problem(find_id, today.get("finds", []), taken, place_of(player_id), depth_of(player_id))
+	if reason == "":
+		SaveGame.saving.emit()  # the rover on this screen says where it is
+		var find: Dictionary = ZoneDepth.find_in(today, find_id)
+		reason = ZoneDepth.reach_problem(TunnelRock.at(find["cell"]), rover_zone, rover_transforms.has(TUNNEL_ROVER), parked_rover_transform(TUNNEL_ROVER).origin)
+	if reason != "":
+		return reason
+	var pay: Dictionary = ZoneDepth.reward(str(ZoneDepth.find_in(today, find_id)["kind"]))
+	finds_taken = ZoneDepth.with_taken(finds_taken, ZoneDepth.ZONE, day, find_id)
+	if pay.has("crystal_ore"):
+		crystal_ore += int(pay["crystal_ore"])
+		ore_changed.emit(crystal_ore)
+	if pay.has("credits"):
+		add_credits(int(pay["credits"]))
+	finds_changed.emit()
 	SaveGame.saving.emit()
 	return ""
 

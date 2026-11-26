@@ -107,7 +107,7 @@ func test_the_validator_judges_a_report() -> String:
 		["lava_tubes", -1, "player_2", "player_2", false],
 		["lava_tubes", ZonePresence.MAX_DEPTH + 1, "player_2", "player_2", false],
 		["farm", 1, "player_2", "player_2", false],
-		["lava_tubes", 1, "player_2", "player_2", false],
+		["lava_tubes", 2, "player_2", "player_2", false],
 		["flooded_aquifer", 0, "player_2", "player_2", false],
 		["flooded_aquifer", 1, "player_2", "player_2", false],
 		["farm", 0, "player_1", "player_2", false],
@@ -187,7 +187,7 @@ func test_the_host_clock_carries_places_to_a_guest() -> String:
 	var kept: bool = guest.player_places == copy
 	# The same rule as the host's command: no depth on the farm, no scene-less zone.
 	var also_bad: Array[String] = []
-	for entry: Array in [["farm", 1], ["dome", 1], ["flooded_aquifer", 0], ["lava_tubes", 1]]:
+	for entry: Array in [["farm", 1], ["dome", 1], ["flooded_aquifer", 0], ["lava_tubes", 2]]:
 		bad["places"] = { "player_2": entry }
 		also_bad.append(FarmSync.follow_clock(bad, guest))
 	if "" in also_bad:
@@ -223,10 +223,10 @@ func test_the_page_says_where_each_player_is() -> String:
 # --- Review fixes --------------------------------------------------------------
 
 func test_the_clock_and_the_command_share_one_rule() -> String:
-	for entry: Array in [["farm", 1], ["dome", 1], ["flooded_aquifer", 0], ["flooded_aquifer", 1], ["lava_tubes", 1], ["lava_tubes", -1], ["nowhere", 0]]:
+	for entry: Array in [["farm", 1], ["dome", 1], ["flooded_aquifer", 0], ["flooded_aquifer", 1], ["lava_tubes", 2], ["lava_tubes", -1], ["nowhere", 0]]:
 		if ZonePresence.place_problem(entry[0], entry[1]) == "" or ZonePresence.table_problem({ "player_2": entry }) == "":
 			return "%s was accepted" % [entry]
-	for entry: Array in [["farm", 0], ["dome", 0], ["lava_tubes", 0]]:
+	for entry: Array in [["farm", 0], ["dome", 0], ["lava_tubes", 0], ["lava_tubes", 1]]:
 		if ZonePresence.place_problem(entry[0], entry[1]) != "" or ZonePresence.table_problem({ "player_2": entry }) != "":
 			return "%s was refused" % [entry]
 	return "" if ZoneData.is_playable(&"lava_tubes") and not ZoneData.is_playable(&"flooded_aquifer") else "Playable zones are wrong."

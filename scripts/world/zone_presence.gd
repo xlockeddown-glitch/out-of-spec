@@ -7,9 +7,9 @@ extends RefCounted
 
 const FARM: String = "farm"
 const DOME: String = "dome"
-## The deepest a report may say [PLACEHOLDER]. Only depth 0 exists today; a
-## later depth PR raises this.
-const MAX_DEPTH: int = 0
+## The deepest a report may say [PLACEHOLDER]. Depth 1 is the first generated one
+## (ZoneDepth); a later depth PR raises this.
+const MAX_DEPTH: int = 1
 ## The place of someone the host has not heard from: everyone starts on the farm.
 const DEFAULT_PLACE: String = FARM
 const NOT_YOURS: String = "A place is reported by the player who is there."
@@ -53,7 +53,7 @@ static func for_scene(path: String) -> Array:
 		return [DOME, 0]
 	for id: StringName in ZoneData.ids():
 		if path != "" and ZoneData.hub_scene(id) == path:
-			return [String(id), 0]
+			return [String(id), ZoneDepth.local_depth if String(id) == ZoneDepth.ZONE else 0]
 	return []
 
 

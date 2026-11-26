@@ -91,10 +91,18 @@ const AMBER := Color("#f5a623")
 var _lintels: Dictionary[Vector3, StandardMaterial3D] = {}
 
 
+## The map in use: the hub's MAP, or below it (ZoneDepth) the layout of the depth
+## this screen's player is in. The same size, so a cell is in the same place.
+static func grid() -> PackedStringArray:
+	if ZoneDepth.local_depth > 0 and not ZoneDepth.local_layout.is_empty():
+		return ZoneDepth.local_layout["grid"]
+	return MAP
+
+
 static func tile(cell: Vector2i) -> String:
-	if cell.y < 0 or cell.y >= MAP.size() or cell.x < 0 or cell.x >= MAP[cell.y].length():
+	if cell.y < 0 or cell.y >= grid().size() or cell.x < 0 or cell.x >= grid()[cell.y].length():
 		return "#"
-	return MAP[cell.y][cell.x]
+	return grid()[cell.y][cell.x]
 
 
 ## True where the rover can drive.
@@ -115,11 +123,11 @@ static func in_deep(place: Vector3) -> bool:
 
 ## The middle of a cell.
 static func at(cell: Vector2i) -> Vector3:
-	return Vector3((cell.x - (MAP[0].length() - 1) * 0.5) * CELL_M, 0.0, (cell.y - (MAP.size() - 1) * 0.5) * CELL_M)
+	return Vector3((cell.x - (grid()[0].length() - 1) * 0.5) * CELL_M, 0.0, (cell.y - (grid().size() - 1) * 0.5) * CELL_M)
 
 
 static func cell_of(place: Vector3) -> Vector2i:
-	return Vector2i(roundi(place.x / CELL_M + (MAP[0].length() - 1) * 0.5), roundi(place.z / CELL_M + (MAP.size() - 1) * 0.5))
+	return Vector2i(roundi(place.x / CELL_M + (grid()[0].length() - 1) * 0.5), roundi(place.z / CELL_M + (grid().size() - 1) * 0.5))
 
 
 ## The ground's height at x and z: level but for the pool's hollow.
@@ -146,8 +154,8 @@ func _ready() -> void:
 	water.name = "Water"
 	water.fill(POOL, WATER_M, drawn_ground_m)
 	add_child(water)
-	for y: int in MAP.size():
-		for x: int in MAP[y].length():
+	for y: int in grid().size():
+		for x: int in grid()[y].length():
 			var cell := Vector2i(x, y)
 			match tile(cell):
 				"A":
@@ -190,7 +198,7 @@ func _hides_floor(cell: Vector2i) -> bool:
 
 
 func _build_colliders() -> void:
-	var end: Vector2 = Vector2(MAP[0].length(), MAP.size()) * CELL_M * 0.5
+	var end: Vector2 = Vector2(grid()[0].length(), grid().size()) * CELL_M * 0.5
 	# All but the pool's hollow.
 	_add_floor(-end, Vector2(end.x, POOL.position.y))
 	_add_floor(Vector2(-end.x, POOL.end.y), end)
@@ -199,13 +207,13 @@ func _build_colliders() -> void:
 	_add_hollow()
 	# Nothing falls out of the world, should it get through the hollow.
 	_add_body("Net", LAYER_WORLD, Vector3(POOL.get_center().x, -2.5, POOL.get_center().y), Vector3(POOL.size.x, 1.0, POOL.size.y))
-	for y: int in MAP.size():
+	for y: int in grid().size():
 		var x: int = 0
-		while x < MAP[y].length():
+		while x < grid()[y].length():
 			var cell := Vector2i(x, y)
 			var kind: String = tile(cell)
 			var run: int = 1
-			while x + run < MAP[y].length() and tile(cell + Vector2i(run, 0)) == kind:
+			while x + run < grid()[y].length() and tile(cell + Vector2i(run, 0)) == kind:
 				run += 1
 			x += run
 			var middle: Vector3 = at(cell) + Vector3((run - 1) * CELL_M * 0.5, 0.0, 0.0)
@@ -258,8 +266,8 @@ func _build_blocks() -> void:
 	var magma: Array[Transform3D] = []
 	var magma_colors: Array[Color] = []
 	var half: float = CELL_M * 0.5
-	for y: int in range(-2, MAP.size() + 2):
-		for x: int in range(-2, MAP[0].length() + 2):
+	for y: int in range(-2, grid().size() + 2):
+		for x: int in range(-2, grid()[0].length() + 2):
 			var cell := Vector2i(x, y)
 			var kind: String = tile(cell)
 			if kind == "~":

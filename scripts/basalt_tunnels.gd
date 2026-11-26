@@ -17,6 +17,10 @@ var _move_granted: bool = false
 ## The cup can reach the Cobalt Sentinel.
 var _in_reach: bool = false
 var _told_reach: bool = false
+## What _hub_near calls the way down and a find below.
+const HATCH: String = "hatch"
+const FIND: String = "find"
+
 ## The rack, the board or a beacon spot the rover is by (LavaHub.nearest), or {}.
 var _hub_near: Dictionary = {}
 var _told_hub: String = ""
@@ -24,6 +28,9 @@ var _told_hub: String = ""
 ## it is not kept if they leave the tunnels].
 var _holding_beacon: bool = false
 var _props: LavaHubProps
+## This player is below, in the first depth (ZoneDepth), not in the hub.
+var _below: bool = false
+var _depth_props: ZoneDepthProps
 
 @onready var _rover: RoverController = %Rover
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
@@ -38,9 +45,21 @@ func _ready() -> void:
 	_rover.dig_rejected.connect(_on_dig_rejected)
 	_rover.fill_rejected.connect(_on_fill_rejected)
 	_exit_pad.rover_entered.connect(_on_rover_entered_exit)
-	_props = LavaHubProps.new()
-	_rover.get_parent().add_child(_props)
-	GameState.beacons_changed.connect(_on_beacons_changed)
+	_below = ZoneDepth.local_depth > 0 and not ZoneDepth.local_layout.is_empty()
+	_depth_props = ZoneDepthProps.new()
+	_rover.get_parent().add_child(_depth_props)
+	if _below:
+		# The depth has its own finds, and none of the hub's rack, board or beacons.
+		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
+		GameState.finds_changed.connect(_on_finds_changed)
+		var wild: Node = get_node_or_null("WorldView/WorldViewport/World/WildSentinel")
+		if wild != null:
+			wild.queue_free()
+	else:
+		_depth_props.build_hatch()
+		_props = LavaHubProps.new()
+		_rover.get_parent().add_child(_props)
+		GameState.beacons_changed.connect(_on_beacons_changed)
 	_hud.set_lights(GameState.rover_lights)
 	GameState.rover_lights_changed.connect(_show_lights)
 	var pause := PauseUI.new()
@@ -104,7 +123,12 @@ func _process(_delta: float) -> void:
 		_told_reach = false
 	# One target for the prompt and for E: the Sentinel's catch comes first, unless
 	# a held beacon has an empty spot in reach.
-	_hub_near = LavaHub.nearest(_rover.global_position, GameState.beacons_placed, spot_wins) if rover_free and not catching else {}
+	if _below:
+		_hub_near = _nearest_find() if rover_free else {}
+	else:
+		_hub_near = LavaHub.nearest(_rover.global_position, GameState.beacons_placed, spot_wins) if rover_free and not catching else {}
+		if _hub_near.is_empty() and rover_free and not catching and ZoneDepth.near_descent(_rover.global_position):
+			_hub_near = { "kind": HATCH, "id": "" }
 	_tell_hub()
 
 
@@ -118,7 +142,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_say_if_away()
 	elif event.is_action_pressed(&"interact") and _exit_pad.rover_inside:
 		get_viewport().set_input_as_handled()
-		_leave_tunnels()
+		if _below:
+			_go_up()
+		else:
+			_leave_tunnels()
 	elif event.is_action_pressed(&"interact") and _in_reach:
 		get_viewport().set_input_as_handled()
 		_cup.open()
@@ -137,7 +164,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_rover_entered_exit() -> void:
-	_hud.push_log("TUNNEL MOUTH: press E to leave.")
+	_hud.push_log("WAY UP: press E to go up." if _below else "TUNNEL MOUTH: press E to leave.")
 
 
 ## Says what E does when the rover first comes by the rack, the board or a spot.
@@ -153,6 +180,10 @@ func _tell_hub() -> void:
 			_hud.push_log("NOTICE BOARD: press E to read it.")
 		LavaHub.SPOT:
 			_hud.push_log("BEACON SPOT: press E to set a beacon down.")
+		HATCH:
+			_hud.push_log("WAY DOWN: press E to go down.")
+		FIND:
+			_hud.push_log("FIND: press E to take it.")
 
 
 func _use_hub(target: Dictionary) -> void:
@@ -165,6 +196,10 @@ func _use_hub(target: Dictionary) -> void:
 				_hud.push_log(line)
 		LavaHub.SPOT:
 			_use_spot(str(target["id"]))
+		HATCH:
+			_go_down()
+		FIND:
+			_use_find(str(target["id"]))
 
 
 ## Orin speaks on the phone: he is not here in person [PLACEHOLDER].
@@ -201,6 +236,65 @@ func _use_spot(spot_id: String) -> void:
 ## A beacon was set down here, or a host's copy says so: show it.
 func _on_beacons_changed() -> void:
 	_props.show_placed(GameState.beacons_placed)
+
+
+## The ids taken below today (ZoneDepth).
+func _taken_today() -> Array:
+	return ZoneDepth.taken_today(GameState.finds_taken, ZoneDepth.ZONE, GameClock.get_day_index())
+
+
+## A find was taken, here or by a friend: show what is left.
+func _on_finds_changed() -> void:
+	_depth_props.show_taken(_taken_today())
+
+
+## The nearest find not taken within reach of the rover: { "kind": FIND, "id" }, or {}.
+func _nearest_find() -> Dictionary:
+	var taken: Array = _taken_today()
+	var best: float = ZoneDepth.REACH_M
+	var found: Dictionary = {}
+	for find: Dictionary in ZoneDepth.local_layout.get("finds", []):
+		if str(find["id"]) in taken:
+			continue
+		var there: Vector3 = TunnelRock.at(find["cell"])
+		var away: float = Vector2(there.x - _rover.global_position.x, there.z - _rover.global_position.z).length()
+		if away <= best:
+			best = away
+			found = { "kind": FIND, "id": str(find["id"]) }
+	return found
+
+
+func _use_find(find_id: String) -> void:
+	var problem: String = await FarmCommands.request(&"take_find", [find_id])
+	if not is_inside_tree():
+		return
+	if problem != "":
+		_hud.push_log("FIND: " + problem)
+		return
+	var find: Dictionary = ZoneDepth.find_in(ZoneDepth.local_layout, find_id)
+	_hud.push_log("FIND: " + ZoneDepth.reward_text(str(find.get("kind", ""))))
+
+
+## Down the hatch: the layout for today comes from the farm's seed, the same one
+## on every screen. The rover goes down with its driver, to the start below.
+func _go_down() -> void:
+	if _moving:
+		return
+	_moving = true
+	var layout: Dictionary = ZoneDepth.layout(GameState.world_seed, ZoneDepth.ZONE, ZoneDepth.DEPTH, GameClock.get_day_index())
+	ZoneDepth.set_local(ZoneDepth.DEPTH, layout)
+	_rover.global_transform = GameState.TUNNEL_START
+	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+
+
+## Up again: the rover comes out by the hatch in the hub.
+func _go_up() -> void:
+	if _moving:
+		return
+	_moving = true
+	ZoneDepth.set_local(0, {})
+	_rover.global_transform = Transform3D(Basis.IDENTITY, ZoneDepth.descent_position() + Vector3(0.0, 0.05, TunnelRock.CELL_M))
+	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
 
 
 func _can_catch() -> bool:
