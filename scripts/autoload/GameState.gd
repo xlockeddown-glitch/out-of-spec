@@ -12,6 +12,8 @@ signal enclosures_changed
 ## The Cobalt Sentinel came out in the tunnels, or is gone.
 signal sentinel_changed
 signal rover_lights_changed
+## A beacon was set down in the Lava Tubes.
+signal beacons_changed
 signal relay_changed(slotted: bool)
 signal calibration_recorded(record: Dictionary)
 signal phone_message(text: String)
@@ -179,6 +181,9 @@ var sentinel_sighted: bool = false
 ## Past this the chance is certain anyway.
 const SENTINEL_DAYS_MAX: int = 10
 var rover_lights: bool = true
+## The Lava Tubes beacon spots (LavaHub.SPOTS) that have one, in the order they
+## were placed. Shared by the farm.
+var beacons_placed: Array[String] = []
 var optical_silk_spools: int = 0
 var relay_slotted: bool = false
 ## Species that spun the spool now in the relay (its lag_reduction_pct stacks).
@@ -627,7 +632,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
-	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held"]
+	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -676,6 +681,11 @@ func farm_dict_problem(data: Dictionary) -> String:
 			for entry: Variant in value:
 				if typeof(entry) != (mine as Array).get_typed_builtin():
 					return "'%s' has an entry of the wrong type." % field
+	if data.has("beacons_placed") and LavaHub.placed_problem(data["beacons_placed"]) != "":
+		return LavaHub.placed_problem(data["beacons_placed"])
+	var beacon_steps: String = LavaHub.steps_problem(QuestEngine.quests(), data.get("quest_state", {}), (data.get("beacons_placed", []) as Array).size())
+	if beacon_steps != "":
+		return beacon_steps
 	if data.has("_spool_damaged") and data["_spool_damaged"].size() > data["_spool_species"].size():
 		return "'_spool_damaged' has more entries than there are spools."
 	for needs: Array in [["at_oirm", TYPE_INT], ["suspect_units", TYPE_INT], ["mined_fissures", TYPE_INT], ["lab_areas", TYPE_INT], ["lab_areas_paid", TYPE_INT],
@@ -4650,6 +4660,27 @@ func set_rover_lights(on: bool, player_id: String = "") -> String:
 	rover_lights_changed.emit()
 	SaveGame.saving.emit()  # it says where it is
 	watch_sentinel(TUNNEL_ROVER, parked_rover_transform(TUNNEL_ROVER).origin, 0.0)
+	return ""
+
+
+## Host: a beacon goes down at one of the Lava Tubes spots, for the player in the
+## tunnels. `player_id` is filled in from the connection (FarmCommands). Returns ""
+## or why not. The player is in the tunnels, Beacon Run is taken and not done, and
+## the farm's tunnel rover is within reach of the spot. The host does not check that
+## the player took a beacon from the rack [PLACEHOLDER]: that is the player's own
+## screen's prompt.
+func place_beacon(spot_id: String, player_id: String = "") -> String:
+	var reason: String = LavaHub.place_problem(spot_id, beacons_placed, place_of(player_id))
+	if reason == "":
+		reason = LavaHub.job_problem(quest_state)
+	if reason == "":
+		SaveGame.saving.emit()  # the rover on this screen says where it is
+		reason = LavaHub.reach_problem(spot_id, rover_zone, rover_transforms.has(TUNNEL_ROVER), parked_rover_transform(TUNNEL_ROVER).origin)
+	if reason != "":
+		return reason
+	beacons_placed.append(spot_id)
+	beacons_changed.emit()
+	SaveGame.saving.emit()
 	return ""
 
 

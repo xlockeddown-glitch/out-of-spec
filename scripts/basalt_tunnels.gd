@@ -17,6 +17,13 @@ var _move_granted: bool = false
 ## The cup can reach the Cobalt Sentinel.
 var _in_reach: bool = false
 var _told_reach: bool = false
+## The rack, the board or a beacon spot the rover is by (LavaHub.nearest), or {}.
+var _hub_near: Dictionary = {}
+var _told_hub: String = ""
+## This player took a beacon from the rack and has not set it down [PLACEHOLDER:
+## it is not kept if they leave the tunnels].
+var _holding_beacon: bool = false
+var _props: LavaHubProps
 
 @onready var _rover: RoverController = %Rover
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
@@ -31,6 +38,9 @@ func _ready() -> void:
 	_rover.dig_rejected.connect(_on_dig_rejected)
 	_rover.fill_rejected.connect(_on_fill_rejected)
 	_exit_pad.rover_entered.connect(_on_rover_entered_exit)
+	_props = LavaHubProps.new()
+	_rover.get_parent().add_child(_props)
+	GameState.beacons_changed.connect(_on_beacons_changed)
 	_hud.set_lights(GameState.rover_lights)
 	GameState.rover_lights_changed.connect(_show_lights)
 	var pause := PauseUI.new()
@@ -78,14 +88,24 @@ func _process(_delta: float) -> void:
 	_hud.set_clock(GameClock.format_now())
 	_hud.set_molt(GameState.molt_text() if GameState.has_skill_unlock("molt_on_phone") else "")
 	var reach: bool = _can_catch()
-	if reach and not _told_reach:
+	var rover_free: bool = _rover.away_text() == ""
+	# A held beacon and an empty spot in reach: the spot wins over the Sentinel's
+	# catch, so the prompt and E agree on one target.
+	var spot_wins: bool = reach and rover_free and _holding_beacon \
+			and not LavaHub.nearest(_rover.global_position, GameState.beacons_placed, true).is_empty()
+	var catching: bool = reach and not spot_wins
+	if catching and not _told_reach:
 		_told_reach = true
 		_hud.push_log("SENTINEL: in reach. Press E for the catch cup.")
-	if not reach and _cup.visible:
+	if not catching and _cup.visible:
 		_cup.hide()
-	_in_reach = reach
-	if not reach:
+	_in_reach = catching
+	if not catching:
 		_told_reach = false
+	# One target for the prompt and for E: the Sentinel's catch comes first, unless
+	# a held beacon has an empty spot in reach.
+	_hub_near = LavaHub.nearest(_rover.global_position, GameState.beacons_placed, spot_wins) if rover_free and not catching else {}
+	_tell_hub()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -102,6 +122,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"interact") and _in_reach:
 		get_viewport().set_input_as_handled()
 		_cup.open()
+	elif event.is_action_pressed(&"interact") and not _hub_near.is_empty():
+		get_viewport().set_input_as_handled()
+		_use_hub(_hub_near)
 	elif event.is_action_pressed(&"rover_lights"):
 		get_viewport().set_input_as_handled()
 		_toggle_lights()
@@ -115,6 +138,69 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _on_rover_entered_exit() -> void:
 	_hud.push_log("TUNNEL MOUTH: press E to leave.")
+
+
+## Says what E does when the rover first comes by the rack, the board or a spot.
+func _tell_hub() -> void:
+	var key: String = "%s:%s" % [_hub_near.get("kind", ""), _hub_near.get("id", "")] if not _hub_near.is_empty() else ""
+	if key == _told_hub:
+		return
+	_told_hub = key
+	match _hub_near.get("kind", ""):
+		LavaHub.RACK:
+			_hud.push_log("BEACON RACK: press E to take a beacon.")
+		LavaHub.BOARD:
+			_hud.push_log("NOTICE BOARD: press E to read it.")
+		LavaHub.SPOT:
+			_hud.push_log("BEACON SPOT: press E to set a beacon down.")
+
+
+func _use_hub(target: Dictionary) -> void:
+	match target["kind"]:
+		LavaHub.RACK:
+			_use_rack()
+		LavaHub.BOARD:
+			for line: String in LavaHub.board_lines(QuestEngine.quests(), GameState.quest_state,
+					GameState.player_quest_state.get(GameState.local_player_id, {}), GameState.beacons_placed.size()):
+				_hud.push_log(line)
+		LavaHub.SPOT:
+			_use_spot(str(target["id"]))
+
+
+## Orin speaks on the phone: he is not here in person [PLACEHOLDER].
+func _orin(line_id: String) -> void:
+	_hud.push_log("ORIN: " + QuestEngine.phone_line("npcs/orin/hub/" + line_id))
+
+
+func _use_rack() -> void:
+	if _holding_beacon:
+		_orin("rack_holding")
+	elif GameState.beacons_placed.size() >= LavaHub.SPOTS.size():
+		_orin("rack_empty")
+	elif LavaHub.job_problem(GameState.quest_state) != "":
+		_orin("rack_no_job")
+	else:
+		_holding_beacon = true
+		_orin("rack_take")
+
+
+func _use_spot(spot_id: String) -> void:
+	if not _holding_beacon:
+		_orin("spot_needs_beacon")
+		return
+	var problem: String = await FarmCommands.request(&"place_beacon", [spot_id])
+	if not is_inside_tree():
+		return
+	if problem != "":
+		_hud.push_log("BEACON SPOT: " + problem)
+		return
+	_holding_beacon = false
+	_orin("spot_placed")
+
+
+## A beacon was set down here, or a host's copy says so: show it.
+func _on_beacons_changed() -> void:
+	_props.show_placed(GameState.beacons_placed)
 
 
 func _can_catch() -> bool:

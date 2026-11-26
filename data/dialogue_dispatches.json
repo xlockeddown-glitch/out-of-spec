@@ -268,7 +268,17 @@
         "daily_row_done": "A straight row. The beacon has something to look at now.",
         "missing_blocks_offer": "Those blocks you keep turning up were a set once. Mine. Somebody buried it a piece at a time and I never asked who. Find me three more and we will see what they still add up to.",
         "missing_blocks_done": "That is a length, and it holds. The case is yours. It has been empty long enough.",
-        "missing_blocks_reference": "You wrung that like someone who has done it ten thousand times. I have. I know the look of it."
+        "missing_blocks_reference": "You wrung that like someone who has done it ten thousand times. I have. I know the look of it.",
+        "beacon_run_offer": "The tunnels go dark past the first bend. There is a rack by the mouth with my beacons on it. Take one, set it down deeper in, and come back for the next. Three, if you would.",
+        "beacon_run_done": "Three little lights where there were none. You can find your way home now. So can I, if I ever come down."
+      },
+      "hub": {
+        "rack_take": "One beacon, off the rack. Now set it down further in.",
+        "rack_holding": "You have one in your hand already. Put it down first.",
+        "rack_no_job": "The beacon run is not open yet. Check back in a moment.",
+        "rack_empty":"The rack is bare. Every beacon I had is lit somewhere in there.",
+        "spot_placed": "That one is lit. I can see it from here, or I could if I were there.",
+        "spot_needs_beacon": "Nothing in your hands. The rack by the mouth has the beacons."
       }
     }
   }
