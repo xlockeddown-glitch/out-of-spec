@@ -44,6 +44,7 @@ const SHOWN_BY: Dictionary = {
 	&"rover_lights_changed": ["rover_lights"],
 	&"beacons_changed": ["beacons_placed"],
 	&"finds_changed": ["finds_taken"],
+	&"lifts_changed": ["lifts_repaired", "deepest_depth"],
 	&"wheels_changed": ["wheel_meters"],
 }
 ## These also show the day.

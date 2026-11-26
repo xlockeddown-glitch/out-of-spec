@@ -134,6 +134,7 @@ func _ready() -> void:
 	GameState.ore_changed.connect(_on_ore_changed)
 	GameState.credibility_changed.connect(_on_credibility_changed)
 	GameState.lab_xp_changed.connect(_on_credibility_changed.bind(0))
+	GameState.lifts_changed.connect(_on_credibility_changed.bind(0))
 	_rover.ore_mined.connect(_on_ore_mined)
 	_rover.boulder_hit.connect(_on_boulder_hit)
 	_bram_bay.rover_entered.connect(_on_rover_entered_bay)
@@ -169,7 +170,7 @@ func _ready() -> void:
 	_refresh_relay_hud()
 	_hud.set_credits(GameState.credits)
 	_hud.set_ore(GameState.crystal_ore)
-	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text(), GameState.lab_phone_text())
+	_hud.set_credibility(GameState.credibility_text(), GameState.contract_phone_text(), GameState.lab_phone_text())
 	_hud.set_gauge_set(GaugeSet.text(GameState.gauge_pieces()))
 	_refresh_jobs_hud()
 	var pause := PauseUI.new()
@@ -710,7 +711,7 @@ func _on_boulder_hit(hits: int) -> void:
 
 
 func _on_credibility_changed(_points: int) -> void:
-	_hud.set_credibility(GameState.credibility_text(), GameState.contract_text(), GameState.lab_phone_text())
+	_hud.set_credibility(GameState.credibility_text(), GameState.contract_phone_text(), GameState.lab_phone_text())
 	if _bram_bay.rover_inside:
 		_refresh_bram()
 

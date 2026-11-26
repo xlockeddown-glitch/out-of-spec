@@ -2056,3 +2056,15 @@ Ryan's idea: stage areas almost level specific. Underground for lab levels about
 - **[KNOWN LIMIT / FOLLOW-UP] The 20 game minute time cost is not built.** The doc allows it only if advancing the shared clock is cleanly host-only. It is not: it meets the 02:00 recall (`_tick_recall`), `waits_within`, and other players' clocks. Only "instruments drift ×2 for the trip" and a phone warning are built. A later PR can add the time cost once the clock rules are settled.
 - **[PLACEHOLDER] numbers.** Vent count 1 to 2; hot 40 game min, cool 60 (period 100); a per-vent phase from the hash; warning glow in the last 10 min before heat; minimum row gap 2; entry reach 2.1 m (plus the host's 1.5 m of slack); drift multiplier ×2; glow levels (1.0 hot, 0.45 warning, 0.08 cool) and the prop's size and colours; the phone lines.
 - **Not yet.** The time cost, a second hazard, hazards in other depths or zones, and a vent prop with real art.
+
+## 2026-11-26: Zones step 9, depths 2 and 3, the lift and the checkpoint (`docs/design/zones.md` section 13)
+
+- **Generalised depth.** `ZoneDepth.layout(seed, zone, depth, day)` serves depths 1 to 3 from a per-depth plan (`PLANS`): the same hand-made-room approach, different room slots and passages, the same integer hash (`mix`/`fold`/`stream`/`draw`), never Godot's RNG. Depth 1 is pinned to its old output. Finds stay off the start, the hatch and the lift, and stay reachable (a 365-day test per depth).
+- **Ids and saves.** Find ids carry the depth (`d2_f0`), so `finds_taken` keeps its shape and needs no migration. `take_find` now requires the player to be at the rover's depth.
+- **Moving.** The hatch (11,13) goes down one depth; the WAY UP pad goes up one. `change_depth` is the same host command, now by any step of one; depth 3 has no way down. The rover arrives at the start going down, beside the hatch coming up.
+- **The lift (every third depth, so depth 3).** `repair_lift` (host-run, one time, shared wallet and stock) and `use_lift` (host-run, free once repaired, same driver checks as `change_depth`). The hub lift goes to the deepest repaired lift depth. `lifts_repaired` is SAVED_LATER, shown by `lifts_changed` in FarmSync SHOWN_BY.
+- **Deepest depth.** `deepest_depth` (zone -> int) is SAVED_LATER and synced, grows only, and shows as "Deepest: Lava Tubes, depth N" under the contract on the phone. An old save counts the rover's own depth.
+- **Vents** stay on depth 1 only (a [PLACEHOLDER] choice; `ZoneHazards.vents_for` returns none elsewhere).
+- **Protocol** 22 to 23 (two new commands, two new synced fields).
+- **[PLACEHOLDER] numbers.** Repair cost 100 CR and 2 crystal ore; lift every 3rd depth; 3 depths; 7 finds per depth; depth 2 and 3 room slots and passage rows (`PLANS`); hatch cell (11,13), hub lift cell (11,16), depth 3 lift cell (9,16); the lift prop's look (primitive plate, posts, a beam, red when broken, cyan when repaired).
+- **Not yet.** Real art for the hatches and the lift, hazards on depths 2 and 3, a lift on other zones, a way to see the deepest depth of other zones (only `lava_tubes` has depths).

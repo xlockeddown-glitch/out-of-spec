@@ -1,8 +1,8 @@
 class_name ZoneDepthProps
 extends Node3D
-## The props of the first depth (ZoneDepth), drawn from primitive meshes like
-## LavaHubProps': the hatch down in the hub, and below, one marker for each find
-## still there. Shows only; no rules. The look is plain [PLACEHOLDER].
+## The props of the depths (ZoneDepth), drawn from primitive meshes like
+## LavaHubProps': a way down (a hatch), the lift stations, and below, one marker for
+## each find still there. Shows only; no rules. The look is plain [PLACEHOLDER].
 
 const ORE := Color(0.2196, 0.8824, 0.7765)
 const MINERAL := Color(0.96, 0.65, 0.14)
@@ -15,16 +15,49 @@ var _vents: Dictionary = {}
 const VENT_HOT := Color(1.0, 0.36, 0.08)
 
 
-## The hatch in the hub: a dark plate with a lit rim and a sign.
-func build_hatch() -> void:
+## A way down: a dark plate with a lit rim and a sign. `depth` is the one it is at (0,
+## the hub; or 1 or 2 below, by the trunk).
+func build_hatch(depth: int = 0) -> void:
 	var hatch := Node3D.new()
 	hatch.name = "Hatch"
-	hatch.position = ZoneDepth.descent_position()
+	hatch.position = ZoneDepth.descent_position(depth)
 	add_child(hatch)
 	hatch.add_child(LavaHubProps._part(LavaHubProps._cylinder(1.3, 0.06), Vector3(0.0, 0.03, 0.0), LavaHubProps._flat(LavaHubProps.STEEL)))
 	hatch.add_child(LavaHubProps._part(LavaHubProps._cylinder(1.0, 0.08), Vector3(0.0, 0.04, 0.0), LavaHubProps._flat(LavaHubProps.DARK)))
 	hatch.add_child(LavaHubProps._part(LavaHubProps._cylinder(1.15, 0.03), Vector3(0.0, 0.015, 0.0), LavaHubProps._glow(LavaHubProps.CYAN, 0.5)))
 	hatch.add_child(LavaHubProps._label("WAY DOWN", Vector3(0.0, 1.5, 0.0)))
+
+
+## The lift station at `depth` (0, the hub's, or the depth that has one): a plate, two
+## posts and a cross beam. Broken, it is dark and leans, with a red sign; repaired, it
+## is square and lit. Drawn again when the farm's repair changes. A look only.
+func build_lift(depth: int, repaired: bool) -> void:
+	var old: Node = get_node_or_null("Lift")
+	if old != null:
+		remove_child(old)
+		old.queue_free()
+	var lift := Node3D.new()
+	lift.name = "Lift"
+	lift.position = ZoneDepth.lift_position(depth)
+	add_child(lift)
+	lift.add_child(LavaHubProps._part(LavaHubProps._box(Vector3(2.4, 0.1, 2.4)), Vector3(0.0, 0.05, 0.0), LavaHubProps._flat(LavaHubProps.STEEL)))
+	var post: Material = LavaHubProps._flat(LavaHubProps.STEEL if repaired else LavaHubProps.DARK)
+	lift.add_child(LavaHubProps._part(LavaHubProps._box(Vector3(0.2, 2.6, 0.2)), Vector3(-1.0, 1.4, -1.0), post))
+	var second: MeshInstance3D = LavaHubProps._part(LavaHubProps._box(Vector3(0.2, 2.6, 0.2)), Vector3(1.0, 1.4, -1.0), post)
+	lift.add_child(second)
+	var beam: MeshInstance3D = LavaHubProps._part(LavaHubProps._box(Vector3(2.4, 0.2, 0.2)), Vector3(0.0, 2.7, -1.0), post)
+	lift.add_child(beam)
+	if repaired:
+		lift.add_child(LavaHubProps._part(LavaHubProps._box(Vector3(2.0, 0.04, 2.0)), Vector3(0.0, 0.12, 0.0), LavaHubProps._glow(LavaHubProps.CYAN, 0.8)))
+		lift.add_child(LavaHubProps._label("LIFT", Vector3(0.0, 3.3, -1.0)))
+	else:
+		# One post down and the beam hanging off it: it is plainly not working.
+		second.rotation_degrees = Vector3(0.0, 0.0, 28.0)
+		second.position = Vector3(1.5, 1.0, -1.0)
+		beam.rotation_degrees = Vector3(0.0, 0.0, -14.0)
+		beam.position = Vector3(0.0, 2.4, -1.0)
+		lift.add_child(LavaHubProps._part(LavaHubProps._box(Vector3(1.4, 0.04, 1.4)), Vector3(0.0, 0.12, 0.0), LavaHubProps._glow(Color(0.9, 0.2, 0.1), 0.6)))
+		lift.add_child(LavaHubProps._label("LIFT: BROKEN", Vector3(0.0, 3.3, -1.0)))
 
 
 ## Below: a marker for each of the layout's finds not in `taken`.

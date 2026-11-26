@@ -67,7 +67,7 @@ func test_a_new_day_or_a_new_farm_changes_the_layout() -> String:
 
 
 func test_only_the_lava_tubes_depth_one_has_a_layout() -> String:
-	if not ZoneDepth.layout(SEED, "flooded_aquifer", 1, 0).is_empty() or not ZoneDepth.layout(SEED, ZoneDepth.ZONE, 2, 0).is_empty() or not ZoneDepth.layout(SEED, ZoneDepth.ZONE, 0, 0).is_empty():
+	if not ZoneDepth.layout(SEED, "flooded_aquifer", 1, 0).is_empty() or not ZoneDepth.layout(SEED, ZoneDepth.ZONE, ZoneDepth.MAX_DEPTH + 1, 0).is_empty() or not ZoneDepth.layout(SEED, ZoneDepth.ZONE, 0, 0).is_empty():
 		return "A layout was made where there is no depth."
 	return ""
 
@@ -364,11 +364,11 @@ func test_the_protocol_moved_with_the_take_command_and_field() -> String:
 	return "" if CoopSession.PROTOCOL >= 19 else "take_find and finds_taken are new on the wire: PROTOCOL must be 19 or more."
 
 
-func test_presence_reports_depth_one_and_no_deeper() -> String:
-	if ZonePresence.MAX_DEPTH != 1:
+func test_presence_reports_the_depths_and_no_deeper() -> String:
+	if ZonePresence.MAX_DEPTH != 3:
 		return "MAX_DEPTH is %d." % ZonePresence.MAX_DEPTH
-	if ZonePresence.place_problem("lava_tubes", 1) != "" or ZonePresence.place_problem("lava_tubes", 2) == "":
-		return "Depth 1 should be accepted and depth 2 refused."
+	if ZonePresence.place_problem("lava_tubes", 3) != "" or ZonePresence.place_problem("lava_tubes", 4) == "":
+		return "Depth 3 should be accepted and depth 4 refused."
 	if ZonePresence.place_problem("farm", 1) == "":
 		return "A depth on the farm was accepted."
 	var was: int = ZoneDepth.local_depth
@@ -427,7 +427,7 @@ func test_a_save_with_a_bad_rover_depth_is_refused() -> String:
 	gs.rover_zone = ZoneDepth.ZONE
 	var data: Dictionary = gs.farm_to_dict()
 	var refused: Array[String] = []
-	for bad: Variant in [-1, ZoneDepth.DEPTH + 1, "1", 1.5, null]:
+	for bad: Variant in [-1, ZoneDepth.MAX_DEPTH + 1, "1", 1.5, null]:
 		data["rover_depth"] = bad
 		refused.append(gs.farm_dict_problem(data))
 	# Below, with the rover somewhere that is not the Lava Tubes.
@@ -615,7 +615,7 @@ func test_a_save_names_only_real_zones_and_real_find_ids() -> String:
 	var bad_records: Array = [
 		{ "not_a_zone": { "day": 1, "ids": [] } },
 		{ "lava_tubes": { "day": 1, "ids": ["d1_f99"] } },
-		{ "lava_tubes": { "day": 1, "ids": ["d2_f0"] } },
+		{ "lava_tubes": { "day": 1, "ids": ["d4_f0"] } },
 		{ "lava_tubes": { "day": 1, "ids": ["d1_f+1"] } },
 		{ "lava_tubes": { "day": 1, "ids": ["d1_f-0"] } },
 	]
