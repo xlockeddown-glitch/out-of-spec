@@ -4554,6 +4554,12 @@ func channel_cells() -> Array[Vector2i]:
 	return StonePieces.channel_cells(stone_pieces)
 
 
+## The gauge set the found blocks make (GaugeSet.pieces): size index -> best grade.
+## Worked out from found_blocks, so it is the host's and nothing more is saved.
+func gauge_pieces() -> Dictionary:
+	return GaugeSet.pieces(world_seed, found_blocks.keys())
+
+
 ## The block a check uses: the last one found. {} with none.
 func block_in_hand() -> Dictionary:
 	var cells: Array[Vector2i] = found_blocks.keys()
