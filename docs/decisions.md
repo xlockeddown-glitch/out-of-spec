@@ -2068,3 +2068,10 @@ Ryan's idea: stage areas almost level specific. Underground for lab levels about
 - **Protocol** 22 to 23 (two new commands, two new synced fields).
 - **[PLACEHOLDER] numbers.** Repair cost 100 CR and 2 crystal ore; lift every 3rd depth; 3 depths; 7 finds per depth; depth 2 and 3 room slots and passage rows (`PLANS`); hatch cell (11,13), hub lift cell (11,16), depth 3 lift cell (9,16); the lift prop's look (primitive plate, posts, a beam, red when broken, cyan when repaired).
 - **Not yet.** Real art for the hatches and the lift, hazards on depths 2 and 3, a lift on other zones, a way to see the deepest depth of other zones (only `lava_tubes` has depths).
+
+## 2026-11-26: Zones step 10, co-op hardening (`docs/design/zones.md` section 13)
+
+- **A guest who drops brings the rover home.** When the last player recorded in a zone leaves (a quit or a lost link), the host sends the rover home as a rescue does: the farm's lent rover to the pad, a console field rover released. Before, a lent rover stayed at its depth with nobody able to reach it from the farm, and a field rover stayed live with its heat trip. It costs nothing [PLACEHOLDER]: the guest chose nothing. The 02:00 recall for a guest who is still in the zone is not built.
+- **The host's word on the rover is the newest word for finds and beacons too.** `take_find` and `place_beacon` read the rover from `_rover_pose_now`, as `enter_vent` and the lift do, and no longer save the host's own rover over a pose a guest drove to.
+- **Left as it is.** The host is not held to a place when it runs a rover command (a guest cannot do the same; the host's screen cannot reach it from the farm).
+- **No protocol change:** `CoopSession.PROTOCOL` stays 23.

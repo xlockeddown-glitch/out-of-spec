@@ -4181,8 +4181,15 @@ func players_in(place: String, among: Array[String]) -> Array[String]:
 
 ## Host: a player left, or dropped.
 func forget_place(player_id: String) -> void:
+	var was: String = place_of(player_id) if player_places.has(player_id) else ""
 	player_places.erase(player_id)
 	_console_arrivals.erase(player_id)
+	# The last one below dropped (a quit, a lost link): nobody is left to bring the
+	# rover back, and the host on the farm cannot reach it. It goes home as it does
+	# for a rescue, so it is neither stranded nor left with a stale heat trip
+	# (zones doc section 12.4) [PLACEHOLDER: home free of charge].
+	if not FarmCommands.guest and was != "" and was != ZonePresence.FARM and was != ZonePresence.DOME 			and rover_zone != "" and _places_in(rover_zone).is_empty():
+		bring_rover_home()
 
 
 ## A session starting or ending: only this screen's own player is known.
@@ -5145,8 +5152,8 @@ func place_beacon(spot_id: String, player_id: String = "") -> String:
 	if reason == "":
 		reason = LavaHub.job_problem(quest_state)
 	if reason == "":
-		SaveGame.saving.emit()  # the rover on this screen says where it is
-		reason = LavaHub.reach_problem(spot_id, rover_zone, rover_transforms.has(TUNNEL_ROVER), parked_rover_transform(TUNNEL_ROVER).origin)
+		var at: Variant = _rover_pose_now(TUNNEL_ROVER)  # honours the told pose and the drive lease
+		reason = LavaHub.reach_problem(spot_id, rover_zone, at != null, at if at != null else Vector3.ZERO)
 	if reason != "":
 		return reason
 	beacons_placed.append(spot_id)
@@ -5178,9 +5185,9 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 	if reason == "":
 		reason = ZoneDepth.take_problem(find_id, today.get("finds", []), taken, place_of(player_id), depth_of(player_id))
 	if reason == "":
-		SaveGame.saving.emit()  # the rover on this screen says where it is
 		var find: Dictionary = ZoneDepth.find_in(today, find_id)
-		reason = ZoneDepth.reach_problem(TunnelRock.at_in(today["grid"], find["cell"]), rover_zone, rover_transforms.has(TUNNEL_ROVER), parked_rover_transform(TUNNEL_ROVER).origin)
+		var at: Variant = _rover_pose_now(TUNNEL_ROVER)  # honours the told pose and the drive lease
+		reason = ZoneDepth.reach_problem(TunnelRock.at_in(today["grid"], find["cell"]), rover_zone, at != null, at if at != null else Vector3.ZERO)
 	if reason != "":
 		return reason
 	var pay: Dictionary = ZoneDepth.reward(str(ZoneDepth.find_in(today, find_id)["kind"]))

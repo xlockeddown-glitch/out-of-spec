@@ -88,3 +88,23 @@ Allow about 18 min. Use a fresh editor run or a **Windows debug export** so F9 c
 7. **Meet the auditors · 2 min** — On the farm, park beside the soil plot (the pod lands just south of it) and note your credits. Tap **F9** once per morning until the phone first reads **DAY 5**. Stop there to watch the drop-pod land with AUD-1T. The day-1 hygrometer calibration is overdue. Expect the phone log to show the manager’s intervention and Vance’s one-time warning, with the same credit balance afterward. After a lot of driving the manager may also name the steering encoder; that is expected. ☐ Pass ☐ Fail
 
 8. **Trade at Bram’s bay · 5 min** — Drive with **W/A/S/D** and tap **Space** on fresh cyan fissures until the phone shows **ORE 6**. The fissure from step 3 regrew the following morning. Drive under the scrapyard bay roof until Bram’s offer appears, then press **E** once. Expect **ORE 0**, **WIDE TREADS FITTED**, and Bram’s message that steering drift per meter is down 50 %. ☐ Pass ☐ Fail
+
+## Two-PC zones checklist
+
+Needs two PCs on one network, a farm with the Lava Tubes unlocked, and the rover at the mouth. The host is **PC A** and the guest is **PC B**. Use a debug export so F9 can move the clock. Allow about 25 min. Mark one box per step.
+
+1. **Join the farm · 2 min** — On PC A press **Host** and read out the address. On PC B press **Join** and type it. Expect both players on the farm, and PC B to see PC A's farm. ☐ Pass ☐ Fail
+
+2. **Two places at once · 5 min** — On PC A drive the rover into the Lava Tubes and down the hatch to depth 1. On PC B stay on the farm. Press **Tab** on PC B to go to the dome and use the console to travel to the Lava Tubes. Expect PC B to arrive at the hub, and PC A to stay at depth 1. Expect PC B to be unable to take a find or ride the hatch. Expect PC A's find to pay once on both screens. ☐ Pass ☐ Fail
+
+3. **Different depths · 4 min** — On PC A take the rover down to depth 2. On PC B try to take a find and to press the hatch. Expect a plain refusal each time. Then drive the rover up to the hub on PC A. Expect PC B to see the rover come back. ☐ Pass ☐ Fail
+
+4. **Join late · 5 min** — On PC B quit to the title screen. On PC A take a find and repair nothing else. On PC B join again. Expect PC B to see the same taken find, the deepest depth, the beacons and the rover where PC A left it. Expect no second pay for that find. ☐ Pass ☐ Fail
+
+5. **A guest drops mid-trip · 5 min** — On PC B use the console to travel to the Lava Tubes and drive the rover. While PC B drives, pull PC B's network cable. Expect PC A to see PC B go, and the rover to stop. On PC A walk to the farm and look for the rover. Expect it on the farm pad, not out in the tunnels. ☐ Pass ☐ Fail
+
+6. **The day does not wait · 2 min** — Rejoin on PC B and go to bed on PC A. Quit PC B while it is below. Expect PC A's day to end at once. Expect no message that waits for PC B. ☐ Pass ☐ Fail
+
+7. **The host drops · 2 min** — On PC B join again and stay on the farm. Close the game on PC A. Expect PC B to go to the title screen with a note that the host left. Expect no stuck screen. ☐ Pass ☐ Fail
+
+Not covered: the 02:00 rescue of a guest who is still in a zone.
