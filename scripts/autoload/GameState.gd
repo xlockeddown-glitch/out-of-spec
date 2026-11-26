@@ -1033,7 +1033,6 @@ func farm_from_dict(data: Dictionary) -> String:
 		return problem
 	put_farm(data)
 	finds_taken = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
-	_note_depth(rover_zone, rover_depth)  # a save from before the record: the rover's own depth counts
 	settle_rover_depth(false)
 	sentinel_sighted = false
 	player_places.clear()
@@ -1072,6 +1071,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	rover_place_changed.emit()
 	sentinel_changed.emit()
 	rover_lights_changed.emit()
+	lifts_changed.emit()
 	return ""
 
 
@@ -1116,6 +1116,8 @@ func put_farm(data: Dictionary) -> void:
 		rover_lent = rover_zone != ""
 	if not data.has("zones_unlocked") and _has_been_to_tunnels(data) and not zones_unlocked.has(TUNNELS_ZONE):
 		zones_unlocked.append(TUNNELS_ZONE)  # it has been in there
+	if not data.has("deepest_depth") and rover_zone != "" and rover_depth > 0:
+		deepest_depth[rover_zone] = rover_depth  # a save from before the record: where the rover is counts
 	_level_pads()
 	if not data.has("stone"):
 		# From before stone, so its broken boulders gave none.
@@ -4257,11 +4259,13 @@ func _rover_trip_problem(player_id: String) -> String:
 	return ""
 
 
-## Host: why the tunnel rover is not within reach of `there` (its own copy of where the
-## rover is, asked of this screen first), or "".
+## Host: why the tunnel rover is not within reach of `there` (where the rover is now:
+## what a guest's driver told, this screen's own live rover, or the kept pose), or "".
+## No SaveGame.saving here: it would make a screen whose rover has not caught up yet
+## overwrite the pose a guest has driven to.
 func _rover_reach_problem(there: Vector3) -> String:
-	SaveGame.saving.emit()  # the rover on this screen says where it is
-	return ZoneDepth.reach_problem(there, rover_zone, rover_transforms.has(TUNNEL_ROVER), parked_rover_transform(TUNNEL_ROVER).origin)
+	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+	return ZoneDepth.reach_problem(there, rover_zone, at != null, at if at != null else Vector3.ZERO)
 
 
 ## Host: puts the rover at `target_depth` at `pose` and tells everyone.
@@ -4322,15 +4326,16 @@ func repair_lift(player_id: String = "") -> String:
 	lifts_repaired[TUNNELS_ZONE] = depths
 	lifts_changed.emit()
 	post_phone("LIFT: repaired for good (depth %d). The hub's lift now comes here." % depth)
-	SaveGame.saving.emit()
 	return ""
 
 
 ## Host: the rover (and whoever is in the tunnels) takes the lift: from the hub down
 ## to the deepest repaired lift's entrance, or from a depth with a repaired lift up
 ## to the hub. Free once repaired. Same checks as change_depth (`_rover_trip_problem`),
-## then the rover is within reach of the lift it takes. Returns "" or why not.
-func use_lift(player_id: String = "") -> String:
+## then the rover is within reach of the lift it takes. `target_depth` is where the
+## screen means to go: a request that was raced by another move (the lift would take the
+## rover somewhere else now) is refused rather than undone. Returns "" or why not.
+func use_lift(target_depth: int, player_id: String = "") -> String:
 	var reason: String = _rover_trip_problem(player_id)
 	if reason != "":
 		return reason
@@ -4343,6 +4348,8 @@ func use_lift(player_id: String = "") -> String:
 		return "There is no lift here."
 	elif not is_lift_repaired(TUNNELS_ZONE, rover_depth):
 		return "The lift is broken."
+	if target != target_depth:
+		return "The rover has moved: look again."
 	reason = _rover_reach_problem(ZoneDepth.lift_position(rover_depth))
 	if reason != "":
 		return reason

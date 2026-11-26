@@ -417,7 +417,8 @@ func _ride_lift() -> void:
 	if _moving or SceneSwitcher.is_busy():
 		return
 	_moving = true
-	var problem: String = await FarmCommands.request(&"use_lift", [])
+	var target: int = 0 if _built_depth > 0 else _lift_depth()  # where this screen means to go
+	var problem: String = await FarmCommands.request(&"use_lift", [target])
 	_finish_move(problem, "LIFT: ")
 
 
@@ -431,6 +432,8 @@ func _finish_move(problem: String, prefix: String) -> void:
 		return
 	# A guest's copy of the farm may come after the host's yes.
 	_on_rover_place_changed()
+	if not SceneSwitcher.is_busy():
+		_moving = false  # no rebuild or swap began (the rover is at this depth already)
 
 
 ## The rover's depth is not the one this scene was built for: it is built again, with
@@ -450,16 +453,15 @@ func _rebuild_for_depth() -> void:
 
 
 ## Where the rebuilt scene's rover starts: where the rover is, if that is inside
-## this depth's rock. A guest has the host's told pose; the host has its parked one,
+## this depth's rock. A guest has the host's told pose, or else (a depth change clears
+## it) the pose the host's snapshot parked; the host has its parked one,
 ## which counts only if the rover has a pose at all, and it lies inside this depth's
 ## rock (so a trip through the airlock that raced a console re-park does not put the
 ## rover by the hatch while it is at the hub start; a depth change parks a pose of
 ## its own, so the hatch is for when none is valid); else where a depth starts it.
 func _rover_pose_for_rebuild() -> Transform3D:
-	var known: Variant = null
-	if FarmCommands.guest:
-		known = CoopRovers.told_pose(GameState.TUNNEL_ROVER)
-	elif GameState.rover_transforms.has(GameState.TUNNEL_ROVER):
+	var known: Variant = CoopRovers.told_pose(GameState.TUNNEL_ROVER) if FarmCommands.guest else null
+	if known == null and GameState.rover_transforms.has(GameState.TUNNEL_ROVER):
 		known = GameState.parked_rover_transform(GameState.TUNNEL_ROVER)
 	return ZoneDepth.rebuild_pose(known, GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
 

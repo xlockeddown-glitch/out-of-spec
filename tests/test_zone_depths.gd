@@ -267,25 +267,57 @@ func test_the_repair_takes_its_cost_once_and_is_for_good() -> String:
 	return "\n".join(problems)
 
 
-func test_a_repaired_lift_is_saved_reloaded_synced_and_checked() -> String:
-	var gs: GameStateScript = _state()
+## The host's rover goes down the three hatches (depth 3 is the deepest) and, after
+## the lift is mended, comes up to the hub in it: `deepest_depth` is 3 with the rover
+## at depth 0, so a save has to keep it as a field of its own.
+func _been_to_three(gs: GameStateScript) -> void:
 	_rich(gs)
-	_rover_at(gs, 3, ZoneDepth.lift_position(3))
+	gs.local_player_id = HOST
+	_rover_at(gs, 0, ZoneDepth.descent_position(0))
+	for depth: int in range(0, 3):
+		gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.descent_position(depth))
+		gs.change_depth(depth + 1)
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.lift_position(3))
 	gs.repair_lift()
+	gs.use_lift(0)
+
+
+func test_a_repaired_lift_and_the_deepest_depth_are_saved_and_checked() -> String:
+	var gs: GameStateScript = _state()
+	_been_to_three(gs)
 	var problems: Array[String] = []
+	if gs.rover_depth != 0 or gs.deepest_depth.get("lava_tubes", 0) != 3 or not gs.is_lift_repaired("lava_tubes", 3):
+		problems.append("The setup did not leave the rover at the hub with 3 reached and the lift mended.")
 	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
+	if data.get("deepest_depth", {}) != { "lava_tubes": 3 } or data.get("rover_depth", -1) != 0:
+		problems.append("The save did not hold the deepest depth: %s." % [data.get("deepest_depth")])
 	var back: GameStateScript = _state()
+	var heard: Array[int] = [0]
+	back.lifts_changed.connect(func() -> void: heard[0] += 1)
 	var loaded: String = back.farm_from_dict(data)
 	if loaded != "":
 		problems.append("The save was refused: %s" % loaded)
 	if not back.is_lift_repaired("lava_tubes", 3) or back.deepest_depth.get("lava_tubes", 0) != 3:
 		problems.append("The repair or the deepest depth was lost in the save.")
-	# Old saves have neither.
+	if heard[0] != 1:
+		problems.append("A load told the lifts %d times, not once at the end." % heard[0])
+	# Old saves have neither: the deepest is where the rover was (the hub: none), quietly.
 	data.erase("lifts_repaired")
 	data.erase("deepest_depth")
 	var old: GameStateScript = _state()
 	if old.farm_from_dict(data) != "" or old.is_lift_repaired("lava_tubes", 3):
 		problems.append("An old save was refused or came with a lift.")
+	if not old.deepest_depth.is_empty():
+		problems.append("An old save from the hub came with a deepest depth: %s." % [old.deepest_depth])
+	data["rover_depth"] = 2
+	data["rover_zone"] = "lava_tubes"
+	var below: GameStateScript = _state()
+	var once: Array[int] = [0]
+	below.lifts_changed.connect(func() -> void: once[0] += 1)
+	if below.farm_from_dict(data) != "" or below.deepest_depth.get("lava_tubes", 0) != 2:
+		problems.append("An old save with the rover at depth 2 did not count depth 2: %s." % [below.deepest_depth])
+	if once[0] != 1:
+		problems.append("An old save told the lifts %d times, not once at the end." % once[0])
 	for bad: Variant in [{ "lava_tubes": [9] }, { "nowhere": [3] }, { "lava_tubes": ["3"] }, [3], { "lava_tubes": [3, 3] }]:
 		var junk: Dictionary = gs.farm_to_dict()
 		junk["lifts_repaired"] = bad
@@ -296,17 +328,135 @@ func test_a_repaired_lift_is_saved_reloaded_synced_and_checked() -> String:
 		junk["deepest_depth"] = bad
 		if gs.farm_dict_problem(junk) == "":
 			problems.append("A bad deepest_depth was accepted: %s" % [bad])
-	var shown: Variant = FarmSync.SHOWN_BY.get(&"lifts_changed", [])
-	if not "lifts_repaired" in shown or not "deepest_depth" in shown:
-		problems.append("FarmSync does not show the lifts and the deepest depth.")
-	for action: StringName in [&"repair_lift", &"use_lift"]:
-		if not action in FarmCommands.ACTIONS:
-			problems.append("%s is not a farm command." % action)
 	if CoopSession.PROTOCOL != 23:
 		problems.append("The protocol is %d, not 23." % CoopSession.PROTOCOL)
 	gs.free()
 	back.free()
 	old.free()
+	below.free()
+	return "\n".join(problems)
+
+
+func test_a_guest_is_told_the_lifts_and_the_deepest_depth() -> String:
+	var elapsed: float = GameClock.elapsed_days
+	var speed: float = GameClock.seconds_per_day
+	var paused: bool = GameClock.paused
+	var open: bool = SaveGame.farm_open
+	var host: GameStateScript = _state()
+	var guest: GameStateScript = _state()
+	var problems: Array[String] = []
+	host.local_player_id = HOST
+	_rich(host)
+	_rover_at(host, 0, ZoneDepth.descent_position(0))
+	for depth: int in range(0, 3):
+		host.rover_transforms[host.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.descent_position(depth))
+		host.change_depth(depth + 1)
+	FarmCommands.guest = true
+	guest.local_player_id = GUEST
+	var joined: String = FarmSync.join(FarmSync.capture(host), guest)
+	if joined != "":
+		problems.append("The join was refused: %s" % joined)
+	if guest.deepest_depth.get("lava_tubes", 0) != 3 or guest.is_lift_repaired("lava_tubes", 3):
+		problems.append("A joining guest did not get the deepest depth (3) with the lift still broken.")
+	host.rover_transforms[host.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.lift_position(3))
+	if host.repair_lift() != "":
+		problems.append("The host could not repair the lift.")
+	var heard: Array[int] = [0]
+	guest.lifts_changed.connect(func() -> void: heard[0] += 1)
+	var updated: String = FarmSync.update(FarmSync.capture(host), guest)
+	if updated != "":
+		problems.append("The update was refused: %s" % updated)
+	if not guest.is_lift_repaired("lava_tubes", 3) or guest.repaired_lift_depth("lava_tubes") != 3:
+		problems.append("The guest was not told the lift is repaired.")
+	if heard[0] < 1:
+		problems.append("The guest's screens were not told (lifts_changed).")
+	if host.use_lift(0) != "":
+		problems.append("The host could not ride up.")
+	FarmSync.update(FarmSync.capture(host), guest)
+	if guest.deepest_depth.get("lava_tubes", 0) != 3 or guest.rover_depth != 0:
+		problems.append("The guest lost the deepest depth when the rover went up.")
+	FarmCommands.guest = false
+	GameClock.elapsed_days = elapsed
+	GameClock.seconds_per_day = speed
+	GameClock.paused = paused
+	SaveGame.farm_open = open
+	host.free()
+	guest.free()
+	return "\n".join(problems)
+
+
+func _commands_for(gs: GameStateScript) -> Node:
+	var commands: Node = preload("res://scripts/autoload/FarmCommands.gd").new()
+	commands.state = gs
+	return commands
+
+
+func test_the_lift_commands_run_for_the_host_and_for_a_guest() -> String:
+	var gs: GameStateScript = _state()
+	gs.local_player_id = HOST
+	_rich(gs)
+	var commands: Node = _commands_for(gs)
+	var problems: Array[String] = []
+	# The host repairs it, as the host.
+	_rover_at(gs, 3, ZoneDepth.lift_position(3))
+	if commands.execute(HOST, &"repair_lift", []) != "" or not gs.is_lift_repaired("lava_tubes", 3):
+		problems.append("The host could not repair the lift through the commands.")
+	if commands.execute(HOST, &"use_lift", [0]) != "" or gs.rover_depth != 0:
+		problems.append("The host could not ride up through the commands.")
+	# A fresh farm: a guest at a depth with no lift is refused; at the lift's depth, not.
+	var fresh: GameStateScript = _state()
+	fresh.local_player_id = HOST
+	_rich(fresh)
+	var theirs: Node = _commands_for(fresh)
+	_rover_at(fresh, 3, ZoneDepth.lift_position(3))
+	fresh.player_places[GUEST] = [fresh.TUNNELS_ZONE, 1]
+	if theirs.execute(GUEST, &"repair_lift", []) == "" or fresh.is_lift_repaired("lava_tubes", 3):
+		problems.append("A guest at depth 1 repaired the lift at depth 3.")
+	fresh.player_places[GUEST] = ["farm", 0]
+	if theirs.execute(GUEST, &"repair_lift", []) == "" or fresh.is_lift_repaired("lava_tubes", 3):
+		problems.append("A guest on the farm repaired the lift.")
+	fresh.player_places[GUEST] = [fresh.TUNNELS_ZONE, 3]
+	if theirs.execute(GUEST, &"repair_lift", []) != "" or not fresh.is_lift_repaired("lava_tubes", 3):
+		problems.append("A guest at depth 3 could not repair the lift.")
+	if fresh.credits != 500 - ZoneDepth.LIFT_COST_CREDITS:
+		problems.append("The guest's repair was not paid from the farm's wallet.")
+	# A guest at another depth cannot ride it; one at the lift's depth can.
+	fresh.player_places[GUEST] = [fresh.TUNNELS_ZONE, 1]
+	if theirs.execute(GUEST, &"use_lift", [0]) == "" or fresh.rover_depth != 3:
+		problems.append("A guest at depth 1 rode the lift at depth 3.")
+	fresh.player_places[GUEST] = [fresh.TUNNELS_ZONE, 3]
+	if theirs.execute(GUEST, &"use_lift", [0]) != "" or fresh.rover_depth != 0:
+		problems.append("A guest at depth 3 could not ride up.")
+	# A stale request: the rover is at the hub now, so a screen that still means
+	# "up to the hub" (0) is refused, not bounced back down; "down to 3" goes.
+	fresh.player_places[GUEST] = [fresh.TUNNELS_ZONE, 0]
+	if theirs.execute(GUEST, &"use_lift", [0]) == "" or fresh.rover_depth != 0:
+		problems.append("A raced request bounced the rover back down.")
+	if theirs.execute(GUEST, &"use_lift", [3]) != "" or fresh.rover_depth != 3:
+		problems.append("The right request (down to 3) was refused.")
+	# And the other way: the rover is at depth 3, so a stale "down to 3" is refused.
+	if theirs.execute(HOST, &"use_lift", [3]) == "" or fresh.rover_depth != 3:
+		problems.append("A stale request to go down bounced the rover back up.")
+	commands.free()
+	theirs.free()
+	gs.free()
+	fresh.free()
+	return "\n".join(problems)
+
+
+func test_a_guest_arrives_where_the_host_parked_the_rover() -> String:
+	var problems: Array[String] = []
+	var day: int = _today()
+	# By the lift up at the hub, and by a hatch up at depth 1 or 2: the host's own
+	# parked pose is inside the rock, so a guest (with no told pose) takes it.
+	for case: Array in [[0, ZoneDepth.lift_exit_transform(0)], [1, ZoneDepth.hatch_exit_transform(1)], [2, ZoneDepth.hatch_exit_transform(2)]]:
+		var depth: int = case[0]
+		var parked: Transform3D = case[1]
+		var got: Transform3D = ZoneDepth.rebuild_pose(parked, depth, SEED, day)
+		if got.origin.distance_to(parked.origin) > 0.01:
+			problems.append("Depth %d: the parked pose was not used." % depth)
+		if got.origin.distance_to(ZoneDepth.rebuild_pose(null, depth, SEED, day).origin) < 0.5:
+			problems.append("Depth %d: the parked pose is no different from the start." % depth)
 	return "\n".join(problems)
 
 
@@ -316,30 +466,30 @@ func test_the_lift_is_broken_until_repaired_then_goes_both_ways_free() -> String
 	_rich(gs)
 	# Before: the hub's lift will not move, nor will depth 3's.
 	_rover_at(gs, 0, ZoneDepth.lift_position(0))
-	if gs.use_lift() == "" or gs.rover_depth != 0:
+	if gs.use_lift(3) == "" or gs.rover_depth != 0:
 		problems.append("The broken hub lift moved the rover.")
 	_rover_at(gs, 3, ZoneDepth.lift_position(3))
-	if gs.use_lift() == "" or gs.rover_depth != 3:
+	if gs.use_lift(0) == "" or gs.rover_depth != 3:
 		problems.append("The broken lift at depth 3 moved the rover.")
 	_rover_at(gs, 2, ZoneDepth.lift_position(3))
-	if gs.use_lift() == "":
+	if gs.use_lift(0) == "":
 		problems.append("A lift was used at depth 2.")
 	_rover_at(gs, 3, ZoneDepth.lift_position(3))
 	gs.repair_lift()
 	var money: int = gs.credits
 	var ore: int = gs.crystal_ore
 	# Up to the hub, beside the hub's lift.
-	if gs.use_lift() != "" or gs.rover_depth != 0:
+	if gs.use_lift(0) != "" or gs.rover_depth != 0:
 		problems.append("The repaired lift did not go up to the hub.")
 	if gs.parked_rover_transform(gs.TUNNEL_ROVER).origin.distance_to(ZoneDepth.lift_exit_transform(0).origin) > 0.01:
 		problems.append("The rover did not come out by the hub's lift.")
 	# Far from the hub's lift it will not ride.
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.lift_position(0) + Vector3(0.0, 0.0, 60.0))
-	if gs.use_lift() == "" or gs.rover_depth != 0:
+	if gs.use_lift(3) == "" or gs.rover_depth != 0:
 		problems.append("The hub's lift was used from far away.")
 	# And down: straight to depth 3's entrance, the rover with the player.
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.lift_position(0))
-	if gs.use_lift() != "" or gs.rover_depth != 3:
+	if gs.use_lift(3) != "" or gs.rover_depth != 3:
 		problems.append("The hub's lift did not go down to depth 3.")
 	if gs.parked_rover_transform(gs.TUNNEL_ROVER).origin.distance_to(ZoneDepth.start_transform().origin) > 0.01:
 		problems.append("The rover did not come out at depth 3's entrance.")
@@ -357,7 +507,7 @@ func test_the_lift_ride_checks_the_driver_like_a_hatch() -> String:
 	_rover_at(gs, 3, ZoneDepth.lift_position(3))
 	gs.repair_lift()
 	gs.player_places[GUEST] = [gs.TUNNELS_ZONE, 1]
-	var refused: String = gs.use_lift(GUEST)
+	var refused: String = gs.use_lift(0, GUEST)
 	var stays: bool = gs.rover_depth == 3
 	gs.free()
 	return "" if refused != "" and stays else "A guest at another depth rode the lift."
