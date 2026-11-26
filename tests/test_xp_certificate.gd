@@ -510,6 +510,14 @@ func test_the_skills_view_opens_the_picker_and_a_second_click_spends() -> String
 	return out if out != "" else back
 
 
+## The picker's row button with this name, or null.
+func _row(picker: XpCertificateUI, row: String) -> Button:
+	for button: Button in _buttons(picker._rows):
+		if str(button.get_meta(&"row", "")) == row:
+			return button
+	return null
+
+
 func _focus(view: Control) -> Control:
 	return view.get_viewport().gui_get_focus_owner()
 
@@ -558,10 +566,43 @@ func _check_view(view: SkillsUI, me: String) -> String:
 		return "The picker says it is spent, with nothing left to press: %s" % picker._note.text
 	# A guest's copy of the farm can still list it for a moment: it is not
 	# shown again, so it can't be clicked again.
+	picker._spent.assign(["lump#1"])
 	GameState.xp_certificates = { me: { "lump#1": 200 } }
 	GameState.xp_certificates_changed.emit()
-	if not picker.spendable().is_empty() or not _buttons(picker._rows).is_empty():
+	if not picker.spendable().is_empty() or not _buttons(picker._rows).is_empty() or picker._spent != ["lump#1"]:
 		return "A spent certificate is not listed again from a stale copy."
+	# Once the farm no longer lists it, it is forgotten here.
+	GameState.xp_certificates = {}
+	GameState.xp_certificates_changed.emit()
+	if not picker._spent.is_empty():
+		return "A spent certificate the farm no longer lists is forgotten."
+	# Another farm (a save loaded, a host joined) may hold the same id: it shows.
+	picker._spent.assign(["lump#1"])
+	GameState.farm_loaded.emit()
+	GameState.xp_certificates = { me: { "lump#1": 200 } }
+	GameState.xp_certificates_changed.emit()
+	if not picker._spent.is_empty() or picker.spendable() != { "lump#1": 200 } or _buttons(picker._rows).is_empty():
+		return "A certificate of another farm is not hidden by one spent on the last."
+	# The rows are built again while one has focus: focus stays on that row.
+	var agronomy: Button = _row(picker, "skill agronomy")
+	agronomy.grab_focus()
+	GameState.xp_certificates_changed.emit()
+	if _focus(view) == agronomy or _focus(view) != _row(picker, "skill agronomy") or agronomy.get_parent() != null:
+		return "Focus stays on the same row when the rows are built again."
+	# A second certificate: its pick row has focus, then it is gone, so BACK has it.
+	GameState.xp_certificates = { me: { "lump#1": 200, "lump#2": 50 } }
+	GameState.xp_certificates_changed.emit()
+	_row(picker, "certificate lump#2").grab_focus()
+	GameState.xp_certificates = { me: { "lump#1": 200 } }
+	GameState.xp_certificates_changed.emit()
+	if _row(picker, "certificate lump#2") != null or _focus(view) != picker._close_button:
+		return "Focus goes to BACK when its row is gone."
+	# Focus elsewhere is left where it is.
+	GameState.xp_certificates_changed.emit()
+	if _focus(view) != picker._close_button:
+		return "Focus on BACK stays on BACK."
+	GameState.xp_certificates = {}
+	GameState.xp_certificates_changed.emit()
 	# BACK closes the picker and hands focus to the skills view's CLOSE.
 	picker._close_button.pressed.emit()
 	if picker.visible or view._close_button.focus_mode != Control.FOCUS_ALL or _focus(view) != view._close_button:

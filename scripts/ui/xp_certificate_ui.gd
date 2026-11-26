@@ -20,7 +20,8 @@ var _picked: String = ""
 var _asked: String = ""
 ## Certificates this screen has spent that the farm's copy here may still list:
 ## a guest's copy is the host's, and it comes a moment after the host's answer.
-## An id is never used again, so one stays out for good.
+## One is forgotten once the farm no longer lists it, and all are when another
+## farm is loaded or joined, where the same id may be a certificate still held.
 var _spent: Array[String] = []
 ## A spend has been asked of the host and its answer has not come.
 var _waiting: bool = false
@@ -93,6 +94,8 @@ func _ready() -> void:
 	_close_button.pressed.connect(step_back)
 	column.add_child(_close_button)
 	GameState.xp_certificates_changed.connect(_on_changed)
+	# A save loaded, or a host joined: another farm, and nothing of it spent here.
+	GameState.farm_loaded.connect(_spent.clear)
 	hide()
 
 
@@ -120,8 +123,12 @@ func step_back() -> void:
 ## The local player's certificates that can still be spent here: id -> XP.
 func spendable() -> Dictionary:
 	var out: Dictionary = GameState.held_xp_certificates()
-	for id: String in _spent:
-		out.erase(id)
+	# Only what the farm still lists needs hiding.
+	for id: String in _spent.duplicate():
+		if out.has(id):
+			out.erase(id)
+		else:
+			_spent.erase(id)
 	return out
 
 
@@ -131,6 +138,21 @@ func _on_changed() -> void:
 
 
 func _refresh() -> void:
+	# The row that has focus is about to be freed: remember which it is.
+	var focused: Control = get_viewport().gui_get_focus_owner() if is_inside_tree() else null
+	var was: String = str(focused.get_meta(&"row", "")) if focused != null and focused.get_parent() == _rows else ""
+	_build_rows()
+	if was == "" or not visible:
+		return
+	# Focus goes to the same row if it is still there, else to BACK.
+	for child: Node in _rows.get_children():
+		if child is Button and str(child.get_meta(&"row", "")) == was and not (child as Button).disabled:
+			(child as Button).grab_focus()
+			return
+	_close_button.grab_focus()
+
+
+func _build_rows() -> void:
 	for child: Node in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
@@ -146,6 +168,7 @@ func _refresh() -> void:
 	if held.size() > 1:
 		for id: String in held:
 			var pick: Button = PlanBoardUI._button(("> " if id == _picked else "") + certificate_text(id, int(held[id])))
+			pick.set_meta(&"row", "certificate " + id)
 			pick.pressed.connect(_pick.bind(id))
 			_rows.add_child(pick)
 	_rows.add_child(PlanBoardUI._label("Spend %s on one skill:" % certificate_text(_picked, int(held[_picked])), TEXT, 20))
@@ -154,6 +177,7 @@ func _refresh() -> void:
 		var asked: bool = skill == _asked and row["problem"] == ""
 		var spend: Button = PlanBoardUI._button(confirm_text(row) if asked else choice_text(row))
 		spend.disabled = row["problem"] != ""
+		spend.set_meta(&"row", "skill " + skill)
 		if asked:
 			spend.pressed.connect(_spend.bind(_picked, skill))
 		else:
