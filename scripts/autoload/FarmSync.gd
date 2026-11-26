@@ -166,12 +166,30 @@ static func _show_changes(farm: Node, before: Dictionary, new_day: bool) -> void
 	for cell: Variant in farm.tilled_cells:
 		if cell is Vector3i and not before["tilled_cells"].has(cell):
 			farm.soil_tilled.emit(cell)
+	var levels_moved: bool = _levels_moved(farm, before)
 	for shown: StringName in SHOWN_BY:
-		var changed: bool = new_day and shown in SHOW_THE_DAY
+		var changed: bool = (new_day and shown in SHOW_THE_DAY) or (levels_moved and shown == &"terrain_changed")
 		for field: String in SHOWN_BY[shown]:
 			changed = changed or farm.get(field) != before[field]
 		if changed:
 			_emit(farm, shown)
+
+
+## True if the pads level the ground differently than they did: the ground is not
+## a saved variable, it is worked out from the pieces and the digging, so a guest
+## is told "the terrain changed" when a pad came or went.
+static func _levels_moved(farm: Node, before: Dictionary) -> bool:
+	if farm.stone_pieces == before["stone_pieces"] and farm.dug == before["dug"]:
+		return false
+	return _pad_levels(farm.stone_pieces, farm.dug) != _pad_levels(before["stone_pieces"], before["dug"])
+
+
+static func _pad_levels(pieces: Dictionary, dug: Dictionary) -> Dictionary[Vector2i, float]:
+	var typed_pieces: Dictionary[Vector2i, int] = {}
+	typed_pieces.assign(pieces)
+	var typed_dug: Dictionary[Vector2i, int] = {}
+	typed_dug.assign(dug)
+	return Terrain.pad_levels(StonePieces.pad_cells(typed_pieces), typed_dug)
 
 
 static func _emit(farm: Node, shown: StringName) -> void:

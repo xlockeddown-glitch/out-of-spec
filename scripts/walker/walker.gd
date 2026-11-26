@@ -59,6 +59,12 @@ func _physics_process(delta: float) -> void:
 	CoopWalkers.moved(global_position, rotation.y, model.speed_mps)
 
 
+## Lifts it out of ground that rose under it. To ground that sank it falls.
+func keep_above_ground() -> void:
+	var ground_m: float = Terrain.height(Vector2(global_position.x, global_position.z), GameState.dug)
+	global_position.y = maxf(global_position.y, ground_m)
+
+
 ## Out of water that has just turned deep under it, after a dig or a stone: to the
 ## nearest place, any way round, that is dry enough and clear of the blocks.
 func leave_deep_water() -> void:

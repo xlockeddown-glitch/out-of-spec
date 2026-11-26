@@ -57,6 +57,12 @@ func leave_deep_water() -> void:
 		_own.leave_deep_water()
 
 
+## After the ground rose: this screen's walker is lifted out of it.
+func keep_above_ground() -> void:
+	if _own != null:
+		_own.keep_above_ground()
+
+
 func _process(delta: float) -> void:
 	for player_id: String in _friends.keys():
 		if not CoopWalkers.is_out(player_id):
