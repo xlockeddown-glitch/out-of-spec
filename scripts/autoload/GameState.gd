@@ -318,14 +318,16 @@ var farm_skill_xp: Dictionary = {}
 ## ordered_by }. Assembled robots' sensors are in `sensors` as "sensor@robot".
 var robots: Dictionary = {}
 ## The farm's water cistern. It runs down as growing plots are irrigated and is
-## refilled at each morning. A cistern that is empty at the morning means the
-## crops went dry that day and do not grow (see _grow_crops); they carry on
-## the next morning, after the refill. Both numbers are [PLACEHOLDER]: 36 growing
-## plots use about 140 L a day, all 144 about 550 L.
+## refilled at each morning. One that is empty at the morning means the crops
+## went dry, so that morning's growth is skipped (see _grow_crops); they carry
+## on the next morning, after the refill. With the current numbers it cannot run
+## dry in normal play (Ryan knew when he decided). Both numbers are
+## [PLACEHOLDER]: 36 growing plots use about 140 L a day, all 144 about 550 L
+## (worst day 553 L of 600 L).
 const CISTERN_CAPACITY_L: float = 600.0
 const CISTERN_DRAW_L_PER_PLOT_HOUR: float = 0.16
 var cistern_liters: float = CISTERN_CAPACITY_L
-const CISTERN_DRY_HINT: String = "Crops will not grow until it refills at the morning."
+const CISTERN_DRY_HINT: String = "Crops lose today's growth. It refills at the morning."
 ## Passed as plant_crop's offset to mean "use planting_offset_steps now".
 const OFFSET_CURRENT: int = -2147483648
 

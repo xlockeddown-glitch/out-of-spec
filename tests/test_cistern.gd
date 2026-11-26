@@ -307,3 +307,21 @@ func test_the_player_is_told_why_nothing_grows() -> String:
 		problem = "A ripe crop is not waiting for water."
 	gs.free()
 	return problem
+
+
+func test_a_full_plot_for_a_day_does_not_empty_it_on_current_numbers() -> String:
+	var gs: GameStateScript = _make_state(0)
+	gs.credits = 1000000
+	for i: int in 144:
+		var cell := Vector3i(i % 12 - 6, 0, i / 12 - 6)
+		gs.till(cell)
+		gs.plant_crop(cell)
+	var growing: int = gs.growing_plots()
+	if growing != 144:
+		gs.free()
+		return "All 144 plots must be growing, got %d." % growing
+	for hour: int in 24:
+		gs._draw_cistern(1.0 / 24.0)
+	var level: float = gs.cistern_liters
+	gs.free()
+	return "" if level > 0.0 else "With the current numbers a full plot must not empty it in a day (revisit the pause if they change)."
