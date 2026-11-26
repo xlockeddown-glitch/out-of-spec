@@ -14,6 +14,7 @@ func _run(body: Callable) -> String:
 	var saved: float = GameClock.elapsed_days
 	GameClock.elapsed_days = _flare_time()
 	var gs: GameStateScript = GameStateScript.new()
+	gs.lab_gates_kept = gs.all_lab_gate_ids()  # these tests are not about the lab-level gates
 	gs.build_registry()
 	gs.credits = 100000
 	gs.crystal_ore = 100
@@ -197,3 +198,17 @@ func _check_uncertified_lasts(gs: GameStateScript) -> String:
 	gs._charge_overdue_credibility(day + 1)
 	var each: int = int(gs._cred_number("overdue_points_per_instrument_day", 0.0))
 	return "" if each != 0 and gs.credibility == start + each else "From the next day it counts as one overdue instrument."
+
+
+func test_kestrel_waits_for_the_lab_level() -> String:
+	return _run(_check_lab_level)
+
+
+func _check_lab_level(gs: GameStateScript) -> String:
+	_open_tier2(gs)
+	gs.lab_gates_kept.clear()
+	var level: int = gs.lab_gate_level("tier2")
+	if not gs.buy_from_kestrel(HM3).contains("lab level %d" % level):
+		return "Kestrel's Tier 2 waits for its lab level: '%s'" % gs.buy_from_kestrel(HM3)
+	gs.lab_xp = gs.xp_for_level(level)
+	return "" if gs.buy_from_kestrel(HM3) == "" else gs.buy_from_kestrel(HM3)

@@ -11,6 +11,7 @@ const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 
 func _make_state() -> GameStateScript:
 	var gs: GameStateScript = GameStateScript.new()
+	gs.lab_gates_kept = gs.all_lab_gate_ids()  # these tests are not about the lab-level gates
 	gs.build_registry()
 	gs.reset_credibility()
 	gs.credibility = 30

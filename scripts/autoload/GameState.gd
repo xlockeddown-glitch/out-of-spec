@@ -377,6 +377,10 @@ var skill_curve: int = SKILL_CURVE
 ## the lab (lab_xp_sources in data/skills.json). It never goes down.
 ## _award_lab_xp is the only writer in play.
 var lab_xp: int = 0
+## Ids of the lab-level gates (lab_gates in data/skills.json) this farm keeps
+## open whatever its lab level: what a save from before the gates had open
+## (docs/design/quests_levels_story.md section 10, 5). Nothing in play adds one.
+var lab_gates_kept: Array[String] = []
 ## Discipline -> the most spaces its lab area has had that the lab has its XP
 ## for (lab_area). A space cleared and fitted again gives none.
 var lab_areas_paid: Dictionary = {}
@@ -589,6 +593,11 @@ const SAVED_FIELDS: Array[String] = [
 ]
 ## Guests a farm remembers [PLACEHOLDER].
 const MAX_KNOWN_GUESTS: int = 64
+## The most gates a save may keep open: far more than the table has rows.
+const MAX_KEPT_GATES: int = 64
+## In lab_gates_kept of a save that had earned the contract's standard before
+## the gates: Bram still sells it with no tier gate, as he did then.
+const KEPT_CONTRACT_SALE: String = "contract_stock"
 ## Variables added after save version 1. A save without one loads its declared
 ## default instead of being refused.
 const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_skill_xp", "farm_skill_xp", "robots",
@@ -597,7 +606,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"sentinel_out", "sentinel_days_unseen", "rover_lights", "cistern_liters", "pit_seep", "new_pockets", "pocket_pending",
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
-	"player_quest_state", "xp_certificates_spent", "wheel_meters"]
+	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -801,6 +810,12 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return quest_problem
 	if data.get("wheel_meters", 0.0) < 0.0:
 		return "'wheel_meters' is not a distance driven."
+	var kept: Array = data.get("lab_gates_kept", [])
+	if kept.size() > MAX_KEPT_GATES:
+		return "'lab_gates_kept' has too many entries."
+	for gate: String in kept:
+		if gate == "" or kept.count(gate) != 1:
+			return "'lab_gates_kept' has an entry that is not one gate."
 	var robot_problem: String = _robots_dict_problem(data.get("robots", {}))
 	if robot_problem != "":
 		return robot_problem
@@ -995,6 +1010,10 @@ func put_farm(data: Dictionary) -> void:
 	certificates.clear()
 	for cert: Dictionary in certificate_log:
 		certificates[cert["standard_id"]] = cert
+	# Last: the tiers' conditions read the rebuilt certificates and logs.
+	if not data.has("lab_gates_kept") and not FarmCommands.guest:
+		# From before the lab-level gates: what it had open stays open.
+		_keep_open_gates()
 
 
 func get_sensor(instrument_id: String) -> DriftingSensor:
@@ -1803,9 +1822,143 @@ func _old_effect_share(skill_id: String, old_level: int) -> float:
 
 # --- The lab level (docs/design/quests_levels_story.md section 3) ---------------
 
-## 1 to the top level, on the skills' curve. It gates nothing yet.
+## 1 to the top level, on the skills' curve. It gates the rows of lab_gates.
 func lab_level() -> int:
 	return _level_for_xp(lab_xp)
+
+
+# --- Lab-level gates (section 3.4) ----------------------------------------------
+# A row of lab_gates in data/skills.json opens when the lab level is reached AND
+# the condition the game already had holds (section 10, 4). The condition stays
+# where it was; these only add the level. The host decides: a guest's copy has
+# the same lab_xp and lab_gates_kept, so its screens say the same.
+
+## The lab level a gate asks for. 0 if the table has no such row, or the row is
+## not built: such a gate is open.
+func lab_gate_level(gate_id: String) -> int:
+	var row: Dictionary = DataManager.get_record(SKILLS_TABLE, StringName(gate_id), "lab_gates")
+	return int(row.get("level", 0)) if row.get("built", true) else 0
+
+
+## Every row id of lab_gates, built or not.
+func all_lab_gate_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for row: Dictionary in DataManager.get_records(SKILLS_TABLE, "lab_gates"):
+		ids.append(str(row["id"]))
+	return ids
+
+
+## True if the lab level lets this row open: it is reached, or the farm kept the
+## row from before the gates.
+func lab_gate_open(gate_id: String) -> bool:
+	return lab_level() >= lab_gate_level(gate_id) or gate_id in lab_gates_kept
+
+
+## "" if the gate is open, or the reason in plain words:
+## "Tier 2 equipment needs lab level 18 (the lab is level 9)."
+func lab_gate_problem(gate_id: String, what: String = "") -> String:
+	if lab_gate_open(gate_id):
+		return ""
+	return "%s lab level %s (the lab is level %s)." % ["Needs" if what == "" else what + " needs",
+		SP811.integer(lab_gate_level(gate_id)), SP811.integer(lab_level())]
+
+
+## Short form for a button or a list: "needs lab level 18", or "".
+func lab_gate_note(gate_id: String) -> String:
+	return "" if lab_gate_open(gate_id) else "needs lab level %s" % SP811.integer(lab_gate_level(gate_id))
+
+
+## The built rows that open from level `after` + 1 to `upto`, as one phone line:
+## "Tier 2 standards (also needs: an OIRM account); Medium lab". "" if none.
+func lab_gates_opened_text(after: int, upto: int) -> String:
+	var parts: PackedStringArray = []
+	for row: Dictionary in DataManager.get_records(SKILLS_TABLE, "lab_gates"):
+		var level: int = int(row.get("level", 0))
+		if not row.get("built", true) or level <= after or level > upto or str(row["id"]) in lab_gates_kept:
+			continue
+		var needs: String = str(row.get("needs", ""))
+		parts.append(str(row.get("opens", row["id"])) + ("" if needs == "" else " (also needs: %s)" % needs))
+	return "; ".join(parts)
+
+
+## The gate of the next robot: robot_1 for the first, up to the last row there is.
+func robot_gate_id() -> String:
+	var number: int = robots.size() + 1
+	while number > 1 and not DataManager.has_record(SKILLS_TABLE, StringName("robot_%d" % number), "lab_gates"):
+		number -= 1
+	return "robot_%d" % number
+
+
+## The lab XP a quest pays on top of its own when it is the provisional way
+## through a gate (section 3.2.1): a share of what the lab is short of the level
+## of the row that names the quest. 0 if the level is reached, the farm kept the
+## row, or no row names it.
+func provisional_lab_xp(quest_id: String) -> int:
+	var share: float = clampf(DataManager.get_number(SKILLS_TABLE, "lab_level/provisional_gap_share", 0.0), 0.0, 1.0)
+	var most: int = 0
+	for row: Dictionary in DataManager.get_records(SKILLS_TABLE, "lab_gates"):
+		if str(row.get("quest", "")) == quest_id and row.get("built", true) and not str(row["id"]) in lab_gates_kept:
+			most = maxi(most, roundi((xp_for_level(int(row.get("level", 0))) - lab_xp) * share))
+	return most
+
+
+## A save from before the gates (section 10, 5): every row it had open, by the
+## conditions of that time, is kept open. What it owns stays whatever this says:
+## a gate is only asked when something is bought, built, sent or offered.
+func _keep_open_gates() -> void:
+	lab_gates_kept.clear()
+	var had: Dictionary = {
+		"tier1": tier1_unlocked,
+		"oirm_account": has_oirm_account(),
+		"first_contract": contract_state != "",
+		"job_board": _best_band >= _band_index_named(jobs_open_band()),
+		"accredited_jobs": _best_band >= _gated_jobs_band_index(),
+		"collect_spool_card": _had_robot_job(JOB_COLLECT),
+		"calibrate_card": _had_robot_job(JOB_CALIBRATE),
+	}
+	for id: String in all_standard_ids():
+		var tier: int = (sensors[id] as DriftingSensor).tier
+		if tier >= 2 and (owned_standards.has(id) or (not _is_contract_stock(id) and _tier_condition_problem(id) == "")):
+			had["tier%d" % tier] = true
+	var building: int = int(lab_build.get("size", 0)) if lab_build.get("kind", "") == "grow" else 0
+	# The next size too: it asked for credits and ore and nothing else.
+	var top: int = mini(maxi(lab_size, building) + 1, lab_sizes().size() - 1)
+	for size: int in range(1, top + 1):
+		had["%s_lab" % lab_size_record(size).get("id", "")] = true
+	# The first trip to OIRM was open to any bought standard of tier 1 or more.
+	for id: String in owned_standards:
+		if (sensors[id] as DriftingSensor).tier >= 1:
+			had["oirm_account"] = true
+	for number: int in range(1, robots.size() + 1):
+		had["robot_%d" % number] = true
+	# The next one too, if a player could have ordered it.
+	for frame: Dictionary in DataManager.get_records(ROBOTS_TABLE, "frames"):
+		for player: String in _known_players():
+			if owned_standards.has(str(frame.get("required_standard", ""))) and _robot_skill_problem(frame, player) == "":
+				had[robot_gate_id()] = true
+	for gate: String in had:
+		if had[gate] and DataManager.has_record(SKILLS_TABLE, StringName(gate), "lab_gates"):
+			lab_gates_kept.append(gate)
+	# Not a row of the table: Bram sold the contract's standard with no tier
+	# gate once it was earned, and a farm that had earned it keeps that sale.
+	if contract_state in ["active", "complete", "fulfilled"]:
+		lab_gates_kept.append(KEPT_CONTRACT_SALE)
+
+
+## True if a robot holds a card of this job, or a player with a robot could
+## have added one.
+func _had_robot_job(job: String) -> bool:
+	for id: Variant in robots:
+		for card: Variant in robots[id].get("cards", []):
+			if card is Dictionary and card.get("job", "") == job:
+				return true
+	if robots.is_empty():
+		return false
+	for player: String in _known_players():
+		if _robot_job_skill_gate(job, player) == "":
+			return true
+	return false
+
 
 
 ## What every lab XP source is multiplied by: the entry of lab_level/size_xp for
@@ -1852,7 +2005,14 @@ func give_lab_xp(amount: int) -> void:
 	lab_xp = mini(lab_xp + amount, MOST_SKILL_XP)
 	lab_xp_changed.emit()
 	if lab_level() > before:
-		post_phone("LAB LEVEL UP: %s." % lab_phone_text())
+		var opened: String = lab_gates_opened_text(before, lab_level())
+		post_phone("LAB LEVEL UP: %s.%s" % [lab_phone_text(), "" if opened == "" else " Open at this level: %s." % opened])
+		# The jobs on offer change now, not next morning, as with a new band.
+		for gate: String in ["job_board", "accredited_jobs"]:
+			var level: int = lab_gate_level(gate)
+			if level > before and level <= lab_level() and not gate in lab_gates_kept and not _morning and _board_day >= 0:
+				refresh_job_board(GameClock.get_day_index())
+				break
 
 
 ## Line for the skills view: "Lab level 2  (60 XP, 105 for level 3)  farm".
@@ -2348,12 +2508,13 @@ func robot_build_problem(frame_id: String, player_id: String = "") -> String:
 	for id: Variant in robots:
 		if robots[id]["state"] == "assembling":
 			return "%s is still being assembled." % robots[id]["name"]
-	var needs: Dictionary = {
-		"robotics": int(frame.get("robotics_level", 1)) + robots.size() * int(frame.get("extra_robot_levels", 0)),
-	}
-	for skill: String in needs:
-		if skill_level(skill, player_id) < needs[skill]:
-			return "Needs %s level %s." % [skill.capitalize(), SP811.integer(needs[skill])]
+	var ordinals: Array[String] = ["The first", "A second", "A third", "A fourth"]
+	var gate: String = lab_gate_problem(robot_gate_id(), "%s robot" % (ordinals[robots.size()] if robots.size() < ordinals.size() else "Another"))
+	if gate != "":
+		return gate
+	var skill_problem: String = _robot_skill_problem(frame, player_id)
+	if skill_problem != "":
+		return skill_problem
 	var standard: String = str(frame.get("required_standard", ""))
 	if standard != "":
 		var title: String = instrument_name(standard, true)
@@ -2593,8 +2754,22 @@ func robot_collect_problem(robot_id: String) -> String:
 	return "" if problem == "" else "COLLECT SPOOL cards need a calibrated grip. %s: %s." % [instrument_name(grip, true), problem]
 
 
-## The skill levels a job's card still needs, or "".
+## The Robotics a player needs to order the next robot of this frame, or "".
+func _robot_skill_problem(frame: Dictionary, player_id: String = "") -> String:
+	var needs: int = int(frame.get("robotics_level", 1)) + robots.size() * int(frame.get("extra_robot_levels", 0))
+	return "" if skill_level("robotics", player_id) >= needs else "Needs Robotics level %s." % SP811.integer(needs)
+
+
+## What a job's card still needs, or "": the lab level of its row (lab_gate in
+## data/robots.json, section 3.4), then the player's skill levels.
 func robot_job_gate(job: String, player_id: String = "") -> String:
+	var row: String = str(DataManager.get_record(ROBOTS_TABLE, job, "jobs").get("lab_gate", ""))
+	var gate: String = "" if row == "" else lab_gate_problem(row, "%s cards" % job.replace("_", " ").to_upper())
+	return gate if gate != "" else _robot_job_skill_gate(job, player_id)
+
+
+## The skill levels a job's card still needs, or "".
+func _robot_job_skill_gate(job: String, player_id: String = "") -> String:
 	var gate: Dictionary = DataManager.get_record(ROBOTS_TABLE, job, "jobs").get("skill_gate", {})
 	var missing: PackedStringArray = []
 	for skill: Variant in gate:
@@ -3389,6 +3564,9 @@ func send_to_oirm(standard_id: String) -> Dictionary:
 		return { "ok": false, "reason": "The %s is not on the colony." % instrument_name(standard_id, true) }
 	if at_oirm.has(standard_id):
 		return { "ok": false, "reason": "Already at OIRM until day %d." % at_oirm[standard_id] }
+	# The trip that would open the account (has_oirm_account) waits for its row.
+	if sensor.tier >= 1 and not has_oirm_account() and not lab_gate_open("oirm_account"):
+		return { "ok": false, "reason": lab_gate_problem("oirm_account", "An OIRM account") }
 	# No pod on the pad: it goes by courier for a surcharge (Ryan, 2026-11-22).
 	var courier: bool = not drop_pod_present
 	var fee: int = oirm_fee() + (oirm_courier_surcharge() if courier else 0)
@@ -3778,12 +3956,33 @@ func has_oirm_account() -> bool:
 	return false
 
 
-## Why this standard's tier is not open yet, or "". Skill gates come later.
+## Why this standard's tier is not open yet, or "": the condition the tier has
+## always had, then its lab level (section 3.4). The contract's discount opens
+## nothing early: the standard it is for waits for its tier like any other.
 func tier_problem(standard_id: String) -> String:
+	if _is_contract_stock(standard_id) and KEPT_CONTRACT_SALE in lab_gates_kept:
+		return ""
+	var problem: String = _tier_condition_problem(standard_id)
+	if problem != "":
+		return problem
+	var tier: int = get_sensor(standard_id).tier
+	return lab_gate_problem("tier%d" % tier, "Tier %d equipment" % tier)
+
+
+## "needs lab level 18" if the lab level is all that keeps this standard's tier
+## shut, for the seller's list. "" if it is open or waits for something else.
+func tier_lab_note(standard_id: String) -> String:
+	if _tier_condition_problem(standard_id) != "" or tier_problem(standard_id) == "":
+		return ""
+	return lab_gate_note("tier%d" % get_sensor(standard_id).tier)
+
+
+## The conditions a tier had before the lab level, which stay (section 10, 4).
+func _tier_condition_problem(standard_id: String) -> String:
 	if not tier1_unlocked:
 		return "Tier 1 equipment needs a clean audit on file first."
 	var tier: int = get_sensor(standard_id).tier
-	if tier < 2 or _is_contract_stock(standard_id):
+	if tier < 2:
 		return ""
 	if not has_oirm_account():
 		return "Tier %d equipment needs an OIRM account: send a standard you bought for its first OIRM calibration." % tier
@@ -3807,11 +4006,13 @@ func _is_bram_stock(standard_id: String) -> bool:
 
 
 ## Standards Bram stocks, in data order (owned ones included). Tier 2 and up
-## show once their gate is open.
+## show once their old condition holds, with the lab level they still need
+## (tier_lab_note); the contract's standard shows from the day it is earned.
 func bram_catalog() -> Array[String]:
 	var ids: Array[String] = []
 	for id: String in all_standard_ids():
-		if _is_bram_stock(id) and ((sensors[id] as DriftingSensor).tier < 2 or owned_standards.has(id) or tier_problem(id) == ""):
+		if _is_bram_stock(id) and ((sensors[id] as DriftingSensor).tier < 2 or owned_standards.has(id)
+				or _is_contract_stock(id) or _tier_condition_problem(id) == ""):
 			ids.append(id)
 	return ids
 
@@ -4586,9 +4787,15 @@ func _offer_first_contract() -> void:
 	contract_state = "active"
 	contract_run = 0
 	credibility_changed.emit(credibility)
-	post_phone("OIRM CONTRACT offered: make %d calibrations in a row on time and traceable, and Bram will sell you the %s for %s CR + %d crystal ore (%d %% off). Calibrating a unit again before it has run half its interval doesn't count." % [
+	# Short of the row's lab level, it is the provisional way through (section
+	# 3.2.1): offered all the same, and its quest pays lab XP toward the level.
+	var provisional: bool = not lab_gate_open("first_contract")
+	post_phone("OIRM CONTRACT offered%s: make %d calibrations in a row on time and traceable, and Bram will sell you the %s for %s CR + %d crystal ore (%d %% off)%s. Calibrating a unit again before it has run half its interval doesn't count." % [
+		" (provisional: OIRM asks for lab level %s and the lab is level %s, so finishing it also lifts the lab level)" % [
+			SP811.integer(lab_gate_level("first_contract")), SP811.integer(lab_level())] if provisional else "",
 		contract_run_needed(), instrument_name(standard), SP811.integer(_discounted(sensor.price_credits)),
-		sensor.price_ore, contract_discount_pct()])
+		sensor.price_ore, contract_discount_pct(),
+		" once Tier %d is open to the lab" % sensor.tier if tier_problem(standard) != "" else ""])
 
 
 # --- Paid calibration jobs (Ryan, 2026-11-22) -------------------------------------
@@ -4641,11 +4848,28 @@ func job_standards(job: Dictionary) -> Array[String]:
 	return ids
 
 
+## The lab-level gate a job of this band waits for: the board's, or the one for
+## the band of the row accredited_jobs and above.
+func job_gate_id(band_name: String) -> String:
+	return "accredited_jobs" if _band_index_named(band_name) >= _gated_jobs_band_index() else "job_board"
+
+
+## The band whose jobs wait for the row accredited_jobs ("band" in lab_gates).
+## Past every band if the row names none.
+func _gated_jobs_band_index() -> int:
+	return _band_index_named(str(DataManager.get_record(SKILLS_TABLE, &"accredited_jobs", "lab_gates").get("band", "")))
+
+
 ## Why `job` can't be accepted now, or "".
 func job_accept_problem(job: Dictionary) -> String:
 	var band_name: String = str(job.get("min_band", ""))
 	if _band_index_named(band_name) > credibility_band_index():
 		return "Needs %s credibility." % band_name.to_upper()
+	var gate: String = lab_gate_problem("job_board", "The job board")
+	if gate == "":
+		gate = lab_gate_problem(job_gate_id(band_name), "%s jobs" % band_name)
+	if gate != "":
+		return gate
 	var area_problem: String = job_area_problem(job)
 	if area_problem != "":
 		return area_problem
@@ -4914,7 +5138,8 @@ func refresh_job_board(day: int) -> void:
 	_board_band = band
 	var eligible: Array[Dictionary] = []
 	for template: Dictionary in _job_templates():
-		if _band_index_named(str(template.get("min_band", ""))) > band:
+		var min_band: String = str(template.get("min_band", ""))
+		if _band_index_named(min_band) > band or not lab_gate_open("job_board") or not lab_gate_open(job_gate_id(min_band)):
 			continue
 		var taken: bool = str(template.get("id", "")) in _board_taken
 		for job: Dictionary in active_jobs:
@@ -4951,6 +5176,8 @@ func job_board_note() -> String:
 		return ""
 	if credibility_band_index() < _band_index_named(open_band):
 		return "JOB BOARD opens at %s." % open_band.to_upper()
+	if not lab_gate_open("job_board"):
+		return "JOB BOARD %s." % lab_gate_problem("job_board").trim_suffix(".").to_lower()
 	return "JOB BOARD: no new jobs today."
 
 
@@ -5145,7 +5372,15 @@ func lab_grow_problem() -> String:
 	var next: Dictionary = lab_next_size()
 	if next.is_empty():
 		return "The lab is already at its largest."
+	var gate: String = lab_gate_problem(lab_size_gate_id(next), "The %s" % str(next.get("name", "next size")).to_lower())
+	if gate != "":
+		return gate
 	return _lab_afford_problem(int(next.get("credits", 0)), int(next.get("ore", 0)))
+
+
+## The lab-level gate of a lab size: "medium_lab" for the size "medium".
+func lab_size_gate_id(size: Dictionary) -> String:
+	return "%s_lab" % size.get("id", "")
 
 
 ## Pays for the next size and starts building it. The new spaces are ready

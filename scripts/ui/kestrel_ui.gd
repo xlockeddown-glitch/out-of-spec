@@ -47,6 +47,7 @@ func _ready() -> void:
 	GameState.credits_changed.connect(_on_farm_changed.unbind(1))
 	GameState.ore_changed.connect(_on_farm_changed.unbind(1))
 	GameState.upgrades_changed.connect(_on_farm_changed)
+	GameState.lab_xp_changed.connect(_on_farm_changed)
 
 
 func _process(_delta: float) -> void:
@@ -105,6 +106,9 @@ func _row(id: String) -> Button:
 	var what: String = GameState.instrument_name(id)
 	if button.disabled:
 		button.text = "%s: on the colony" % what
+	elif GameState.tier_lab_note(id) != "":
+		# Pressing it still gives the full reason.
+		button.text = "%s: %s" % [what, GameState.tier_lab_note(id)]
 	elif id == _armed_id:
 		button.text = "PRESS AGAIN TO BUY: %s, %s, NO CERTIFICATE" % [what, GameState.standard_price_text(id)]
 	else:

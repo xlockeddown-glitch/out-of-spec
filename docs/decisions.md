@@ -1827,6 +1827,31 @@ Built from section 7 of the design (7.1 row 4, 7.2 to 7.6), on Bram's wheel serv
 7. Bram's three lines, 60 CR and 100 lab XP are placeholders. Change any?
 8. No practice swing here either. Add one?
 
+## 2026-11-26: Lab-level gates (build order step 9 of `docs/design/quests_levels_story.md`)
+
+Ryan decided to turn on the section 3.4 table with its numbers as they are (all [PLACEHOLDER], to tune after play).
+
+- **The table** is `lab_gates` in `data/skills.json`. A thing opens when the lab level is reached and its old condition holds. Built and gated: daily asks 3 (still in `data/quests.json`, checked equal by a test), Tier 1 at 5, job board 10, OIRM account 12, first contract 15 (offered by its old rule, provisional below the level), Tier 2 at 18, medium lab 20, robot 1 at 25, COLLECT SPOOL cards 30, robot 2 at 35, Tier 3 at 40, CALIBRATE cards 42, large lab and Accredited jobs 45, robot 3 at 65, robot 4 at 75.
+- **Not built, so not gated** (rows kept with `built: false`): certificate wall 8, 4th job 28, second contract 35, relay dish 48, master audit 52, intrinsic silk contract 56, the Larder 60, 5th job 65, robot paint 85, plaque 92, gold border 99.
+- **Existing saves** keep what they had open: `lab_gates_kept` (new saved field, `SAVED_LATER`, no version bump, no protocol bump, not shown by a signal because it only changes on load) is made once on a load with no such key. A farm that had finished the first contract also keeps Bram's sale of its standard with no tier gate.
+- **The contract discount does not bypass the Tier 3 gate** [decided, section 3.4]. The old code did skip the OIRM, sign-off and Tier 2 conditions for the contract's standard; that is changed for new farms. Bram still lists it ("needs lab level 40") and the discount is held.
+- **Where it shows**: the reason is in plain words ("Tier 2 equipment needs lab level 18 (the lab is level 9)."), on Bram's and the Kestrel's buttons ("needs lab level 18"), the Plan board's grow button, the job board note, the robot build and job card reasons, and the level-up phone line names what opens. The host enforces; a guest's copy has the same lab XP and kept rows.
+- **[ASSUMPTION] The provisional way through**: the first contract's quest pays 75 % of the lab XP still missing to level 15 on top of its 400 (`lab_level/provisional_gap_share`); none if the row is kept. The OIRM account has no quest of its own to be provisional with, so it just waits for its level.
+- **Hours** (test prints them; budget 20 at 5 h, 40 at 20 h, 60 at 50 h, log-linear between): level 5 at 2.2 h, 10 at 3.4 h, 12 at 3.8 h, 15 at 4.3 h, 18 at 4.7 h, 20 at 5.0 h, 25 at 9.0 h, 30 at 12.7 h, 35 at 16.4 h, 40 at 20 h, 42 at 23 h, 45 at 27.6 h, 60 at 50 h, 65 at 57 h, 75 at 72 h, 99 at 108 h. The lab XP an hour this asks is 512 (levels 1-20), 1 168 (20-40) and 3 928 (40-60), about 20, 10 and 5 traceable calibrations an hour. Every story beat is at or below 60.
+
+### Ryan decided 2026-11-26
+
+1. The contract's HB-700 may wait for Tier 3 (lab level 40) on a new farm.
+2. The first contract is still offered below level 15 by its old Trusted rule (the provisional way through). This settles review finding 4.
+3. Robot 2 and COLLECT SPOOL keep both the lab level and Robotics.
+
+### Review follow-up (Opus, 2026-11-26)
+
+- **Seeding order**: `_keep_open_gates()` now runs at the end of `put_farm`, after the calibration records and certificates are rebuilt from their logs, so a boot load or a second load reads the loaded save and nothing else.
+- **Seeding keeps every gate the old rule had open at load**: also the next lab size (it needed credits and ore only), `oirm_account` for a save that owns a bought Tier 1 or higher standard, and the contract sale for a contract that is active, complete or fulfilled.
+- **The level-up refreshes**: Bram's list, the Kestrel screen and the Plan board redraw on `lab_xp_changed`, so a "needs lab level" button changes at once.
+- **Decision line (hours model, unchanged)**: the hours model is self-referential (the budget anchors 20/40/60 at 5/20/50 h and the printed hours come from that same budget, with a +50 offset in the test's curve); it shows the shape of the table, not a measured play time. Left as is.
+
 ## 2026-11-26: Quest log on the phone (build order step 7 of `docs/design/quests_levels_story.md`)
 
 Built from Ryan's decision of 2026-11-26: a QUESTS view opened by a key, the same way the SKILLS view opens, in the phone's current look.

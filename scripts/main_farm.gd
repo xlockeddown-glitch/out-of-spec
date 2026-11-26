@@ -808,11 +808,20 @@ func _refresh_bram() -> void:
 			var sensor: DriftingSensor = GameState.get_sensor(id)
 			var owned: bool = GameState.owned_standards.has(id)
 			var verb: String = "CONFIRM: BUY" if id == _armed_standard else "BUY"
+			# Shut by its tier (a lab level, or what the tier has always asked):
+			# the line says so, and the number key gives Bram's full reason.
+			var gate: String = "" if owned else GameState.tier_lab_note(id)
+			if gate == "" and not owned and GameState.tier_problem(id) != "":
+				gate = "not open yet"
+			var text: String = "%s %s: %s  [%d]" % [verb, sensor.short_name.to_upper(), GameState.standard_price_text(id).to_upper(), i + 1]
+			if owned:
+				text = "%s: ON THE COLONY" % sensor.short_name.to_upper()
+			elif gate != "":
+				text = "%s: %s  [%d]" % [sensor.short_name.to_upper(), gate.to_upper(), i + 1]
 			offers.append({
 				"id": id,
-				"text": ("%s: ON THE COLONY" % sensor.short_name.to_upper()) if owned
-					else "%s %s: %s  [%d]" % [verb, sensor.short_name.to_upper(), GameState.standard_price_text(id).to_upper(), i + 1],
-				"disabled": owned or GameState.credits < GameState.standard_price_credits(id) or GameState.crystal_ore < sensor.price_ore,
+				"text": text,
+				"disabled": owned or gate != "" or GameState.credits < GameState.standard_price_credits(id) or GameState.crystal_ore < sensor.price_ore,
 			})
 	_hud.show_standards(offers, "" if GameState.tier1_unlocked else "Tier 1 standards: pass one audit clean and Bram will sell them.")
 

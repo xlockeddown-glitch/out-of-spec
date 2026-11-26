@@ -31,6 +31,7 @@ func _ready() -> void:
 	GameState.jobs_changed.connect(_on_lab_changed)
 	GameState.credits_changed.connect(_refresh_if_open.unbind(1))
 	GameState.ore_changed.connect(_refresh_if_open.unbind(1))
+	GameState.lab_xp_changed.connect(_refresh_if_open)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -129,6 +130,10 @@ func _refresh() -> void:
 		_grow_button.disabled = true
 	elif not GameState.lab_build.is_empty():
 		_grow_button.text = "One build at a time: wait for this one to finish."
+		_grow_button.disabled = true
+	elif GameState.lab_gate_note(GameState.lab_size_gate_id(next)) != "":
+		_grow_button.text = "GROW TO %s: %s" % [str(next.get("name", "?")).to_upper(),
+			GameState.lab_gate_note(GameState.lab_size_gate_id(next))]
 		_grow_button.disabled = true
 	else:
 		var days: int = int(next.get("build_days", 1))

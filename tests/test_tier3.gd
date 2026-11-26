@@ -15,6 +15,7 @@ func _run(body: Callable) -> String:
 	var saved: float = GameClock.elapsed_days
 	GameClock.elapsed_days = 6.0
 	var gs: GameStateScript = GameStateScript.new()
+	gs.lab_gates_kept = gs.all_lab_gate_ids()  # these tests are not about the lab-level gates
 	gs.build_registry()
 	gs.credits = 100000
 	gs.crystal_ore = 100
@@ -79,8 +80,13 @@ func _check_gate(gs: GameStateScript) -> String:
 		return "Bram must not sell the Rb-2D."
 	gs.traceable_lab = false
 	gs.contract_state = "complete"
-	if gs.tier_problem(HB700) != "" or not HB700 in gs.bram_catalog():
-		return "The contract HB-700 skips the gate."
+	# The contract's discount opens nothing early (section 3.4): the gate holds.
+	if gs.tier_problem(HB700) == "" or not HB700 in gs.bram_catalog():
+		return "The contract HB-700 must wait for Tier 3, and be listed."
+	# A farm that had earned the contract before the gates keeps the sale.
+	gs.lab_gates_kept.append(gs.KEPT_CONTRACT_SALE)
+	if gs.tier_problem(HB700) != "":
+		return "A farm that had earned the contract keeps its sale."
 	return ""
 
 
@@ -193,3 +199,24 @@ func _check_two_audits(gs: GameStateScript) -> String:
 			return "One clean audit must not sign the lab off."
 		gs._run_audit(day)
 	return "" if gs.traceable_lab and gs.clean_audit_streak == 2 else "Two clean audits must: %s" % [gs.audit_log]
+
+
+func test_tier3_waits_for_its_lab_level() -> String:
+	return _run(_check_lab_level)
+
+
+func _check_lab_level(gs: GameStateScript) -> String:
+	gs.buy_standard("field_meter_dc")
+	gs.send_to_oirm("field_meter_dc")
+	gs.traceable_lab = true
+	gs.buy_standard(TW6)
+	gs.oirm_calibrate(TW6, 7)
+	# The old conditions hold; only the level is left.
+	gs.lab_gates_kept.clear()
+	var level: int = gs.lab_gate_level("tier3")
+	if not gs.tier_problem(HB700).contains("lab level %d" % level) or gs.tier_lab_note(HB700) == "":
+		return "Tier 3 waits for its lab level, with a note: '%s'" % gs.tier_problem(HB700)
+	if gs.buy_standard(HB700) == "":
+		return "It can't be bought below the level."
+	gs.lab_xp = gs.xp_for_level(level)
+	return gs.tier_problem(HB700)
