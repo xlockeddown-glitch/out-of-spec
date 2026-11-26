@@ -64,6 +64,11 @@ const STATES: Array[String] = ["contract_state"]
 const LOGS: Dictionary = { "cal_log": "cal_log", "job_log": "job_log", "audit_log": "audit_log", "certificates": "certificate_log", "oirm_trips": "oirm_trips" }
 ## Checks that count from the day the quest was accepted, unless `ever`.
 const COUNTING: Array[String] = ["count", "counter"]
+## The checks check_value() knows: what a step's `check` may be, and with
+## `always` and `day_at_least` (WHENS) what a `when` may be.
+const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter"]
+## A `when` that is not a step check (offer_holds).
+const WHENS: Array[String] = ["always", "day_at_least"]
 ## A reward of skill XP is "xp_<skill id>".
 const XP_PREFIX: String = "xp_"
 ## A reward of an XP certificate: the XP it is worth in the one skill its holder
@@ -209,6 +214,8 @@ static func _accepted(farm: Node, quest: Dictionary, present: Array[String], own
 ## A player's own quest (`owner`) pays that player.
 static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: Array[String], owner: String = "") -> void:
 	entry["done"] = GameClock.get_day_index()
+	# Before anything is paid: a reward must not change which ending it is.
+	var line: String = phone_line(ending_line(farm, quest, present, owner))
 	var reward: String = reward_text(quest)
 	farm.post_phone("QUEST DONE: %s.%s" % [str(quest["title"]), "" if reward == "" else " Reward: %s." % reward])
 	var rewards: Dictionary = quest.get("rewards", {})
@@ -259,7 +266,6 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 	if bonus > 0:
 		farm.add_credits(bonus)
 		farm.post_phone("QUEST BONUS: %s, played to %s. %s CR more." % [str(quest["title"]), MinigameScore.grade_name(score).to_upper(), SP811.integer(bonus)])
-	var line: String = phone_line(ending_line(farm, quest, present, owner))
 	if line != "":
 		farm.post_phone("%s: %s" % [giver_name(quest), line])
 	# The best grade also has a line from the giver, one for each such step.
@@ -309,8 +315,10 @@ static func phone_line(reward: String) -> String:
 
 
 ## What the giver says when the quest is paid, as a path or the words: the
-## `phone` of the first of the quest's `endings` whose check holds at that
-## moment, or the reward's own `phone` when it has no endings or none holds.
+## `phone` of the first of the quest's `endings` whose check holds, or the
+## reward's own `phone` when it has no endings or none holds. _finish() asks
+## before it pays, so the quest's own reward (its credits, its lab XP) is not
+## in what an ending's check reads.
 ## An ending changes the words only; every ending pays the same. Which one it
 ## was is not kept: the line is on the phone, and nothing reads it later.
 static func ending_line(farm: Node, quest: Dictionary, present: Array[String], owner: String = "") -> String:
@@ -367,6 +375,8 @@ static func data_problem(quest: Dictionary) -> String:
 			ending_ids.append(ending_id)
 			if not ending.get("when") is String or not ending.get("phone") is String or ending["phone"] == "":
 				return "ending '%s' has no check (when) or no line (phone)." % ending_id
+			if not when_known(ending["when"]):
+				return "ending '%s' has a check (when) this build does not have." % ending_id
 	return ""
 
 
@@ -419,6 +429,11 @@ static func _closed(farm: Node, quest: Dictionary, present: Array[String], owner
 	var as_step: Dictionary = closed.duplicate()
 	as_step["check"] = str(closed.get("when", ""))
 	return check_value(farm, as_step, present, owner) >= step_need(as_step)
+
+
+## Whether a `when` is one offer_holds() can read: always, a day, or a step check.
+static func when_known(when: String) -> bool:
+	return when in WHENS or when in CHECKS
 
 
 ## `offer`: always (or nothing), a day, or any step check that holds now.

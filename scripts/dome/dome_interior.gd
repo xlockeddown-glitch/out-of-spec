@@ -21,7 +21,8 @@ const TOAST_SECONDS_PER_CHAR: float = 0.04
 @onready var _kestrel_click: Clickable = %KestrelClick
 @onready var _kestrel_ui: KestrelUI = %KestrelUI
 ## The coffee ring on the bench (quest S2): there once the audit's one-time
-## warning has been used, when the manager calibrated here overnight.
+## warning has been used. It says only that a mug stood here: the warning can
+## come from a fault the bench has no part in.
 @onready var _mug_ring: Node3D = %MugRing
 @onready var _mug_ring_click: Inspectable = %MugRingInspect
 
@@ -69,6 +70,7 @@ func _ready() -> void:
 
 	var species: Dictionary = GameState.get_dome_species()
 	_species_label.text = "%s  (%s)" % [_field(species, "common_name", "Unknown"), _field(species, "scientific_name", "Unclassified")]
+	_show_mug_ring()
 
 
 ## The mug ring is on the bench, and can be inspected, once the audit's one-time

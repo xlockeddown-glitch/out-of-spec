@@ -140,7 +140,7 @@ size = Vector3(0.7, 0.6, 0.5)
 size = Vector3(0.7, 1.2, 0.6)
 
 [sub_resource type="BoxShape3D" id="Inspect_mug_ring"]
-size = Vector3(0.2, 0.08, 0.2)
+size = Vector3(0.14, 0.05, 0.14)
 
 [sub_resource type="BoxShape3D" id="SentinelShape"]
 size = Vector3(0.7, 0.6, 0.5)
@@ -639,7 +639,7 @@ model_path = "res://assets/voxels/mug_ring.glb"
 model_scale = 0.025
 [node name="MugRingInspect" type="Area3D" parent="MugRing"]
 unique_name_in_owner = true
-position = Vector3(0, 0.05, 0)
+position = Vector3(0, 0.025, 0)
 collision_layer = 8
 collision_mask = 0
 script = ExtResource("30_inspect")

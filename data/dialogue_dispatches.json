@@ -227,9 +227,9 @@
     "odalys": {
       "name": "Odalys Brandt",
       "quests": {
-        "warmly_dispatch_offer": "This is Odalys Brandt at BNH Dispatch. Every message BNH sends you goes through my desk first. Inspector Vance's first audit is on the schedule. Have the stickers on your bench in date when he lands. Warmly, Dispatch.",
+        "warmly_dispatch_offer": "This is Odalys Brandt at BNH Dispatch. Every message BNH sends you goes through my desk first. Inspector Vance's first audit is on the schedule. Have the stickers on your bench in date when he lands.",
         "warmly_dispatch_clean": "Your first audit is on file with nothing in it for me to relay. I had three apology templates ready and have put them back in the drawer. Warmly, Dispatch.",
-        "warmly_dispatch_grace": "Your first audit is on file. The form says warning, so that is what I filed. Someone ran your bench overnight so that it would say no more than that, and left a mug on it. I am told the ring comes out. I would not hurry. Warmly, Dispatch."
+        "warmly_dispatch_grace": "Your first audit is on file. The form says warning, so that is what I filed. Someone sat up with your paperwork so that it would say no more than that, and left a mug on your bench. I am told the ring comes out. I would not hurry. Warmly, Dispatch."
       }
     }
   }

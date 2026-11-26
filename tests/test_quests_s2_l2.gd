@@ -111,15 +111,21 @@ func test_s2_and_l2_ship_as_the_design_has_them() -> String:
 	return "" if steps == ["account", "send", "certificate"] else "L2's steps: %s" % [steps]
 
 
-## Odalys signs as the morning dispatches do, for BNH.
+## Odalys signs her closing notes as the morning dispatches do, for BNH. The
+## offer is not signed: the phone puts the step's text after it.
 func test_odalys_signs_warmly_dispatch() -> String:
 	var lines: Variant = DataManager.get_value(&"dialogue_dispatches", "npcs/odalys/quests")
 	if not lines is Dictionary or (lines as Dictionary).size() < 3:
 		return "Odalys has an offer and a note for each ending."
 	for key: Variant in lines:
 		var text: String = str(lines[key])
-		if not text.ends_with(" Warmly, Dispatch.") or text.to_lower().contains("omnispec"):
-			return "%s must end ' Warmly, Dispatch.' and not name OmniSpec." % key
+		if text.to_lower().contains("omnispec"):
+			return "%s must not name OmniSpec." % key
+		if text.ends_with(" Warmly, Dispatch.") == (str(key) == "warmly_dispatch_offer"):
+			return "%s: the closing notes end ' Warmly, Dispatch.' and the offer does not." % key
+		# The warning can come from a fault the bench has no part in.
+		if text.to_lower().contains("overnight") or text.to_lower().contains("ran your bench"):
+			return "%s must not say the bench was used overnight." % key
 	for quest: Dictionary in [_shipped(S2), _shipped(L2)]:
 		var paths: Array = [str(quest.get("offer_line", "")), str(quest.get("rewards", {}).get("phone", ""))]
 		for ending: Variant in quest.get("endings", []):
@@ -262,12 +268,34 @@ func test_bad_endings_are_refused() -> String:
 	var good: Dictionary = { "id": "a", "when": "flag", "flag": "tier1_unlocked", "phone": "A." }
 	if QuestEngine.data_problem(_ending_quest([good])) != "":
 		return "A good ending is not a problem: %s" % QuestEngine.data_problem(_ending_quest([good]))
+	for when: String in ["always", "day_at_least", "stat_at_least", "count", "counter", "level"]:
+		if QuestEngine.data_problem(_ending_quest([{ "id": "a", "when": when, "phone": "A." }])) != "":
+			return "'%s' is a check an ending may have." % when
 	var bad: Array = [[], "grace", [3], [good, good], [{ "id": "a", "phone": "A." }],
-		[{ "id": "a", "when": "flag", "flag": "tier1_unlocked" }], [{ "when": "always", "phone": "A." }]]
+		[{ "id": "a", "when": "flag", "flag": "tier1_unlocked" }], [{ "when": "always", "phone": "A." }],
+		# A check no build has, a `when` that is not text, and no words.
+		[{ "id": "a", "when": "flagg", "flag": "tier1_unlocked", "phone": "A." }],
+		[{ "id": "a", "when": "", "phone": "A." }],
+		[{ "id": "a", "when": 3, "phone": "A." }], [{ "id": "a", "when": ["flag"], "phone": "A." }],
+		[{ "id": "a", "when": "always", "phone": "" }], [{ "id": "a", "when": "always", "phone": 3 }]]
 	for endings: Variant in bad:
 		if QuestEngine.data_problem(_ending_quest(endings)) == "":
 			return "These endings must be refused: %s" % [endings]
 	return ""
+
+
+## An ending is picked before the quest pays, so the reward is not in its check.
+func test_an_ending_is_picked_before_the_quest_pays() -> String:
+	var quest: Dictionary = _ending_quest([
+		{ "id": "rich", "when": "stat_at_least", "stat": "credits", "at_least": 50, "phone": "Rich." }], "Poor.")
+	quest["rewards"]["credits"] = 100
+	return _run(func(gs: GameStateScript) -> String:
+		gs.credits = 5
+		gs.update_quests()
+		if gs.credits != 105 or not QuestEngine.is_done(gs, "fork"):
+			return "The test needs the quest paid: %d CR" % gs.credits
+		return "" if _lines(gs, "LIN: Poor.") == 1 and _lines(gs, "LIN: Rich.") == 0 else "The reward's 100 CR must not pick the ending: %s" % [gs.phone_log],
+		[quest])
 
 
 # --- L2 -------------------------------------------------------------------------
@@ -348,8 +376,46 @@ func _check_l2_certificates(gs: GameStateScript) -> String:
 	return "" if QuestEngine.is_done(gs, L2) else "OIRM's certificate finishes L2."
 
 
-## An account opened before lab level 12 counts when the quest is offered.
-func test_l2_on_a_farm_with_an_account_already_is_paid_when_offered() -> String:
+## A founding standard's earlier trip to OIRM comes back with a certificate that
+## is not a founding one. It must not pay L2 while the bought standard is away.
+func test_l2_is_not_paid_by_a_founding_standards_earlier_return() -> String:
+	return _run(_check_l2_earlier_return, [_shipped(L2)])
+
+
+func _check_l2_earlier_return(gs: GameStateScript) -> String:
+	gs.credits = 100000
+	gs.crystal_ore = 100
+	gs.tier1_unlocked = true
+	gs.give_lab_xp(gs.xp_for_level(12))
+	gs.update_quests()
+	if not gs.quest_state.has(L2):
+		return "The test needs L2 offered."
+	if not gs.send_to_oirm("rotary_table").get("ok", false):
+		return "The test could not send the rotary table."
+	var cert: Dictionary = gs.oirm_calibrate("rotary_table", 3)
+	if cert.get("issuer", "") != "OIRM" or cert.get("founding", true):
+		return "The test needs the return to be an OIRM certificate that is not founding: %s" % [cert]
+	gs.update_quests()
+	if not (gs.quest_state[L2]["steps_done"] as Array).is_empty():
+		return "A founding standard's trip and return do none of L2's steps: %s" % [gs.quest_state[L2]]
+	gs.buy_standard(FM3)
+	if not gs.send_to_oirm(FM3).get("ok", false):
+		return "The test could not buy and send the FM-3."
+	var credits: int = gs.credits
+	gs.update_quests()
+	if gs.quest_state[L2]["steps_done"] != ["account", "send"] or QuestEngine.is_done(gs, L2) or gs.credits != credits:
+		return "L2 must wait while the FM-3 is away: %s" % [gs.quest_state[L2]]
+	gs.update_quests()
+	if QuestEngine.is_done(gs, L2):
+		return "A second look must not pay it either."
+	gs.oirm_calibrate(FM3, 10)
+	gs.update_quests()
+	return "" if QuestEngine.is_done(gs, L2) and gs.credits == credits + 100 else "The FM-3's certificate pays L2: %s" % [gs.quest_state[L2]]
+
+
+## An account and a certificate from before lab level 12 do the first two steps
+## when the quest is offered, and no more: the certificate must come after.
+func test_l2_on_a_farm_with_an_account_already_needs_a_new_trip() -> String:
 	return _run(_check_l2_old, [_shipped(L2)])
 
 
@@ -366,13 +432,74 @@ func _check_l2_old(gs: GameStateScript) -> String:
 	gs.give_lab_xp(gs.xp_for_level(12))
 	var credits: int = gs.credits
 	gs.update_quests()
-	return "" if QuestEngine.is_done(gs, L2) and gs.credits == credits + 100 else "An old account does L2 at once: %s" % [gs.quest_state]
+	if QuestEngine.is_done(gs, L2) or gs.credits != credits or gs.quest_state.get(L2, {}).get("steps_done", []) != ["account", "send"]:
+		return "An old account and certificate do two steps and do not pay: %s" % [gs.quest_state]
+	if _lines(gs, "Get its certificate back.") != 1:
+		return "The phone names the step that is left: %s" % [gs.phone_log]
+	if not gs.send_to_oirm(FM3).get("ok", false):
+		return "The test could not send the FM-3 again."
+	credits = gs.credits
+	gs.update_quests()
+	if QuestEngine.is_done(gs, L2):
+		return "Sending is not the certificate."
+	gs.oirm_calibrate(FM3, 20)
+	gs.update_quests()
+	return "" if QuestEngine.is_done(gs, L2) and gs.credits == credits + 100 else "A new certificate pays L2: %s" % [gs.quest_state]
+
+
+# --- Saving ---------------------------------------------------------------------
+
+## Every shipped quest, with S2 and L2 part done, through the farm's save.
+func test_the_shipped_quests_mid_quest_go_through_a_save() -> String:
+	return _run(_check_save_mid_quest)
+
+
+func _check_save_mid_quest(gs: GameStateScript) -> String:
+	gs.credits = 100000
+	gs.crystal_ore = 100
+	gs.tier1_unlocked = true
+	gs.give_lab_xp(gs.xp_for_level(12))
+	gs.update_quests()
+	gs.buy_standard(FM3)
+	gs.send_to_oirm(FM3)
+	gs.update_quests()
+	for quest: Dictionary in QuestEngine.quests():
+		if QuestEngine.data_problem(quest) != "":
+			return "A shipped quest has a problem: %s" % quest["id"]
+	if not gs.quest_state.has(S2) or QuestEngine.is_done(gs, S2) or QuestEngine.is_done(gs, L2) \
+			or gs.quest_state.get(L2, {}).get("steps_done", []) != ["account", "send"]:
+		return "The test needs S2 and L2 open: %s" % [gs.quest_state]
+	# As the save file holds it (SaveGame.to_bytes).
+	var saved: Variant = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
+	var again: GameStateScript = GameStateScript.new()
+	again.build_registry()
+	var problem: String = again.farm_from_dict(saved) if saved is Dictionary else "The farm is not a dictionary."
+	var out: String = ""
+	if problem != "":
+		out = "The farm did not load: %s" % problem
+	elif again.quest_state != gs.quest_state or again.player_quest_state != gs.player_quest_state or again.quest_points != gs.quest_points:
+		out = "The quests changed in the save: %s / %s" % [gs.quest_state, again.quest_state]
+	else:
+		# A look at the loaded farm offers, ticks and pays nothing.
+		var lines: int = again.phone_log.size()
+		again.update_quests()
+		if again.quest_state != gs.quest_state or again.phone_log.size() != lines or again.credits != gs.credits or again.lab_xp != gs.lab_xp:
+			out = "A look at the loaded farm changed its quests: %s" % [again.phone_log.slice(lines)]
+		else:
+			# And the last step is still counted from the send.
+			again.oirm_calibrate(FM3, 10)
+			again.update_quests()
+			if not QuestEngine.is_done(again, L2) or again.credits != gs.credits + 100:
+				out = "The loaded farm's L2 is paid by the certificate: %s" % [again.quest_state.get(L2)]
+	again.free()
+	return out
 
 
 # --- The mug ring ---------------------------------------------------------------
 
 func test_the_mug_ring_has_its_text_and_its_model() -> String:
-	if Inspectable.display_name("mug_ring") != "Mug Ring" or not Inspectable.inspect_text("mug_ring").contains("overnight"):
+	if Inspectable.display_name("mug_ring") != "Mug Ring" or not Inspectable.inspect_text("mug_ring").contains("coffee") \
+			or Inspectable.inspect_text("mug_ring").contains("overnight"):
 		return "The mug ring's inspect text: %s" % Inspectable.inspect_text("mug_ring")
 	return "" if ResourceLoader.exists("res://assets/voxels/mug_ring.glb") else "assets/voxels/mug_ring.glb is missing."
 
