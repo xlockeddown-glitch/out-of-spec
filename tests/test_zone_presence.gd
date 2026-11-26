@@ -315,3 +315,36 @@ func test_the_host_runs_a_place_report_without_the_quest_look() -> String:
 	commands.free()
 	gs.free()
 	return "" if answer == "" and where == "lava_tubes" else "Answer '%s', place %s" % [answer, where]
+
+
+func test_a_lost_answer_leaves_the_host_unknown() -> String:
+	var dome: Array = [ZonePresence.DOME, 0]
+	var farm: Array = [ZonePresence.FARM, 0]
+	# No answer: the host may or may not hold the dome, so the farm must still go.
+	var known: Array = ZonePresence.acknowledged_after(dome, ZonePresence.NO_ANSWER)
+	if not known.is_empty():
+		return "A lost answer counted as taken"
+	if ZonePresence.next_to_send(known, farm) != farm:
+		return "The place after a lost answer was not sent"
+	# Answered, taken or refused: the host has had its word on it.
+	if ZonePresence.acknowledged_after(dome, "") != dome:
+		return "A taken place was not counted"
+	return "" if ZonePresence.acknowledged_after(dome, "That player is not on this farm.") == dome \
+			else "A refused place would be sent again and again"
+
+
+func test_a_session_change_stops_the_old_sender() -> String:
+	ZonePresence.reset_reports()
+	ZonePresence.forget_acknowledged()
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	# After the reset a new report must still go out (the flag is not left stuck).
+	var me: String = GameState.local_player_id
+	var before: Variant = GameState.player_places.get(me)
+	ZonePresence.report_scene(SceneSwitcher.DOME_SCENE, tree, 1, 0.0)
+	var told: String = GameState.place_of(me)
+	ZonePresence.reset_reports()
+	if before == null:
+		GameState.player_places.erase(me)
+	else:
+		GameState.player_places[me] = before
+	return "" if told == ZonePresence.DOME else "A report after a session change was not sent"

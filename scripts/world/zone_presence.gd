@@ -64,15 +64,24 @@ static func next_to_send(acknowledged: Array, latest: Array) -> Array:
 	return latest if latest != acknowledged else []
 
 
+const NO_ANSWER: String = "The host gave no answer."
+const NOT_CONNECTED: String = "Not connected to the host."
+
 static var _latest: Array = []
 static var _acknowledged: Array = []
 static var _sending: bool = false
+## Bumped when a session starts or ends: a sender from before stops at its next
+## step, so it never writes into the next session or the solo farm.
+static var _session: int = 0
 
 
-## Forgets what the host last took, so the next report is sent even if it names
-## the same place (a session started or ended). A sender still running keeps going.
+## A session started or ended: forget what the host took and what was waiting,
+## and stop any sender still running.
 static func forget_acknowledged() -> void:
 	_acknowledged = []
+	_latest = []
+	_sending = false
+	_session += 1
 
 
 ## Forgets what was said (tests).
@@ -80,6 +89,14 @@ static func reset_reports() -> void:
 	_latest = []
 	_acknowledged = []
 	_sending = false
+	_session += 1
+
+
+## What the sender knows the host holds after one try of `sent`: the place when the
+## host answered (taken or refused), else nothing, so the next place is always
+## sent. Pure, for tests.
+static func acknowledged_after(sent: Array, answer: Variant) -> Array:
+	return [] if answer == NO_ANSWER else sent
 
 
 ## Says where this screen's player is, as the scene `path` gives it (nothing for a
@@ -87,7 +104,9 @@ static func reset_reports() -> void:
 ## sender runs at a time on its own wait flag (never the gameplay command's), and
 ## it keeps going until the newest place is acknowledged; a swap while it waits
 ## only replaces what it will send next. `tries` and `wait_s` bound the retries
-## of one place the host did not answer.
+## of one place the host did not answer; a new place starts its own count. A place
+## counts as taken only when the host answered, so after a lost answer the next
+## place is sent whatever it is. The sender stops when the session changes.
 static func report_scene(path: String, tree: SceneTree, tries: int, wait_s: float) -> void:
 	var at: Array = for_scene(path)
 	if at.is_empty():
@@ -96,20 +115,33 @@ static func report_scene(path: String, tree: SceneTree, tries: int, wait_s: floa
 	if _sending:
 		return
 	_sending = true
+	var session: int = _session
 	var failed: int = 0
-	while true:
+	var failing: Array = []
+	while session == _session:
 		var now: Array = next_to_send(_acknowledged, _latest)
 		if now.is_empty():
 			break
+		if now != failing:
+			failing = now
+			failed = 0
 		var answer: Variant = await FarmCommands.request(&"report_place", now)
-		if answer == "The host gave no answer." and failed < tries:
-			failed += 1
-			await tree.create_timer(wait_s).timeout
+		if session != _session or answer == NOT_CONNECTED:
+			break
+		_acknowledged = acknowledged_after(now, answer)
+		if answer != NO_ANSWER:
 			continue
-		# Answered, refused for good, or out of tries for this place.
-		failed = 0
-		_acknowledged = now
-	_sending = false
+		if _latest != now:
+			continue  # a newer place came while this one waited: send it
+		if failed >= tries:
+			# Given up on this place; the next swap sends again.
+			_latest = []
+			break
+		failed += 1
+		await tree.create_timer(wait_s).timeout
+	# A sender from an ended session leaves the flag to the new session's sender.
+	if session == _session:
+		_sending = false
 
 
 ## A table of places the host sent, or "": a dictionary of player -> [place, depth].
