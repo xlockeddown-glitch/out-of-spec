@@ -237,7 +237,10 @@
         "warmly_dispatch_clean": "Your first audit is on file with nothing in it for me to relay. I had three apology templates ready and have put them back in the drawer. Warmly, Dispatch.",
         "warmly_dispatch_grace": "Your first audit is on file. The form says warning, so that is what I filed. Someone sat up with your paperwork so that it would say no more than that, and left a mug on your bench. I am told the ring comes out. I would not hurry. Warmly, Dispatch.",
         "daily_block_offer": "Check the rover's steering encoder against a block for me.",
-        "daily_block_done": "The steering check is on file. Warmly, Dispatch."
+        "daily_block_done": "The steering check is on file. Warmly, Dispatch.",
+        "a_clean_line_offer": "Dispatch again. Your uplink reaches my desk a little late and a little chewed. I am told you have a silk spool on the shelf. Seat it in the relay, and take your time lowering it. The slot is narrower than it looks.",
+        "a_clean_line_done": "Your line is on my board and it is holding. I have filed the old static under weather. Warmly, Dispatch.",
+        "a_clean_line_reference": "That went in dead center. I heard the line clear from here, and I am four hundred kilometers up. Warmly, Dispatch."
       }
     },
     "chet": {

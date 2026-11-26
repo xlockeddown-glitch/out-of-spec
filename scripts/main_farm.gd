@@ -21,6 +21,7 @@ const INSPECT_SECONDS_PER_CHAR: float = 0.04
 const SOIL_PROBE_PROP: String = "soil_moisture_probe"
 const CISTERN_PROP: String = "water_cistern"
 const WRING_SCENE: PackedScene = preload("res://ui/minigames/wring_the_blocks.tscn")
+const SPOOL_SCENE: PackedScene = preload("res://ui/minigames/thread_the_spool.tscn")
 
 ## Within this far of the relay mast the Q check reads the dish; elsewhere, the
 ## rover's own steering encoder [PLACEHOLDER].
@@ -51,6 +52,7 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 var _robots_ui: RobotsUI
 ## Wring the Blocks, made the first time J opens it.
 var _wring_game: WringTheBlocks
+var _spool_game: ThreadTheSpool
 ## Sum of the dug depths when last looked at, to tell a dig from a fill.
 var _dug_depth: int = 0
 ## When this screen last pressed dig, so a snapshot or the other player's dig isn't ours.
@@ -220,18 +222,53 @@ func _on_steering_zeroed(record: Dictionary) -> void:
 		SP811.signed(record.get("as_found", 0.0)), SP811.signed(record.get("as_left", 0.0)), schedule])
 
 
+## Seats a spool in the relay. While an open quest step carries Thread the
+## Spool for this player (quests design section 7.4), the game is played first.
+## The host seats the same spool whatever the score: a skip, the game switched
+## off and a poor try all send the same seat. The host refuses a seat for a
+## player on foot or with no spool to seat, and both are checked here before
+## the game opens. Unlike a block stack, it seats a spool with the rover away
+## or moving, so the plain seat asks for neither.
 func _on_slot_spool_pressed() -> void:
 	if _refuse_on_foot():
 		return
+	if _spool_game != null and _spool_game.is_playing():
+		return
+	var arguments: Array = []
+	var seat: String = ""
+	var due: bool = QuestEngine.has_minigame_step(GameState, MinigameScore.THREAD_THE_SPOOL, "", GameState.local_player_id)
+	if due and GameState.can_slot_spool() and MinigameSettings.mode() != MinigameSettings.Mode.OFF:
+		# The game takes the rover's controls for its 8 s: a rover that is here
+		# and rolling is stopped first, as for Wring the Blocks.
+		if _rover.away_text() == "" and not _rover.is_stopped():
+			_hud.push_log("SILK SPOOL: stop the rover first.")
+			return
+		if _spool_game == null:
+			_spool_game = SPOOL_SCENE.instantiate()
+			_hud.get_parent().add_child(_spool_game)
+		var was_blocked: bool = RoverController.input_blocked
+		RoverController.input_blocked = true
+		# The clock is in the seed: the next spool does not sway the same way.
+		var motion_seed: int = hash([GameState.optical_silk_spools, Time.get_ticks_usec()])
+		var share: float = MinigameScore.sweet_share(GameState, GameState.local_player_id, MinigameScore.THREAD_SKILL)
+		_spool_game.play(share, MinigameSettings.mode(), motion_seed, "The relay's slot")
+		var score: int = await _spool_game.finished
+		RoverController.input_blocked = was_blocked
+		if not is_inside_tree():
+			return
+		if score >= 0:
+			# With no game played nothing more is sent: the seat is as it always was.
+			arguments = [score]
+			seat = " " + MinigameScore.seat_text(score)
 	var replaced: bool = GameState.relay_slotted
-	if await FarmCommands.request(&"slot_spool_into_relay") and is_inside_tree():
+	if await FarmCommands.request(&"slot_spool_into_relay", arguments) and is_inside_tree():
 		if FarmCommands.guest:
 			# The relay itself may not have reached this copy yet.
-			_hud.push_log("Silk spool installed.")
+			_hud.push_log("Silk spool installed.%s" % seat)
 			return
-		_hud.push_log("%s installed%s. Uplink lag × %s." % [
+		_hud.push_log("%s installed%s. Uplink lag × %s.%s" % [
 			"Damaged silk spool" if GameState.slotted_spool_damaged else "Optical silk spool",
-			", the old one taken out" if replaced else "", SP811.number(GameState.get_relay_lag_multiplier(), 2)])
+			", the old one taken out" if replaced else "", SP811.number(GameState.get_relay_lag_multiplier(), 2), seat])
 
 
 func _on_silk_changed(_spools: int) -> void:
