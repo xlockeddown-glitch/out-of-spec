@@ -1110,7 +1110,13 @@ const NO_TIME_TONIGHT: String = "This would run past 06:00, and the day waits un
 
 ## With friends in: "" or why not. See CoopBeds.
 func go_to_bed(player_id: String = "") -> String:
-	return CoopBeds.go_to_bed(_player(player_id))
+	var id: String = _player(player_id)
+	# Where the local player stands is theirs to check; a guest's is checked on their screen.
+	if id == local_player_id:
+		var why: String = CoopBeds.here_refusal()
+		if why != "":
+			return why
+	return CoopBeds.go_to_bed(id)
 
 
 func get_up(player_id: String = "") -> String:
