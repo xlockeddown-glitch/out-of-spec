@@ -378,6 +378,7 @@ func _drop(id: int, gone: bool = false) -> void:
 		_peer.disconnect_peer(id, true)
 	if player_id != "":
 		players.erase(player_id)
+		_noted_at.erase(player_id)
 		_tell_guests([LEFT, player_id])
 		player_left.emit(player_id)
 

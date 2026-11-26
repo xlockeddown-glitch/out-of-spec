@@ -204,15 +204,19 @@ func _on_walked(player_id: String, pose: Array, now: int = Time.get_ticks_msec()
 	var reach: Array = _reach.get(player_id, [BURST_M, now])
 	var left: float = minf(BURST_M, reach[0] + (now - reach[1]) * BURST_MPS / 1000.0)
 	var distance: float = spot(out[player_id]).distance_to(to)
-	if distance > left or not _on_land(to) or absf(to.y - Terrain.height(Vector2(to.x, to.z), farm.dug)) > HEIGHT_M:
+	if distance > left:
 		_refuse(player_id, "a walker %.1f m away, %.1f m allowed" % [distance, left], now)
+		return
+	if not _on_land(to) or absf(to.y - Terrain.height(Vector2(to.x, to.z), farm.dug)) > HEIGHT_M:
+		_refuse(player_id, "a walker off the ground at %s" % [to], now)
 		return
 	_reach[player_id] = [left - distance, now]
 	out[player_id] = pose
 
 
-## Host: keeps the guest where it was, logs it now and then, and tells the guest
-## where it is at the next tick, so it goes back.
+## Host: keeps the guest where it was (so everyone else sees it there), logs it
+## now and then, and tells the guest at the next tick. The guest's own screen
+## only snaps back once it is more than SNAP_M from that place.
 func _refuse(player_id: String, what: String, now: int) -> void:
 	session.note_refusal(player_id, "refused " + what, now)
 	_sent_at = -STILL_MS

@@ -221,6 +221,16 @@ func test_a_pose_that_is_not_real_is_refused_and_the_guest_stays() -> String:
 		mine._on_driven("player_2", ID, bad, 1000)
 		if state.rover_transforms[ID] != _at(1.0):
 			return _end_with("%s must be refused" % [bad])
+	# Near the edge, the distance allowed is not what refuses it: the edge is.
+	state.park_rover(ID, _at(Terrain.HALF_M - 1.0))
+	mine._reach.erase(ID)
+	mine._poses.erase(ID)
+	mine._on_driven("player_2", ID, _pose(Terrain.HALF_M + 3.0), 5000)
+	if state.rover_transforms[ID] != _at(Terrain.HALF_M - 1.0):
+		return _end_with("A rover 3 m past the edge must be refused")
+	mine._on_driven("player_2", ID, _pose(Terrain.HALF_M + 1.0), 5100)
+	if state.rover_transforms[ID] != _at(Terrain.HALF_M + 1.0):
+		return _end_with("A rover 1 m past the edge is still on the land")
 	if mine.is_sane([0.0, 0.0, 0.0, 0.0, 7.6, true]) or not mine.is_sane([0.0, 0.0, 0.0, 0.0, 6.0, true]):
 		return _end_with("A rover goes 6 m/s and no more than 7.5")
 	# One packet of nonsense does not end the connection.

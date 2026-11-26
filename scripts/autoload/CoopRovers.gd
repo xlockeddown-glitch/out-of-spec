@@ -192,8 +192,11 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 	var left: float = minf(REACH_M, reach[0] + (now - reach[1]) * REACH_MPS / 1000.0)
 	var distance: float = from.origin.distance_to(to.origin)
 	# In the rock nobody could get it out again.
-	if distance > left or not _in_bounds(rover_id, to.origin) or (rover_id == farm.TUNNEL_ROVER and not TunnelRock.holds(to.origin)):
+	if distance > left:
 		_refuse(player_id, rover_id, "a rover %.1f m away, %.1f m allowed" % [distance, left], now)
+		return
+	if not _in_bounds(rover_id, to.origin) or (rover_id == farm.TUNNEL_ROVER and not TunnelRock.holds(to.origin)):
+		_refuse(player_id, rover_id, "a rover out of bounds at %s" % [to.origin], now)
 		return
 	_reach[rover_id] = [left - distance, now]
 	_drivers[rover_id] = [player_id, now + HOLD_MS]
