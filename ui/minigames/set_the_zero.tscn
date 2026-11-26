@@ -119,4 +119,5 @@ custom_minimum_size = Vector2(240, 60)
 layout_mode = 2
 focus_mode = 0
 theme_override_font_sizes/font_size = 24
+tooltip_text = "Esc/Skip calibrates without the game."
 text = "SKIP  [Esc]"

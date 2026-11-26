@@ -41,6 +41,10 @@ static func grade_name(score: int) -> String:
 	return STANDARD_GRADE
 
 
+## Shown when a score was sent and the host counted none.
+const NOT_COUNTED_TEXT: String = "Score not counted (not a key moment)."
+
+
 ## "Zero score 97 of 100: REFERENCE, as-left residual 40 % of standard."
 static func result_text(score: int) -> String:
 	if score < 0:
@@ -60,7 +64,10 @@ static func instrument_type(instrument_id: String) -> String:
 static func is_first_of_type(cal_log: Array, instrument_id: String) -> bool:
 	var type: String = instrument_type(instrument_id)
 	for record: Variant in cal_log:
-		if record is Dictionary and str(record.get("standard_id", "")) != "" 				and str(record.get("programmed_by", "")) == "" 				and str(record.get("performed_by", "")) != MANAGER 				and instrument_type(str(record.get("instrument_id", ""))) == type:
+		if not record is Dictionary or instrument_type(str(record.get("instrument_id", ""))) != type:
+			continue
+		var by_hand: bool = str(record.get("programmed_by", "")) == "" and str(record.get("performed_by", "")) != MANAGER
+		if by_hand and str(record.get("standard_id", "")) != "":
 			return false
 	return true
 

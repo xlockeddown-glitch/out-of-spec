@@ -307,6 +307,12 @@ func test_it_plays_with_no_frames() -> String:
 	if problem == "" and (game.stage() != SetTheZero.Stage.RESULT or want < SetTheZero.SWEET_SCORE or not _scores.is_empty()):
 		problem = "A stop in the sweet spot is 95 or over, shown before it is sent: %d." % want
 	game.press()
+	game.advance(SetTheZero.RESULT_ARM_S - 0.05)
+	game.press()
+	if problem == "" and (not _scores.is_empty() or game.stage() != SetTheZero.Stage.RESULT):
+		problem = "A second click right after the fine stop must not close the result."
+	game.advance(0.05)
+	game.press()
 	if problem == "" and (_scores != [want] or game.is_playing() or game.visible):
 		problem = "The game ends with its score, once: %s, wanted %d." % [_scores, want]
 	# The same seed sweeps the same way; another does not.
@@ -406,3 +412,121 @@ func test_the_bench_opens_the_game_at_a_key_moment() -> String:
 	MinigameSettings.path = kept_path
 	MinigameSettings._file = null
 	return problem
+
+
+func test_a_hitch_or_a_fast_farm_clock_does_not_jump_the_needle() -> String:
+	if SetTheZero.frame_step(5.0) != SetTheZero.MAX_STEP_S or SetTheZero.frame_step(-1.0) != 0.0 \
+			or not is_equal_approx(SetTheZero.frame_step(0.016), 0.016):
+		return "One frame moves the game by its real time, 0.1 s at most."
+	var game: SetTheZero = _new_game()
+	var kept: float = Engine.time_scale
+	Engine.time_scale = 50.0
+	game.play(0.0, MinigameSettings.Mode.STANDARD, 42)
+	game.advance(0.3)
+	game.press()
+	# One frame, however long the farm's clock says it was.
+	game._process(SetTheZero.SETTLE_S * 50.0)
+	Engine.time_scale = kept
+	var problem: String = ""
+	if game.stage() != SetTheZero.Stage.SETTLE:
+		problem = "The farm's clock must not run the game's timers."
+	_end_game(game)
+	return problem
+
+
+func test_the_factor_is_taken_back_when_nothing_is_calibrated() -> String:
+	var saved: float = GameClock.elapsed_days
+	var waits: bool = GameClock.morning_waits
+	var commands: Node = _make()
+	var gs: Node = commands.state
+	var id: String = gs.HYGROMETER_ID
+	# No time left tonight: the bench refuses.
+	GameClock.morning_waits = true
+	GameClock.elapsed_days = floorf(saved) + 1.0 - GameClock.BEFORE_MORNING_DAYS
+	var refused: Variant = commands.execute(GUEST, &"calibrate_at_bench", [id, 100])
+	GameClock.morning_waits = waits
+	GameClock.elapsed_days = saved
+	var problem: String = ""
+	if not refused is Dictionary or not refused.get("refused", false) or refused.has(MinigameScore.RECORD_KEY) \
+			or not gs.cal_log.is_empty():
+		problem = "The bench must refuse with no time left: %s" % [refused]
+	elif gs.get_sensor(id).next_residual_scale != 1.0:
+		problem = "A refused calibration must leave no factor for the next zero."
+	# So the next plain one is plain.
+	var sensor: DriftingSensor = gs.get_sensor(id)
+	sensor._rng.seed = 811
+	sensor.error = sensor.mpe * 0.25
+	gs.get_sensor(sensor.calibrated_by).error = 0.0
+	var next: Dictionary = commands.execute(GUEST, &"calibrate_at_bench", [id])
+	GameClock.elapsed_days = saved
+	_free(commands)
+	if problem == "" and not is_equal_approx(next["as_left"], _bench([])["as_left"]):
+		problem = "The calibration after a refused one must be the plain result."
+	return problem
+
+
+func test_a_request_carries_the_score() -> String:
+	var saved: float = GameClock.elapsed_days
+	var commands: Node = _make()
+	var gs: Node = commands.state
+	var id: String = gs.HYGROMETER_ID
+	var bad: PackedStringArray = []
+	# As a guest nothing is done here; a bad score is refused before it is sent.
+	commands.guest = true
+	var refused: Dictionary = await commands.request(&"calibrate_at_bench", [id, 99.5])
+	if refused.get("ok", true) or not str(refused.get("reason", "")).contains("bad score"):
+		bad.append("a guest's request with 99.5 was not refused: %s" % [refused])
+	var unsent: Dictionary = await commands.request(&"calibrate_at_bench", [id, 90])
+	if str(unsent.get("reason", "")) != "Not connected to the host.":
+		bad.append("a whole score must pass the guest's own check: %s" % [unsent])
+	commands.guest = false
+	# The host's own request: done here, as the local player.
+	var mine: Dictionary = commands.request(&"calibrate_at_bench", [id, 90])
+	if mine.get(MinigameScore.RECORD_KEY, -9) != 90 or gs.cal_log.size() != 1 \
+			or gs.cal_log[0].get("performed_by", "") != gs.local_player_id:
+		bad.append("the host's request with 90 must count 90: %s" % [mine.get(MinigameScore.RECORD_KEY)])
+	var again: Dictionary = commands.request(&"calibrate_at_bench", [id, 99.5])
+	if again.get("ok", true) or gs.cal_log.size() != 1:
+		bad.append("the host's request with 99.5 was not refused")
+	GameClock.elapsed_days = saved
+	_free(commands)
+	return "; ".join(bad)
+
+
+func test_a_guests_score_for_a_standard_or_a_robot_counts_for_nothing() -> String:
+	var saved: float = GameClock.elapsed_days
+	var commands: Node = _make()
+	var gs: Node = commands.state
+	var standard: String = gs.standard_ids()[0]
+	var problem: String = ""
+	# A robot is no instrument, and a robot's sensor that is not on the farm is none.
+	for id: String in ["TR-1", "robot_joint_encoder@TR-99"]:
+		if MinigameScore.allowed(gs, id, GUEST, 100) != MinigameScore.SKIPPED:
+			problem = "A score for %s must be cut to none." % id
+		var answer: Variant = commands.execute(GUEST, &"calibrate_at_bench", [id, 100])
+		if answer is Dictionary and (answer.has(MinigameScore.RECORD_KEY) or answer.has("as_left")):
+			problem = "Nothing is calibrated or scored for %s." % id
+	if MinigameScore.allowed(gs, standard, GUEST, 100) != MinigameScore.SKIPPED:
+		problem = "A score for a standard must be cut to none without the CAREFUL level."
+	var sensor: DriftingSensor = gs.get_sensor(standard)
+	var answer: Variant = commands.execute(GUEST, &"calibrate_at_bench", [standard, 100])
+	if problem == "" and answer is Dictionary and answer.get(MinigameScore.RECORD_KEY, MinigameScore.SKIPPED) != MinigameScore.SKIPPED:
+		problem = "The host counted a score for a standard: %s" % [answer.get(MinigameScore.RECORD_KEY)]
+	if problem == "" and sensor.next_residual_scale != 1.0:
+		problem = "A standard's next zero must take no factor."
+	GameClock.elapsed_days = saved
+	_free(commands)
+	return problem
+
+
+func test_a_stale_score_is_told_as_not_counted() -> String:
+	# The guest played when the kind was new; another player's calibration landed first.
+	var routine: Dictionary = _bench([], 1)
+	var stale: Dictionary = _bench([97], 1)
+	if stale.get(MinigameScore.RECORD_KEY, 0) != MinigameScore.SKIPPED:
+		return "A score for a kind no longer new must come back as not counted: %s" % [stale.get(MinigameScore.RECORD_KEY)]
+	if not _same(stale, routine) or stale["logged"] != routine["logged"]:
+		return "A stale score must leave the result as it would have been."
+	if MinigameScore.result_text(MinigameScore.SKIPPED) != "" or MinigameScore.NOT_COUNTED_TEXT == "":
+		return "The bench has a line for a score the host did not count."
+	return ""

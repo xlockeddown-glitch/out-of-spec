@@ -98,6 +98,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func open(instrument_id: String = "hygrometer") -> void:
 	_visit += 1
+	# A game still open from before ends with no score, and nothing is calibrated.
+	_zero_game.skip()
 	_rebuild_list()
 	_show_game_choices()
 	show()
@@ -144,7 +146,9 @@ func _on_game_mode_picked(index: int) -> void:
 
 ## Whether ZERO / CALIBRATE opens Set the Zero for the instrument shown.
 func _zero_game_due(instrument_id: String) -> bool:
-	return MinigameSettings.mode() != MinigameSettings.Mode.OFF and not _budget.get("refused", false) 		and MinigameScore.is_due(GameState, instrument_id, GameState.local_player_id, MinigameSettings.careful())
+	if MinigameSettings.mode() == MinigameSettings.Mode.OFF or _budget.get("refused", false):
+		return false
+	return MinigameScore.is_due(GameState, instrument_id, GameState.local_player_id, MinigameSettings.careful())
 
 
 ## The pod landing or leaving changes whether a standard can be sent, and a
@@ -402,8 +406,10 @@ func _on_calibrate_pressed() -> void:
 	var arguments: Array = [id]
 	if _zero_game_due(id):
 		_calibrate_button.disabled = true
-		_zero_game.play(MinigameScore.sweet_share(GameState, GameState.local_player_id), MinigameSettings.mode(),
-			hash([id, GameState.cal_log.size()]), GameState.instrument_name(id, true))
+		# The clock is in the seed: opening the bench again is not the same sweep.
+		var motion_seed: int = hash([id, GameState.cal_log.size(), Time.get_ticks_usec()])
+		var share: float = MinigameScore.sweet_share(GameState, GameState.local_player_id)
+		_zero_game.play(share, MinigameSettings.mode(), motion_seed, GameState.instrument_name(id, true))
 		var score: int = await _zero_game.finished
 		# Closed with the game open: nothing is calibrated.
 		if _visit != visit:
@@ -471,8 +477,11 @@ func _on_calibrate_pressed() -> void:
 	else:
 		_result_label.text = "AS-FOUND WITHIN ACCEPTANCE LIMIT, LATE: PASS. Interval unchanged. " + interval_note
 	_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
-	# The score the host counted, if a game was played and it counted one.
+	# The score the host counted. If one was sent and the host counted none (the
+	# kind was no longer new by the time it arrived), that is said too.
 	var zero_text: String = MinigameScore.result_text(int(record.get(MinigameScore.RECORD_KEY, MinigameScore.SKIPPED)))
+	if zero_text == "" and arguments.size() > 1:
+		zero_text = MinigameScore.NOT_COUNTED_TEXT
 	if zero_text != "":
 		_result_label.text += " " + zero_text
 	_finished_text = _result_label.text

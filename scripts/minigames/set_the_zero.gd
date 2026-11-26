@@ -32,6 +32,14 @@ const MISS_AT: float = 8.0
 const SWEET_SCORE: int = 95
 ## A press sooner than this after a sweep starts is not taken: no double press.
 const ARM_S: float = 0.25
+## At the result a press sooner than this is not taken, so a double click on the
+## fine stop can't close the result unread.
+const RESULT_ARM_S: float = 0.4
+## The most one frame may move the game on: a hitch must not jump the needle or
+## run a timer out.
+const MAX_STEP_S: float = 0.1
+## Shown under the sweeps: what SKIP does at the bench.
+const SKIP_HINT: String = "Esc/Skip calibrates without the game."
 const SETTLE_S: float = 0.5
 const RESULT_S: float = 1.4
 
@@ -54,6 +62,8 @@ var _needle: float = 0.0
 var _coarse_stop: float = 0.0
 var _fine_stop: float = 0.0
 var _score: int = MinigameScore.SKIPPED
+## The real clock at the last frame, in microseconds.
+var _last_usec: int = 0
 
 @onready var _subject_label: Label = %SubjectLabel
 @onready var _stage_label: Label = %StageLabel
@@ -120,6 +130,7 @@ func play(share: float, mode: int, motion_seed: int, subject: String = "") -> vo
 	_stop_button.disabled = false
 	_begin(Stage.COARSE)
 	show()
+	_last_usec = Time.get_ticks_usec()
 	set_process(true)
 
 
@@ -139,8 +150,17 @@ func sweet_half() -> float:
 	return _sweet
 
 
-func _process(delta: float) -> void:
-	advance(delta)
+## Real seconds, not the farm's: a faster or stopped farm clock (Engine.time_scale)
+## must not move the needle.
+func _process(_delta: float) -> void:
+	var now: int = Time.get_ticks_usec()
+	advance(frame_step((now - _last_usec) / 1000000.0))
+	_last_usec = now
+
+
+## What one frame of `real_seconds` moves the game on by.
+static func frame_step(real_seconds: float) -> float:
+	return clampf(real_seconds, 0.0, MAX_STEP_S)
 
 
 ## Moves the game on by `seconds`. Tests call it in place of frames.
@@ -175,7 +195,8 @@ func press() -> void:
 				_score = score(_coarse_stop, _fine_stop, _sweet)
 				_begin(Stage.RESULT)
 		Stage.RESULT:
-			_finish(_score)
+			if _time >= RESULT_ARM_S:
+				_finish(_score)
 
 
 ## Ends the game with no score. At the result the score stands.
@@ -191,14 +212,14 @@ func _begin(next: Stage) -> void:
 		Stage.COARSE:
 			_needle = needle_at(0.0, 1.0, COARSE_PERIOD_S / _speed, _phase)
 			_stage_label.text = "STEP 1 OF 2: COARSE ADJUST"
-			_hint_label.text = "Stop the needle as near zero as you can. Nearer leaves a narrower scale for the fine adjust."
+			_hint_label.text = "Stop the needle as near zero as you can. Nearer leaves a narrower scale for the fine adjust.\n" + SKIP_HINT
 		Stage.SETTLE:
 			_stage_label.text = "COARSE STOP TAKEN"
 			_hint_label.text = "Now the fine adjust."
 		Stage.FINE:
 			_needle = needle_at(0.0, fine_amplitude(_coarse_stop), FINE_PERIOD_S / _speed, _fine_phase)
 			_stage_label.text = "STEP 2 OF 2: FINE ADJUST"
-			_hint_label.text = "Stop the needle inside the marked sweet spot at zero."
+			_hint_label.text = "Stop the needle inside the marked sweet spot at zero.\n" + SKIP_HINT
 		Stage.RESULT:
 			_stage_label.text = "ZERO SET"
 			_hint_label.text = MinigameScore.result_text(_score)
