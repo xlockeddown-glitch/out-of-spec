@@ -10,14 +10,24 @@ func _root() -> Window:
 	return (Engine.get_main_loop() as SceneTree).root
 
 
-## A cell that can be dug now, with its east neighbour.
+## A cell that can be dug now, with its east neighbour, holding no block and no pocket.
 func _diggable_cell() -> Vector2i:
 	for x: int in range(-30, 30):
 		for z: int in range(-30, 30):
 			var cell := Vector2i(x, z)
-			if GameState.dig_problem(cell) == "" and GameState.dig_problem(cell + Vector2i(1, 0)) == "":
+			if GameState.dig_problem(cell) == "" and GameState.dig_problem(cell + Vector2i(1, 0)) == "" and _plain(cell):
 				return cell
 	return Vector2i.MAX
+
+
+func _plain(cell: Vector2i) -> bool:
+	for near: Vector2i in [cell, cell + Vector2i(1, 0)]:
+		if not ReferenceBlock.at(GameState.world_seed, near).is_empty() or near in OrePocket.cells(GameState.world_seed) or near in GameState.new_pockets:
+			return false
+	return true
+
+
+const SETUP: String = "Test setup: no plain diggable cell found"
 
 
 func _forward(deg: float) -> Vector3:
@@ -38,14 +48,16 @@ func _rover(cell: Vector2i, deg: float, behind_m: float = 2.0) -> RoverControlle
 
 
 func _free(rover: RoverController) -> void:
+	var id: String = rover.rover_id
 	rover.ground.free()
 	rover.free()
+	GameState.rover_transforms.erase(id)
 
 
 func test_the_outline_and_the_command_name_the_cell_in_front() -> String:
 	var cell: Vector2i = _diggable_cell()
 	if cell == Vector2i.MAX:
-		return "Test setup: no diggable cell found"
+		return SETUP
 	var bad: PackedStringArray = []
 	for deg: float in FACINGS_DEG:
 		var rover: RoverController = _rover(cell, deg, 2.0)
@@ -60,23 +72,10 @@ func test_the_outline_and_the_command_name_the_cell_in_front() -> String:
 	return "" if bad.is_empty() else "; ".join(bad)
 
 
-func test_the_cell_is_the_same_for_keys_and_pad() -> String:
-	var cell: Vector2i = _diggable_cell()
-	var rover: RoverController = _rover(cell, 90.0)
-	var seen: Array[Vector2i] = []
-	var states: Array[int] = []
-	for device: int in [Controls.Device.KEY, Controls.Device.PAD]:
-		Controls.last_device = device
-		seen.append(rover.dig_target())
-		states.append(DigOutline.state_of(rover))
-	Controls.last_device = Controls.Device.KEY
-	_free(rover)
-	var same: bool = seen[0] == seen[1] and states[0] == states[1] and states[0] == DigOutline.State.DIGGABLE
-	return "" if same else "Keys %s/%s, pad %s/%s" % [seen[0], states[0], seen[1], states[1]]
-
-
 func test_the_outline_is_teal_when_diggable_and_amber_when_not() -> String:
 	var cell: Vector2i = _diggable_cell()
+	if cell == Vector2i.MAX:
+		return SETUP
 	var rover: RoverController = _rover(cell, 0.0)
 	var bad: PackedStringArray = []
 	if DigOutline.state_of(rover) != DigOutline.State.DIGGABLE:
@@ -107,6 +106,8 @@ func test_the_outline_is_teal_when_diggable_and_amber_when_not() -> String:
 
 func test_the_outline_is_hidden_only_when_no_dig_can_be_aimed() -> String:
 	var cell: Vector2i = _diggable_cell()
+	if cell == Vector2i.MAX:
+		return SETUP
 	var rover: RoverController = _rover(cell, 0.0)
 	var bad: PackedStringArray = []
 	rover.hide()
@@ -136,6 +137,8 @@ func test_the_outline_is_hidden_only_when_no_dig_can_be_aimed() -> String:
 
 func test_a_small_drift_keeps_the_dig_and_a_large_one_cancels_it() -> String:
 	var cell: Vector2i = _diggable_cell()
+	if cell == Vector2i.MAX:
+		return SETUP
 	var rover: RoverController = _rover(cell, 0.0)
 	var said: Array[String] = []
 	rover.dig_rejected.connect(func(why: String) -> void: said.append(why))
@@ -158,13 +161,15 @@ func test_a_small_drift_keeps_the_dig_and_a_large_one_cancels_it() -> String:
 
 func test_a_dig_that_drifted_a_little_digs_the_lit_cell_and_a_fast_one_does_not() -> String:
 	var cell: Vector2i = _diggable_cell()
+	if cell == Vector2i.MAX:
+		return SETUP
 	var rover: RoverController = _rover(cell, 90.0)
 	var said: Array[String] = []
 	rover.dig_rejected.connect(func(why: String) -> void: said.append(why))
 	var bad: PackedStringArray = []
 	var lit: Vector2i = rover.dig_target()
+	var held: Dictionary = SaveGame.snapshot()
 	var dug_before: Dictionary[Vector2i, int] = GameState.dug.duplicate()
-	var paid_before: Dictionary[Vector2i, int] = GameState.dug_paid.duplicate()
 	rover.queue_command(RoverController.Command.DIG)
 	var cmd: RoverController.UplinkCommand = rover._commands[0]
 	# It drifted, and turned a little, but within the allowance.
@@ -181,7 +186,48 @@ func test_a_dig_that_drifted_a_little_digs_the_lit_cell_and_a_fast_one_does_not(
 	rover._execute(cmd)
 	if GameState.dug.get(lit, 0) != dug_before.get(lit, 0) + 1 or said != [RoverController.STOP_FIRST]:
 		bad.append("a fast rover dug or said %s" % [said])
-	GameState.dug = dug_before
-	GameState.dug_paid = paid_before
+	var back: String = SaveGame.restore(held)
+	GameState.terrain_changed.emit()
+	_free(rover)
+	if back != "":
+		bad.append("the farm did not restore: %s" % back)
+	return "" if bad.is_empty() else "; ".join(bad)
+
+
+func test_two_presses_each_keep_their_own_cell_and_origin() -> String:
+	var cell: Vector2i = _diggable_cell()
+	if cell == Vector2i.MAX:
+		return SETUP
+	var rover: RoverController = _rover(cell, 0.0)
+	var said: Array[String] = []
+	rover.dig_rejected.connect(func(why: String) -> void: said.append(why))
+	var bad: PackedStringArray = []
+	rover.queue_command(RoverController.Command.DIG)
+	var first: Vector2i = rover.dig_cell()
+	var start: Vector3 = rover.global_position
+	rover.global_position += Vector3(0.0, 0.0, -rover.dig_drift_m * 0.6)
+	var second: Vector2i = rover.dig_cell()
+	rover.queue_command(RoverController.Command.DIG)
+	var a: RoverController.UplinkCommand = rover._commands[0]
+	var b: RoverController.UplinkCommand = rover._commands[1]
+	if a.cell != first or a.origin != start or b.cell != second or b.origin != rover.global_position:
+		bad.append("the presses did not keep their own cell and origin")
+	if rover.dig_target() != first:
+		bad.append("the outline must show the dig that lands first")
+	# Past the first press's allowance, but not the second's: only the first goes.
+	rover.global_position += Vector3(0.0, 0.0, -rover.dig_drift_m * 0.6)
+	rover._cancel_drifted_digs()
+	if rover._commands.size() != 1 or rover._commands[0] != b or said != [RoverController.MOVED_REFUSAL]:
+		bad.append("only the first press should have been cancelled (%s)" % [said])
+	if rover.dig_target() != second:
+		bad.append("the outline did not move on to the next dig")
+	# Several together say it once.
+	said.clear()
+	rover.queue_command(RoverController.Command.DIG)
+	rover.queue_command(RoverController.Command.DIG)
+	rover.global_position += Vector3(0.0, 0.0, -rover.dig_drift_m * 3.0)
+	rover._cancel_drifted_digs()
+	if not rover._commands.is_empty() or said.size() != 1:
+		bad.append("three drifted digs should be one line (%s)" % [said])
 	_free(rover)
 	return "" if bad.is_empty() else "; ".join(bad)

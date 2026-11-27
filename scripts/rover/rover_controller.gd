@@ -363,7 +363,9 @@ func queue_command(command: Command, seed_id: String = "", offset_steps: int = 0
 		offset_steps = GameState.planting_offset_steps
 	var sent := UplinkCommand.new(_uplink_clock, command, seed_id, offset_steps)
 	if command == Command.DIG:
-		sent.cell = dig_target()
+		# The cell in front now, as the outline shows it when nothing is in flight;
+		# with one in flight the outline keeps showing that one until it lands.
+		sent.cell = dig_cell()
 		sent.origin = global_position
 	_commands.append(sent)
 
@@ -631,16 +633,19 @@ func can_aim_dig() -> bool:
 func dig_problem() -> String:
 	if absf(_speed_mps) > dig_drift_speed_mps:
 		return STOP_FIRST
-	return GameState.dig_problem(dig_target())
+	return GameState.dig_problem(dig_target(), true)
 
 
 ## Drops a dig in flight once the rover has drifted past the allowance, and says so.
 func _cancel_drifted_digs() -> void:
+	var dropped: bool = false
 	for i: int in range(_commands.size() - 1, -1, -1):
 		var cmd: UplinkCommand = _commands[i]
 		if cmd.command == Command.DIG and _drift_from(cmd.origin) > dig_drift_m:
 			_commands.remove_at(i)
-			dig_rejected.emit(MOVED_REFUSAL)
+			dropped = true
+	if dropped:
+		dig_rejected.emit(MOVED_REFUSAL)
 
 
 func _drift_from(origin: Vector3) -> float:
