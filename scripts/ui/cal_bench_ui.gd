@@ -122,7 +122,7 @@ func open(instrument_id: String = "hygrometer") -> void:
 ## The bench's own controls take focus, except while a game is up.
 func _bench_focus(on: bool) -> void:
 	var mode: Control.FocusMode = Control.FOCUS_ALL if on else Control.FOCUS_NONE
-	for control: Control in [_instrument_option, _careful_check, _game_option, _calibrate_button, _close_button]:
+	for control: Control in [_instrument_option, _careful_check, _game_option, _calibrate_button, _send_button, _close_button]:
 		control.focus_mode = mode
 		if not on and control.has_focus():
 			control.release_focus()

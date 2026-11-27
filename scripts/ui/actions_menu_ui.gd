@@ -10,6 +10,8 @@ extends Control
 const CHORD_TEXT: String = "LB + RB"
 ## A lone shoulder press waits this long for the other, s.
 const CHORD_GRACE_S: float = 0.12
+## A set-point nudge waits longer than the chord window, so a press cannot both nudge and open.
+const NUDGE_WAIT_S: float = CHORD_GRACE_S + 0.06
 const TEAL: Color = SkillsUI.TEAL
 const TEXT: Color = SkillsUI.TEXT
 const DIM: Color = SkillsUI.DIM
@@ -43,8 +45,8 @@ var _blocked_before: bool = false
 ## When each shoulder went down (msec); far in the past when up.
 var _lb_msec: int = -1000000
 var _rb_msec: int = -1000000
-## Counts every shoulder press and every open, so a set-point nudge that is
-## waiting on the chord can tell it was overtaken.
+## Counts every open, so a set-point nudge that is waiting on the chord can
+## tell the menu took it.
 static var chord_token: int = 0
 
 
@@ -122,7 +124,6 @@ func _input(event: InputEvent) -> void:
 		else:
 			_rb_msec = -1000000
 		return
-	chord_token += 1
 	var now: int = Time.get_ticks_msec()
 	var other_msec: int = _rb_msec if lb else _lb_msec
 	if lb:

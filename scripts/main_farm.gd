@@ -671,8 +671,8 @@ func _adjust_setpoint(cell: Vector3i, step: int) -> void:
 ## and gives way if the menu opened.
 func _pad_setpoint(step: int) -> void:
 	var token: int = ActionsMenuUI.chord_token
-	await get_tree().create_timer(ActionsMenuUI.CHORD_GRACE_S).timeout
-	# Overtaken by a second shoulder or the menu, or the situation changed.
+	await get_tree().create_timer(ActionsMenuUI.NUDGE_WAIT_S).timeout
+	# Overtaken by the menu, or the situation changed.
 	if (is_inside_tree() and token == ActionsMenuUI.chord_token and not QuestsUI.other_panel_open(get_tree())
 			and not CoopWalkers.on_foot() and _rover.away_text() == ""):
 		_step_setpoint(step)

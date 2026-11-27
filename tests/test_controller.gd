@@ -213,8 +213,10 @@ func test_the_chord_must_be_quick_and_a_single_shoulder_does_not_open() -> Strin
 	menu._input(_shoulder(JOY_BUTTON_RIGHT_SHOULDER, true))
 	if menu.visible:
 		problem = "A slow second shoulder must not open the menu."
-	if ActionsMenuUI.chord_token == token:
-		problem = "Every shoulder press must overtake a waiting set-point nudge."
+	if ActionsMenuUI.chord_token != token:
+		problem = "A shoulder press alone must not cancel a waiting set-point nudge (rapid taps each nudge)."
+	if ActionsMenuUI.NUDGE_WAIT_S <= ActionsMenuUI.CHORD_GRACE_S:
+		problem = "A nudge must wait longer than the chord window."
 	# Let go of both and tap them together again.
 	menu._input(_shoulder(JOY_BUTTON_LEFT_SHOULDER, false))
 	menu._input(_shoulder(JOY_BUTTON_RIGHT_SHOULDER, false))
@@ -222,6 +224,8 @@ func test_the_chord_must_be_quick_and_a_single_shoulder_does_not_open() -> Strin
 	menu._input(_shoulder(JOY_BUTTON_RIGHT_SHOULDER, true))
 	if not menu.visible:
 		problem = "A quick chord must open the menu."
+	elif ActionsMenuUI.chord_token == token:
+		problem = "Opening the menu must cancel a waiting set-point nudge."
 	menu.free()
 	RoverController.input_blocked = false
 	return problem
@@ -348,4 +352,25 @@ func test_start_does_not_open_pause_over_a_panel_and_close_restores_the_block() 
 	pause.free()
 	tree.paused = false
 	RoverController.input_blocked = false
+	return problem
+
+
+func test_a_running_minigame_consumes_back_and_l3() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var problem: String = ""
+	var scenes: Array[String] = ["wring_the_blocks", "thread_the_spool", "torque_to_spec"]
+	for name: String in scenes:
+		var game: Control = (load("res://ui/minigames/%s.tscn" % name) as PackedScene).instantiate()
+		tree.root.add_child(game)
+		game._stage = 1
+		game.set_process(false)
+		for index: int in [JOY_BUTTON_BACK, JOY_BUTTON_LEFT_STICK]:
+			tree.root.set_input_as_handled()
+			var press := InputEventJoypadButton.new()
+			press.button_index = index
+			press.pressed = true
+			game._unhandled_input(press)
+			if not tree.root.is_input_handled():
+				problem = "%s must consume pad button %d while running." % [name, index]
+		game.free()
 	return problem

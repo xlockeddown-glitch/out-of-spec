@@ -364,6 +364,13 @@ func _input(event: InputEvent) -> void:
 		skip()
 
 
+## While the game runs, no key or pad press reaches the farm or the scene swap behind it.
+func _unhandled_input(event: InputEvent) -> void:
+	if _stage != Stage.IDLE and is_visible_in_tree() and (event is InputEventKey
+			or event is InputEventJoypadButton or event is InputEventJoypadMotion):
+		get_viewport().set_input_as_handled()
+
+
 ## Off the two buttons, the mouse button is the one button too.
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:

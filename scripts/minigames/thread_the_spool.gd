@@ -71,7 +71,7 @@ const COLOR_OUT := Color(1.0, 0.75, 0.3)
 const COLOR_SPOOL := Color(1, 1, 1)
 
 var _stage: Stage = Stage.IDLE
-## Which way the left stick leans past half (-1, 0, 1), so a lean counts once.
+## Which way the left stick leans (-1, 0, 1): in past 0.5, out below 0.3, so a lean counts once.
 var _stick_x: int = 0
 ## Seconds in this stage.
 var _time: float = 0.0
@@ -162,6 +162,7 @@ func _ready() -> void:
 func play(share: float, mode: int, motion_seed: int, subject: String = "") -> void:
 	if is_playing():
 		skip()
+	_stick_x = 0
 	_slot = slot_half(MinigameSettings.sweet_factor(mode))
 	_sway_speed = MinigameSettings.speed_factor(mode) * sway_factor(share)
 	var rng := RandomNumberGenerator.new()
@@ -336,7 +337,6 @@ func _set_steer(direction: int) -> void:
 
 
 func _let_go() -> void:
-	_stick_x = 0
 	_steer = 0
 	_left = false
 	_right = false
@@ -384,7 +384,10 @@ func _input(event: InputEvent) -> void:
 	if motion != null:
 		# The left stick pushes like the D-pad: a push on crossing half, let go on easing back.
 		if motion.axis == JOY_AXIS_LEFT_X:
-			var dir: int = 0 if absf(motion.axis_value) < 0.5 else (1 if motion.axis_value > 0.0 else -1)
+			var lean: float = absf(motion.axis_value)
+			var dir: int = 0
+			if lean >= 0.5 or (_stick_x != 0 and lean >= 0.3 and (motion.axis_value > 0.0) == (_stick_x > 0)):
+				dir = 1 if motion.axis_value > 0.0 else -1
 			if dir != _stick_x:
 				if _stick_x != 0:
 					push(_stick_x < 0, false)
@@ -405,6 +408,13 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"ui_cancel"):
 		get_viewport().set_input_as_handled()
 		skip()
+
+
+## While the game runs, no key or pad press reaches the farm or the scene swap behind it.
+func _unhandled_input(event: InputEvent) -> void:
+	if _stage != Stage.IDLE and is_visible_in_tree() and (event is InputEventKey
+			or event is InputEventJoypadButton or event is InputEventJoypadMotion):
+		get_viewport().set_input_as_handled()
 
 
 func _draw_view() -> void:
