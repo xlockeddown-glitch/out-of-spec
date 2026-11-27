@@ -206,13 +206,14 @@ static func lowest_under(at: Vector2, half_m: Vector2, dug: Dictionary[Vector2i,
 	return lowest_m
 
 
-## Every plant of the natural land.
+## Every plant of the natural land. Drawn over the old land only (OLD_HALF_M), so
+## every plant stays where it was; the ring outside has none for now.
 static func plants() -> Array[Placed]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = PLANT_SEED
 	var found: Array[Placed] = []
-	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M, SHRUB_EVERY_M):
-		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M, SHRUB_EVERY_M):
+	for x: int in range(-Terrain.OLD_HALF_M, Terrain.OLD_HALF_M, SHRUB_EVERY_M):
+		for z: int in range(-Terrain.OLD_HALF_M, Terrain.OLD_HALF_M, SHRUB_EVERY_M):
 			var at := Vector2(x + rng.randf() * SHRUB_EVERY_M, z + rng.randf() * SHRUB_EVERY_M)
 			var chance: float = SHRUB_CHANCE_SLOPE if _slope(at) >= SLOPE else SHRUB_CHANCE_FLAT
 			var wanted: bool = rng.randf() < chance
@@ -220,7 +221,7 @@ static func plants() -> Array[Placed]:
 			if wanted and _is_free(at):
 				found.append(shrub)
 	for i: int in DRIFT_TRIES:
-		var middle := Vector2(rng.randf_range(-Terrain.HALF_M, Terrain.HALF_M), rng.randf_range(-Terrain.HALF_M, Terrain.HALF_M))
+		var middle := Vector2(rng.randf_range(-Terrain.OLD_HALF_M, Terrain.OLD_HALF_M), rng.randf_range(-Terrain.OLD_HALF_M, Terrain.OLD_HALF_M))
 		var high: bool = Terrain.height(middle, {}) >= DRIFT_ABOVE_M
 		var drift: Array[Vector2] = []
 		for j: int in rng.randi_range(DRIFT_COUNT.x, DRIFT_COUNT.y):
@@ -258,7 +259,7 @@ static func _placed(rng: RandomNumberGenerator, plant: Plant, at: Vector2, sizes
 
 ## Off level ground, the land's edge and the rocks, with their margins.
 static func _is_free(at: Vector2) -> bool:
-	if maxf(absf(at.x), absf(at.y)) > Terrain.HALF_M - EDGE_MARGIN_M:
+	if maxf(absf(at.x), absf(at.y)) > Terrain.OLD_HALF_M - EDGE_MARGIN_M:
 		return false
 	# Nothing grows in the wash or its banks [ASSUMPTION].
 	if Terrain.wash_out(at) < Terrain.WASH_REACH:

@@ -167,7 +167,7 @@ static func dead_spots(holder: Node3D, half_m: int, step_m: int) -> Dictionary:
 			var blind: bool = not sees_relay(space, Vector2i(x, z), half_m)
 			tried += 1
 			blocked += 1 if blind else 0
-			if maxi(absi(x), absi(z)) > Terrain.HALF_M:
+			if maxi(absi(x), absi(z)) > Terrain.OLD_HALF_M:
 				ring_tried += 1
 				ring_blocked += 1 if blind else 0
 	return {

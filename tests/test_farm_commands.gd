@@ -201,7 +201,7 @@ func test_a_boulder_must_be_close_in_front_and_stand() -> String:
 func test_a_guest_digs_and_fills_only_by_the_rules() -> String:
 	var commands: Node = _make()
 	var problems: PackedStringArray = []
-	for cell: Vector3i in [Vector3i(0, 0, 0), Vector3i(20, 1, 20), Vector3i(2147483647, 0, -2147483648), Vector3i(-39, 0, 39)]:
+	for cell: Vector3i in [Vector3i(0, 0, 0), Vector3i(20, 1, 20), Vector3i(2147483647, 0, -2147483648), Vector3i(-59, 0, 59)]:
 		if commands.execute("player_2", &"dig", [cell]) == "" or commands.execute("player_2", &"fill", [cell]) == "":
 			problems.append("Changed the ground at %s" % cell)
 	for arguments: Array in [[], [Vector2i(20, 20)], [Vector3(20, 0, 20)], ["x"], [Vector3i(20, 0, 20), "player_1"]]:
