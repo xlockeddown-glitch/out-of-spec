@@ -286,7 +286,7 @@ func test_the_pad_check_refuses_known_bad_places() -> String:
 		["the plot", Vector2(4, 4), "farm: marker is on the farm plot"],
 		["the relay road", Vector2(-20, -20), "farm: marker pad is 0.0 m from the relay road, inside its 5 m level strip"],
 		["the Basalt hill", Vector2(44, -40), "farm: marker pad ground varies by"],
-		["the Badlands hill", Vector2(58, 24), "farm: marker pad ground varies by"],
+		["the Badlands hill", Vector2(68, 38), "farm: marker pad ground varies by"],
 	]
 	for c: Array in bad:
 		var lines: Array[String] = BiomeData.pad_problems("farm", "marker", c[1] as Vector2)

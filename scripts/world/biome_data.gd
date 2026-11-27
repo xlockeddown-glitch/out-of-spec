@@ -93,9 +93,9 @@ const SCENE_SPOTS: Array[Vector4] = [
 	Vector4(20, 13, 1.0, 1.0),      # cobbles B
 	Vector4(-1, -25, 7.0, 1.5),     # the gulch, x -8 to 6
 	Vector4(0, -30, 10.0, 1.5),     # the plateau rim
-	Vector4(-16, 3, 1.5, 1.5), Vector4(-19, -3, 1.5, 1.5), Vector4(-15, 12, 1.5, 1.5),
-	Vector4(4, -19, 1.5, 1.5), Vector4(-3, -21, 1.5, 1.5), Vector4(19, 4, 1.5, 1.5),
-	Vector4(21, -9, 1.5, 1.5), Vector4(11, 18, 1.5, 1.5),  # ore fissures
+	Vector4(46, 8, 1.5, 1.5), Vector4(52, 14, 1.5, 1.5), Vector4(46, 20, 1.5, 1.5),
+	Vector4(56, 22, 1.5, 1.5), Vector4(50, 28, 1.5, 1.5), Vector4(44, 32, 1.5, 1.5),
+	Vector4(58, 30, 1.5, 1.5), Vector4(52, 36, 1.5, 1.5),  # ore fissures, in the Badlands
 ]
 
 static var _cache: Array[Dictionary] = []

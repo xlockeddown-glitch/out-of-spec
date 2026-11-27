@@ -559,35 +559,35 @@ omni_range = 3.0
 [node name="Fissures" type="Node3D" parent="WorldView/WorldViewport/World"]
 
 [node name="FissureA" type="Node3D" parent="WorldView/WorldViewport/World/Fissures"]
-position = Vector3(-16, 0, 3)
+position = Vector3(46, 0, 8)
 script = ExtResource("10_ore")
 
 [node name="FissureB" type="Node3D" parent="WorldView/WorldViewport/World/Fissures"]
-position = Vector3(-19, 0, -3)
+position = Vector3(52, 0, 14)
 script = ExtResource("10_ore")
 
 [node name="FissureC" type="Node3D" parent="WorldView/WorldViewport/World/Fissures"]
-position = Vector3(-15, 0, 12)
+position = Vector3(46, 0, 20)
 script = ExtResource("10_ore")
 
 [node name="FissureD" type="Node3D" parent="WorldView/WorldViewport/World/Fissures"]
-position = Vector3(4, 0, -19)
+position = Vector3(56, 0, 22)
 script = ExtResource("10_ore")
 
 [node name="FissureE" type="Node3D" parent="WorldView/WorldViewport/World/Fissures"]
-position = Vector3(-3, 0, -21)
+position = Vector3(50, 0, 28)
 script = ExtResource("10_ore")
 
 [node name="FissureF" type="Node3D" parent="WorldView/WorldViewport/World/Fissures"]
-position = Vector3(19, 0, 4)
+position = Vector3(44, 0, 32)
 script = ExtResource("10_ore")
 
 [node name="FissureG" type="Node3D" parent="WorldView/WorldViewport/World/Fissures"]
-position = Vector3(21, 0, -9)
+position = Vector3(58, 0, 30)
 script = ExtResource("10_ore")
 
 [node name="FissureH" type="Node3D" parent="WorldView/WorldViewport/World/Fissures"]
-position = Vector3(11, 0, 18)
+position = Vector3(52, 0, 36)
 script = ExtResource("10_ore")
 
 [node name="BramBay" type="Area3D" parent="WorldView/WorldViewport/World"]
