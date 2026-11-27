@@ -107,5 +107,9 @@
   "mug_ring": {
     "display_name": "Mug Ring",
     "description": "A ring of dried coffee on the bench top. Somebody set a mug down here, and it was not you."
+  },
+  "phobos_shed_skin": {
+    "display_name": "Shed Skin by the Grille",
+    "description": "A papery shed skin, caught on the torn mesh of a service-tunnel grille. Something went through here, and it was warm in there."
   }
 }

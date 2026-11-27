@@ -21,6 +21,7 @@ signal lifts_changed
 signal lab_sitter_changed
 ## The farm was given the shuttle license.
 signal shuttle_license_changed
+signal shuttle_trips_changed
 signal relay_changed(slotted: bool)
 signal calibration_recorded(record: Dictionary)
 signal phone_message(text: String)
@@ -208,6 +209,10 @@ var lab_sitter: Dictionary = {}
 ## Whether the farm holds the shuttle license (Shuttle): Vance's exam grants it,
 ## and it is never lost. Shared by the farm.
 var shuttle_licensed: bool = false
+## The day trips under way (Shuttle, zones doc section 8.2): player id -> { "moon",
+## "ends_at" } with the end in GameClock elapsed days. One trip a player. The host ends
+## each when its time is up or from the hub's console (shuttle_home). Shared by the farm.
+var shuttle_trips: Dictionary = {}
 ## The deepest depth the farm's rover has reached in each zone: zone id -> depth.
 ## Only ever grows. Shown on the phone. Shared by the farm.
 var deepest_depth: Dictionary = {}
@@ -716,7 +721,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -833,7 +838,7 @@ func farm_dict_problem(data: Dictionary) -> String:
 	if not liters is float or liters < 0.0 or liters > CISTERN_CAPACITY_L:
 		return "'cistern_liters' is out of range."
 	var zone: Variant = data.get("rover_zone", "")
-	if zone is String and zone != "" and not ZoneData.is_playable(StringName(zone)):
+	if zone is String and zone != "" and (not ZoneData.is_playable(StringName(zone)) or Shuttle.is_moon(zone)):
 		return "'rover_zone' is not a zone with a scene."
 	if data.has("rover_epoch") and data["rover_epoch"] is int and data["rover_epoch"] < 0:
 		return "'rover_epoch' is out of range."
@@ -846,9 +851,14 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return "'rover_lent' is not a yes or no."
 	if data.get("rover_lent", false) and data.get("rover_zone", "") == "":
 		return "'rover_lent' is set for a rover that is on the farm."
+	var trips: Variant = data.get("shuttle_trips", {})
+	if trips is Dictionary:
+		for who: Variant in trips:
+			if not who is String or who == "" or Shuttle.trip_shape_problem(trips[who]) != "":
+				return "'shuttle_trips' has a trip that is not one."
 	var seen_zones: Array[String] = []
 	for zone_id: Variant in data.get("zones_unlocked", []):
-		if not zone_id is String or not ZoneData.is_playable(StringName(zone_id)):
+		if not zone_id is String or not ZoneData.is_playable(StringName(zone_id)) or Shuttle.is_moon(zone_id):
 			return "'zones_unlocked' holds a zone that does not exist."
 		if seen_zones.has(zone_id):
 			return "'zones_unlocked' holds a zone twice."
@@ -1058,6 +1068,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	settle_rover_depth(false)
 	sentinel_sighted = false
 	player_places.clear()
+	_settle_trips_on_load()
 	_recall_warned_day = 0
 	_recall_rescued_day = 0
 	_guest_warned_day.clear()
@@ -1099,6 +1110,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	lifts_changed.emit()
 	lab_sitter_changed.emit()
 	shuttle_license_changed.emit()
+	shuttle_trips_changed.emit()
 	return ""
 
 
@@ -1625,6 +1637,7 @@ func _on_time_advanced(delta_days: float) -> void:
 		drop_pod_present = false
 		drop_pod_changed.emit(false)
 		post_phone("AUD-1T: Departing. Please remain compliant in our absence.")
+	_end_due_trips()
 	_tick_recall()
 
 
@@ -3509,8 +3522,16 @@ func grant_shuttle_license() -> void:
 ## host's clock. Before anything else it checks the sender stands at the terminal
 ## (on foot there, or in the rover there) and that `people` are all here to go
 ## (players_present()); then Shuttle.trip_problem's reasons. A refusal takes no
-## fare. No moon has a hub yet, so every booking is refused for now. Returns "" when
-## booked, else why not.
+## fare. Phobos has a hub; Deimos has none yet, so its bookings are refused. Only the
+## sender flies for now (people must be 1) [PLACEHOLDER: parties come later]. Booked
+## means paid once from the shared wallet, the trip recorded (shuttle_trips) and the
+## sender at the moon's hub: their place is the moon's and they are no longer on foot on
+## the farm, or driving its rover. The farm rover stays where it is: a player who
+## books from inside it is out of it (the lease is let go), and walks home to the pad
+## on the way back. The sender's screen changes to the hub when the answer comes
+## (ShuttleUI). A player in bed who books is woken by the act (FarmCommands). With friends
+## in, the day cannot end until the traveller is home: the trip ends by its clock or the
+## 02:00 recall at the latest, so the wait is bounded. Returns "" when booked, else why not.
 func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
 	var id: String = _player(player_id)
 	var at: Variant = standing_at(id)
@@ -3522,9 +3543,105 @@ func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
 	var reason: String = Shuttle.trip_problem(moon, lab_level(), shuttle_licensed, credits, people, GameClock.elapsed_days, hub_ready)
 	if reason != "":
 		return reason
-	add_credits(-Shuttle.fare() * people)
-	post_phone(Shuttle.text("booked_text") % [Shuttle.moon_name(moon), Shuttle.clock_text(GameClock.elapsed_days), SP811.integer(Shuttle.fare() * people)])
+	if people != 1:
+		return Shuttle.text("one_seat_text")
+	add_credits(-Shuttle.fare())
+	var ends_at: float = Shuttle.trip_end(GameClock.elapsed_days)
+	shuttle_trips[id] = { "moon": moon, "ends_at": ends_at }
+	player_places[id] = [moon, 0]
+	_trip_players.erase(id)
+	# Off the farm's ground: out of the rover (it stays parked where it is) and not
+	# among the walkers there.
+	CoopWalkers.out.erase(id)
+	var rovers: Node = rovers_node if rovers_node != null else CoopRovers
+	rovers.release(id)
+	shuttle_trips_changed.emit()
+	post_phone(Shuttle.text("booked_text") % [Shuttle.moon_name(moon), Shuttle.clock_text(GameClock.elapsed_days),
+		SP811.integer(Shuttle.fare()), Shuttle.clock_text(ends_at)])
 	return ""
+
+
+## Host: the player takes the return shuttle from the moon's hub console, at any time
+## (the way home ignores the windows, and costs nothing) [PLACEHOLDER]. `player_id` is
+## filled in from the connection. Returns "" or why not. See _return_traveller.
+func shuttle_home(player_id: String = "") -> String:
+	var id: String = _player(player_id)
+	if not shuttle_trips.has(id) or not Shuttle.is_moon(place_of(id)):
+		return Shuttle.text("not_away_text")
+	_return_traveller(id, Shuttle.text("home_text"))
+	return ""
+
+
+## Host: ends every trip whose time is up, or that is still under way at the recall
+## hour (a straggler: trip_problem keeps a booking from running past it, so only a
+## clock jump or a forced trip gets here). The farm's night never charges or rescues
+## a moon's traveller: the way home is the shuttle's, free (_return_traveller).
+func _end_due_trips() -> void:
+	if FarmCommands.guest or shuttle_trips.is_empty():
+		return
+	var closed: bool = TunnelRecall.closed(GameClock.elapsed_days)
+	for id: String in shuttle_trips.keys():
+		if closed or GameClock.elapsed_days >= float(shuttle_trips[id]["ends_at"]):
+			_return_traveller(id, Shuttle.text("trip_over_text"))
+
+
+## Host: a traveller comes home. Their trip is over (nothing is charged), their place is
+## the farm and they stand on foot beside the pad's terminal, a phone line says so, and
+## their screen goes back to the farm (the hub sees its trip end: Phobos hub script). A
+## guest is told by the farm they have.
+func _return_traveller(player_id: String, line: String) -> void:
+	var moon: String = str(shuttle_trips.get(player_id, {}).get("moon", ""))
+	shuttle_trips.erase(player_id)
+	player_places[player_id] = [ZonePresence.FARM, 0]
+	_stand_at_pad(player_id)
+	shuttle_trips_changed.emit()
+	post_phone(line % Shuttle.moon_name(moon) if moon != "" else line % "the moon")
+
+
+## Host: puts a returned traveller on foot at the landing pad. With the farm rover away
+## (a field trip has it) there is nothing to be on foot beside, so they are put among
+## the players there with no walker: a walker with no rover could never get in, and the
+## rover coming home would only fold them into it. The spot is the pad's return spot, or
+## the nearest dry one if that was dug under or flooded; a player's own building is not
+## checked (there is no cheap query for it) [ASSUMPTION]. The silence clock does not
+## start here but at their first farm report or pose (CoopWalkers.heard), as their
+## screen has the host's next send, a fade and a load to get through first.
+func _stand_at_pad(player_id: String) -> void:
+	if rover_is_away(ROVER):
+		CoopWalkers.out.erase(player_id)
+		return
+	CoopWalkers.stand(player_id, _pad_spot(), Time.get_ticks_msec() + CoopWalkers.ARRIVAL_MS)
+
+
+func _pad_spot() -> Vector3:
+	var base := Vector2(Shuttle.RETURN_AT.x, Shuttle.RETURN_AT.y)
+	for ring: int in 7:
+		for step: int in (1 if ring == 0 else 8):
+			var angle: float = TAU * float(step) / 8.0
+			var at: Vector2 = base + Vector2(cos(angle), sin(angle)) * 1.5 * float(ring)
+			if maxf(absf(at.x), absf(at.y)) <= Terrain.HALF_M and not Terrain.is_deep(at):
+				return Vector3(at.x, Terrain.height(at, dug), at.y)
+	return Vector3(base.x, Terrain.height(base, dug), base.y)
+
+
+## A farm opens (a load, or a guest joining): the host's own trip goes on if it is still
+## on (and the farm opens at the hub, SaveGame.restore), one past its end brings them
+## home, and nobody else's is kept: a guest who is not here is not on a trip. A
+## guest's copy is the host's word (FarmSync), never settled here.
+func _settle_trips_on_load() -> void:
+	if FarmCommands.guest:
+		return
+	for id: String in shuttle_trips.keys():
+		if id != local_player_id:
+			shuttle_trips.erase(id)
+		elif TunnelRecall.closed(GameClock.elapsed_days) or GameClock.elapsed_days >= float(shuttle_trips[id]["ends_at"]):
+			var moon: String = str(shuttle_trips[id]["moon"])
+			shuttle_trips.erase(id)
+			# No walker is stood: farm_loaded (below, in farm_from_dict) has CoopWalkers
+			# forget everyone, so the host opens at the farm in the rover, as on any load.
+			post_phone(Shuttle.text("trip_over_text") % Shuttle.moon_name(moon))
+		else:
+			player_places[id] = [str(shuttle_trips[id]["moon"]), 0]
 
 
 ## Where a player stands on the farm: their walking pose if they are out, else the
@@ -4307,9 +4424,18 @@ func report_place(place: String, depth: int, player_id: String = "") -> String:
 	var reason: String = ZonePresence.problem(place, depth, player_id, player_id, here)
 	if reason != "":
 		return reason
+	# A moon has no depth: no tunnel, no dig.
+	if Shuttle.is_moon(place) and depth != 0:
+		return Shuttle.text("not_away_text")
+	# A moon is reached by booking the shuttle, never by a report.
+	if Shuttle.is_moon(place) and not shuttle_trips.has(player_id):
+		return Shuttle.text("not_away_text")
+	if not Shuttle.is_moon(place) and shuttle_trips.has(player_id) and Shuttle.is_moon(place_of(player_id)):
+		return Shuttle.text("home_by_console_text")
 	var on_trip: bool = rover_zone != "" and (_trip_players.has(player_id) or (player_places.has(player_id) and place_of(player_id) == rover_zone))
 	player_places[player_id] = [place, depth]
 	if place == ZonePresence.FARM:
+		CoopWalkers.heard(player_id)  # a traveller back on foot has spoken: the silence clock starts
 		_trip_players.erase(player_id)  # back on the farm: not on the trip
 		# The last one off the trip (a guest in the dome after the rescue hour walks to the
 		# farm): nobody is left to bring the rover back, so it goes home as for a drop.
@@ -4350,6 +4476,11 @@ func forget_place(player_id: String) -> void:
 	player_places.erase(player_id)
 	_console_arrivals.erase(player_id)
 	_trip_players.erase(player_id)
+	# Gone mid-trip: the day trip is over with them, and nothing is charged. The shuttle
+	# is not the farm's rover, so nothing is sent home.
+	if not FarmCommands.guest and shuttle_trips.has(player_id):
+		shuttle_trips.erase(player_id)
+		shuttle_trips_changed.emit()
 	if FarmCommands.guest or rover_zone == "" or not (was == rover_zone or on_trip):
 		return
 	# The last one on the trip dropped (a quit, a lost link, in the zone or in the dome
@@ -4371,6 +4502,14 @@ func clear_other_places() -> void:
 	for who: Variant in _trip_players:
 		others = others or who != local_player_id
 	player_places.clear()
+	if not FarmCommands.guest:
+		var staying: Dictionary = {}
+		for who: Variant in shuttle_trips:
+			if who == local_player_id:
+				staying[who] = shuttle_trips[who]
+		if staying.size() != shuttle_trips.size():
+			shuttle_trips = staying  # a trip of someone who is gone is over
+			shuttle_trips_changed.emit()
 	if mine != null:
 		player_places[local_player_id] = mine
 	var kept: bool = _trip_players.has(local_player_id)
@@ -4655,6 +4794,8 @@ func move_rover(into_tunnels: bool, player_id: String = "") -> String:
 ## nobody below (FastTravel.arrival_plan): then it starts again at the hub, as a
 ## new epoch. Shut after the rescue hour, like the mouth.
 func fast_travel(zone_id: String, player_id: String = "") -> String:
+	if Shuttle.is_moon(zone_id):
+		return Shuttle.text("by_shuttle_text")  # a moon is reached by the shuttle alone
 	if not ZoneData.is_playable(StringName(zone_id)) or not zones_unlocked.has(zone_id):
 		return FastTravel.text("no_zone")
 	if place_of(player_id) != ZonePresence.DOME:
@@ -4694,6 +4835,8 @@ func leave_zone(player_id: String = "") -> String:
 	var zone: String = place_of(player_id)
 	if zone == ZonePresence.FARM or zone == ZonePresence.DOME:
 		return "You are not in a zone."
+	if Shuttle.is_moon(zone):
+		return Shuttle.text("home_by_console_text")  # the way home is the hub's return shuttle
 	if rover_lent:
 		return FastTravel.text("use_the_mouth")  # the farm's rover is out: it comes home by the mouth
 	if depth_of(player_id) != 0 or rover_depth != 0:
@@ -4811,7 +4954,7 @@ func _local_in_tunnels() -> bool:
 func _guests_below() -> Array[String]:
 	var found: Array[String] = []
 	for who: Variant in player_places:
-		if str(who) != local_player_id and not place_of(str(who)) in [ZonePresence.DOME, ZonePresence.FARM]:
+		if str(who) != local_player_id and not place_of(str(who)) in [ZonePresence.DOME, ZonePresence.FARM] 				and not Shuttle.is_moon(place_of(str(who))):
 			found.append(str(who))
 	found.sort()
 	return found
@@ -4878,7 +5021,7 @@ func _carry_out_due(player_id: String) -> bool:
 		return false
 	if player_id == local_player_id:
 		return _host_below()
-	return player_places.has(player_id) and not place_of(player_id) in [ZonePresence.DOME, ZonePresence.FARM]
+	return player_places.has(player_id) and not place_of(player_id) in [ZonePresence.DOME, ZonePresence.FARM] 		and not Shuttle.is_moon(place_of(player_id))
 
 
 ## The crew carries these players out of the tunnels, all of them as one act: each

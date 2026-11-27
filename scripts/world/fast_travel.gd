@@ -51,6 +51,6 @@ static func arrival_plan(live: bool, depth: int, places: Array) -> String:
 static func destinations(lab_level: int, unlocked: Array) -> Array[Dictionary]:
 	var found: Array[Dictionary] = []
 	for id: StringName in ZoneData.ids():
-		if ZoneData.is_playable(id) and unlocked.has(String(id)):
+		if ZoneData.is_playable(id) and not Shuttle.is_moon(String(id)) and unlocked.has(String(id)):
 			found.append({ "id": String(id), "name": str(ZoneData.zone(id).get("name", id)), "warning": ZoneData.warning_text(id, lab_level) })
 	return found

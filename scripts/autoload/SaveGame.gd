@@ -168,7 +168,9 @@ func restore(data: Dictionary) -> String:
 	problem = GameState.farm_from_dict(data["farm"])
 	# Anything else, and a save from before this, opens the farm.
 	var in_tunnels: bool = GameState.rover_in_tunnels and str(data.get("scene")) == SceneSwitcher.TUNNELS_SCENE
-	open_scene = SceneSwitcher.TUNNELS_SCENE if in_tunnels else SceneSwitcher.FARM_SCENE
+	# A day trip still on when the save was made carries on at its moon's hub.
+	var on_a_moon: bool = GameState.shuttle_trips.has(GameState.local_player_id) 			and Shuttle.is_moon(GameState.place_of(GameState.local_player_id))
+	open_scene = SceneSwitcher.PHOBOS_SCENE if on_a_moon else (SceneSwitcher.TUNNELS_SCENE if in_tunnels else SceneSwitcher.FARM_SCENE)
 	return problem
 
 

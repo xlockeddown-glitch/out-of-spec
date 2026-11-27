@@ -1,7 +1,7 @@
 extends RefCounted
 ## Inspect text for placed props (data/props.json) and the scenes that use it.
 
-const SCENES: Array[String] = ["res://scenes/main_farm.tscn", "res://scenes/dome_interior.tscn"]
+const SCENES: Array[String] = ["res://scenes/main_farm.tscn", "res://scenes/dome_interior.tscn", "res://scenes/phobos_hub.tscn"]
 
 
 func _prop_ids() -> Array[String]:

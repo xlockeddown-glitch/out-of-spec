@@ -8,6 +8,7 @@ const FARM_SCENE: String = "res://scenes/main_farm.tscn"
 const TITLE_SCENE: String = "res://scenes/title_menu.tscn"
 const DOME_SCENE: String = "res://scenes/dome_interior.tscn"
 const TUNNELS_SCENE: String = "res://scenes/basalt_tunnels.tscn"
+const PHOBOS_SCENE: String = "res://scenes/phobos_hub.tscn"
 const FADE_SECONDS: float = 0.1  # each way; ~0.2 s total per the Week 2 board
 
 ## Where the dome's airlock leads: the farm or the tunnels, whichever was left.
@@ -24,6 +25,8 @@ func _ready() -> void:
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_fade)
+	GameState.shuttle_trips_changed.connect(reconcile_trip)
+	scene_swapped.connect(func(_path: String) -> void: reconcile_trip())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -38,6 +41,8 @@ func toggle_farm_dome() -> void:
 		return  # no farm is open yet
 	if CoopWalkers.on_foot():
 		return  # only the rover goes anywhere
+	if current != null and current.scene_file_path == PHOBOS_SCENE:
+		return  # the way home from a moon is the hub's return shuttle
 	var on_dome: bool = current != null and current.scene_file_path == DOME_SCENE
 	swap_to(exit_path() if on_dome else DOME_SCENE)
 
@@ -62,10 +67,28 @@ func swap_blocked(path: String, scene_path: String) -> bool:
 	return path != TITLE_SCENE and trip_holds_dome(scene_path)
 
 
-## Like swap_to, but after a swap in progress instead of not at all.
+## A guest's screen follows the host's word on its trip (the synced shuttle_trips), not
+## the answer to its booking, which can be lost: on a trip but still at the farm or the
+## dome, it goes to the moon's hub. The other way (a hub with no trip) is the hub's own
+## doing, which asks the host first. Returns the scene it set out for, or "".
+func reconcile_trip() -> String:
+	if not FarmCommands.guest:
+		return ""
+	var current: Node = get_tree().current_scene
+	var to: String = Shuttle.hub_to_join(GameState.shuttle_trips.get(GameState.local_player_id), current.scene_file_path if current != null else "")
+	if to != "":
+		go_to(to)
+	return to
+
+
+## Like swap_to, but after a swap in progress instead of not at all; nothing if that swap
+## (or an earlier go_to) already brought this screen to `path`, so two asks load it once.
 func go_to(path: String) -> void:
 	while _busy:
 		await scene_swapped
+	var current: Node = get_tree().current_scene
+	if current != null and current.scene_file_path == path:
+		return
 	swap_to(path)
 
 
