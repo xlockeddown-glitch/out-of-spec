@@ -147,7 +147,7 @@ func _ready() -> void:
 	_bram_bay.rover_entered.connect(_on_rover_entered_bay)
 	_bram_bay.rover_exited.connect(_on_rover_exited_bay)
 	_cal_pad.rover_entered.connect(_on_rover_entered_cal_pad)
-	_tunnel_pad.rover_entered.connect(func() -> void: _hud.push_log("TUNNEL MOUTH: press E to enter."))
+	_tunnel_pad.rover_entered.connect(func() -> void: _hud.push_log("TUNNEL MOUTH: press " + Controls.prompt(&"interact") + " to enter."))
 	_tunnel_pad.rover_exited.connect(func() -> void: _tunnel_warned_day = -1)
 	_hud.trade_pressed.connect(_try_trade)
 	_hud.wheel_service_pressed.connect(_try_wheel_service)
@@ -164,6 +164,8 @@ func _ready() -> void:
 	# Replay the persistent phone log first, so fresh SYS lines land on top of it.
 	for line: String in GameState.phone_log.slice(-LOG_REPLAY_LINES):
 		_hud.push_log(line)
+	# Once per game run, and not saved: a line that points to the controls guide.
+	Controls.tell_once(_hud)
 	var relay_name: String = _rover.satellite_relay.relay_name if _rover.satellite_relay else "NO RELAY"
 	_hud.configure(relay_name, _rover.steering.mpe, _rover.steering.acceptance_ratio)
 	_walkers = FarmWalkers.new()
@@ -184,6 +186,7 @@ func _ready() -> void:
 	_hud.get_parent().add_child(pause)
 	_hud.get_parent().move_child(pause, 0)
 	_hud.get_parent().add_child(SkillsUI.new())
+	_hud.get_parent().add_child(ControlsGuideUI.new())
 	_hud.get_parent().add_child(QuestsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())
 	_hud.get_parent().add_child(ActionsMenuUI.new(ActionsMenuUI.farm_actions()))
@@ -798,7 +801,7 @@ func _on_rover_entered_cal_pad() -> void:
 	var names: PackedStringArray = []
 	for id: String in offered:
 		names.append(GameState.instrument_name(id).to_lower())
-	var line: String = "FIELD CAL PAD: press E to calibrate %s." % " and ".join(names)
+	var line: String = "FIELD CAL PAD: press " + Controls.prompt(&"interact") + " to calibrate %s." % " and ".join(names)
 	if not GameState.is_in_service(GameState.TIRE_ID):
 		line += " The tire gauge needs the WD-1 reference gauge. Bram sells it."
 	_hud.push_log(line)
@@ -854,12 +857,12 @@ func _on_rover_entered_bay() -> void:
 	else:
 		_bram_line = "Bring me %d crystal ore and I'll bolt wider treads onto your tractor. Carrying %d." % [cost, GameState.crystal_ore]
 	if not GameState.harvest_bin.is_empty():
-		_hud.push_log("LIN: %s crops in your bin, %s CR for the lot. Press L to sell." % [
-			SP811.integer(GameState.harvest_bin.size()), SP811.integer(GameState.harvest_bin_value())])
+		_hud.push_log("LIN: %s crops in your bin, %s CR for the lot. Press %s to sell." % [
+			SP811.integer(GameState.harvest_bin.size()), SP811.integer(GameState.harvest_bin_value()), Controls.prompt(&"sell_lin")])
 	if GameState.owned_standards.has("torque_standard") or not GameState.robots.is_empty():
-		_hud.push_log("BRAM: robots are built here. Press T.")
+		_hud.push_log("BRAM: robots are built here. Press " + Controls.prompt(&"open_robots") + ".")
 	if GameState.wheels_due():
-		_hud.push_log("BRAM: wheel nuts are due a re-torque. Press Y.")
+		_hud.push_log("BRAM: wheel nuts are due a re-torque. Press " + Controls.prompt(&"wheel_service") + ".")
 	_refresh_bram()
 
 
@@ -1069,7 +1072,7 @@ func _enter_tunnels() -> void:
 	var warning: String = "" if refused else ZoneData.warning_text(TUNNELS_ZONE, GameState.lab_level())
 	if warning != "" and _tunnel_warned_day != int(GameClock.elapsed_days):
 		_tunnel_warned_day = int(GameClock.elapsed_days)
-		_hud.push_log("TUNNEL MOUTH: %s Press E again to go in, or drive off the pad to stay." % warning)
+		_hud.push_log("TUNNEL MOUTH: %s Press %s again to go in, or drive off the pad to stay." % [warning, Controls.prompt(&"interact")])
 		return
 	_tunnel_warned_day = -1
 	_moving = true

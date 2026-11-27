@@ -75,6 +75,21 @@ static func scaled(base: float) -> float:
 	return roundf(base * PHONE_SCALE)
 
 
+## The key or button in each button's brackets follows the device in use.
+var _keys_device: int = -1
+
+
+func _process(_delta: float) -> void:
+	if int(Controls.last_device) != _keys_device:
+		_refresh_keys()
+
+
+func _refresh_keys() -> void:
+	_keys_device = int(Controls.last_device)
+	_zero_button.text = "ZERO STEERING  [%s]" % Controls.prompt(&"rover_zero_steering")
+	_dome_button.text = "ENTER DOME  [%s]" % Controls.prompt(&"swap_scene")
+
+
 ## A font size at the phone's scale.
 static func scaled_font(base: int) -> int:
 	return roundi(base * PHONE_SCALE)
@@ -82,6 +97,7 @@ static func scaled_font(base: int) -> int:
 
 func _ready() -> void:
 	anchor_left = LEFT_ANCHOR
+	_refresh_keys()
 	_scale_scene_nodes(self)
 	_zero_button.pressed.connect(func() -> void: zero_steering_pressed.emit())
 	_slot_spool_button.pressed.connect(func() -> void: slot_spool_pressed.emit())
@@ -252,13 +268,13 @@ func show_bram(line: String, cost: int, ore: int, owned: bool) -> void:
 		_trade_button.text = "WIDE TREADS FITTED"
 		_trade_button.disabled = true
 	else:
-		_trade_button.text = "TRADE %d ORE: WIDE TREADS  [E]" % cost
+		_trade_button.text = "TRADE %d ORE: WIDE TREADS  [%s]" % [cost, Controls.prompt(&"interact")]
 		_trade_button.disabled = ore < cost
 
 
 ## Bram's wheel service, under his trade: one press when the nuts are due.
 func show_wheel_service(text: String, due: bool) -> void:
-	_wheels_button.text = text + ("  [Y]" if due else "")
+	_wheels_button.text = text + ("  [%s]" % Controls.prompt(&"wheel_service") if due else "")
 	_wheels_button.disabled = not due
 
 

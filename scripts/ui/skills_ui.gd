@@ -31,7 +31,7 @@ func _ready() -> void:
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override(&"separation", 4)
 	column.add_child(_rows)
-	_close_button = PlanBoardUI._button("CLOSE  (K or Esc)")
+	_close_button = PlanBoardUI._button("CLOSE  (%s or %s)" % [Controls.key_label(&"open_skills"), Controls.key_label(&"ui_cancel")])
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_close_button.pressed.connect(hide)
 	column.add_child(_close_button)

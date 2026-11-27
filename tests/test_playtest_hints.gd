@@ -45,7 +45,7 @@ func test_the_sentinel_rules_are_told_once_per_sighting() -> String:
 		var hint: String = GameStateScript.SENTINEL_HINT
 		if farm.phone_log != [hint]:
 			return "One line, once: %s" % [farm.phone_log]
-		if not "Lights low (L)" in hint or not "creep" in hint or not "stop short" in hint or "m/s" in hint:
+		if not "Lights low" in hint or not "creep" in hint or not "stop short" in hint or "m/s" in hint:
 			return "Wrong words, and no speed readout: " + hint
 		# It bolts for lights; the next sighting is a new one.
 		farm.rover_lights = true

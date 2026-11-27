@@ -27,12 +27,13 @@ const ENTRIES: Array[Dictionary] = [
 	{ "action": &"open_quests", "label": "QUESTS" },
 	{ "action": &"open_skills", "label": "SKILLS" },
 	{ "action": &"open_coop", "label": "CO-OP" },
+	{ "action": &"open_controls", "label": "CONTROLS" },
 ]
 ## Bram's standards: one entry for each in his catalog, at the bay.
 const BUY_ACTIONS: Array[StringName] = [
 	&"buy_1", &"buy_2", &"buy_3", &"buy_4", &"buy_5", &"buy_6", &"buy_7", &"buy_8", &"buy_9"]
 ## What the dome and the tunnels have: no farm verbs there.
-const PANEL_ACTIONS: Array[StringName] = [&"open_quests", &"open_skills", &"open_coop"]
+const PANEL_ACTIONS: Array[StringName] = [&"open_quests", &"open_skills", &"open_coop", &"open_controls"]
 
 ## The actions this scene offers.
 var offered: Array[StringName] = []

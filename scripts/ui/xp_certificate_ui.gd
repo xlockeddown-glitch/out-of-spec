@@ -90,7 +90,7 @@ func _ready() -> void:
 	column.add_child(_rows)
 	_note = PlanBoardUI._label("", DIM, 16)
 	column.add_child(_note)
-	_close_button = PlanBoardUI._button("BACK  (Esc)")
+	_close_button = PlanBoardUI._button("BACK  (%s)" % Controls.key_label(&"ui_cancel"))
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_close_button.pressed.connect(step_back)
 	column.add_child(_close_button)

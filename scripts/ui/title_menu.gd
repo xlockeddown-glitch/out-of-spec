@@ -142,7 +142,7 @@ func _start_new() -> void:
 func _show_join() -> void:
 	_main_buttons.visible = false
 	_join_buttons.visible = true
-	_note.text = "Your friend opens their farm, presses F7 and hosts it. Your own saved farm is not touched."
+	_note.text = "Your friend opens their farm, presses %s and hosts it. Your own saved farm is not touched." % Controls.key_label(&"open_coop")
 	_set_joining(false)
 	_address.grab_focus()
 

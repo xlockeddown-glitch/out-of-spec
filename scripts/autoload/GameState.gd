@@ -146,7 +146,7 @@ const SENTINEL_CALM_MPS: float = 3.5
 const SENTINEL_CROWDED_M: float = 1.8
 const SENTINEL_REACH_M: float = 4.0
 ## Told once when it is first in sight; the numbers are the ones above.
-const SENTINEL_HINT: String = "SENTINEL: Lights low (L), creep, stop short."
+const SENTINEL_HINT: String = "SENTINEL: Lights low, creep, stop short."
 ## The chance on its first morning, and again for each morning it isn't met. [PLACEHOLDER]
 const SENTINEL_CHANCE: float = 0.10
 ## How far the cup's relative humidity may really be from its ideal. [PLACEHOLDER]
@@ -570,6 +570,11 @@ func _set_up_farm(p_seed: int) -> void:
 	credits = int(DataManager.get_number(ECONOMY_TABLE, "starting_credits", 0.0))
 	reset_credibility()
 	_post_morning_dispatch(1)  # day 1 is already under way at boot
+
+
+func _input(event: InputEvent) -> void:
+	# Which device the player uses last, for the on-screen key names (Controls).
+	Controls.note_event(event)
 
 
 func _unhandled_input(event: InputEvent) -> void:

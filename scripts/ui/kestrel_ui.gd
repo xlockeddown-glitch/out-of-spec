@@ -39,7 +39,7 @@ func _ready() -> void:
 	column.add_child(_rows)
 	_result = PlanBoardUI._label("", AMBER, 20)
 	column.add_child(_result)
-	_close_button = PlanBoardUI._button("CLOSE  (Esc)")
+	_close_button = PlanBoardUI._button("CLOSE  (%s)" % Controls.key_label(&"ui_cancel"))
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_close_button.pressed.connect(hide)
 	column.add_child(_close_button)

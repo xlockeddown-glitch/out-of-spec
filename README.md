@@ -86,11 +86,14 @@ Open `project.godot` in Godot 4.7 and press F5. The farm saves each morning and 
 | K | Skills panel |
 | O | Quests panel |
 | F7 | Co-op panel (host or see who is here) |
+| F1 | Controls guide: every verb in plain English, grouped, with its key and its pad button. F1 or Esc closes it. On a pad: LB + RB, then CONTROLS |
 | Esc | Close a panel |
 | F9 (debug builds) | Skip to the next morning |
 | Tab, airlock, or ENTER DOME | Swap farm <-> dome |
 | Click (dome) | Bench calibration, terrarium info, collect silk spool |
 | INSTALL SILK SPOOL (phone) | Slot a spool into the relay (cuts uplink lag); a whole one may replace a damaged one |
+
+The on-screen prompts name the key, or the Xbox button once you use a pad (read from the Input Map, so they follow it). The game tells you about F1 once when the farm opens.
 
 Week 2 loop: dome hygrometer starts out of tolerance -> calibrate at the bench -> molt fills (20 s) -> collect spool -> farm -> install spool -> lower lag.
 

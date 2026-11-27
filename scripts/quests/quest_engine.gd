@@ -473,7 +473,7 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 			if (is_daily(quest) or not farm.has_had_xp_certificate(str(quest["id"]), player)) and farm.give_xp_certificate(player, str(quest["id"]), certificate) != "":
 				given += 1
 	if given > 0:
-		farm.post_phone("XP CERTIFICATE: %s XP in a skill of your choice, for each player who took part. Open SKILLS (K) to spend it." % SP811.integer(certificate))
+		farm.post_phone("XP CERTIFICATE: %s XP in a skill of your choice, for each player who took part. Open SKILLS to spend it." % SP811.integer(certificate))
 	# One each for a reward of a player, one for the farm for the farm's: held
 	# until the action it is for uses it (GameState.give_one_use).
 	var one_use: String = str(rewards.get(ONE_USE, ""))
