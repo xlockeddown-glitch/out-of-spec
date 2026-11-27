@@ -11,6 +11,10 @@ Gave the Abandoned Colony Mine (`scripts/world/colony_mine.gd`, `scripts/world/m
 - **Hub & depth 1 dressing (`ColonyMine`):** added a zero-collision `MineDecor` node holding old timber sets along the hub passages and depth 1 trunk (`span_m = 7.8` / `5.4`, `height_m = 3.0` / `2.9`), flush abandoned steel rail tracks with timber sleepers and a bent end (`RAIL_GAUGE_M = 0.90`, `SLEEPER_STEP_M = 0.75`), dead unlit hanging lamps on the timber caps (no `OmniLight3D`, no emission), and faded colony stencil signs (`COLONY MINE 01`, `LEVEL 01 DRIFT`) flat against the passage walls. Restyled `PropCrate`, `NoticeSign` trim, unshored rubble piles, and shored timber arches via `MineLook` while preserving all node names, positions, labels, and interaction ranges.
 - **Tests:** `tests/test_mine_look.gd` checks `MineLook` builders (zero collision, dead lamp has no light), full `colony_mine.tscn` hub and depth 1 builds, and verifies `basalt_tunnels.tscn` (Lava Tubes) does not receive the mine look or mutated `TunnelLook` materials.
 
+## 2026-11-27: Service tunnel walker follows loadout changes (fix/tunnel-walker-loadout)
+
+Connected `GameState.loadouts_changed` in `PhobosServiceTunnel` (`scripts/world/phobos_service_tunnel.gd`) to `_dress_walker()` (matching `PhobosHub`) so the walker's suit and loadout update live when loadouts change in the tunnel, and disconnected it in `_exit_tree()`. Added a regression test in `tests/test_phobos_service_tunnel.gd`.
+
 ## 2026-11-27: UI restyle, part 2 (feat/ui-restyle-2)
 
 Moved `PauseUI` (`scripts/ui/pause_ui.gd`), `TitleMenu` (`scripts/ui/title_menu.gd`), `SkillsUI` (`scripts/ui/skills_ui.gd`), and `XpCertificateUI` (`scripts/ui/xp_certificate_ui.gd`) onto `ScopeTheme` (Meridiani Scope putty shell, terracotta header bar, recessed dark glass, and chunky putty buttons). Looks only — all button order, callbacks, signals, focus handling, node/field names, texts, and open/close rules are unchanged. Every new size and colour choice below is a [PLACEHOLDER]:
