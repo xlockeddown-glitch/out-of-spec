@@ -87,6 +87,7 @@ func _ready() -> void:
 	_airlock.verb = VERB_AIRLOCK
 	_plan_board.verb = VERB_PLAN_BOARD
 	_spool.verb = VERB_SPOOL
+	_sentinel_tank.spool_pickup.verb = VERB_SPOOL
 	_verb_prompt = VerbPrompt.new()
 	$UI.add_child(_verb_prompt)
 	_bench.clicked.connect(_bench_ui.open)
@@ -184,10 +185,12 @@ func _refresh_prompts() -> void:
 ## The "[A] verb" label over the clickable the pad has picked (the mouse clicks, so
 ## it has no key to show); hidden when nothing is picked or a panel is open.
 func _update_verb_prompt() -> void:
-	if _pad_pick == null or not _pad_pick_valid():
+	# _process has just cleared an invalid pick. The airlock does nothing mid-travel.
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if _pad_pick == null or camera == null or (_pad_pick == _airlock and FastTravel.pending):
 		_verb_prompt.clear()
 		return
-	_verb_prompt.point_at(_screen_point(_pad_pick), VerbPrompt.verb_of(_pad_pick))
+	_verb_prompt.point_at(camera.unproject_position(_pick_point(_pad_pick)), VerbPrompt.verb_of(_pad_pick))
 
 
 func _name_of(item: Clickable) -> String:
@@ -220,14 +223,16 @@ func _pad_pick_valid() -> bool:
 	return _pad_pick != null and is_instance_valid(_pad_pick) and _pickable(_pad_pick)
 
 
-func _screen_point(item: Clickable) -> Vector2:
-	var camera: Camera3D = get_viewport().get_camera_3d()
-	var at: Vector3 = item.global_position
+func _pick_point(item: Clickable) -> Vector3:
 	for child: Node in item.get_children():
 		if child is CollisionShape3D:
-			at = (child as CollisionShape3D).global_position
-			break
-	return camera.unproject_position(at) if camera != null else Vector2.ZERO
+			return (child as CollisionShape3D).global_position
+	return item.global_position
+
+
+func _screen_point(item: Clickable) -> Vector2:
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	return camera.unproject_position(_pick_point(item)) if camera != null else Vector2.ZERO
 
 
 ## The usable clickable nearest in `direction` (screen space) from the pick, or
