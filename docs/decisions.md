@@ -2265,5 +2265,5 @@ Ryan: redo the phone UI to be similar to the Meridian style, not an exact replic
 - Its own device, not a copy of the bench: a rounded putty case with a terracotta edge and a terracotta band across the top, dark #1D222B glass inside, small putty keys. New ScopeTheme variations ScopePhoneCase, ScopePhoneGlass, ScopePhoneBand, ScopePhoneKey; the bench and the quest board look as before.
 - Same layout, rows, wording, keys and signals as before (Ryan liked the old phone). The earlier PR 127 look (metal case, needle gauge, message cards) stays out. The drift reading now sits on one Scope card.
 - The key hints still follow Controls.shown_pad (the brackets show the pad button on a pad); no separate pad badge was added, since the phone's keys are not focus targets.
-- Size is unchanged: PHONE_SCALE 0.8, the phone still starts at LEFT_ANCHOR (0.7952, 1527 px of 1920) and the case is the same 456 x 1040 px at 1080p.
+- Size is unchanged: PHONE_SCALE 0.8, the phone still starts at LEFT_ANCHOR (0.744, 1428 px of 1920) and the case is the same 460 x 1048 px at 1080p.
 - Colours: green terminal text became Scope ink (white), muted captions (INK_MUTED) and teal for good states; amber and red keep their meaning. Nothing is saved or sent.

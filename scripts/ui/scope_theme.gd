@@ -138,15 +138,20 @@ static func _build() -> Theme:
 	for kind: StringName in [&"OptionButton", &"CheckButton"]:
 		_button_styles(t, kind, GLASS_CARD, GLASS_LINE, INK, INK_DIM)
 	t.set_color(&"font_color", &"CheckButton", INK)
-	# The drop-down list.
 	t.set_type_variation(PHONE_KEY, &"Button")
 	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
-		var key: StyleBoxFlat = (t.get_stylebox(state, &"Button") as StyleBoxFlat).duplicate()
+		var key: StyleBoxFlat = (t.get_stylebox(state, &"Button") as StyleBoxFlat).duplicate() as StyleBoxFlat
 		key.content_margin_left = 8
 		key.content_margin_right = 8
 		key.content_margin_top = 6
 		key.content_margin_bottom = 6
+		# Thin edges to match the small margins [PLACEHOLDER].
+		key.border_width_top = 2
+		key.border_width_left = 2
+		key.border_width_right = 2
+		key.border_width_bottom = 2 if state == &"pressed" else 3 if state == &"disabled" else 4
 		t.set_stylebox(state, PHONE_KEY, key)
+	# The drop-down list.
 	t.set_stylebox(&"panel", &"PopupMenu", box(GLASS_DEEP, TEAL, 2, 6, 6))
 	t.set_stylebox(&"hover", &"PopupMenu", box(Color(TEAL, 0.25), TEAL, 0, 4, 4))
 	t.set_color(&"font_color", &"PopupMenu", INK)

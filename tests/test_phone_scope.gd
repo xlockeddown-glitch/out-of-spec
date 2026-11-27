@@ -19,8 +19,8 @@ func _free(hud: FieldPhoneHUD) -> void:
 func test_the_phone_uses_the_scope_theme() -> String:
 	var hud: FieldPhoneHUD = _hud()
 	var problem: String = ""
-	var case_box: StyleBoxFlat = hud.get_node("Bezel").get_theme_stylebox("panel")
-	var glass_box: StyleBoxFlat = hud.get_node("Bezel/Screen").get_theme_stylebox("panel")
+	var case_box := (hud.get_node("Bezel") as Control).get_theme_stylebox("panel") as StyleBoxFlat
+	var glass_box := (hud.get_node("Bezel/Screen") as Control).get_theme_stylebox("panel") as StyleBoxFlat
 	var band: PanelContainer = hud.get_node("Band")
 	if hud.theme != ScopeTheme.theme():
 		problem = "The phone must carry the Scope theme."
@@ -30,8 +30,10 @@ func test_the_phone_uses_the_scope_theme() -> String:
 		problem = "The screen must be the dark Scope glass."
 	elif (band.get_theme_stylebox("panel") as StyleBoxFlat).bg_color != ScopeTheme.TERRA:
 		problem = "The band across the top must be terracotta."
-	elif not (hud._zero_button.get_theme_stylebox("normal") as StyleBoxFlat).bg_color.is_equal_approx(ScopeTheme.ENAMEL_INSET):
-		problem = "The keys must be putty."
+	elif hud._zero_button.theme_type_variation != ScopeTheme.PHONE_KEY 			or (hud._zero_button.get_theme_stylebox("normal") as StyleBoxFlat).content_margin_left != 8.0:
+		problem = "The keys must be the small phone keys."
+	elif (hud._zero_button.get_theme_stylebox("normal") as StyleBoxFlat).border_width_bottom > 4:
+		problem = "The phone keys' bottom edge must fit their small margins."
 	_free(hud)
 	return problem
 
@@ -56,7 +58,7 @@ func test_every_row_the_phone_showed_is_still_there() -> String:
 		"spools": hud._spool_label.text, "ore": hud._ore_label.text, "cred": hud._credibility_label.text,
 		"gauge": hud._gauge_label.text, "lights": hud._lights_label.text, "log": hud._log_label.text,
 		"title": (hud.get_node("Bezel/Screen/Content/Title") as Label).text,
-		"caption": (hud.get_node("Bezel/Screen/DriftCard").get_child(0).get_child(0) as Label).text,
+		"caption": ((hud.get_node("Bezel/Screen/Content/DriftCard") as Control).get_child(0).get_child(0) as Label).text,
 	}
 	var want: Dictionary = {
 		"clock": "DAY 3  09:40", "credits": "1 240 CR", "relay": "SAT-RELAY", "link": "LOS CLEAR",
@@ -89,22 +91,42 @@ func test_bram_and_the_jobs_keep_their_rows_and_work() -> String:
 	hud.trade_pressed.connect(func() -> void: pressed.append("trade"))
 	hud.zero_steering_pressed.connect(func() -> void: pressed.append("zero"))
 	hud.buy_standard_pressed.connect(func(id: String) -> void: pressed.append(id))
+	hud.wheel_service_pressed.connect(func() -> void: pressed.append("wheels"))
+	hud.accept_job_pressed.connect(func(i: int) -> void: pressed.append("job%d" % i))
+	hud._process(0.0)
+	var zero_key: String = "[%s]" % Controls.short_prompt(&"rover_zero_steering")
 	hud.show_bram("Treads for ore.", 6, 9, false)
 	hud.show_standards([{"id": "a", "text": "BUY A", "disabled": false}] as Array[Dictionary], "")
 	hud.show_wheel_service("Wheel nuts due", true)
+	hud.show_jobs(PackedStringArray(["Dome seal check"]), [{"text": "Recal", "disabled": false}] as Array[Dictionary], "")
+	hud.set_molt("MOLT: DUE")
 	var problem: String = ""
+	var accept: Button = hud._jobs_box.get_child(1) as Button
 	if not hud._bram_panel.visible or hud._bram_label.text != "BRAM: Treads for ore.":
 		problem = "Bram's line must show."
-	elif not hud._trade_button.text.begins_with("TRADE 6 ORE: WIDE TREADS"):
+	elif hud._trade_button.text != "TRADE 6 ORE: WIDE TREADS  [%s]" % Controls.short_prompt(&"interact"):
 		problem = "Bram's trade key changed: %s" % hud._trade_button.text
+	elif hud._zero_button.text != "ZERO STEERING  " + zero_key:
+		problem = "The zero key must end in its prompt: %s" % hud._zero_button.text
 	elif (hud._standards_box.get_child(0) as Button).theme_type_variation != ScopeTheme.PHONE_KEY:
 		problem = "Bram's stock must be phone keys."
+	elif hud._wheels_button.text != "Wheel nuts due  [%s]" % Controls.short_prompt(&"wheel_service") 			or hud._wheels_button.theme_type_variation != ScopeTheme.PHONE_KEY:
+		problem = "The wheel key changed: %s" % hud._wheels_button.text
+	elif not hud._molt_label.visible or hud._molt_label.text != "MOLT: DUE":
+		problem = "The molt row must show its text."
+	elif (hud._jobs_box.get_child(0) as Label).text != "Dome seal check" or accept.text != "ACCEPT Recal" 			or accept.theme_type_variation != ScopeTheme.PHONE_KEY:
+		problem = "The job list changed."
 	else:
 		hud._trade_button.pressed.emit()
 		hud._zero_button.pressed.emit()
 		(hud._standards_box.get_child(0) as Button).pressed.emit()
-		if pressed != ["trade", "zero", "a"]:
+		hud._wheels_button.pressed.emit()
+		accept.pressed.emit()
+		if pressed != ["trade", "zero", "a", "wheels", "job0"]:
 			problem = "Keys must still send their signals: %s" % [pressed]
+	hud.show_jobs(PackedStringArray(), [] as Array[Dictionary], "No offers today")
+	if problem == "" and ((hud._jobs_box.get_child(0) as Label).text != "No offers today" 			or (hud._jobs_box.get_child(0) as Label).get_theme_color("font_color") != ScopeTheme.INK_MUTED):
+		problem = "The jobs note must be a muted caption."
 	hud.hide_bram()
 	if problem == "" and hud._bram_panel.visible:
 		problem = "Leaving Bram's bay must hide his panel."

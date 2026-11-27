@@ -139,7 +139,6 @@ func _ready() -> void:
 	_credibility_label = Label.new()
 	_credibility_label.name = "CredibilityLabel"
 	_credibility_label.add_theme_font_size_override("font_size", scaled_font(16))
-	_credibility_label.add_theme_color_override("font_color", COLOR_OK)
 	# A long contract line wraps rather than widening the phone off the screen.
 	_credibility_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var clock_row: Node = _credits_label.get_parent()
@@ -176,11 +175,11 @@ func _ready() -> void:
 func _style_case() -> void:
 	var bezel: PanelContainer = $Bezel
 	var screen: PanelContainer = $Bezel/Screen
-	var case_box: StyleBoxFlat = theme.get_stylebox(&"panel", ScopeTheme.PHONE_CASE).duplicate()
+	var case_box := theme.get_stylebox(&"panel", ScopeTheme.PHONE_CASE).duplicate() as StyleBoxFlat
 	case_box.set_content_margin(SIDE_TOP, 40.0)
 	case_box.set_content_margin(SIDE_BOTTOM, 40.0)
 	bezel.add_theme_stylebox_override(&"panel", case_box)
-	screen.add_theme_stylebox_override(&"panel", theme.get_stylebox(&"panel", ScopeTheme.PHONE_GLASS).duplicate())
+	screen.add_theme_stylebox_override(&"panel", theme.get_stylebox(&"panel", ScopeTheme.PHONE_GLASS).duplicate() as StyleBoxFlat)
 	var band := PanelContainer.new()
 	band.name = "Band"
 	band.theme_type_variation = ScopeTheme.PHONE_BAND
@@ -397,15 +396,18 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 	for child: Node in _jobs_box.get_children():
 		_jobs_box.remove_child(child)
 		child.queue_free()
-	var lines: PackedStringArray = active.duplicate()
-	if offers.is_empty() and note != "":
-		lines.append(note)
-	if not lines.is_empty():
+	# Accepted jobs are a plain readout (ink); the note is a muted caption.
+	var shown: Array[Array] = [[("\n".join(active) if not active.is_empty() else ""), false],
+		[(note if offers.is_empty() else ""), true]]
+	for entry: Array in shown:
+		if str(entry[0]) == "":
+			continue
 		var label := Label.new()
-		label.text = "\n".join(lines)
+		label.text = str(entry[0])
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.add_theme_font_size_override("font_size", scaled_font(14))
-		label.add_theme_color_override("font_color", COLOR_OK)
+		if bool(entry[1]):
+			label.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
 		_jobs_box.add_child(label)
 	# Offers you can accept come first; `index` stays the board's own.
 	var order: Array[int] = []

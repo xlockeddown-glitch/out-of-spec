@@ -22,11 +22,9 @@ offset_right = -20.0
 offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_type_variation = &"ScopePhoneCase"
 
 [node name="Screen" type="PanelContainer" parent="Bezel"]
 layout_mode = 2
-theme_type_variation = &"ScopePhoneGlass"
 
 [node name="Content" type="VBoxContainer" parent="Bezel/Screen"]
 layout_mode = 2
@@ -35,6 +33,7 @@ theme_override_constants/separation = 14
 [node name="Title" type="Label" parent="Bezel/Screen/Content"]
 layout_mode = 2
 theme_type_variation = &"ScopeTitle"
+theme_override_constants/outline_size = 0
 theme_override_font_sizes/font_size = 26
 text = "FIELD PHONE // UPLINK"
 
@@ -185,7 +184,6 @@ text = "ORE 0   "
 [node name="SpoolLabel" type="Label" parent="Bezel/Screen/Content/RelayRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_type_variation = &"ScopeCaption"
 theme_override_font_sizes/font_size = 18
 text = "SILK SPOOLS 0"
 
