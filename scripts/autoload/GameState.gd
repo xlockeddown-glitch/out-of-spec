@@ -4630,7 +4630,7 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 	var going_down: bool = target_depth > rover_depth
 	var down_at: Vector3 = AquiferDepth.hatch_position() if aquifer else ZoneDepth.descent_position(rover_depth)
 	var there: Vector3 = down_at if going_down else ZoneDepth.ascent_position()
-	reason = _rover_reach_problem(there)
+	reason = _rover_reach_problem(there, rover_zone)
 	if reason != "":
 		return reason
 	var pose: Transform3D = ZoneDepth.arrival_pose(target_depth, going_down, false)
@@ -4646,7 +4646,7 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 ## tunnels at the rover's depth; or, while someone drives, that player. Returns "" or why.
 func _rover_trip_problem(player_id: String) -> String:
 	if not rover_zone in [TUNNELS_ZONE, AquiferDepth.ZONE]:
-		return "The rover is not in the Lava Tubes."
+		return "The rover is not in a zone."
 	var driver: String = CoopRovers.driver(TUNNEL_ROVER)
 	if driver == "":
 		var here: bool = place_of(player_id) == rover_zone and depth_of(player_id) == rover_depth
@@ -4661,9 +4661,10 @@ func _rover_trip_problem(player_id: String) -> String:
 ## what a guest's driver told, this screen's own live rover, or the kept pose), or "".
 ## No SaveGame.saving here: it would make a screen whose rover has not caught up yet
 ## overwrite the pose a guest has driven to.
-func _rover_reach_problem(there: Vector3) -> String:
+## `want` is the zone the move is for; only change_depth passes the Aquifer.
+func _rover_reach_problem(there: Vector3, want: String = TUNNELS_ZONE) -> String:
 	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
-	return ZoneDepth.reach_problem(there, rover_zone, at != null, at if at != null else Vector3.ZERO)
+	return ZoneDepth.reach_problem(there, rover_zone, at != null, at if at != null else Vector3.ZERO, want)
 
 
 ## Host: puts the rover at `target_depth` at `pose` and tells everyone.
@@ -4737,6 +4738,8 @@ func use_lift(target_depth: int, player_id: String = "") -> String:
 	var reason: String = _rover_trip_problem(player_id)
 	if reason != "":
 		return reason
+	if rover_zone != TUNNELS_ZONE:
+		return "There is no lift here."
 	var target: int = 0
 	if rover_depth == 0:
 		target = repaired_lift_depth(TUNNELS_ZONE)
@@ -5746,7 +5749,7 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 ## buy_problem). One pump for the whole farm, paid once from the shared wallet.
 func buy_pump(player_id: String = "") -> String:
 	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
-	var near: bool = rover_zone == AquiferDepth.ZONE and at != null and AquiferDepth.near_crate(at)
+	var near: bool = rover_zone == AquiferDepth.ZONE and rover_depth == 0 and at != null and AquiferDepth.near_crate(at)
 	var here: String = place_of(player_id) if rover_zone == AquiferDepth.ZONE else ""
 	var reason: String = AquiferDepth.buy_problem(here, depth_of(player_id), pump_owned, credits, near)
 	if reason != "":

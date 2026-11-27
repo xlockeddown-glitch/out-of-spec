@@ -134,9 +134,10 @@ func test_deep_water_stops_the_rover_and_a_drained_pool_does_not() -> String:
 	var cell: Vector2i = (deep["rect"] as Rect2i).position
 	if full["grid"][cell.y][cell.x] != "w" or dry["grid"][cell.y][cell.x] != ".":
 		return "A deep pool is water (w) until it is pumped dry."
-	# The rover's rule: only . A B hold it.
-	if ".AB".contains("w"):
-		return "Water must not be floor."
+	# The rover's own rule (the host's hold): deep water does not hold it, drained floor does.
+	var middle: Vector3 = TunnelRock.at_in(full["grid"], cell)
+	if TunnelRock.holds_in(full["grid"], middle) or not TunnelRock.holds_in(dry["grid"], middle):
+		return "Deep water must stop the rover and a drained pool must hold it."
 	var stand: int = 0
 	for pool: Dictionary in full["pools"]:
 		var rect: Rect2i = pool["rect"]
@@ -577,4 +578,47 @@ func test_zone_presence_accepts_depth_one_in_the_aquifer() -> String:
 			return "Depth %d in the Aquifer was refused: %s" % [depth, ZonePresence.place_problem(ZONE, depth)]
 	if ZonePresence.place_problem(ZONE, 2) == "":
 		return "Depth 2 in the Aquifer was accepted: there is none."
+	return ""
+
+
+# --- The hatch and the lift ---------------------------------------------------------
+
+func test_the_hatch_takes_the_rover_down_and_back_up() -> String:
+	var problems: Array[String] = []
+	var run: String = _at(10.5, func() -> String:
+		var gs: GameStateScript = _state()
+		_rover_at(gs, 0, AquiferDepth.hatch_position())
+		var why: String = gs.change_depth(1, HOST)
+		if why != "" or gs.rover_depth != 1:
+			problems.append("The hatch must take the rover down: '%s', depth %d." % [why, gs.rover_depth])
+		gs.player_places[HOST] = [ZONE, 1]
+		gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.ascent_position())
+		if gs.change_depth(2, HOST) == "" or gs.rover_depth != 1:
+			problems.append("The Aquifer has no depth 2.")
+		why = gs.change_depth(0, HOST)
+		if why != "" or gs.rover_depth != 0:
+			problems.append("The way up must bring the rover back: '%s', depth %d." % [why, gs.rover_depth])
+		var back: Vector3 = (gs.rover_transforms[gs.TUNNEL_ROVER] as Transform3D).origin
+		if Vector2(back.x - AquiferDepth.hatch_position().x, back.z - AquiferDepth.hatch_position().z).length() > TunnelRock.CELL_M * 1.5:
+			problems.append("The rover must come up beside the hatch.")
+		gs.free()
+		var far: GameStateScript = _state()
+		_rover_at(far, 0, AquiferDepth.hatch_position() + Vector3(30.0, 0.0, 0.0))
+		if far.change_depth(1, HOST) == "" or far.rover_depth != 0:
+			problems.append("The hatch worked from across the hub.")
+		far.free()
+		return "")
+	return run if run != "" else "
+".join(problems)
+
+
+func test_the_lava_lift_is_refused_in_the_aquifer() -> String:
+	var gs: GameStateScript = _state()
+	_rover_at(gs, 0, AquiferDepth.hatch_position())
+	for depth: int in ZoneDepth.lift_depths():
+		gs.lifts_repaired[gs.TUNNELS_ZONE] = [depth]
+		if gs.use_lift(depth, HOST) == "" or gs.rover_depth != 0:
+			gs.free()
+			return "The Lava Tubes' lift must not run from the Aquifer."
+	gs.free()
 	return ""

@@ -437,7 +437,7 @@ static func _kept_clear(depth: int) -> Array[Vector2i]:
 ## nearness is its own check (reach_problem).
 static func take_problem(find_id_text: String, finds: Array, taken: Array, place: String, depth: int, zone: String = ZONE) -> String:
 	if place != zone or depth < DEPTH or depth > max_depth_of(zone):
-		return "Finds lie in the Lava Tubes, below the hub."
+		return "Finds lie in the Lava Tubes, below the hub." if zone == ZONE else "Finds lie in the Flooded Aquifer, below the hub."
 	var known: bool = false
 	for find: Variant in finds:
 		if find is Dictionary and str(find.get("id", "")) == find_id_text:
