@@ -262,6 +262,11 @@ class Observer extends Node:
 	func _input(event: InputEvent) -> void:
 		Controls.note_event(event)
 
+	## The settle moves on every frame, not only when a screen asks, so a scene with no
+	## caller (the title, a moon hub) does not leave the next one on stale wording.
+	func _process(_delta: float) -> void:
+		Controls.shown_pad()
+
 	func _on_root_child(node: Node) -> void:
 		if node != self:
 			keep_last.call_deferred()

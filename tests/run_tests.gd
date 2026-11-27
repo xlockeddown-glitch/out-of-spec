@@ -19,8 +19,10 @@ func _on_timeout() -> void:
 
 
 func _run_tests() -> void:
-	# Prompts follow the device at once here; the settle has its own tests.
-	Controls.settle_text = false
+	# Prompts follow the device at once here; the settle has its own tests. Loaded at run
+	# time: naming Controls here would compile it (and, through it, scripts that need the
+	# autoloads) before the autoloads exist, as this runner is the --script main loop.
+	(load("res://scripts/ui/controls.gd") as GDScript).set(&"settle_text", false)
 	var passed: int = 0
 	var failed: int = 0
 	for file: String in DirAccess.get_files_at("res://tests"):
