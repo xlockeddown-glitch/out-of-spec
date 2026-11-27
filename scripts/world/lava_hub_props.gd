@@ -3,13 +3,19 @@ extends Node3D
 ## The Lava Tubes hub's props, drawn from primitive meshes (LavaHub says where):
 ## Orin's beacon rack, the notice board, and a pad at each beacon spot that
 ## becomes a lit beacon once one is placed. Shows only; no rules.
+## Palette and sizes are [PLACEHOLDER] via TunnelLook (ScopeTheme colours only).
 
-const STEEL := Color(0.45, 0.48, 0.54)
-const DARK := Color(0.12, 0.12, 0.13)
-const CYAN := Color(0.2196, 0.8824, 0.7765)
+const STEEL: Color = TunnelLook.STEEL
+const DARK: Color = TunnelLook.BASALT_DARK
+const CYAN: Color = TunnelLook.CRYSTAL
 ## A placed beacon's light [PLACEHOLDER].
 const LIGHT_RANGE_M: float = 7.0
 const LIGHT_ENERGY: float = 1.2
+## Hub arch & rubble accent placement around the rack/board [PLACEHOLDER].
+const ARCH_SPAN_M: float = 2.6
+const ARCH_HEIGHT_M: float = 2.4
+const RUBBLE_OFFSET := Vector3(-1.35, 0.0, -0.35)
+const RUBBLE_SCALE: float = 0.65
 
 ## Spot id -> the node that shows it.
 var _spots: Dictionary[String, Node3D] = {}
@@ -40,19 +46,33 @@ func show_placed(placed: Array) -> void:
 		if spot_id in placed:
 			_add_beacon(spot)
 		else:
-			spot.add_child(_part(_cylinder(0.7, 0.05), Vector3(0.0, 0.025, 0.0), _glow(CYAN, 0.4)))
+			_add_unplaced_pad(spot)
 
 
 func spot_node(spot_id: String) -> Node3D:
 	return _spots.get(spot_id)
 
 
+func _add_unplaced_pad(spot: Node3D) -> void:
+	# Stepped basalt socket ring with brass anchor lugs and a teal core [PLACEHOLDER].
+	spot.add_child(_part(_cylinder(0.82, 0.08), Vector3(0.0, 0.04, 0.0), _flat(TunnelLook.BASALT_DARK)))
+	spot.add_child(_part(_cylinder(0.68, 0.06), Vector3(0.0, 0.06, 0.0), _flat(TunnelLook.BASALT_MID)))
+	spot.add_child(_part(_cylinder(0.42, 0.04), Vector3(0.0, 0.08, 0.0), _glow(CYAN, 0.45)))
+	for angle_deg: float in [45.0, 135.0, 225.0, 315.0]:
+		var rad: float = deg_to_rad(angle_deg)
+		spot.add_child(_part(_box(Vector3(0.14, 0.09, 0.14)), Vector3(cos(rad) * 0.68, 0.06, sin(rad) * 0.68), _flat(TunnelLook.BRASS)))
+
+
 func _add_beacon(spot: Node3D) -> void:
-	spot.add_child(_part(_cylinder(0.3, 0.1), Vector3(0.0, 0.05, 0.0), _flat(DARK)))
-	spot.add_child(_part(_cylinder(0.06, 1.2), Vector3(0.0, 0.7, 0.0), _flat(STEEL)))
-	spot.add_child(_part(_sphere(0.16), Vector3(0.0, 1.4, 0.0), _glow(CYAN, 1.6)))
+	# Stepped basalt plinth, brass collar, steel mast, and glowing teal cap [PLACEHOLDER].
+	spot.add_child(_part(_cylinder(0.42, 0.12), Vector3(0.0, 0.06, 0.0), _flat(DARK)))
+	spot.add_child(_part(_cylinder(0.28, 0.10), Vector3(0.0, 0.16, 0.0), _flat(TunnelLook.BASALT_MID)))
+	spot.add_child(_part(_cylinder(0.12, 0.12), Vector3(0.0, 0.26, 0.0), _flat(TunnelLook.BRASS)))
+	spot.add_child(_part(_cylinder(0.06, 1.15), Vector3(0.0, 0.80, 0.0), _flat(STEEL)))
+	spot.add_child(_part(_box(Vector3(0.22, 0.06, 0.22)), Vector3(0.0, 1.32, 0.0), _flat(TunnelLook.BRASS)))
+	spot.add_child(_part(_sphere(0.16), Vector3(0.0, 1.44, 0.0), _glow(CYAN, 1.6)))
 	var light := OmniLight3D.new()
-	light.position = Vector3(0.0, 1.4, 0.0)
+	light.position = Vector3(0.0, 1.44, 0.0)
 	light.light_color = CYAN
 	light.omni_range = LIGHT_RANGE_M
 	light.light_energy = LIGHT_ENERGY
@@ -64,11 +84,15 @@ func _build_rack() -> void:
 	rack.name = "BeaconRack"
 	rack.position = LavaHub.rack_position()
 	add_child(rack)
-	rack.add_child(_part(_box(Vector3(1.8, 0.15, 0.7)), Vector3(0.0, 0.075, 0.0), _flat(DARK)))
-	rack.add_child(_part(_box(Vector3(0.1, 1.3, 0.1)), Vector3(-0.85, 0.7, 0.0), _flat(STEEL)))
-	rack.add_child(_part(_box(Vector3(0.1, 1.3, 0.1)), Vector3(0.85, 0.7, 0.0), _flat(STEEL)))
-	rack.add_child(_part(_box(Vector3(1.8, 0.08, 0.08)), Vector3(0.0, 1.3, 0.0), _flat(STEEL)))
-	rack.add_child(_label("BEACON RACK", Vector3(0.0, 1.9, 0.0)))
+	# Stepped basalt plinth, steel posts with brass gussets, timber top beam [PLACEHOLDER].
+	rack.add_child(_part(_box(Vector3(2.0, 0.16, 0.84)), Vector3(0.0, 0.08, 0.0), _flat(DARK)))
+	rack.add_child(_part(_box(Vector3(1.8, 0.10, 0.64)), Vector3(0.0, 0.20, 0.0), _flat(TunnelLook.BASALT_MID)))
+	for x: float in [-0.85, 0.85]:
+		rack.add_child(_part(_box(Vector3(0.14, 1.35, 0.14)), Vector3(x, 0.82, 0.0), _flat(STEEL)))
+		rack.add_child(_part(_box(Vector3(0.20, 0.14, 0.20)), Vector3(x, 1.42, 0.0), _flat(TunnelLook.BRASS)))
+	rack.add_child(_part(_box(Vector3(2.05, 0.14, 0.18)), Vector3(0.0, 1.52, 0.0), _flat(TunnelLook.TIMBER)))
+	rack.add_child(_label("BEACON RACK", Vector3(0.0, 2.05, 0.0)))
+	TunnelLook.add_rubble_pile(rack, RUBBLE_OFFSET, RUBBLE_SCALE)
 	_rack_beacons = Node3D.new()
 	_rack_beacons.name = "Beacons"
 	rack.add_child(_rack_beacons)
@@ -82,83 +106,64 @@ func _show_rack(placed: int) -> void:
 		child.queue_free()
 	for i: int in maxi(LavaHub.SPOTS.size() - placed, 0):
 		var x: float = -0.5 + 0.5 * i
-		_rack_beacons.add_child(_part(_cylinder(0.05, 0.9), Vector3(x, 0.6, 0.0), _flat(STEEL)))
-		_rack_beacons.add_child(_part(_sphere(0.12), Vector3(x, 1.1, 0.0), _glow(CYAN, 1.2)))
+		_rack_beacons.add_child(_part(_cylinder(0.10, 0.08), Vector3(x, 0.29, 0.0), _flat(TunnelLook.BRASS)))
+		_rack_beacons.add_child(_part(_cylinder(0.05, 0.86), Vector3(x, 0.72, 0.0), _flat(STEEL)))
+		_rack_beacons.add_child(_part(_sphere(0.12), Vector3(x, 1.22, 0.0), _glow(CYAN, 1.2)))
 
 
 func _build_board() -> void:
 	var board: Node3D = board_node("NOTICE BOARD")
 	board.position = LavaHub.board_position()
 	add_child(board)
+	# Frame the hub board under a sturdy support-beam arch [PLACEHOLDER].
+	TunnelLook.add_support_arch(board, Vector3(0.0, 0.0, -0.35), ARCH_SPAN_M, ARCH_HEIGHT_M)
 
 
-## A notice board: two posts, a board with two notes pinned, and `title` over it.
-## The lava hub's and the farm's (NoticeBoard) are built the same way, at the
-## origin of the node returned; the caller puts it down.
+## A notice board: stepped footplates, steel posts, timber backing & cap, brass
+## corner brackets, two pinned cream notes, and `title` over it. The lava hub's
+## and the farm's (NoticeBoard) are built the same way, at the origin of the node
+## returned; the caller puts it down. Every size is a [PLACEHOLDER].
 static func board_node(title: String) -> Node3D:
 	var board := Node3D.new()
 	board.name = "NoticeBoard"
-	board.add_child(_part(_box(Vector3(0.12, 1.5, 0.12)), Vector3(-0.8, 0.75, 0.0), _flat(STEEL)))
-	board.add_child(_part(_box(Vector3(0.12, 1.5, 0.12)), Vector3(0.8, 0.75, 0.0), _flat(STEEL)))
-	board.add_child(_part(_box(Vector3(1.9, 1.0, 0.1)), Vector3(0.0, 1.1, 0.0), _flat(Color(0.30, 0.24, 0.17))))
-	board.add_child(_part(_box(Vector3(0.5, 0.35, 0.02)), Vector3(-0.4, 1.25, 0.07), _flat(Color(0.9, 0.88, 0.8))))
-	board.add_child(_part(_box(Vector3(0.5, 0.35, 0.02)), Vector3(0.35, 0.95, 0.07), _flat(Color(0.9, 0.88, 0.8))))
+	for x: float in [-0.82, 0.82]:
+		board.add_child(_part(_box(Vector3(0.28, 0.12, 0.28)), Vector3(x, 0.06, 0.0), _flat(DARK)))
+		board.add_child(_part(_box(Vector3(0.14, 1.56, 0.14)), Vector3(x, 0.82, 0.0), _flat(STEEL)))
+		board.add_child(_part(_box(Vector3(0.18, 0.14, 0.18)), Vector3(x, 1.56, 0.0), _flat(TunnelLook.BRASS)))
+	board.add_child(_part(_box(Vector3(1.94, 1.04, 0.12)), Vector3(0.0, 1.12, 0.0), _flat(TunnelLook.TIMBER)))
+	board.add_child(_part(_box(Vector3(2.12, 0.12, 0.22)), Vector3(0.0, 1.66, 0.0), _flat(TunnelLook.TIMBER_LIGHT)))
+	# Two pinned cream notices with brass tacks [PLACEHOLDER].
+	board.add_child(_part(_box(Vector3(0.52, 0.36, 0.02)), Vector3(-0.4, 1.25, 0.075), _flat(TunnelLook.CREAM)))
+	board.add_child(_part(_box(Vector3(0.06, 0.06, 0.03)), Vector3(-0.4, 1.39, 0.085), _flat(TunnelLook.BRASS)))
+	board.add_child(_part(_box(Vector3(0.52, 0.36, 0.02)), Vector3(0.35, 0.95, 0.075), _flat(TunnelLook.CREAM)))
+	board.add_child(_part(_box(Vector3(0.06, 0.06, 0.03)), Vector3(0.35, 1.09, 0.085), _flat(TunnelLook.BRASS)))
 	board.add_child(_label(title, Vector3(0.0, 2.0, 0.0)))
 	return board
 
 
 static func _box(size: Vector3) -> Mesh:
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	return mesh
+	return TunnelLook.box(size)
 
 
 static func _cylinder(radius: float, height: float) -> Mesh:
-	var mesh := CylinderMesh.new()
-	mesh.top_radius = radius
-	mesh.bottom_radius = radius
-	mesh.height = height
-	return mesh
+	return TunnelLook.cylinder(radius, height)
 
 
 static func _sphere(radius: float) -> Mesh:
-	var mesh := SphereMesh.new()
-	mesh.radius = radius
-	mesh.height = radius * 2.0
-	return mesh
+	return TunnelLook.sphere(radius)
 
 
 static func _flat(color: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = color
-	material.roughness = 0.9
-	return material
+	return TunnelLook.flat_mat(color)
 
 
 static func _glow(color: Color, energy: float) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = Color.BLACK
-	material.emission_enabled = true
-	material.emission = color
-	material.emission_energy_multiplier = energy
-	return material
+	return TunnelLook.glow_mat(color, energy)
 
 
 static func _part(mesh: Mesh, at: Vector3, material: Material) -> MeshInstance3D:
-	var part := MeshInstance3D.new()
-	part.mesh = mesh
-	part.position = at
-	part.material_override = material
-	return part
+	return TunnelLook.part(mesh, at, material)
 
 
 static func _label(text: String, at: Vector3) -> Label3D:
-	var label := Label3D.new()
-	label.text = text
-	label.position = at
-	label.pixel_size = 0.01
-	label.font_size = 32
-	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-	label.no_depth_test = true
-	label.modulate = CYAN
-	return label
+	return TunnelLook.label(text, at, CYAN)
