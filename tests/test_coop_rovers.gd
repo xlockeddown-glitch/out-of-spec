@@ -270,23 +270,25 @@ func test_the_fastest_loadout_climbs_the_steepest_real_grade_without_being_refus
 	var mine: Node = all[2]
 	var speed: float = 6.0 * Loadout.MAX_SPEED_FACTOR
 	var step_m: float = speed * 0.05
+	# Poses stamped in the past, as the host reads its own clock for where a rover is now.
+	var base: int = Time.get_ticks_msec() - 60000
 	if not mine.is_sane([0.0, 0.0, 0.0, 0.0, speed, true]):
 		return _end_with("The fastest loadout's speed must pass is_sane")
 	if Vector2(step_m, step_m).length() / 0.05 <= mine.REACH_MPS:
 		return _end_with("The 3D speed on this grade is meant to be past the budget, or this test proves nothing")
-	# 30 s straight up a 45 degree grade, a pose every 50 ms.
-	for i: int in 600:
+	# 10 s straight up a 45 degree grade (the 3D budget would be gone in about 6), a pose every 50 ms.
+	for i: int in 200:
 		var x: float = step_m * (i + 1)
-		mine._on_driven("player_2", ID, [x, x, 0.0, 0.0, speed, true], 1000 + 50 * i)
+		mine._on_driven("player_2", ID, [x, x, 0.0, 0.0, speed, true], base + 50 * i)
 		if state.rover_transforms[ID].origin != Vector3(x, x, 0.0):
 			return _end_with("The climb was refused at pose %d" % i)
 	# And back down it.
-	for i: int in 600:
-		var x: float = step_m * 600 - step_m * (i + 1)
-		mine._on_driven("player_2", ID, [x, x, 0.0, 0.0, speed, true], 31000 + 50 * i)
+	for i: int in 200:
+		var x: float = step_m * 200 - step_m * (i + 1)
+		mine._on_driven("player_2", ID, [x, x, 0.0, 0.0, speed, true], base + 10000 + 50 * i)
 		if state.rover_transforms[ID].origin != Vector3(x, x, 0.0):
 			return _end_with("The descent was refused at pose %d" % i)
 	# A rise with no run to explain it is still a jump.
-	mine._on_driven("player_2", ID, [0.0, 17.0, 0.0, 0.0, 0.0, true], 62000)
-	mine._on_driven("player_2", ID, [0.0, 34.0, 0.0, 0.0, 0.0, true], 62050)
+	mine._on_driven("player_2", ID, [0.0, 17.0, 0.0, 0.0, 0.0, true], base + 20000)
+	mine._on_driven("player_2", ID, [0.0, 34.0, 0.0, 0.0, 0.0, true], base + 20050)
 	return _end_with("" if state.rover_transforms[ID].origin.y < 30.0 else "A rise without a run must still be charged")

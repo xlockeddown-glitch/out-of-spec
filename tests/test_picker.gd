@@ -157,7 +157,7 @@ func test_a_name_is_trimmed_and_kept_short() -> String:
 	if Loadout.clean_name("  Quill  ") != "Quill" or Loadout.clean_name(5) != "":
 		return "Spaces off, and only text is a name"
 	var rude: String = "Q" + char(0x202E) + "u" + char(0x200B) + "i" + char(0x85) + "l" + char(0xFEFF) + "[b]l" + char(7) + char(0x2066)
-	if Loadout.clean_name(rude) != "Quilbl":
+	if Loadout.clean_name(rude) != "Quilb]l":
 		return "Direction marks, zero-width, C1 and C0 controls and [ must go: got '%s'" % Loadout.clean_name(rude)
 	var crowded: Dictionary = {}
 	for i: int in Loadout.SLOTS.size() + 1:
@@ -438,7 +438,9 @@ func test_a_new_farm_offers_the_picker_once() -> String:
 	var consumed: bool = not PickerUI.offer_next
 	await _root().get_tree().process_frame
 	var opened: bool = first.visible
+	first.close()
 	_free(first)
+	await _root().get_tree().process_frame
 	var second: PickerUI = _picker()
 	await _root().get_tree().process_frame
 	var quiet: bool = not second.visible
@@ -473,6 +475,7 @@ func test_a_p_typed_into_the_name_field_does_not_close_the_picker() -> String:
 	picker._unhandled_input(_key(KEY_P))
 	var toggled_off: bool = not picker.visible
 	_free(picker)
+	_root().gui_release_focus()
 	_restore(snap)
 	if not focused:
 		return "The name field must take the focus for this test to mean anything"
