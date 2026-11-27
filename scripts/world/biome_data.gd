@@ -54,6 +54,10 @@ const ROAD_END_SLACK_M: float = 0.5
 const ROAD_END_LOW_M: float = 0.1
 const ROAD_TEXT: String = "Keep the road clear."
 
+## What a biome's "opens" may name (step 9): the lab level to reach and the audits
+## done. A hint only; nothing is ever blocked.
+const OPENS_KEYS: Array[String] = ["lab_level", "audits"]
+
 const ROLES: Array[String] = ["hub", "spoke", "open"]
 
 const FIELDS: Dictionary = {
@@ -68,6 +72,7 @@ const FIELDS: Dictionary = {
 	"sign": TYPE_STRING,
 	"marker": TYPE_ARRAY,
 	"road": TYPE_ARRAY,
+	"opens": TYPE_DICTIONARY,
 	"entrances": TYPE_ARRAY,
 }
 
@@ -401,6 +406,34 @@ static func sign_text(id: StringName) -> String:
 	return str(biome(id).get("sign", ""))
 
 
+## When the biome's road lights up (step 9): {lab_level: n} and/or {audits: n}, all
+## to be met. Empty means always open.
+static func opens(id: StringName) -> Dictionary:
+	var raw: Variant = biome(id).get("opens")
+	return raw as Dictionary if raw is Dictionary else {}
+
+
+## Whether a player at `lab_level` with `audits_done` audits behind them has reached
+## the biome's step (biomes.md section 4). A hint only: it lights a road and clears a
+## sign's next-step line, and blocks nothing. An unknown id is not open.
+static func is_open(id: StringName, lab_level: int, audits_done: int) -> bool:
+	if not has_biome(id):
+		return false
+	var need: Dictionary = opens(id)
+	return lab_level >= int(need.get("lab_level", 0)) and audits_done >= int(need.get("audits", 0))
+
+
+## The one line a closed biome's sign adds, naming the next step, or "" when it is
+## open. `audit_day` is the morning of the next audit (GameState.next_audit_day).
+static func next_step_text(id: StringName, lab_level: int, audits_done: int, audit_day: int) -> String:
+	if not has_biome(id) or is_open(id, lab_level, audits_done):
+		return ""
+	var need: Dictionary = opens(id)
+	if lab_level < int(need.get("lab_level", 0)):
+		return "Lights up at lab level %d." % int(need["lab_level"])
+	return "Next: the auditor comes on morning %d." % audit_day
+
+
 ## The zone ids with a way in inside the biome, in table order.
 static func zones(id: StringName) -> Array[StringName]:
 	var out: Array[StringName] = []
@@ -579,6 +612,7 @@ static func _row_problems(label: String, row: Dictionary) -> Array[String]:
 		out.append_array(_point_problems(label, field, row[field]))
 	for i: int in (row["road"] as Array).size():
 		out.append_array(_point_problems(label, "road waypoint %d" % i, (row["road"] as Array)[i]))
+	out.append_array(_opens_problems(label, row))
 	if str(row["role"]) == "hub" and not (row["road"] as Array).is_empty():
 		out.append("%s: the hub has no road" % label)
 	var bearing: Variant = row.get("bearing_deg")
@@ -591,6 +625,24 @@ static func _row_problems(label: String, row: Dictionary) -> Array[String]:
 		out.append("%s: bearing_deg %s must be from 0 up to 360" % [label, bearing])
 	for i: int in (row["entrances"] as Array).size():
 		out.append_array(_entrance_problems(label, i, (row["entrances"] as Array)[i]))
+	return out
+
+
+## "opens" names only lab_level (1 to 99) and audits (1 or more), whole numbers;
+## the hub's is empty.
+static func _opens_problems(label: String, row: Dictionary) -> Array[String]:
+	var out: Array[String] = []
+	var need: Dictionary = row["opens"]
+	if str(row["role"]) == "hub" and not need.is_empty():
+		out.append("%s: the hub is always open" % label)
+	for key: Variant in need.keys():
+		var value: Variant = need[key]
+		if not OPENS_KEYS.has(str(key)):
+			out.append("%s: opens has an unknown key %s" % [label, key])
+		elif (typeof(value) != TYPE_FLOAT and typeof(value) != TYPE_INT) or float(value) != floorf(float(value)):
+			out.append("%s: opens %s must be a whole number" % [label, key])
+		elif int(value) < 1 or (str(key) == "lab_level" and int(value) > LEVEL_MAX):
+			out.append("%s: opens %s %s is out of range" % [label, key, value])
 	return out
 
 

@@ -66,6 +66,39 @@ static func reset() -> void:
 func _ready() -> void:
 	name = "BiomeMarkers"
 	build(GameState.dug)
+	# The next-step line follows what a guest also has: lab XP, the audit log, the day.
+	GameState.lab_xp_changed.connect(refresh_hints)
+	GameState.audit_completed.connect(_on_audit_completed)
+	GameState.farm_loaded.connect(refresh_hints)
+	GameClock.day_started.connect(_on_day_started)
+
+
+func _on_audit_completed(_report: Dictionary) -> void:
+	refresh_hints()
+
+
+func _on_day_started(_day: int) -> void:
+	refresh_hints()
+
+
+## The hover text of a biome's sign: its line, and while the biome is closed one more
+## line naming the next step (step 9). A hint only.
+static func hint_for(id: StringName, lab_level: int, audits_done: int, audit_day: int) -> String:
+	var next: String = BiomeData.next_step_text(id, lab_level, audits_done, audit_day)
+	var line: String = BiomeData.sign_text(id)
+	return line if next.is_empty() else "%s
+%s" % [line, next]
+
+
+## Sets every sign's hover text from the lab level, the audits done and the day.
+func refresh_hints() -> void:
+	var level: int = GameState.lab_level()
+	var audits: int = GameState.audit_log.size()
+	var audit_day: int = GameState.next_audit_day(GameClock.get_day_index())
+	for id: StringName in spoke_ids():
+		var post: Clickable = get_node_or_null("Sign_%s" % id) as Clickable
+		if post != null:
+			post.hint = hint_for(id, level, audits, audit_day)
 
 
 ## Puts a "Pad_<id>" slab and a "Sign_<id>" post in for each spoke biome, on the
@@ -102,7 +135,6 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 		post.name = "Sign_%s" % id
 		post.collision_layer = 8
 		post.collision_mask = 0
-		post.hint = BiomeData.sign_text(id)
 		post.position = Vector3(sign_at.x, Terrain.height(sign_at, dug), sign_at.y)
 		var shape := CollisionShape3D.new()
 		var box := BoxShape3D.new()
@@ -127,3 +159,4 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 		board.position = Vector3(0.0, POST_HEIGHT_M - BOARD_SIZE.y * 0.5, 0.0)
 		post.add_child(board)
 		add_child(post)
+	refresh_hints()
