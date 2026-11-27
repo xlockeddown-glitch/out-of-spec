@@ -127,6 +127,12 @@ static func _is_taken(at: Vector3) -> bool:
 	return false
 
 
+## True when the local walker stands within reach of the rover and the rover is here.
+func rover_in_reach() -> bool:
+	return (_own != null and rover.away_text() == ""
+			and _own.global_position.distance_to(rover.global_position) <= CoopWalkers.REACH_M)
+
+
 func hint() -> String:
 	if _own == null or rover.away_text() != "":
 		return ""

@@ -51,6 +51,8 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 @onready var _hud: FieldPhoneHUD = %FieldPhoneHUD
 @onready var _airlock: Clickable = %Airlock
 @onready var _hover_hint: Label = %HoverHint
+## The "[E] verb" label over what the interact key would use (VerbPrompt).
+var _verb_prompt: VerbPrompt
 @onready var _bram_bay: BramBay = %BramBay
 ## Ryan, 2026-11-22: "Pad by the airlock". Park here and press E to calibrate
 ## the tire gauge against the WD-1 without going into the dome.
@@ -92,8 +94,22 @@ var _move_granted: bool = false
 var _tunnel_warned_day: int = -1
 
 
+## [PLACEHOLDER] What the interact key does at each spot, for the prompt over it.
+const VERB_NOTICE: String = "Read notices"
+const VERB_CAL_PAD: String = "Calibrate"
+const VERB_TUNNEL: String = "Enter tunnels"
+const VERB_TRADE: String = "Trade with Bram"
+const VERB_TERMINAL: String = "Open terminal"
+const VERB_ROVER: String = "Get in rover"
+## [PLACEHOLDER] Height above a spot's ground the prompt floats at, metres.
+const VERB_HEIGHT_M: float = 2.2
+## [PLACEHOLDER] The hint line at the foot of the world view: size and lift from the edge.
+const HINT_FONT_SIZE: int = 30
+
+
 func _ready() -> void:
 	_build_notice_board()
+	_setup_hint_and_prompt()
 	_rover.uplink_changed.connect(_on_uplink_changed)
 	_rover.drift_changed.connect(_on_drift_changed)
 	_rover.steering_zeroed.connect(_on_steering_zeroed)
@@ -208,11 +224,60 @@ func _ready() -> void:
 	_hud.get_parent().add_child(_shuttle_ui)
 	_landing = landing
 	landing.terminal_click.clicked.connect(_open_shuttle_terminal)
+	landing.terminal_click.verb = VERB_TERMINAL
 	_robots_ui = RobotsUI.new()
 	_hud.get_parent().add_child(_robots_ui)
 
 
+## The hint line is centred, bigger and in Scope ink; the verb prompt floats over the target.
+func _setup_hint_and_prompt() -> void:
+	_hover_hint.add_theme_color_override(&"font_color", ScopeTheme.INK)
+	_hover_hint.add_theme_font_size_override(&"font_size", HINT_FONT_SIZE)
+	_hover_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_cal_pad.verb = VERB_CAL_PAD
+	_tunnel_pad.verb = VERB_TUNNEL
+	_bram_bay.verb = VERB_TRADE
+	_notice_pad.verb = VERB_NOTICE
+	_verb_prompt = VerbPrompt.new()
+	_hover_hint.get_parent().add_child(_verb_prompt)
+
+
+## What the interact key would do for the local player now, as {at, verb, action}
+## (at = where in the world to mark), or {} when nothing is in reach. The order is
+## the one _unhandled_input answers in, so the prompt never promises another verb.
+func verb_target() -> Dictionary:
+	if _terminal_in_reach():
+		return {"at": _landing.terminal_click.global_position, "verb": VerbPrompt.verb_of(_landing.terminal_click), "action": &"interact"}
+	if CoopWalkers.on_foot():
+		if _walkers != null and _walkers.rover_in_reach():
+			return {"at": _rover.global_position, "verb": VERB_ROVER, "action": &"get_out_in"}
+		return {}
+	if _rover.away_text() != "":
+		return {}
+	for pad: ParkingPad in [_notice_pad, _cal_pad, _tunnel_pad, _bram_bay]:
+		if pad.rover_inside:
+			return {"at": pad.global_position, "verb": VerbPrompt.verb_of(pad), "action": &"interact"}
+	return {}
+
+
+## Puts the verb prompt over the target, or hides it.
+func _update_verb_prompt() -> void:
+	var camera: Camera3D = ($WorldView/WorldViewport as SubViewport).get_camera_3d()
+	var view: Control = $WorldView as Control
+	var target: Dictionary = verb_target()
+	if target.is_empty() or camera == null:
+		_verb_prompt.clear()
+		return
+	var at: Vector3 = (target["at"] as Vector3) + Vector3(0.0, VERB_HEIGHT_M, 0.0)
+	if camera.is_position_behind(at):
+		_verb_prompt.clear()
+		return
+	_verb_prompt.limit = view.size
+	_verb_prompt.point_at(view.position + camera.unproject_position(at), String(target["verb"]), target["action"] as StringName)
+
+
 func _process(delta: float) -> void:
+	_update_verb_prompt()
 	_hud.set_clock(GameClock.format_now())
 	_hud.set_molt(GameState.molt_text() if GameState.has_skill_unlock("molt_on_phone") else "")
 	# Bram's number tags follow the device in use.

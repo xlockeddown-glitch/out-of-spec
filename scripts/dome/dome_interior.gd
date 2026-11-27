@@ -52,6 +52,8 @@ const TOAST_SECONDS_PER_CHAR: float = 0.04
 @onready var _molt_bar: ProgressBar = %MoltBar
 @onready var _silk_label: Label = %SilkLabel
 @onready var _hint_label: Label = %HintLabel
+## The "[E] verb" label over the clickable the pad has picked.
+var _verb_prompt: VerbPrompt
 
 var _toast_left: float = 0.0
 ## Frame the last toast was shown; another the same frame is added under it.
@@ -72,8 +74,21 @@ var _default_text: String = ""
 var _use_text: String = ""
 
 
+## [PLACEHOLDER] What the interact key does at the dome's main clickables (others read "Use").
+const VERB_BENCH: String = "Calibrate"
+const VERB_AIRLOCK: String = "Go outside"
+const VERB_PLAN_BOARD: String = "Plan the lab"
+const VERB_SPOOL: String = "Pick up"
+
+
 func _ready() -> void:
 	get_viewport().physics_object_picking = true
+	_bench.verb = VERB_BENCH
+	_airlock.verb = VERB_AIRLOCK
+	_plan_board.verb = VERB_PLAN_BOARD
+	_spool.verb = VERB_SPOOL
+	_verb_prompt = VerbPrompt.new()
+	$UI.add_child(_verb_prompt)
 	_bench.clicked.connect(_bench_ui.open)
 	_plan_board.clicked.connect(_plan_board_ui.open)
 	_kestrel_click.clicked.connect(_kestrel_ui.open)
@@ -137,6 +152,7 @@ func _process(delta: float) -> void:
 	if _pad_pick != null and not _pad_pick_valid():
 		_pad_pick = null
 	_refresh_prompts()
+	_update_verb_prompt()
 	var picked: bool = _pad_pick != null
 	var pick_line: String = "%s  ·  %s" % [_name_of(_pad_pick), _use_text] if picked else ""
 	if _toast_left > 0.0:
@@ -163,6 +179,15 @@ func _refresh_prompts() -> void:
 	_hint_pad = pad
 	_default_text = default_hint()
 	_use_text = "%s to use" % Controls.prompt(&"interact")
+
+
+## The "[A] verb" label over the clickable the pad has picked (the mouse clicks, so
+## it has no key to show); hidden when nothing is picked or a panel is open.
+func _update_verb_prompt() -> void:
+	if _pad_pick == null or not _pad_pick_valid():
+		_verb_prompt.clear()
+		return
+	_verb_prompt.point_at(_screen_point(_pad_pick), VerbPrompt.verb_of(_pad_pick))
 
 
 func _name_of(item: Clickable) -> String:

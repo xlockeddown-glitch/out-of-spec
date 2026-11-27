@@ -7,6 +7,9 @@ extends Area3D
 signal rover_entered
 signal rover_exited
 
+## What the interact key does on this spot ("Calibrate"); the prompt over it says it.
+@export var verb: String = ""
+
 var rover_inside: bool = false
 
 
