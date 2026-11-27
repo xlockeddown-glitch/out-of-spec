@@ -16,6 +16,13 @@ const ACTIONS: Array[StringName] = [
 ## What a player in bed may do and stay in bed: going to bed, paperwork, and
 ## saying where they are.
 const NO_WAKE: Array[StringName] = [&"go_to_bed", &"report_place", &"spend_xp_certificate"]
+## What is done only in a zone. A late one from a player already carried out (a command
+## in flight at the 02:00 rescue) is refused by the farm and must not wake them from the
+## bed they were put in.
+const BELOW_ONLY: Array[StringName] = [
+	&"catch_sentinel", &"change_depth", &"enter_vent", &"hit_boulder", &"leave_zone", &"mine_fissure",
+	&"place_beacon", &"repair_lift", &"set_interlock_override", &"survey_ore", &"take_find", &"use_lift",
+]
 ## What is done at a cell of the farm's ground: the cell in front of the rover, or
 ## under it. The cell's middle is within this far of the rover [PLACEHOLDER]: the
 ## 2 m it digs ahead, half a cell's corner and what the host's word of the
@@ -83,7 +90,8 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	if reason != "":
 		return refusal(action, reason)
 	# Whoever does something is up, but for what can be done from bed.
-	if not action in NO_WAKE:
+	var stale: bool = action in BELOW_ONLY and _farm().place_of(player_id) in [ZonePresence.FARM, ZonePresence.DOME]
+	if not action in NO_WAKE and not stale:
 		CoopBeds.get_up(player_id)
 	var passed: Array = arguments.duplicate()
 	var scored: bool = action in SCORED

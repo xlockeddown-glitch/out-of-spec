@@ -470,12 +470,6 @@ func _guest_read(packet: PackedByteArray) -> bool:
 		if _accepted:
 			walkers_told.emit(poses)
 		return true
-	if _is_shape(message, [RECALL, TYPE_STRING]):
-		if not message[1] in TunnelRecall.STEPS:
-			return false
-		if _accepted:
-			recalled.emit(message[1])
-		return true
 	if not _accepted:
 		if _is_shape(message, [REFUSED, TYPE_STRING]):
 			_end(REASONS.get(message[1], NO_HOST))
@@ -493,6 +487,12 @@ func _guest_read(packet: PackedByteArray) -> bool:
 		_farm_commands().remote = _ask
 		_farm_commands().guest = true
 		joined.emit(message[1])
+		return true
+	if _is_shape(message, [RECALL, TYPE_STRING]):
+		# Only from the host that has taken this guest in: no welcome yet, no recall.
+		if not message[1] in TunnelRecall.STEPS:
+			return false
+		recalled.emit(message[1])
 		return true
 	if _is_shape(message, [ANSWER, TYPE_INT, TYPE_MAX]):
 		_answer(message[1], message[2])

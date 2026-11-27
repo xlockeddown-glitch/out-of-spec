@@ -561,6 +561,7 @@ func test_a_guest_below_is_held_to_the_floor_of_the_rovers_depth() -> String:
 	var id: String = GameState.TUNNEL_ROVER
 	var day: int = GameClock.get_day_index()
 	state.rover_zone = ZoneDepth.ZONE
+	state.player_places["player_2"] = [ZoneDepth.ZONE, ZoneDepth.DEPTH]  # a guest below drives
 	state.rover_depth = ZoneDepth.DEPTH
 	var grid: PackedStringArray = ZoneDepth.grid_for(ZoneDepth.DEPTH, state.world_seed, day)
 	# A floor cell of the layout, with a neighbour that is rock below and floor in
@@ -624,6 +625,7 @@ func test_a_pose_from_before_the_rover_was_moved_is_dropped() -> String:
 	var state: Node = host.commands.state
 	var id: String = GameState.TUNNEL_ROVER
 	state.rover_zone = ZoneDepth.ZONE
+	state.player_places["player_2"] = [ZoneDepth.ZONE, ZoneDepth.DEPTH]  # a guest below drives
 	state.rover_depth = ZoneDepth.DEPTH
 	state.rover_epoch = 5
 	var grid: PackedStringArray = ZoneDepth.grid_for(ZoneDepth.DEPTH, state.world_seed, GameClock.get_day_index())
@@ -669,6 +671,7 @@ func test_a_guest_drops_a_host_pose_from_before_the_rover_was_moved() -> String:
 	var state: Node = guest.commands.state
 	var id: String = GameState.TUNNEL_ROVER
 	state.rover_zone = ZoneDepth.ZONE
+	state.player_places["player_2"] = [ZoneDepth.ZONE, ZoneDepth.DEPTH]  # a guest below drives
 	state.rover_depth = ZoneDepth.DEPTH
 	state.rover_epoch = 5
 	var parked: Vector3 = ZoneDepth.start_transform().origin

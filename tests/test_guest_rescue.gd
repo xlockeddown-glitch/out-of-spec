@@ -7,6 +7,7 @@ extends "res://tests/coop_net.gd"
 const BedsScript: GDScript = preload("res://scripts/autoload/CoopBeds.gd")
 const ClockScript: GDScript = preload("res://scripts/autoload/GameClock.gd")
 const ScenesScript: GDScript = preload("res://scripts/autoload/CoopScenes.gd")
+const RoversScript: GDScript = preload("res://scripts/autoload/CoopRovers.gd")
 
 const ZONE: String = "lava_tubes"
 const HOME: Vector3 = Vector3(3.0, 0.0, 3.0)
@@ -19,6 +20,25 @@ class _NoBeds:
 
 	func recall_to_bed(player_id: String) -> void:
 		put_to_bed.append(player_id)
+
+	func get_up(player_id: String) -> void:
+		put_to_bed.erase(player_id)
+
+
+## Beds that say what the farm looked like when each player was put in bed.
+class _SpyBeds:
+	extends RefCounted
+	var farm: Object = null
+	var seen: Array = []  # [player, credits, players still below] at each call
+
+	func recall_to_bed(player_id: String) -> void:
+		var below: int = 0
+		for who: Variant in farm.player_places:
+			below += 0 if farm.place_of(str(who)) in [ZonePresence.FARM, ZonePresence.DOME] else 1
+		seen.append([player_id, farm.credits, below])
+
+	func get_up(_player_id: String) -> void:
+		pass
 
 
 ## Stands in for the session on a guest's screen.
@@ -252,7 +272,8 @@ func test_a_guest_who_leaves_in_the_moment_before_the_carry_out_is_not_charged()
 	gs.recall_beds = beds
 	gs.credits = 500
 	gs.player_places["player_2"] = [ZonePresence.DOME, 0]  # between the hour and the deferred carry-out
-	gs._carry_out("player_2")
+	var one: Array[String] = ["player_2"]
+	gs._carry_out(one)
 	var problem: String = "" if gs.credits == 500 and beds.put_to_bed.is_empty() and told.is_empty() else "The carry-out looks again: %d CR, %s, %s" % [gs.credits, beds.put_to_bed, told]
 	gs.free()
 	return problem
@@ -267,8 +288,8 @@ func test_a_repeated_rescue_does_not_charge_twice() -> String:
 	gs.credits = 500
 	_tick(gs, 2.0)
 	_tick(gs, 2.0)
-	gs._carry_out("player_2")  # a duplicate that was already queued
-	gs._carry_out("player_3")
+	var dupes: Array[String] = ["player_2", "player_3"]
+	gs._carry_out(dupes)  # duplicates that were already queued
 	var problems: Array[String] = []
 	if gs.credits != 400 or beds.put_to_bed != ["player_2", "player_3"]:
 		problems.append("Two guests, each once: %d CR, bed %s" % [gs.credits, beds.put_to_bed])
@@ -456,3 +477,229 @@ func test_the_zone_scenes_are_told_from_the_rest() -> String:
 		if ZonePresence.in_zone(path):
 			problems.append("'%s' is not a zone" % path)
 	return "\n".join(problems)
+
+
+# --- Review round 1 -------------------------------------------------------------------------
+
+func test_the_last_one_off_the_trip_reporting_the_farm_brings_the_rover_home() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = gs.local_player_id
+	_trip(gs, me, [], 0)
+	gs.player_places[me] = [ZonePresence.DOME, 0]  # in the dome, still on the trip
+	var reason: String = gs.report_place(ZonePresence.FARM, 0, me)
+	var problems: Array[String] = []
+	if reason != "":
+		problems.append("The report is taken: %s" % reason)
+	if gs.rover_in_tunnels or gs.rover_lent:
+		problems.append("The last one off the trip is on the farm: the rover is home")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_going_below_gets_a_player_out_of_bed() -> String:
+	var gs: GameStateScript = _state()
+	var beds: _NoBeds = _NoBeds.new()
+	gs.recall_beds = beds
+	beds.put_to_bed.append(gs.local_player_id)
+	gs.report_place(ZONE, 0, gs.local_player_id)
+	var up: bool = beds.put_to_bed.is_empty()
+	gs.free()
+	return "" if up else "A player who goes below is not in bed any more"
+
+
+func test_every_bill_is_paid_before_anyone_is_put_in_bed() -> String:
+	var gs: GameStateScript = _state()
+	var spy: _SpyBeds = _SpyBeds.new()
+	spy.farm = gs
+	gs.recall_beds = spy
+	gs.recall_in_tunnels = func() -> bool: return false
+	gs.credits = 500
+	_trip(gs, "player_2", ["player_3"], 0)
+	_tick(gs, 2.0)
+	var problems: Array[String] = []
+	if spy.seen.size() != 2:
+		problems.append("Both are put in bed: %s" % [spy.seen])
+	elif spy.seen[0][1] != 400 or spy.seen[0][2] != 0:
+		problems.append("At the first bed both are billed and out: %s" % [spy.seen[0]])
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_a_late_report_below_after_the_hour_is_carried_out_at_once() -> String:
+	var gs: GameStateScript = _state()
+	var beds: _NoBeds = _NoBeds.new()
+	gs.recall_beds = beds
+	gs.recall_in_tunnels = func() -> bool: return true
+	gs.credits = 500
+	var me: String = gs.local_player_id
+	_trip(gs, me, [], 0)
+	gs.player_places[me] = [ZonePresence.DOME, 0]
+	_at(2.0, func() -> void: gs.report_place(ZONE, 0, me))
+	var problems: Array[String] = []
+	if gs.credits != 450 or beds.put_to_bed != [me]:
+		problems.append("Arriving after 02:00 is carried out now, not at a tick that may never come: %d CR, %s" % [gs.credits, beds.put_to_bed])
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_a_carry_out_checks_again_for_the_host_and_the_rover() -> String:
+	var gs: GameStateScript = _state()
+	var beds: _NoBeds = _NoBeds.new()
+	gs.recall_beds = beds
+	gs.recall_in_tunnels = func() -> bool: return true
+	gs.credits = 500
+	var host_only: Array[String] = [gs.local_player_id]
+	_at(2.0, func() -> void: gs._carry_out(host_only))  # the rover is home
+	var problems: Array[String] = []
+	if gs.credits != 500 or not beds.put_to_bed.is_empty() or gs._recall_rescued_day != 0:
+		problems.append("Nothing is below: no bill, no bed, no used-up day (%d, %s, %d)" % [gs.credits, beds.put_to_bed, gs._recall_rescued_day])
+	_trip(gs, gs.local_player_id, [], 0)
+	gs.recall_in_tunnels = func() -> bool: return false  # the host left the scene
+	_at(2.0, func() -> void: gs._carry_out(host_only))
+	if gs.credits != 500 or not beds.put_to_bed.is_empty():
+		problems.append("A host who is not below is not carried out")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_a_guest_who_left_in_the_moment_keeps_the_day_unused() -> String:
+	var gs: GameStateScript = _state()
+	gs.recall_beds = _NoBeds.new()
+	_trip(gs, "player_2", [], 0)
+	gs.player_places["player_2"] = [ZonePresence.DOME, 0]
+	var guest: Array[String] = ["player_2"]
+	_at(2.0, func() -> void: gs._carry_out(guest))
+	var burned: bool = gs._guest_rescued_day.has("player_2") or gs._guest_warned_day.has("player_2")
+	gs.free()
+	return "A rescue that did not run uses up no day" if burned else ""
+
+
+func test_the_way_out_forgets_the_trip_s_ore_baseline() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = gs.local_player_id
+	_trip(gs, me, [], 7)
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)
+	var reason: String = gs.move_rover(false, me)
+	var problems: Array[String] = []
+	if reason != "":
+		problems.append("The way out is open: %s" % reason)
+	if gs._ore_at_entry != -1:
+		problems.append("No trip, no baseline: %d" % gs._ore_at_entry)
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_a_stale_tunnel_command_does_not_wake_a_carried_out_player() -> String:
+	CoopBeds.in_bed.assign(["player_3"])
+	var host: Node = _host()
+	host.commands.execute("player_3", &"enter_vent", ["vent", 0])
+	var stale: Array[String] = CoopBeds.in_bed.duplicate()
+	host.commands.execute("player_3", &"accept_job", [99])
+	var farm_job: Array[String] = CoopBeds.in_bed.duplicate()
+	CoopBeds.in_bed.clear()
+	return _finish("" if stale == ["player_3"] and farm_job.is_empty() else "Got %s then %s" % [stale, farm_job])
+
+
+func test_the_rescue_is_told_once_after_the_farm_has_changed() -> String:
+	var gs: GameStateScript = _state()
+	gs.recall_beds = _NoBeds.new()
+	gs.recall_in_tunnels = func() -> bool: return false
+	var told: Array = _trip(gs, "player_2", [], 0)
+	_tick(gs, 2.0)
+	var ok: bool = _count(told, "player_2", TunnelRecall.RESCUE) == 1 and gs.place_of("player_2") == ZonePresence.FARM
+	gs.free()
+	return "" if ok else "The guest is told once, with the farm already changed"
+
+
+func test_a_rescued_guest_cannot_go_on_driving_the_rover_below() -> String:
+	var host: Node = _host()
+	var guest: Node = _guest(host)
+	var gs: GameStateScript = _state()
+	var rovers: Node = RoversScript.new()
+	rovers.start(host, gs)
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_START.origin)
+	gs.rover_zone = ZONE
+	gs.rover_in_tunnels = true
+	var pose: Array = [gs.TUNNEL_START.origin.x, gs.TUNNEL_START.origin.y, gs.TUNNEL_START.origin.z, 0.0, 0.0, true, gs.rover_epoch]
+	gs.player_places["player_2"] = [ZonePresence.FARM, 0]  # carried out
+	rovers._on_driven("player_2", gs.TUNNEL_ROVER, pose, 1000)
+	var problems: Array[String] = []
+	if rovers.driver(gs.TUNNEL_ROVER) != "":
+		problems.append("A drive from one who is on the farm is not taken")
+	gs.player_places["player_2"] = [ZONE, 0]
+	rovers._on_driven("player_2", gs.TUNNEL_ROVER, pose, 1100)
+	if rovers.driver(gs.TUNNEL_ROVER) != "player_2":
+		problems.append("A drive from one in the zone is")
+	rovers.free()
+	gs.free()
+	return _finish("\n".join(problems))
+
+
+func test_a_rescue_ends_the_rescued_player_s_drive_lease() -> String:
+	var gs: GameStateScript = _state()
+	gs.recall_beds = _NoBeds.new()
+	_trip(gs, "player_2", [], 0)
+	CoopRovers._drivers[gs.TUNNEL_ROVER] = ["player_2", Time.get_ticks_msec() + 100000]
+	gs.rescue_from_tunnels("player_2")
+	var held: bool = CoopRovers.driver(gs.TUNNEL_ROVER) == "player_2"
+	CoopRovers._drivers.erase(gs.TUNNEL_ROVER)
+	gs.free()
+	return "The rescue ends the lease" if held else ""
+
+
+func test_loading_a_farm_forgets_who_was_on_the_trip() -> String:
+	var gs: GameStateScript = _state()
+	gs._trip_players["player_2"] = true
+	var reason: String = gs.farm_from_dict(gs.farm_to_dict())
+	var left: bool = gs._trip_players.is_empty()
+	gs.free()
+	return "" if reason == "" and left else "A loaded farm has no trip in it (%s)" % reason
+
+
+func test_leaving_the_zone_while_a_friend_is_still_on_the_way_keeps_the_field_rover() -> String:
+	var gs: GameStateScript = _state()
+	var me: String = gs.local_player_id
+	gs.rover_zone = ZONE
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)
+	gs.player_places[me] = [ZONE, 0]
+	gs._trip_players["player_2"] = true  # up in the dome, on the same trip
+	var reason: String = gs.leave_zone(me)
+	var kept: bool = gs.rover_zone == ZONE
+	gs.free()
+	return "" if reason == "" and kept else "The rover stays for one still on the trip (%s)" % reason
+
+
+func test_a_warning_waits_for_a_swap_in_progress() -> String:
+	var session: _Session = _Session.new()
+	var gs: GameStateScript = _state()
+	var scenes: Node = ScenesScript.new()
+	scenes.start(session, gs)
+	var here: Array[String] = [SceneSwitcher.FARM_SCENE]
+	scenes.scene_at = func() -> String: return here[0]
+	var phone: Array[String] = []
+	gs.phone_message.connect(func(text: String) -> void: phone.append(text))
+	SceneSwitcher._busy = true
+	session.recalled.emit(TunnelRecall.WARN)  # the swap is on its way into the zone
+	var early: int = phone.size()
+	here[0] = SceneSwitcher.TUNNELS_SCENE
+	SceneSwitcher._busy = false
+	SceneSwitcher.scene_swapped.emit(SceneSwitcher.TUNNELS_SCENE)
+	var shown: bool = phone == [TunnelRecall.text("warn_text")]
+	scenes.free()
+	session.free()
+	gs.free()
+	return "" if early == 0 and shown else "The warning is shown on the screen that arrives (%d early, %s)" % [early, phone]
+
+
+func test_a_recall_is_taken_only_from_an_accepted_host_and_only_a_known_step() -> String:
+	var host: Node = _host()
+	var guest: Node = _guest(host)
+	var lone: Node = _session()
+	var problems: Array[String] = []
+	if lone._guest_read(var_to_bytes([SessionScript.RECALL, TunnelRecall.WARN])):
+		problems.append("No welcome yet: no recall")
+	if guest._guest_read(var_to_bytes([SessionScript.RECALL, "dance"])) or guest._guest_read(var_to_bytes([SessionScript.RECALL, 1])):
+		problems.append("An unknown step, or one that is no text, is a bad host")
+	if not guest._guest_read(var_to_bytes([SessionScript.RECALL, TunnelRecall.WARN])):
+		problems.append("A known step from the host is taken")
+	return _finish("\n".join(problems))

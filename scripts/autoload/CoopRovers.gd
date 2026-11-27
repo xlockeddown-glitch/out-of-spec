@@ -195,6 +195,10 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 		return
 	if not driver(rover_id) in ["", player_id] or not together() or CoopWalkers.is_out(player_id):
 		return
+	# Only one in the rover's zone drives it: a guest carried out at 02:00 may still have
+	# a drive in flight.
+	if rover_id == farm.TUNNEL_ROVER and farm.place_of(player_id) != farm.rover_zone:
+		return
 	# A pose sent before the guest knew the rover was moved is old news, not a fault.
 	if rover_id == farm.TUNNEL_ROVER and (pose.size() != 7 or pose[6] != farm.rover_epoch):
 		return
@@ -260,6 +264,11 @@ func _on_told(rover_id: String, driver_id: String, pose: Array, now: int = Time.
 
 
 func _on_left(player_id: String) -> void:
+	release(player_id)
+
+
+## A player's drive leases and told places end (they left, or were carried out).
+func release(player_id: String) -> void:
 	for rover_id: String in _told_driver.keys():
 		if _told_driver[rover_id] == player_id:
 			_told_driver[rover_id] = ""  # the key stays: the rover is still told about

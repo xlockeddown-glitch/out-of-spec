@@ -51,6 +51,7 @@ func report_scene(path: String) -> void:
 ## for the farm, where the host already has them in bed (the clock says so).
 func _on_recalled(step: String) -> void:
 	if step == TunnelRecall.WARN:
+		await _swap_done()
 		if ZonePresence.in_zone(_scene_path()):
 			farm.phone_message.emit(TunnelRecall.text("warn_text"))
 	elif step == TunnelRecall.RESCUE:
@@ -59,13 +60,17 @@ func _on_recalled(step: String) -> void:
 
 ## A swap in progress may be on its way into the zone, so it is waited for first.
 func _carry_out_here() -> void:
-	while not go_to_farm.is_valid() and SceneSwitcher.is_busy():
-		await SceneSwitcher.scene_swapped
+	await _swap_done()
 	if ZonePresence.in_zone(_scene_path()):
 		if go_to_farm.is_valid():
 			go_to_farm.call()
 		else:
 			SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE)
+
+
+func _swap_done() -> void:
+	while not go_to_farm.is_valid() and SceneSwitcher.is_busy():
+		await SceneSwitcher.scene_swapped
 
 
 func _scene_path() -> String:
