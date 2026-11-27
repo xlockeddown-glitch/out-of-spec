@@ -134,7 +134,7 @@ func test_stray_spots_are_deterministic_per_day_and_change_across_days() -> Stri
 	return ""
 
 
-func test_clicking_stray_toasts_and_changes_no_game_state() -> String:
+func test_clicking_a_stray_from_the_farm_is_refused_and_changes_no_game_state() -> String:
 	var held_clock: float = GameClock.elapsed_days
 	GameClock.elapsed_days = 4.2
 	var tunnel: PhobosServiceTunnel = _open(PhobosServiceTunnel.SCENE_PATH) as PhobosServiceTunnel
@@ -145,10 +145,10 @@ func test_clicking_stray_toasts_and_changes_no_game_state() -> String:
 	else:
 		var spot: Vector3 = tunnel.stray_nodes[0].position
 		tunnel.walker.position = spot
-		tunnel._on_stray_clicked(spot)
+		tunnel._on_stray_clicked(spot, tunnel.stray_indices[0], GameClock.get_day_index())
 		var after: PackedByteArray = var_to_bytes(GameState.farm_to_dict())
-		if tunnel._hint.text != PhobosServiceTunnel.STRAY_INSPECT_TEXT:
-			problem = "Unexpected stray inspect line: '%s'" % tunnel._hint.text
+		if tunnel._hint.text != "Strays are in the Phobos service tunnel.":
+			problem = "Unexpected stray line for a player not on Phobos: '%s'" % tunnel._hint.text
 		elif before != after:
 			problem = "Clicking a stray must not change GameState."
 	_drop(tunnel)

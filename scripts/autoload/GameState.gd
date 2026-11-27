@@ -11,6 +11,7 @@ signal silk_changed(spools: int)
 signal enclosures_changed
 ## The Cobalt Sentinel came out in the tunnels, or is gone.
 signal sentinel_changed
+signal strays_changed  # a Phobos service-tunnel stray was caught today
 signal rover_lights_changed
 ## A beacon was set down in the Lava Tubes.
 signal beacons_changed
@@ -150,7 +151,21 @@ const PRE_MOLT_AT: float = 0.8
 ## burrow (hidden) until then, since the two can't share the tank floor.
 const EXUVIA_LINGER_DAYS: int = 1
 ## Tarantulas that can be caught. Each has a tank waiting in the dome.
-const CATCHABLE: Array[StringName] = [&"cobalt_sentinel"]
+const CATCHABLE: Array[StringName] = [&"cobalt_sentinel", &"banded_regolith_runner"]
+## The Banded Regolith Runner: station stock that got loose in Phobos's warm service
+## tunnels, caught there (catch_stray). Its tank record stays the three-field molt
+## record every tank has (_is_tank), so the marker that it is station stock is kept
+## beside it, in enclosure_origins.
+const RUNNER: StringName = &"banded_regolith_runner"
+const STATION_ORIGIN: String = "phobos_station"
+## Species caught with a tank record but no dome tank yet: they sit out the molt and the
+## lab sitter's round until the tank exists (nothing could show or collect them).
+const NO_DOME_TANK: Array[StringName] = [&"banded_regolith_runner"]
+const STATION_LINE: String = "Station stock, caught in a Phobos service tunnel"
+## What a catch is counted under in action_counts (the Strays quest reads it), and the
+## prefix of a count of arriving on a moon ("reached_phobos"): both with no XP.
+const STRAY_COUNT: String = "catch_stray"
+const REACHED_PREFIX: String = "reached_"
 const SENTINEL: StringName = &"cobalt_sentinel"
 ## Where the wild one sits, off the sump's edge. How near it notices the rover, how
 ## fast is calm, how close is on top of it, and how far the cup reaches. [PLACEHOLDER]
@@ -191,6 +206,14 @@ var exuvia_until_day: int = 0
 ## The caught tarantulas, each in a tank of its own beside the main terrarium.
 ## Species id (String) -> { molt_progress, molt_stage, exuvia_until_day }.
 var enclosures: Dictionary = {}
+## Where a caught tarantula came from, when it is not the wild: species id -> an origin
+## (STATION_ORIGIN). Kept beside `enclosures` because a tank is exactly three fields.
+## Saved, shown to guests; a save without it has none.
+var enclosure_origins: Dictionary = {}
+## The Phobos service-tunnel strays caught today: { "day": int, "ids": Array of the
+## stray spot indices (PhobosServiceTunnel) }. Only today's count; another day's
+## record is dropped. Host-run, saved, shown to guests.
+var strays_caught: Dictionary = {}
 ## The wild Cobalt Sentinel: out by the sump today, and the mornings since it was
 ## last scared off.
 var sentinel_out: bool = false
@@ -767,7 +790,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -794,6 +817,7 @@ func farm_to_dict() -> Dictionary:
 	out["finds_taken"] = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	out["pools_drained"] = ZoneDepth.prune(pools_drained, GameClock.get_day_index())
 	out["rooms_shored"] = ZoneDepth.prune(rooms_shored, GameClock.get_day_index())
+	out["strays_caught"] = _strays_today()
 	out["cold_since"] = _cold_in_caves()  # the stamps of whoever is in the caves: the rest are stale
 	return out
 
@@ -940,6 +964,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 	for id: Variant in tanks:
 		if not id is String or not StringName(id) in CATCHABLE or not _is_tank(tanks[id]):
 			return "'enclosures' has an entry that is not a caught tarantula."
+	var stray_problem: String = _stray_problem(data.get("strays_caught", {}), data.get("enclosure_origins", {}), tanks)
+	if stray_problem != "":
+		return stray_problem
 	if not _optional_fields(data["lab_build"], ["kind", "discipline"], ["size", "done_day"]):
 		return "'lab_build' has a field of the wrong type."
 	for list: String in ["job_board", "active_jobs"]:
@@ -1118,6 +1145,24 @@ static func _has_nan(value: Variant) -> bool:
 	return false
 
 
+## Why a save's strays_caught and enclosure_origins can't load, or "".
+static func _stray_problem(strays: Variant, origins: Variant, tanks: Dictionary) -> String:
+	if not strays is Dictionary or not origins is Dictionary:
+		return "'strays_caught' and 'enclosure_origins' must be dictionaries."
+	if not (strays as Dictionary).is_empty():
+		var day: Variant = (strays as Dictionary).get("day")
+		var ids: Variant = (strays as Dictionary).get("ids")
+		if (strays as Dictionary).size() != 2 or not day is int or day < 0 or not ids is Array:
+			return "'strays_caught' is not a day and its caught strays."
+		for stray: Variant in ids:
+			if not stray is int or stray < 0 or stray >= PhobosServiceTunnel.STRAY_SPOTS.size() or (ids as Array).count(stray) != 1:
+				return "'strays_caught' holds a stray that is not one."
+	for id: Variant in origins:
+		if not id is String or id != String(RUNNER) or not tanks.has(id) or not origins[id] is String or origins[id] != STATION_ORIGIN:
+			return "'enclosure_origins' has an entry that is not a caught tarantula's origin."
+	return ""
+
+
 ## An entry of `enclosures`: a molt, at the stage its progress gives.
 static func _is_tank(tank: Variant) -> bool:
 	if not tank is Dictionary or tank.size() != 3 or not tank.has_all(["molt_progress", "molt_stage", "exuvia_until_day"]):
@@ -1144,6 +1189,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	sentinel_sighted = false
 	player_places.clear()
 	_prune_cold()
+	strays_caught = _strays_today()
 	_settle_trips_on_load()
 	_recall_warned_day = 0
 	_recall_rescued_day = 0
@@ -3776,6 +3822,9 @@ func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
 	add_credits(-Shuttle.fare())
 	var ends_at: float = Shuttle.trip_end(GameClock.elapsed_days)
 	shuttle_trips[id] = { "moon": moon, "ends_at": ends_at }
+	if id != MANAGER_ID:
+		var reached: Dictionary = (action_counts.get_or_add(id, {}) as Dictionary).get_or_add(REACHED_PREFIX + moon, { "count": 0, "xp": 0 })
+		reached["count"] = int(reached["count"]) + 1
 	_set_place(id, moon, 0)
 	_trip_players.erase(id)
 	# Off the farm's ground: out of the rover (it stays parked where it is) and not
@@ -5882,6 +5931,56 @@ func catch_species(species_id: String) -> bool:
 	return true
 
 
+## Today's caught strays as { "day", "ids" }, or {} when the record is another day's.
+func _strays_today() -> Dictionary:
+	if strays_caught.is_empty() or int(strays_caught.get("day", -1)) != GameClock.get_day_index():
+		return {}
+	return strays_caught.duplicate(true)
+
+
+## The indices of the service-tunnel strays caught today.
+func strays_caught_today() -> Array[int]:
+	var out: Array[int] = []
+	out.assign(_strays_today().get("ids", []))
+	return out
+
+
+## Host: the player catches one of today's strays in Phobos's service tunnel. `player_id` is
+## filled in from the connection (FarmCommands). `stray_index` is the stray's spot
+## (PhobosServiceTunnel.stray_indices_for_day) and `layout_day` the day the player's screen drew
+## it from, so a screen still on yesterday's strays is refused. Returns "" or why not. The
+## player must be away on Phobos (nothing tracks hub versus tunnel, and the tunnel is the only
+## part of Phobos with strays [PLACEHOLDER]). One catch per stray per day, and the stray is
+## gone for everyone. The first Runner caught goes to a tank of its own in the dome, marked as
+## station stock; later catches find the tank already there (one tank a species, as for any
+## find), so they are let go on the spot but still count, so every player's Strays quest can
+## finish. A catch is counted for who made it (action_counts, STRAY_COUNT, with no XP).
+func catch_stray(stray_index: int, layout_day: int, player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host decides a catch."
+	var who: String = _player(player_id)
+	var day: int = GameClock.get_day_index()
+	if place_of(who) != Shuttle.PHOBOS:
+		return "Strays are in the Phobos service tunnel."
+	if layout_day != day:
+		return "That was yesterday's tunnel. Look again."
+	if not stray_index in PhobosServiceTunnel.stray_indices_for_day(day):
+		return "There is no stray there."
+	if stray_index in strays_caught_today():
+		return "That one is already caught."
+	var ids: Array = _strays_today().get("ids", [])
+	ids.append(stray_index)
+	strays_caught = { "day": day, "ids": ids }
+	if catch_species(String(RUNNER)):
+		enclosure_origins[String(RUNNER)] = STATION_ORIGIN
+		post_phone("A Banded Regolith Runner. %s. It is kept for the dome." % STATION_LINE)
+	if who != MANAGER_ID:
+		var done: Dictionary = (action_counts.get_or_add(who, {}) as Dictionary).get_or_add(STRAY_COUNT, { "count": 0, "xp": 0 })
+		done["count"] = int(done["count"]) + 1
+	strays_changed.emit()
+	return ""
+
+
 func is_caught(species_id: String) -> bool:
 	return enclosures.has(species_id)
 
@@ -6241,7 +6340,7 @@ func _species_number(species_id: String, field: String) -> float:
 
 
 func is_enclosure_spool_ready(species_id: String) -> bool:
-	return is_caught(species_id) and enclosures[species_id]["molt_stage"] == MoltStage.MOLTED
+	return is_caught(species_id) and not StringName(species_id) in NO_DOME_TANK and enclosures[species_id]["molt_stage"] == MoltStage.MOLTED
 
 
 func is_enclosure_exuvia_visible(species_id: String) -> bool:
@@ -6253,14 +6352,18 @@ func is_enclosure_exuvia_visible(species_id: String) -> bool:
 func enclosure_text(species_id: String) -> String:
 	if not is_caught(species_id):
 		return ""
-	return _molt_line(enclosures[species_id]["molt_progress"], enclosures[species_id]["molt_stage"],
+	var line: String = _molt_line(enclosures[species_id]["molt_progress"], enclosures[species_id]["molt_stage"],
 		enclosure_pause_reason(species_id))
+	# One plain line says where it came from (no full stop: the caller ends the sentence).
+	if enclosure_origins.get(species_id, "") == STATION_ORIGIN:
+		return line + ". " + STATION_LINE
+	return line
 
 
 func _tick_enclosures(delta_days: float) -> void:
 	for id: String in enclosures:
 		var tank: Dictionary = enclosures[id]
-		if tank["molt_stage"] == MoltStage.MOLTED or enclosure_pause_reason(id) != "":
+		if StringName(id) in NO_DOME_TANK or tank["molt_stage"] == MoltStage.MOLTED or enclosure_pause_reason(id) != "":
 			continue
 		tank["molt_progress"] = minf(1.0, tank["molt_progress"] + delta_days / molt_days())
 		tank["molt_stage"] = int(_molt_stage_at(tank["molt_progress"]))
