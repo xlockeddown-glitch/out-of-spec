@@ -26,6 +26,8 @@ var _shape := HeightMapShape3D.new()
 var _heights := PackedFloat32Array()
 ## The natural land's tint at every point, in the same order.
 var _tints := PackedColorArray()
+## One chunk's triangles by index, built on first use and shared.
+static var _faces := PackedInt32Array()
 
 
 func _ready() -> void:
@@ -136,27 +138,33 @@ func _build(chunk: Vector2i) -> void:
 	var points := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var tints := PackedColorArray()
-	var indices := PackedInt32Array()
 	var side: int = CHUNK_M + 1
 	for x: int in range(chunk.x, chunk.x + side):
 		for z: int in range(chunk.y, chunk.y + side):
 			points.append(_point(x, z))
 			normals.append(_normal(x, z))
 			tints.append(_tints[_index(x, z)])
-	for x: int in CHUNK_M:
-		for z: int in CHUNK_M:
-			# Corners run clockwise from above.
-			var here: int = x * side + z
-			indices.append_array([here, here + side, here + 1, here + side, here + side + 1, here + 1])
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = points
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_COLOR] = tints
-	arrays[Mesh.ARRAY_INDEX] = indices
+	arrays[Mesh.ARRAY_INDEX] = _chunk_indices()
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_chunks[chunk].mesh = mesh
+
+
+## The triangles of one chunk by its shared points, the same for every chunk, built
+## once. Corners run clockwise from above.
+func _chunk_indices() -> PackedInt32Array:
+	if _faces.is_empty():
+		var side: int = CHUNK_M + 1
+		for x: int in CHUNK_M:
+			for z: int in CHUNK_M:
+				var here: int = x * side + z
+				_faces.append_array([here, here + side, here + 1, here + side, here + side + 1, here + 1])
+	return _faces
 
 
 func _normal(x: int, z: int) -> Vector3:
@@ -185,4 +193,6 @@ func _index(x: int, z: int) -> int:
 
 
 func _chunk_of(point: Vector2i) -> Vector2i:
-	return Vector2i((Vector2(point) / CHUNK_M).floor()) * CHUNK_M
+	# Chunks start at the land's corner, which is not a multiple of CHUNK_M for every size.
+	var origin := Vector2i(-half_m, -half_m)
+	return Vector2i((Vector2(point - origin) / CHUNK_M).floor()) * CHUNK_M + origin

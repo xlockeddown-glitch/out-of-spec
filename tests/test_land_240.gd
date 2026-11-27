@@ -14,11 +14,11 @@ const OLD_DUG_CELLS: Array[Vector2i] = [Vector2i(30, 30), Vector2i(31, 30), Vect
 ## Of those, the ones the land lets be dug (the freeze took five).
 const OLD_DUG_COUNT: int = 5
 const OLD_DUG_HASH: int = 2385797109
-## The natural plants: how many and a hash of where each stands.
 ## Pocket cells of 240 farms (seeds 7919 * 1..240) and four chained replacements for
 ## each, hashed. Taken on the 160 m code: this is what an old save's seed must give.
 const OLD_POCKETS_HASH: int = 639962704
 const OLD_REPLACEMENTS_HASH: int = 1291208380
+## The natural plants: how many and a hash of where each stands.
 const OLD_PLANTS: int = 545
 const OLD_PLANTS_HASH: int = 532874052
 

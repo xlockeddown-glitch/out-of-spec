@@ -64,6 +64,32 @@ func test_the_ground_shows_digging_and_filling() -> String:
 	return fail
 
 
+func _chunk_heights(ground: TerrainGround, cell: Vector2i) -> PackedFloat32Array:
+	var chunk: Vector2i = ground._chunk_of(cell * Terrain.CELL_M)
+	var mesh: ArrayMesh = ground._chunks[chunk].mesh as ArrayMesh
+	var found := PackedFloat32Array()
+	for corner: Vector3 in mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+		found.append(corner.y)
+	return found
+
+
+func test_a_dig_redraws_the_chunk_in_the_old_land_and_the_ring() -> String:
+	var ground := TerrainGround.new()
+	ground._ready()
+	for cell: Vector2i in [Vector2i(10, 10), Vector2i(-39, 5), Vector2i(50, 50), Vector2i(-58, 20), Vector2i(20, 58)]:
+		var before: PackedFloat32Array = _chunk_heights(ground, cell)
+		ground.show_dug({ cell: 1 })
+		if _chunk_heights(ground, cell) == before:
+			ground.free()
+			return "Digging %s did not redraw its chunk." % cell
+		ground.show_dug({})
+		if _chunk_heights(ground, cell) != before:
+			ground.free()
+			return "Filling %s did not redraw its chunk." % cell
+	ground.free()
+	return ""
+
+
 func test_a_body_lies_level_on_level_ground_and_tips_into_a_hole() -> String:
 	var ground := TerrainGround.new()
 	ground._ready()
