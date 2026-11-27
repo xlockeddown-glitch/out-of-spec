@@ -53,6 +53,7 @@ const GROUPS: Array[Dictionary] = [
 		{ "verb": "Pause", "action": &"open_pause" },
 		{ "verb": "Quests", "action": &"open_quests" },
 		{ "verb": "Skills", "action": &"open_skills" },
+		{ "verb": "Tool roll (what you hold)", "action": &"inventory" },
 		{ "verb": "Co-op", "action": &"open_coop" },
 		{ "verb": "Robots (at Bram's bay)", "action": &"open_robots" },
 		{ "verb": "This guide", "action": &"open_controls" },

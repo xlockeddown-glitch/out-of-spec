@@ -220,6 +220,7 @@ func _ready() -> void:
 	_hud.get_parent().add_child(pause)
 	_hud.get_parent().move_child(pause, 0)
 	_hud.get_parent().add_child(SkillsUI.new())
+	_hud.get_parent().add_child(ToolRollUI.new())
 	_hud.get_parent().add_child(ControlsGuideUI.new())
 	_hud.get_parent().add_child(QuestsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())

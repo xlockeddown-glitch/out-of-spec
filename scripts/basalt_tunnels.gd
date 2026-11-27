@@ -118,6 +118,7 @@ func _ready() -> void:
 	_hud.set_ore(GameState.crystal_ore)
 	_on_credibility_changed(0)
 	_hud.get_parent().add_child(SkillsUI.new())
+	_hud.get_parent().add_child(ToolRollUI.new())
 	_hud.get_parent().add_child(ControlsGuideUI.new())
 	_hud.get_parent().add_child(QuestsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())

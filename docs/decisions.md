@@ -2311,3 +2311,14 @@ Ryan picked "Mix": keep the putty case and terracotta band, and put cream cards 
 - **Save and protocol.** None changed.
 - **Placeholders.** Drift 0.75 m, landing speed 0.6 m/s (was: full stop, 0.05 m/s), outline lift 6 cm, width 8 cm (as before).
 - **Review fixes (Fable, PR 231).** Each press records the cell in front and the rover's place at that press (no chaining of a stale cell with a fresh origin); the outline shows the dig that lands first. Several digs drifting out together say "You moved away" once. The outline's beside-the-pad answer is cached by cell and cleared on terrain, stone, pocket and farm-load changes (`GameState._pad_problems`, not saved), so no per-frame copy of the dug cells. The keys-and-pad test was dropped: the cell does not read the device, so it could not fail.
+
+## Tool Roll inventory panel (2026-11-27, feat/inventory)
+
+Ryan's playtest asked "how do I know I have blocks?". There was no inventory, and gauge-set progress was only a phone row. The Tool Roll is a read-only, tabbed, cream panel of item slots (icon or a placeholder chip with initials, name, count). It adds no item and no save data and changes no protocol; it reads GameState and updates live from its signals. A co-op guest sees what the host synced.
+
+- Tabs: Tools (soil probe, reference standards, wide treads), Crops and Seeds (next seed with its cost, harvest bin by crop), Blocks ("Set n / 81" from gauge_pieces(), blocks dug up from found_blocks), Supplies (credits, stone, crystal ore, optical silk spools; zero is left out). An empty tab says so.
+- Seeds have no held count in GameState (they are bought as planted), so the seed slot shows "NEXT" and the cost rather than an invented number.
+- Key: I opens and closes it; Esc or B also close it. Back is already the scene swap and Start the pause menu, so the pad reaches it through the actions menu (LB + RB), as with Quests and Skills. tests/test_controller.gd lists "inventory" as menu-only for that reason.
+- It does not open while another modal panel (phone, bench, quest board) is open, and holds the rover's input while open.
+- Icons: 10 PNGs from Ryan's sheet copied into assets/icons/; items without one show a chip.
+- [PLACEHOLDER] key, tab names and order, slot size, texts, which items show.
