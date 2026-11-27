@@ -1,0 +1,255 @@
+# Biomes: laying out the surface around the farm (design proposal)
+
+Status: **design, 2026-11-26. For Ryan to answer (§7).** This PR changes no code and no data. Every number and name below is a [PLACEHOLDER] or an [ASSUMPTION] until Ryan sets it.
+
+Ryan, after playtesting: "the map needs to be laid out better. We should make like 'biomes' with farm being center and different things in different areas extending from there." He also said the beginning needs a few tips and an idea of what you are doing (§4).
+
+Markers, as in `zones.md`:
+
+- **[ASSUMPTION]**: a design guess for Ryan to confirm or replace.
+- **[PLACEHOLDER]**: a number or name with no source.
+- **NEW**: something the game does not have today.
+- **[RISK]**: technical risk (§3).
+
+Rules this doc keeps:
+
+- **Biomes are the surface. Zones are the places you go to** (`zones.md`). A biome is walked or driven over; a zone is a separate scene. A zone entrance sits in the biome it belongs to.
+- **The farm stays first and complete.** A player who never leaves the middle still plays the loop.
+- **Small PRs.** The first slice paints a map and moves a few props (§6).
+
+## 1. The problem today
+
+Read from `scenes/main_farm.tscn`, `scripts/world/terrain.gd` and `scripts/main_farm.gd` on main.
+
+- **The land is one 160 m square** (`Terrain.SIZE_M`), centred on the farm, with seven hills of 3 to 6 m (`Terrain.HILLS`: three 6 m hills at the corners, four 3 m ones at the edges). Nothing says what any part of it is for.
+- **The middle is crowded.** The 12 by 12 cell plot (`GameState.PLOT`, 2 m cells, so 24 m square) sits at the origin. Within about 20 m of it are the rover start (0, 2), the drop pod (-3, 14), the dome airlock (8, 14), the field calibration pad (13.5, 15), Bram's bay (16, -2), eight ore fissures (for example (-16, 3) and (11, 18)) and four rim rocks. The tunnel mouth and its pad are at (20.5, -19) and (20.5, -15.5). That is farming, metrology, shopping, mining and rover parking mixed in one ring.
+- **The far land is empty.** Past the 33 m level circle (`Terrain.FARM_LEVEL_M`) there are hills, shrubs, rocks, the wash at (63, 8) and the relay at (-70, -70) with a level road to it. There is little reason to walk to most of it.
+- **Things you do are in different scenes, not different places.** The dome, the tunnels and the farm are three scenes (`SceneSwitcher`). On the farm scene itself, digging, rover driving, ore and the tunnel entrance have no area of their own.
+- **No sense of direction or progress.** The tunnel mouth is open from the first day. The wash, the arch and the hills are scenery. A new player has no road to follow and no sign of what comes next.
+- **The new zones have nowhere to attach.** `zones.md` plans four more underground zones and a shuttle. Only the tunnel mouth exists as an entrance (and a lava hub scene, `scripts/world/lava_hub.gd`).
+
+## 2. The ring idea
+
+The farm is the centre. Around it, **five biomes**, each with one main job and, where it has one, one zone entrance. The land keeps its 160 m square shape; the biomes are painted onto it.
+
+| Biome | Job in play | Systems | Look [ASSUMPTION] | What you find | Level band [PLACEHOLDER] | Zone entrance |
+|---|---|---|---|---|---|---|
+| **Farm** (centre) | Grow, water, harvest, sleep | Plot, bed, bin, Lin buying crops, robots working | Warm terracotta flat, tidy | Crops, the day loop | Always | None |
+| **Lab Quarter** | Metrology: dome, calibration pad, uplink | Dome airlock, field calibration pad, relay road, OIRM drop pod | Pale pads, antennas, cable runs | Instruments, standards, audits | Lab 1 to 20 | None (the dome is a scene) |
+| **Badlands** | Hills, digging, stone, pit water, gauge blocks | `Terrain`, `PitWater`, `StonePieces`, `GaugeSet`, ore pockets, fissures | Rolling hills, mesas, the wash | Ore, blocks, stone, water | Earthworks 1 to 30 | Aquifer sinkhole (Flooded Aquifer, 8 to 24) |
+| **Basalt Ridge** | Tunnel mouth, beacons, rover trips | Rover, Orin's beacons, the lava hub | Dark basalt, steam, cooler colour | Crystal ore, the Sentinel | Lab 5 to 20 | Lava Tubes mouth (built); Colony Mine gate on the ridge road (12 to 30) |
+| **Frost Flats** (north) | Cold, long drives, ice | Rover range and uplink limits, heater supplies | Pale ice, frost, long shadows | Ice samples, minerals | Lab 18 to 35 | Polar Ice Caves ramp (18 to 35) |
+| **Landing Field** | Shuttle, OIRM drop, off-world | Shuttle pad, Odalys's desk, fast-travel terminal | Concrete pad, lights, a gantry | Trips, parts, mail | Lab 20 and up (shuttle) | Phobos and Deimos (by shuttle) |
+
+Where tarantulas live: in the dome, as now (`zones.md` §10). The biomes bring them in; they do not house them.
+
+**Notes**
+
+- **The Lab Quarter is mostly a re-labelling.** The dome is its own scene. The Lab Quarter is its surface side: the airlock, the calibration pad, the relay road and OIRM's drop pod. They already exist; today they sit among the fissures.
+- **The Badlands is the home of digging.** The hills, the wash and the gauge blocks exist (`docs/decisions.md`, "Hills, digging, tunnels"). The biome gives them a name and a place.
+- **The Basalt Ridge** holds what exists (tunnel mouth, pad) and gains a road.
+- **The Frost Flats and the Landing Field are NEW.** Both start small, an empty flat and a pad, so the ring is visible before the content is built.
+
+### 2.1 Layout A: wedges
+
+The farm is the middle disc. Five wedges, painted on the existing 160 m square.
+
+```
+                 N
+     +--------------------------------------+
+     |  FROST FLATS          | BASALT RIDGE |
+     |  (ice ramp)           | (tunnel mouth|
+     |                       |  + mine gate)|
+     |          .------------'              |
+ W   |  LAB    /    FARM     \   LANDING    |  E
+     | QUARTER |  plot, bed  |    FIELD     |
+     | (dome,   \           /  (shuttle)    |
+     |  pad)     '---------'                 |
+     |  BADLANDS (hills, wash, digging)     |
+     +--------------------------------------+
+                 S
+```
+
+- **Good:** simple to paint from one function. Each wedge is one rule.
+- **Bad:** wedges invite "walk straight over". A rover still needs a clear way, so roads come anyway.
+
+### 2.2 Layout B: hub and spokes (roads)
+
+The farm is the hub. Five roads leave it, each level and wide enough for a rover, each ending at the biome's marker. The land between the roads is Badlands.
+
+```
+                Frost Flats
+                     |
+                     | north road [PLACEHOLDER 60 m]
+   Lab Quarter ------+------ Basalt Ridge
+   (west road)       |       (east road)
+                   FARM
+                     |
+                     | south road
+                Landing Field
+
+   Badlands: the open land between the roads
+```
+
+- **Good:** roads teach direction ("follow the road"). The game already has one level road, the one to the relay (`Terrain.ROAD_LEVEL_M`, `RELAY_WAY`). A road can light up when it opens (§4).
+- **Bad:** more terrain rules and art (one road per biome). The Badlands has no edge of its own.
+- **Recommended: B.** It copies the one road the game has and teaches the order of play. A is cheaper. Question 1.
+
+### 2.3 What a biome marker is
+
+Each biome has one marked place on its road: **a sign and a rover-sized pad**. The sign names the biome and the band ("Basalt Ridge: lab level 5 and up. Dark ground, cold nights."). The zone entrance, if any, is next to it. The warning is the soft gate of `zones.md` §7.1 (information, never a wall).
+
+## 3. Size and travel
+
+### 3.1 Distances
+
+The land is 160 m square today. I did not trace the rover's top speed, so times are [ASSUMPTION] and the first PR measures them (§6).
+
+| Trip | Straight line | On foot | By rover |
+|---|---|---|---|
+| Farm centre to the dome airlock | about 16 m | well under a minute | a few seconds |
+| Farm centre to the tunnel mouth | about 28 m | about a minute | about 10 seconds |
+| Farm centre to the relay | about 100 m | several minutes | under a minute |
+| Farm centre to a new biome marker | 50 to 70 m [PLACEHOLDER] | 2 to 3 minutes | 20 to 30 seconds |
+
+- **Walking is for the middle** (farm, Lab Quarter, Landing Field), where the walkers go (`scripts/walker/`).
+- **The rover is for the ring**, as it already is for the dome and the tunnels (`docs/decisions.md`, co-op).
+- **No bigger land at first.** 160 m fits five biomes of 40 to 60 m if the middle is tidied [ASSUMPTION]. Grow it only if a biome needs it (Question 5).
+
+### 3.2 How the world is held
+
+The biggest technical choice.
+
+| Option | What it means | Co-op and save | Risk |
+|---|---|---|---|
+| **A. One big scene (recommended)** | Keep `main_farm.tscn`. Paint biomes into `Terrain`; add props from data. | Nothing changes: the host's farm, `GameState.dug`, the farm seed and the saves stay. | Low while the land stays near 160 m. The ground is already built in 16 m chunks (`TerrainGround.CHUNK_M`). |
+| **B. Streamed chunks** | Load and unload tiles as the rover drives. | Each PC would have a different loaded part, but the host must answer dig and till anywhere. | **High [RISK].** Nothing streams today. The land-hash tests need a rethink. |
+| **C. A scene per biome** | Like the dome and the tunnels: a pad switches scene. | Matches `zones.md` (one scene per PC), but "the rover is in one place" (`rover_in_tunnels`) grows into one flag per biome. | **Medium to high [RISK].** Breaks the open land Ryan asked for. |
+
+- **A is the plan.** One `Terrain`, one dig grid, one save.
+- **[RISK] The ground is computed from a point every meter.** 160 m is 161 by 161 points; doubling the width quadruples that. Measure before choosing a larger size.
+- **[RISK] The uplink.** The ground blocks the relay (`docs/decisions.md`). More hills and a wider land mean more dead spots. A second relay for the far edge is a possible fix [ASSUMPTION].
+- **Zones stay scenes.** A zone entrance on the surface uses the pad-and-E pattern the tunnel mouth uses.
+
+### 3.3 Co-op
+
+- **Host-authoritative, anyone anywhere.** Players in the same biome share the one farm scene. Biomes add no new world to the host.
+- **Shared rover.** The rover is one saved place. A friend who drives it to the Frost Flats leaves another on foot at the farm. That is already true, and is why `zones.md` §8.1 gives each zone its own field rover. A free **parking pad at each biome sign** would let a walker pick up a rover nearby [ASSUMPTION; Question 7].
+- **No new message for a painted map.** The biome map is a function of the farm's seed, so every PC agrees, as the hills do now.
+
+### 3.4 The terrain grid
+
+- `Terrain` already has a seed and a salt, hills, a wash, a road and a rim. A biome is **one more input to the same function**: a tint (`TerrainGround` already tints by height) and a choice of rocks and plants (`HillDressing`).
+- **Digging** (2 m cells, 0.5 m steps, at most 4 steps) works anywhere the rules allow. A biome can change the rules: no digging on a road or a pad; deep Badlands pits seep (`PitWater` already does) [ASSUMPTION].
+- **[RISK] Any change to ground height moves the land hash**, so an old save's dug cells, found blocks and ore pockets could land in a different place. **Do not move the ground, only dress it,** in the early PRs (§5).
+
+## 4. Gating and the first hour
+
+The farm-first layout should teach the loop. The world opens outward in the order the game teaches things.
+
+| Step | What the player does | What opens | Where |
+|---|---|---|---|
+| 0 | Start: a few tips ("Water the plot. Check the probe.") | The Farm: plot, bed, bin | Centre |
+| 1 | First crops, first water | The Lab Quarter: a road sign points at the dome | West |
+| 2 | First calibration, first audit (every 5th morning) | The relay road and the field calibration pad | Lab Quarter |
+| 3 | Lab level about 5 | The Basalt Ridge road lights up; the tunnel mouth stays open | East |
+| 4 | Earthworks skill, first gauge block | The Badlands get a sign and digging tips | Between roads |
+| 5 | Lab level about 18 | The Frost Flats road lights up (a warning below) | North |
+| 6 | Lab level 20, shuttle license | The Landing Field shuttle opens | South |
+
+- **Roads are the tutorial.** A lit road is the hint. Nothing is walled; every biome is reachable on day one, and a sign says what to expect, as `zones.md` §7 chose. [ASSUMPTION] A lit road is a hint, not a lock.
+- **Tips go on a quest board.** Add a board at the farm's edge (NEW; the lava hub already has one, `lava_hub.gd` `BOARD`) showing the first three jobs. The first story quest is "The Thirsty Probe" (`quests_levels_story.md` §6, S1). The hover label on props already gives short text.
+- **Signs name the next step.** "Next: the auditor comes on morning 5" costs one label.
+- **No hard gate on the surface.** Only zone depths and the shuttle license are hard gates (`zones.md` §7.2). Biomes only warn.
+
+## 5. Migration
+
+The rule is **move props, not ground.**
+
+| Today | New layout | Move |
+|---|---|---|
+| Plot (24 m square at the origin) | Farm centre | Stays |
+| Drop pod (-3, 14) | Lab Quarter | Stays or a short move [ASSUMPTION] |
+| Dome airlock (8, 14) | Lab Quarter, west road | Stays or a short move |
+| Field calibration pad (13.5, 15) | Lab Quarter | Stays or a short move |
+| Bram's bay (16, -2) | Farm edge or Landing Field | Question 6 |
+| Tunnel mouth (20.5, -19) and pad | Basalt Ridge | Stays; a road is added |
+| Eight ore fissures near the plot | Badlands side, outside the plot ring | Move out; they are scene props, not in a save |
+| Relay (-70, -70) and its road | West road to the Lab Quarter | Stays |
+| Rim rocks, hill plants | Per biome | Redressed; they are "in no save" (`docs/decisions.md`) |
+| Wash (63, 8) and the arch hill | Badlands | Stays |
+
+- **Saves.** The seed, `GameState.dug`, `found_blocks`, `found_pockets`, `new_pockets`, `pocket_pending`, `pit_seep` and the rover's place are all in ground coordinates. If the ground does not move, **no save changes.** Props that are only scene nodes can move.
+- **A prop that moves under something saved** (a tilled or dug cell at a fissure's old spot): the prop stays, or moves only to a free spot [ASSUMPTION]. Test with an old save.
+- **Old rover places** all lie inside today's 160 m land, which does not shrink. [ASSUMPTION]
+- **Co-op:** the PR that moves props should raise `CoopSession.PROTOCOL`, so a host and guest on different builds are refused, as other changes have done.
+- **The biome map is data:** a table of biome id, centre, reach, tint and props, read the way the zone table is (`zone_data.gd`, `data/`). [ASSUMPTION]
+
+## 6. Build order
+
+Small PRs, one job each, smallest first.
+
+1. **Measure.** A test or dev scene that prints rover top speed and ground build time at 160 m, to put real numbers in §3.1. No change to play.
+2. **Biome table.** `data/biomes.json` and a pure `BiomeData` class (ids, centres, reach, band, tint, zone entrance). Tests only.
+3. **Paint the map.** A debug overlay (a key) that colours the ground by biome, so Ryan can see layout A against B before art is spent.
+4. **Tint the ground by biome.** `TerrainGround` takes the tint. Heights do not change, so the land hash and old saves are safe.
+5. **Signs and parking pads.** One sign and one rover pad per biome, on the existing land. Hover text only.
+6. **Move the fissures out of the middle.** Scene props only. Old-save test.
+7. **Roads.** Level roads from the farm to each biome, as the relay road is. This moves the land hash, so it is its own PR with a migration note (§3.4).
+8. **Quest board on the farm.** Three first-hour tips as quests in `data/quests.json`.
+9. **Gating hints.** Road lighting and signs tied to lab level and the first audit (§4).
+10. **Basalt Ridge dressing.** Dark ground, steam, a lit road to the tunnel mouth.
+11. **Frost Flats.** An empty flat, a sign and a small rock set. The ice-cave ramp comes with that zone.
+12. **Landing Field.** The pad and terminal, when the shuttle is built.
+13. **Land size.** Only if a PR finds a need: grow the land and re-measure.
+
+## 7. Open questions for Ryan
+
+Each has a recommended option first.
+
+1. **Which layout?**
+   - (a) Hub and spokes: roads out of the farm (recommended: teaches direction, matches the relay road).
+   - (b) Wedges painted on the land.
+   - (c) Wedges with a road to each hub.
+2. **How many biomes?**
+   - (a) Five around the farm: Lab Quarter, Badlands, Basalt Ridge, Frost Flats, Landing Field (recommended: each carries a zone).
+   - (b) Four (leave out the Landing Field until the shuttle exists).
+   - (c) Six or more (add a salt flat or a dune field for looks only).
+3. **Is the Lab Quarter a biome of its own?**
+   - (a) Yes, the surface around the dome and calibration pad (recommended: metrology is the game's core).
+   - (b) No, the dome and pad stay part of the Farm.
+4. **Do biomes block you until a level or a quest?**
+   - (a) No: a sign warns and a road lights up as a hint (recommended: matches your soft-gate rule).
+   - (b) A real gate on the Frost Flats and the Landing Field only.
+   - (c) A gate on every biome except the Farm and the Lab Quarter.
+5. **How big should the land be?**
+   - (a) Keep 160 m for now and measure first (recommended: lowest risk to saves and hashes).
+   - (b) Grow to about 240 m.
+   - (c) Grow to about 320 m, with a second relay.
+6. **Where does Bram's bay live?**
+   - (a) At the farm's edge, the shop for the middle (recommended: the first stop for standards).
+   - (b) In the Landing Field.
+   - (c) In the Lab Quarter, beside the dome.
+7. **What do you drive between biomes?**
+   - (a) The shared rover, plus a free parking pad at each biome sign (recommended: no one is stranded).
+   - (b) The shared rover only.
+   - (c) A second small rover per biome.
+8. **How do biomes look different?**
+   - (a) Ground tint, rocks, plants and a few props per biome, with your packs as style reference (recommended: cheapest, saves untouched).
+   - (b) Also a different ground shape per biome (taller hills in the Badlands, flat Frost Flats). This moves the land hash.
+   - (c) Also different light or sky per biome.
+9. **Where does the first-hour teaching live?**
+   - (a) A quest board on the farm with three starter jobs, plus lit roads (recommended: reuses the quest system).
+   - (b) A scripted tutorial with arrows and pop-ups.
+   - (c) Only signs and the phone.
+10. **Where does digging belong?**
+    - (a) Allowed everywhere except roads and pads; the Badlands pays best (recommended).
+    - (b) Only inside the Badlands.
+    - (c) Everywhere, including roads (as today).
+11. **Do old saves keep their ground?**
+    - (a) Yes: biomes are painted over the same ground and only props move (recommended: no save breaks).
+    - (b) Allow a new ground, with a "new world" prompt for old saves.
+12. **Which zone entrance is built on the surface first?**
+    - (a) The Aquifer sinkhole in the Badlands (recommended: digging and pit water are already there).
+    - (b) The Colony Mine gate on the Basalt Ridge road.
+    - (c) The Ice Caves ramp in the Frost Flats.
