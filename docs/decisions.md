@@ -15,6 +15,10 @@ A new hire tends the lab for one day; a one-use reward books her free. Everythin
 - **Save and sync:** `lab_sitter` is in `SAVED_LATER` (old saves have none) and in `FarmSync.SHOWN_BY`. `CoopSession.PROTOCOL` 24 to 25.
 - **Out of scope:** camps, sprinklers, paying someone for several days.
 
+## 2026-11-26: Surface biomes proposal (design only)
+
+Ryan after playtesting: the map needs a better layout, with biomes and the farm at the centre. `docs/design/biomes.md` proposes five surface biomes (Lab Quarter, Badlands, Basalt Ridge, Frost Flats, Landing Field) joined to zone entrances, two layouts, one big scene, props moved but ground not. No code or data changed. Ryan answered all 12 the same day (`biomes.md` §7.1): hub and spokes, five biomes, no gates, land grows to about 240 m (the doc keeps the old 160 m middle's ground so old saves are safe), Bram at the farm's edge, parking pads, tint and props only, a farm quest board for first-hour tips, no digging on roads or pads, old saves keep their ground, the Aquifer sinkhole first.
+
 ## 2026-11-26: The 02:00 rescue for guests (zones sections 6.1 and 12.4)
 
 The recall now covers every connected guest the host has below. Everything is a [PLACEHOLDER] or an [ASSUMPTION] unless Ryan says otherwise; the numbers and words are still `economy.json` `tunnel_recall`.
@@ -2105,3 +2109,7 @@ Ryan's idea: stage areas almost level specific. Underground for lab levels about
 - **Review round 1 (Neon, 15 items).** Fixed: the rover also goes home when the last one on the trip drops from the dome (a trip list, `_trip_players`, holds a player from the moment the rover goes in or the console takes them until they leave the zone or come back to the farm), and when the host stops hosting; `move_rover` is held to the sender's place (in from the farm, out from the hub), notes the guest below at once and counts a new rover epoch, and reads the rover from `_rover_pose_now`; `catch_sentinel` and `set_rover_lights` are held to a guest at the rover's place and depth and no longer save over a told pose; the rover's own poses are only taken with the current epoch; a lent rover coming home counts an epoch; the day no longer ends before the rover is home (CoopBeds loads after CoopScenes); a drop sends the farm to the others after the next frame, and the leaver stops being the told driver; the walkers on foot are left alone when only a field rover changes; the title menu is never held by a console trip that waits; a guest PC's strip names the rover of the scene it is in. Not real: #8 (the permissive reach while the rover is away is meant for players on foot, and is pinned by a test).
 - **The rover home on a drop or a stop costs nothing** [PLACEHOLDER], as for a drop in the zone.
 - **No protocol change:** `CoopSession.PROTOCOL` stays 23.
+
+## The field phone is a little smaller (Ryan: "a little too big")
+
+The phone is scaled by one number, `FieldPhoneHUD.PHONE_SCALE = 0.85` [PLACEHOLDER], to about 85 0f its old size: its width (the phone now starts at 0.728 of the screen, not 0.68), every font, fixed size, gap and the case margins. Only size changed; colours, order, styles and wording are as they were. The scene file still holds the original sizes and the phone scales them when it loads, so "a bit more or less" is a one-number change. The world view, the hover hint and the robots panel end where the phone begins (`FieldPhoneHUD.LEFT_ANCHOR`); a test pins that the scenes agree with it.

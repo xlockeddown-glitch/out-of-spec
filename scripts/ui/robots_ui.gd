@@ -4,7 +4,7 @@ extends Control
 ## The order button is pressed twice.
 
 ## The phone fills the screen from this fraction of its width (field_phone_hud.tscn).
-const PHONE_LEFT_ANCHOR: float = 0.68
+const PHONE_LEFT_ANCHOR: float = FieldPhoneHUD.LEFT_ANCHOR
 const TEAL: Color = Color("38E1C6")
 const AMBER: Color = Color("F5A623")
 const TEXT: Color = Color(0.85, 0.95, 0.88)

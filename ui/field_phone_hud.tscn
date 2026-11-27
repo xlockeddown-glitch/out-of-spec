@@ -36,7 +36,7 @@ corner_radius_bottom_left = 8
 
 [node name="FieldPhoneHUD" type="Control"]
 layout_mode = 3
-anchor_left = 0.68
+anchor_left = 0.728
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 0
