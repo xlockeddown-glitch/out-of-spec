@@ -18,6 +18,10 @@ extends Node3D
 const REACH_M: float = 9.0
 ## Where the walker arrives, by the shuttle.
 const ARRIVE_AT := Vector3(-2.0, 0.0, 7.0)
+## Offset from the hatch when climbing back up from the service tunnel [PLACEHOLDER].
+const HATCH_ARRIVE_OFFSET := Vector3(-2.0, 0.0, 0.0)
+## Set by PhobosServiceTunnel when climbing back up the ladder.
+static var arrive_at_hatch: bool = false
 ## A trip not seen this long after the scene opened is taken as gone, so a screen that
 ## never got it is not stranded [PLACEHOLDER].
 const GRACE_S: float = 3.0
@@ -211,7 +215,11 @@ func _build_walker() -> void:
 	walker.name = "Walker"
 	walker.camera = camera
 	add_child(walker)
-	walker.position = ARRIVE_AT
+	if arrive_at_hatch:
+		arrive_at_hatch = false
+		walker.position = SPOTS["Hatch"] + HATCH_ARRIVE_OFFSET
+	else:
+		walker.position = ARRIVE_AT
 	walker.model.set_suit(WalkerModel.suit_for(GameState.local_player_id, CoopSession.players))
 	_dress_walker()
 	GameState.loadouts_changed.connect(_dress_walker)
@@ -387,8 +395,16 @@ func _on_board() -> void:
 
 
 func _on_hatch() -> void:
-	if _near("Hatch"):
+	if _moon() != MOON:
 		_toast(Shuttle.text("hub_hatch_text"))
+		return
+	if not _near("Hatch") or _leaving:
+		return
+	_leaving = true
+	if change_scene.is_valid():
+		change_scene.call(PhobosServiceTunnel.SCENE_PATH)
+	else:
+		SceneSwitcher.go_to(PhobosServiceTunnel.SCENE_PATH)
 
 
 func _toast(text: String) -> void:
