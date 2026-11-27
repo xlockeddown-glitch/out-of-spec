@@ -4,6 +4,7 @@ extends RefCounted
 
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 const DomeScript: GDScript = preload("res://scripts/dome/dome_interior.gd")
+const HudScene: PackedScene = preload("res://ui/field_phone_hud.tscn")
 
 
 func _root() -> Window:
@@ -35,7 +36,7 @@ func test_labels_match_the_input_map() -> String:
 	var want: Dictionary = {
 		"interact": ["E", "A"], "rover_dig": ["G", "X"], "open_pause": ["Esc", "Start"],
 		"setpoint_up": ["]", "RB"], "setpoint_down": ["[", "LB"], "swap_scene": ["Tab", "View"],
-		"open_controls": ["F1", ""], "buy_1": ["1", ""],
+		"open_controls": ["F1", ""], "buy_1": ["1", ""], "ui_accept": ["Space", "A"],
 	}
 	var bad: PackedStringArray = []
 	for name: String in want:
@@ -47,11 +48,26 @@ func test_labels_match_the_input_map() -> String:
 
 
 func test_stick_and_trigger_axes_are_named() -> String:
-	var steer: String = Controls.pad_label(&"rover_steer_left")
-	var gas: String = Controls.pad_label(&"rover_forward")
-	var brake: String = Controls.pad_label(&"rover_reverse")
-	if not "LS" in steer or not "RT" in gas or not "LT" in brake:
-		return "Axes read %s, %s, %s" % [steer, gas, brake]
+	var want: Dictionary = {
+		"rover_steer_left": "LS left", "rover_steer_right": "LS right",
+		"rover_forward": "LS up / RT", "rover_reverse": "LS down / LT",
+	}
+	var bad: PackedStringArray = []
+	for action: String in want:
+		var got: String = Controls.pad_label(StringName(action))
+		if got != want[action]:
+			bad.append("%s reads \"%s\", not \"%s\"" % [action, got, want[action]])
+	return "" if bad.is_empty() else "Axes: %s" % "; ".join(bad)
+
+
+func test_the_game_says_space_for_accept_and_keeps_the_other_keys() -> String:
+	var all: String = Controls.key_labels(&"ui_accept")
+	if not all.begins_with("Space") or not "Enter" in all:
+		return "ui_accept must list Space first and still know Enter: %s" % all
+	var digit := InputEventKey.new()
+	digit.physical_keycode = KEY_1
+	if Controls._key_name(digit) != "1":
+		return "A digit stays a digit, not %s" % Controls._key_name(digit)
 	return ""
 
 
@@ -111,6 +127,23 @@ func test_every_group_has_a_title_and_lines() -> String:
 	for want: String in ["DRIVING", "ON FOOT", "FARMING", "BUILDING AND STONE", "MENUS", "SHOPPING"]:
 		if not want in titles:
 			return "No %s group" % want
+	return ""
+
+
+## On foot the walker moves and the player gets in or out. Interact is refused there.
+func test_on_foot_lists_walking_not_interact() -> String:
+	for group: Dictionary in ControlsGuideUI.GROUPS:
+		var actions: Array[StringName] = []
+		for line: Dictionary in group["lines"]:
+			if line.has("move"):
+				actions.append(&"walk")
+			elif line.has("action"):
+				actions.append(line["action"])
+		if group["title"] == "ON FOOT":
+			if not actions.has(&"walk") or actions.has(&"interact"):
+				return "ON FOOT must list walking and not interact: %s" % [actions]
+		if group["title"] == "DRIVING" and not actions.has(&"interact"):
+			return "Interact (the bay, the pads) belongs under DRIVING"
 	return ""
 
 
@@ -208,7 +241,10 @@ func test_stored_text_names_no_key() -> String:
 
 
 func test_no_script_hard_codes_a_key_in_a_prompt() -> String:
-	var spot := RegEx.create_from_string("[Pp]ress [A-Z0-9]\\b|\\[(?:E|Y|R|Tab|Space)\\]|\\((?:Esc|K|O|T|F7)\\)")
+	# A key named inside a string: "press X", "X does", "X: ...", "[%d]", "[ and ]", Space.
+	var spot := RegEx.create_from_string("[Pp]ress [A-Z0-9]\\b|\\[(?:E|Y|R|Tab|Space|%d)\\]|\\((?:Esc|K|O|T|F7)\\)"
+		+ "|\"[A-Z]: |[^\\w%][A-Z0-9] (?:does|checks|fills|shows|gets|changes|moves|again|plants|digs|opens|closes)\\b"
+		+ "|\\[ and \\]|\\bSpace\\b")
 	var found: PackedStringArray = []
 	var dirs: Array[String] = ["res://scripts"]
 	while not dirs.is_empty():
@@ -218,10 +254,12 @@ func test_no_script_hard_codes_a_key_in_a_prompt() -> String:
 		for file: String in DirAccess.get_files_at(dir):
 			if not file.ends_with(".gd"):
 				continue
+			if file == "controls.gd":
+				continue
 			var n: int = 0
 			for line: String in FileAccess.get_file_as_string(dir + "/" + file).split("\n"):
 				n += 1
-				if line.strip_edges().begins_with("#"):
+				if line.strip_edges().begins_with("#") or "A picks, B closes." in line:
 					continue
 				if spot.search(line) != null and "\"" in line:
 					found.append("%s/%s:%d" % [dir, file, n])
@@ -289,3 +327,171 @@ class _FakePhone extends RefCounted:
 
 	func push_log(text: String) -> void:
 		lines.append(text)
+
+
+## An open guide stops the rover and the walker (they poll the stick), and the
+## block goes back to what it was.
+func test_the_guide_holds_the_rover_and_gives_it_back() -> String:
+	var guide: ControlsGuideUI = _guide()
+	var problem: String = ""
+	RoverController.input_blocked = false
+	guide.open()
+	if not RoverController.input_blocked:
+		problem = "An open guide must block the rover"
+	guide.close()
+	if problem == "" and RoverController.input_blocked:
+		problem = "Closing must unblock it"
+	RoverController.input_blocked = true
+	guide.open()
+	guide.close()
+	if problem == "" and not RoverController.input_blocked:
+		problem = "A block that was already there must stay"
+	RoverController.input_blocked = false
+	guide.open()
+	_root().remove_child(guide)
+	guide.free()
+	if problem == "" and RoverController.input_blocked:
+		problem = "Tearing the guide down while open must unblock the rover"
+	RoverController.input_blocked = false
+	return problem
+
+
+func test_the_guide_closes_on_the_open_action_too() -> String:
+	var guide: ControlsGuideUI = _guide()
+	guide.open()
+	var problem: String = ""
+	var close := InputEventAction.new()
+	close.action = Controls.CONTROLS_ACTION
+	close.pressed = true
+	guide._unhandled_input(close)
+	if guide.visible:
+		problem = "The open_controls action must close it"
+	_root().remove_child(guide)
+	guide.free()
+	RoverController.input_blocked = false
+	return problem
+
+
+## F7 and K must not open on top of the guide.
+func test_co_op_and_skills_stay_shut_over_the_guide() -> String:
+	var guide: ControlsGuideUI = _guide()
+	guide.open()
+	var coop := CoopUI.new()
+	_root().add_child(coop)
+	var skills := SkillsUI.new()
+	_root().add_child(skills)
+	coop._unhandled_input(_key(KEY_F7))
+	skills._unhandled_input(_key(KEY_K))
+	var problem: String = ""
+	if coop._panel.visible:
+		problem = "F7 opened the co-op panel over the guide"
+	elif skills.visible:
+		problem = "K opened the skills view over the guide"
+	guide.close()
+	coop._unhandled_input(_key(KEY_F7))
+	if problem == "" and not coop._panel.visible:
+		problem = "With the guide shut, F7 must open the co-op panel"
+	for node: Node in [coop, skills, guide]:
+		_root().remove_child(node)
+		node.free()
+	RoverController.input_blocked = false
+	return problem
+
+
+## The pad's actions menu (LB + RB) opens the guide, end to end.
+func test_the_actions_menu_opens_the_guide_end_to_end() -> String:
+	var guide: ControlsGuideUI = _guide()
+	var menu := ActionsMenuUI.new(ActionsMenuUI.PANEL_ACTIONS)
+	menu.sender = func(action: StringName) -> void:
+		var event := InputEventAction.new()
+		event.action = action
+		event.pressed = true
+		guide._unhandled_input(event)
+	_root().add_child(menu)
+	menu.open()
+	var problem: String = "The menu has no CONTROLS button"
+	for row: Node in menu._rows.get_children():
+		if row is Button and (row as Button).text.begins_with("CONTROLS"):
+			(row as Button).pressed.emit()
+			problem = ""
+			break
+	if problem == "" and (menu.visible or not guide.visible):
+		problem = "Picking CONTROLS must close the menu and open the guide"
+	elif problem == "" and not RoverController.input_blocked:
+		problem = "The open guide must hold the rover"
+	guide.close()
+	if problem == "" and RoverController.input_blocked:
+		problem = "Closing the guide must free the rover"
+	for node: Node in [menu, guide]:
+		_root().remove_child(node)
+		node.free()
+	RoverController.input_blocked = false
+	return problem
+
+
+## The watcher sees a pad press even when a scene would eat it, and stays last.
+func test_the_observer_sees_events_first_and_stays_last() -> String:
+	_reset()
+	var watcher: Controls.Observer = Controls.install_observer(Engine.get_main_loop() as SceneTree)
+	var problem: String = ""
+	if watcher.process_mode != Node.PROCESS_MODE_ALWAYS:
+		problem = "It must run while the game is paused"
+	Controls.pad_present_override = true
+	watcher._input(_pad_button(JOY_BUTTON_A))
+	if problem == "" and Controls.last_device != Controls.Device.PAD:
+		problem = "A pad button must flip the device"
+	var late := Node.new()
+	_root().add_child(late)
+	watcher.keep_last()
+	if problem == "" and _root().get_child(_root().get_child_count() - 1) != watcher:
+		problem = "The watcher must be the last child of the root"
+	if problem == "" and Controls.install_observer(Engine.get_main_loop() as SceneTree) != watcher:
+		problem = "Installing twice must not add a second watcher"
+	_root().remove_child(late)
+	late.free()
+	_reset()
+	return problem
+
+
+func _hud() -> FieldPhoneHUD:
+	var hud: FieldPhoneHUD = HudScene.instantiate()
+	_root().add_child(hud)
+	return hud
+
+
+## The phone's key text follows the device in use, including Bram's two buttons,
+## and goes back to keys when the pad is unplugged. No label grows on the pad.
+func test_the_phone_follows_the_device_and_the_unplugging() -> String:
+	_reset()
+	var hud: FieldPhoneHUD = _hud()
+	hud.show_bram("hello", 5, 9, false)
+	hud.show_wheel_service("Wheel nuts due", true)
+	hud._process(0.0)
+	var keys: Array[String] = [Controls.key_label(&"rover_zero_steering"), Controls.key_label(&"interact"),
+		Controls.key_label(&"wheel_service")]
+	var problem: String = ""
+	if not ("[%s]" % keys[0]) in hud._zero_button.text or not ("[%s]" % keys[1]) in hud._trade_button.text \
+			or not ("[%s]" % keys[2]) in hud._wheels_button.text:
+		problem = "On the keyboard: %s | %s | %s" % [hud._zero_button.text, hud._trade_button.text, hud._wheels_button.text]
+	Controls.pad_present_override = true
+	Controls.last_device = Controls.Device.PAD
+	hud._process(0.0)
+	var pad_texts: Array[String] = [hud._zero_button.text, hud._dome_button.text, hud._trade_button.text, hud._wheels_button.text]
+	if problem == "":
+		for text: String in pad_texts:
+			var open: int = text.rfind("[")
+			if open < 0 or text.length() - open > 8:
+				problem = "A pad label must stay short: %s" % text
+		if ("[%s]" % keys[1]) in hud._trade_button.text or ("[%s]" % keys[2]) in hud._wheels_button.text:
+			problem = "On the pad the keys must go: %s" % [pad_texts]
+		elif not "[A]" in hud._trade_button.text:
+			problem = "The trade button must show the pad button: %s" % hud._trade_button.text
+	# The pad is unplugged: the keys come back with no new key press.
+	Controls.pad_present_override = false
+	hud._process(0.0)
+	if problem == "" and not (("[%s]" % keys[1]) in hud._trade_button.text and ("[%s]" % keys[0]) in hud._zero_button.text):
+		problem = "Unplugging must bring the keys back: %s | %s" % [hud._trade_button.text, hud._zero_button.text]
+	_root().remove_child(hud)
+	hud.free()
+	_reset()
+	return problem

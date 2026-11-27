@@ -83,7 +83,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	var toggled: bool = event.is_action_pressed(&"open_coop")
 	if not _panel.visible:
-		if toggled:
+		# Not over another panel (the controls guide, a minigame, ...).
+		if toggled and not QuestsUI.other_panel_open(get_tree(), _panel):
 			get_viewport().set_input_as_handled()
 			open()
 		return

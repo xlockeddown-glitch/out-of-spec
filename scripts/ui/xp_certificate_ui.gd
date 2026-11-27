@@ -96,7 +96,7 @@ func _ready() -> void:
 	column.add_child(_close_button)
 	GameState.xp_certificates_changed.connect(_on_changed)
 	# A save loaded, or a host joined: another farm, and nothing of it spent here.
-	GameState.farm_loaded.connect(_spent.clear)
+	GameState.farm_loaded.connect(_on_farm_loaded)
 	hide()
 
 
@@ -131,6 +131,11 @@ func spendable() -> Dictionary:
 		else:
 			_spent.erase(id)
 	return out
+
+
+## Bound to this node (not to the array), so it lets go when the picker is freed.
+func _on_farm_loaded() -> void:
+	_spent.clear()
 
 
 func _on_changed() -> void:

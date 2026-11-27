@@ -58,6 +58,8 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 @onready var _tunnel_pad: ParkingPad = %TunnelPad
 
 var _robots_ui: RobotsUI
+## Whether Bram's buttons were last drawn for the pad.
+var _bram_pad: bool = false
 ## Wring the Blocks, made the first time J opens it.
 var _wring_game: WringTheBlocks
 var _spool_game: ThreadTheSpool
@@ -198,6 +200,9 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_hud.set_clock(GameClock.format_now())
 	_hud.set_molt(GameState.molt_text() if GameState.has_skill_unlock("molt_on_phone") else "")
+	# Bram's number tags follow the device in use.
+	if _bram_bay.rover_inside and Controls.using_pad() != _bram_pad:
+		_refresh_bram()
 	if _inspect_left > 0.0:
 		_inspect_left -= delta
 		return
@@ -311,9 +316,10 @@ func _refresh_relay_hud() -> void:
 
 
 func _on_soil_tilled(cell: Vector3i) -> void:
-	_hud.push_log("Tilled cell (%s, %s). Space again plants %s (%s CR seed); C changes the seed, [ and ] its starting set point." % [
-		SP811.integer(cell.x), SP811.integer(cell.z), GameState.crop_name(GameState.current_seed()),
-		SP811.integer(GameState.seed_cost(GameState.current_seed()))])
+	_hud.push_log("Tilled cell (%s, %s). %s again plants %s (%s CR seed); %s changes the seed, %s and %s its starting set point." % [
+		SP811.integer(cell.x), SP811.integer(cell.z), Controls.prompt(&"rover_till"), GameState.crop_name(GameState.current_seed()),
+		SP811.integer(GameState.seed_cost(GameState.current_seed())), Controls.prompt(&"cycle_seed"),
+		Controls.prompt(&"setpoint_down"), Controls.prompt(&"setpoint_up")])
 
 
 ## Space on tilled soil: harvest a ready crop, report a growing one, or plant.
@@ -331,7 +337,7 @@ func _on_tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int) ->
 		_hud.push_log("HARVESTED %s, %s.%s" % [GameState.crop_name(entry["crop_id"]), grade, "" if FarmCommands.guest
 			else " Bin: %s crops for Lin at Bram's bay." % SP811.integer(GameState.harvest_bin.size())])
 	elif GameState.plantings.has(cell):
-		_hud.push_log(GameState.crop_status_text(cell) + ". [ and ] move the set point.")
+		_hud.push_log(GameState.crop_status_text(cell) + ". %s and %s move the set point." % [Controls.prompt(&"setpoint_down"), Controls.prompt(&"setpoint_up")])
 	else:
 		var problem: String = await FarmCommands.request(&"plant_crop", [cell, seed_id, offset_steps])
 		if not is_inside_tree():
@@ -382,8 +388,8 @@ func _on_blocks_changed() -> void:
 		var block: Dictionary = ReferenceBlock.at(GameState.world_seed, cell)
 		if not block.is_empty():
 			var kind: StringName = GaugeSet.finding(GameState.world_seed, _blocks_told, block)
-			_hud.push_log("FOUND A REFERENCE BLOCK: %s° angle, ±%s° (k = %s). Q checks a sensor with it." % [
-				SP811.number(block["certified"], 0), SP811.number(block["u"], 2), SP811.number(block["k"], 0)])
+			_hud.push_log("FOUND A REFERENCE BLOCK: %s° angle, ±%s° (k = %s). %s checks a sensor with it." % [
+				SP811.number(block["certified"], 0), SP811.number(block["u"], 2), SP811.number(block["k"], 0), Controls.prompt(&"check_block")])
 			var told: Array = []
 			told.assign(_blocks_told)
 			told.append(cell)
@@ -551,7 +557,7 @@ func _say_dug() -> void:
 	var own: bool = Time.get_ticks_msec() - _dig_pressed_msec < OWN_DIG_MS
 	if total > _dug_depth and own:
 		_dig_pressed_msec = -OWN_DIG_MS
-		_hud.push_log("Dug. H fills it again.")
+		_hud.push_log("Dug. " + Controls.prompt(&"rover_fill") + " fills it again.")
 	_dug_depth = total
 
 
@@ -611,7 +617,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"wheel_service") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_wheel_service()
-	elif event.is_action_pressed(&"open_robots") and _bram_bay.rover_inside:
+	elif event.is_action_pressed(&"open_robots") and _bram_bay.rover_inside and not QuestsUI.other_panel_open(get_tree(), _robots_ui):
 		get_viewport().set_input_as_handled()
 		_robots_ui.open()
 	elif event.is_action_pressed(&"rover_dig"):
@@ -769,7 +775,7 @@ func _on_credibility_changed(_points: int) -> void:
 
 func _on_skill_leveled(player_id: String, skill_id: String, _level: int) -> void:
 	if player_id == "" or player_id == GameState.local_player_id:
-		_hud.push_log("SKILL UP: %s. K shows skills." % GameState.skill_text(skill_id))
+		_hud.push_log("SKILL UP: %s. %s shows skills." % [GameState.skill_text(skill_id), Controls.prompt(&"open_skills")])
 
 
 func _on_credits_changed(amount: int) -> void:
@@ -866,7 +872,16 @@ func _on_rover_entered_bay() -> void:
 	_refresh_bram()
 
 
+## The number key's tag on one of Bram's buttons: "  [3]" on the keyboard, nothing
+## on a pad (its buttons would grow, and the actions menu lists the buys).
+func _buy_tag(index: int) -> String:
+	if Controls.using_pad():
+		return ""
+	return "  [%s]" % Controls.key_label(ActionsMenuUI.BUY_ACTIONS[index])
+
+
 func _refresh_bram() -> void:
+	_bram_pad = Controls.using_pad()
 	_hud.show_bram(_bram_line, GameState.treads_ore_cost(), GameState.crystal_ore, GameState.has_wide_treads)
 	_hud.show_wheel_service(GameState.wheel_service_text(), GameState.wheels_due())
 	var offers: Array[Dictionary] = []
@@ -882,11 +897,11 @@ func _refresh_bram() -> void:
 			var gate: String = "" if owned else GameState.tier_lab_note(id)
 			if gate == "" and not owned and GameState.tier_problem(id) != "":
 				gate = "not open yet"
-			var text: String = "%s %s: %s  [%d]" % [verb, sensor.short_name.to_upper(), GameState.standard_price_text(id).to_upper(), i + 1]
+			var text: String = "%s %s: %s%s" % [verb, sensor.short_name.to_upper(), GameState.standard_price_text(id).to_upper(), _buy_tag(i)]
 			if owned:
 				text = "%s: ON THE COLONY" % sensor.short_name.to_upper()
 			elif gate != "":
-				text = "%s: %s  [%d]" % [sensor.short_name.to_upper(), gate.to_upper(), i + 1]
+				text = "%s: %s%s" % [sensor.short_name.to_upper(), gate.to_upper(), _buy_tag(i)]
 			offers.append({
 				"id": id,
 				"text": text,
@@ -1041,7 +1056,7 @@ func _get_out_or_in() -> void:
 	if problem == "" and is_inside_tree():
 		CoopWalkers.went_out(at.x, at.z)
 		_robots_ui.hide()
-		_hud.push_log("On foot. F gets back in the rover.")
+		_hud.push_log("On foot. " + Controls.prompt(&"get_out_in") + " gets back in the rover.")
 	elif is_inside_tree():
 		_hud.push_log("ROVER: " + problem)
 

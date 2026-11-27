@@ -132,5 +132,5 @@ func hint() -> String:
 		return ""
 	var far_m: float = _own.global_position.distance_to(rover.global_position)
 	if far_m <= CoopWalkers.REACH_M:
-		return "F: get in the rover"
+		return "%s: get in the rover" % Controls.prompt(&"get_out_in")
 	return "On foot. The rover is %d m away." % ceili(far_m)

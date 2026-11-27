@@ -537,6 +537,9 @@ const OFFSET_CURRENT: int = -2147483648
 
 
 func _ready() -> void:
+	# Watches the input, for the on-screen key names (Controls). The root is still
+	# busy setting up autoloads, so the node is added a moment later.
+	Controls.install_observer.call_deferred(get_tree())
 	_set_up_farm(_new_seed())
 	GameClock.time_advanced.connect(_on_time_advanced)
 	GameClock.clock_ran.connect(_tick_molt)
@@ -570,11 +573,6 @@ func _set_up_farm(p_seed: int) -> void:
 	credits = int(DataManager.get_number(ECONOMY_TABLE, "starting_credits", 0.0))
 	reset_credibility()
 	_post_morning_dispatch(1)  # day 1 is already under way at boot
-
-
-func _input(event: InputEvent) -> void:
-	# Which device the player uses last, for the on-screen key names (Controls).
-	Controls.note_event(event)
 
 
 func _unhandled_input(event: InputEvent) -> void:

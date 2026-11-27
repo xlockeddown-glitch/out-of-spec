@@ -150,7 +150,7 @@ func _show_reading(sensor: DriftingSensor, ideal: Variant, unit: String, title: 
 
 func _on_skill_leveled(player_id: String, skill_id: String, _level: int) -> void:
 	if not _holding_audit and (player_id == "" or player_id == GameState.local_player_id):
-		_toast("SKILL UP: %s. K shows skills." % GameState.skill_text(skill_id))
+		_toast("SKILL UP: %s. %s shows skills." % [GameState.skill_text(skill_id), Controls.prompt(&"open_skills")])
 
 
 func _on_terrarium_clicked() -> void:

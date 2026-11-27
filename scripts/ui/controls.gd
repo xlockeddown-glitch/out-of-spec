@@ -27,6 +27,10 @@ const STICK_NOTICE: float = 0.5
 ## [PLACEHOLDER] words for a verb the pad reaches only through the actions menu.
 const MENU_WORDS: String = "LB + RB > %s"
 const CONTROLS_ACTION: StringName = &"open_controls"
+## Where an action has several keys, the one the game's text names first.
+const PREFERRED_KEYS: Dictionary[StringName, int] = {&"ui_accept": KEY_SPACE}
+## What a phone button says on a pad for a verb that has no pad button.
+const SHORT_MENU: String = "menu"
 
 ## The device the local player touched last.
 static var last_device: Device = Device.KEY
@@ -64,21 +68,30 @@ static func using_pad() -> bool:
 
 ## "E", "Space", "Esc", "[": the first key of the action, "" if it has none.
 static func key_label(action: StringName) -> String:
-	for event: InputEvent in _events(action):
-		if event is InputEventKey:
-			return _key_name(event as InputEventKey)
-	return ""
+	var all: PackedStringArray = _key_list(action)
+	return all[0] if not all.is_empty() else ""
 
 
 ## Every key of the action: "W / Up".
 static func key_labels(action: StringName) -> String:
+	return " / ".join(_key_list(action))
+
+
+## The keys of the action, the preferred one (if it has one) first.
+static func _key_list(action: StringName) -> PackedStringArray:
 	var found: PackedStringArray = []
 	for event: InputEvent in _events(action):
 		if event is InputEventKey:
 			var text: String = _key_name(event as InputEventKey)
 			if not text in found:
 				found.append(text)
-	return " / ".join(found)
+	if PREFERRED_KEYS.has(action):
+		var want: String = KEY_NAMES.get(PREFERRED_KEYS[action], "")
+		var at: int = found.find(want)
+		if at > 0:
+			found.remove_at(at)
+			found.insert(0, want)
+	return found
 
 
 ## "A", "RB", "D-pad up", "LS up / RT": every pad input of the action, "" if it has none.
@@ -103,6 +116,16 @@ static func prompt(action: StringName) -> String:
 		if pad != "":
 			return pad
 		return MENU_WORDS % menu_name(action)
+	var key: String = key_label(action)
+	return key if key != "" else pad_label(action)
+
+
+## Like prompt(), but never longer than a phone button can hold: on a pad a verb
+## with no button is just "menu".
+static func short_prompt(action: StringName) -> String:
+	if using_pad():
+		var pad: String = pad_label(action)
+		return pad.replace("D-pad ", "D-") if pad != "" else SHORT_MENU
 	var key: String = key_label(action)
 	return key if key != "" else pad_label(action)
 
@@ -143,7 +166,14 @@ static func _events(action: StringName) -> Array[InputEvent]:
 
 
 static func _key_name(event: InputEventKey) -> String:
-	var code: int = event.keycode if event.keycode != KEY_NONE else event.physical_keycode
+	var code: int = event.keycode
+	if code == KEY_NONE:
+		code = event.physical_keycode
+		## A letter key shows what is printed on this keyboard (AZERTY, QWERTZ).
+		if code >= KEY_A and code <= KEY_Z and DisplayServer.get_name() != "headless":
+			var printed: int = DisplayServer.keyboard_get_label_from_physical(code as Key)
+			if printed != KEY_NONE:
+				code = printed
 	if KEY_NAMES.has(code):
 		return KEY_NAMES[code]
 	return OS.get_keycode_string(code)
@@ -165,3 +195,36 @@ static func _axis_name(event: InputEventJoypadMotion) -> String:
 		JOY_AXIS_TRIGGER_RIGHT:
 			return "RT"
 	return ""
+
+
+## Puts a watcher at the end of the root's children, so it sees every input event
+## first (the last child runs _input first), even while paused and even when a
+## minigame or a panel would eat the event. Safe to call twice.
+static func install_observer(tree: SceneTree) -> Observer:
+	var existing: Node = tree.root.get_node_or_null(^"ControlsObserver")
+	if existing != null:
+		return existing as Observer
+	var watcher: Observer = Observer.new()
+	watcher.name = "ControlsObserver"
+	tree.root.add_child(watcher)
+	return watcher
+
+
+## Only watches: it never handles an event.
+class Observer extends Node:
+	func _ready() -> void:
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		get_tree().root.child_entered_tree.connect(_on_root_child)
+
+	func _input(event: InputEvent) -> void:
+		Controls.note_event(event)
+
+	func _on_root_child(node: Node) -> void:
+		if node != self:
+			keep_last.call_deferred()
+
+	## A scene added after this node would run _input before it: move back to the end.
+	func keep_last() -> void:
+		var root: Node = get_parent()
+		if root != null and root.get_child(root.get_child_count() - 1) != self:
+			root.move_child(self, root.get_child_count() - 1)

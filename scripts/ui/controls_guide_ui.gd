@@ -4,7 +4,8 @@ extends Control
 ## pad button, read from the InputMap (Controls). F1 opens and closes it, or the
 ## pad's actions menu (LB + RB, then CONTROLS). It copies the look of the skills view.
 ## It never opens over another panel (the minigames too), and while it is open no
-## key or pad press reaches the farm behind it. The pad scrolls it with the D-pad or stick.
+## key or pad press reaches the farm behind it, and the rover and the walker stand
+## still. The pad scrolls it with the D-pad or stick.
 
 const TEAL: Color = SkillsUI.TEAL
 const TEXT: Color = SkillsUI.TEXT
@@ -12,8 +13,9 @@ const DIM: Color = SkillsUI.DIM
 ## [PLACEHOLDER] words.
 const TITLE: String = "CONTROLS"
 const CHORD_LINE: String = "LB + RB together open the actions menu: the verbs that have no button of their own."
-## How far one D-pad or stick step scrolls, px.
-const SCROLL_STEP: int = 70
+## How fast the D-pad, the stick or the arrow keys scroll it, px per second
+## (the stick scrolls slower the less it is pushed).
+const SCROLL_SPEED: float = 600.0
 ## [PLACEHOLDER] The groups, in the order shown. Each line is a verb and its action;
 ## "actions" is a run of actions shown as one line (the buy keys).
 const GROUPS: Array[Dictionary] = [
@@ -25,10 +27,12 @@ const GROUPS: Array[Dictionary] = [
 		{ "verb": "Re-zero the steering", "action": &"rover_zero_steering" },
 		{ "verb": "Lights low or on (the tunnels)", "action": &"rover_lights" },
 		{ "verb": "Swap farm and dome", "action": &"swap_scene" },
+		{ "verb": "Use what is in front of you (Bram's bay)", "action": &"interact" },
 	] },
 	{ "title": "ON FOOT", "lines": [
 		{ "verb": "Get out of the rover, or back in", "action": &"get_out_in" },
-		{ "verb": "Use what is in front of you", "action": &"interact" },
+		{ "verb": "Walk (forward, left, back, right)", "move": [
+			&"rover_forward", &"rover_steer_left", &"rover_reverse", &"rover_steer_right"] },
 	] },
 	{ "title": "FARMING", "lines": [
 		{ "verb": "Drill, till, plant or harvest", "action": &"rover_till" },
@@ -70,6 +74,8 @@ var _rows: VBoxContainer
 var _close_button: Button
 ## What had the focus when the guide opened: it gets it back.
 var _focus_before: Control
+## The rover's input block as it was when the guide opened: it goes back to that.
+var _blocked_before: bool = false
 
 
 func _ready() -> void:
@@ -103,13 +109,15 @@ func _ready() -> void:
 	hide()
 
 
-## The D-pad and the stick scroll it. Taken before the button's focus moves.
+## The D-pad, the stick and the arrow keys scroll it smoothly while held.
+func _process(delta: float) -> void:
+	if visible:
+		_scroll.scroll_vertical += int(Input.get_axis(&"ui_up", &"ui_down") * SCROLL_SPEED * delta)
+
+
+## Taken before the button's focus moves: up and down only scroll.
 func _input(event: InputEvent) -> void:
-	if not visible:
-		return
-	var down: bool = event.is_action_pressed(&"ui_down")
-	if down or event.is_action_pressed(&"ui_up"):
-		_scroll.scroll_vertical += SCROLL_STEP if down else -SCROLL_STEP
+	if visible and (event.is_action(&"ui_down") or event.is_action(&"ui_up")):
 		get_viewport().set_input_as_handled()
 
 
@@ -124,12 +132,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if toggled or event.is_action_pressed(&"ui_cancel"):
 		close()
+		get_viewport().set_input_as_handled()
 	# As in SkillsUI: no key or pad press reaches the farm behind the view.
-	if key != null or event is InputEventJoypadButton or event is InputEventJoypadMotion:
+	elif key != null or event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		get_viewport().set_input_as_handled()
 
 
 func open() -> void:
+	_blocked_before = RoverController.input_blocked
+	RoverController.input_blocked = true
 	_focus_before = get_viewport().gui_get_focus_owner()
 	_refresh()
 	show()
@@ -139,6 +150,8 @@ func open() -> void:
 
 ## Hides the view and gives the focus back to what had it before open().
 func close() -> void:
+	if visible:
+		RoverController.input_blocked = _blocked_before
 	hide()
 	var before: Control = _focus_before
 	_focus_before = null
@@ -148,6 +161,12 @@ func close() -> void:
 		_close_button.release_focus()
 
 
+## If the guide is torn down while open, the rover gets its controls back.
+func _exit_tree() -> void:
+	if visible:
+		RoverController.input_blocked = _blocked_before
+
+
 ## Every action the guide lists.
 static func listed_actions() -> Array[StringName]:
 	var all: Array[StringName] = []
@@ -155,6 +174,8 @@ static func listed_actions() -> Array[StringName]:
 		for line: Dictionary in group["lines"]:
 			if line.has("actions"):
 				all.append_array(line["actions"])
+			elif line.has("move"):
+				all.append_array(line["move"])
 			else:
 				all.append(line["action"])
 	return all
@@ -165,11 +186,18 @@ static func key_text(line: Dictionary) -> String:
 	if line.has("actions"):
 		var run: Array = line["actions"]
 		return "%s to %s" % [Controls.key_label(run[0]), Controls.key_label(run[run.size() - 1])]
+	if line.has("move"):
+		var keys: PackedStringArray = []
+		for action: StringName in line["move"]:
+			keys.append(Controls.key_label(action))
+		return " ".join(keys)
 	return Controls.key_labels(line["action"])
 
 
 ## The pad text of a line: "menu" for the verbs the actions menu carries.
 static func pad_text(line: Dictionary) -> String:
+	if line.has("move"):
+		return "LS"
 	var action: StringName = line["actions"][0] if line.has("actions") else line["action"]
 	var pad: String = Controls.pad_label(action)
 	return pad if pad != "" else "menu"
