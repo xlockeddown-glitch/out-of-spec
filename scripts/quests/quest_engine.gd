@@ -758,8 +758,8 @@ static func data_problem(quest: Dictionary) -> String:
 		if quest.has(key) and not quest[key] is Dictionary:
 			return "'%s' is not a dictionary." % key
 	if (quest.get("rewards", {}) as Dictionary).has(SHUTTLE_LICENSE):
-		var licence: Variant = (quest["rewards"] as Dictionary)[SHUTTLE_LICENSE]
-		if typeof(licence) != TYPE_BOOL or not licence:
+		var license: Variant = (quest["rewards"] as Dictionary)[SHUTTLE_LICENSE]
+		if typeof(license) != TYPE_BOOL or not license:
 			return "its shuttle_license reward is not true."
 		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_FARM or is_daily(quest):
 			return "the shuttle license is the farm's: a farm quest that is not a daily ask."
