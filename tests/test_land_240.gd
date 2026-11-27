@@ -15,6 +15,10 @@ const OLD_DUG_CELLS: Array[Vector2i] = [Vector2i(30, 30), Vector2i(31, 30), Vect
 const OLD_DUG_COUNT: int = 5
 const OLD_DUG_HASH: int = 2385797109
 ## The natural plants: how many and a hash of where each stands.
+## Pocket cells of 240 farms (seeds 7919 * 1..240) and four chained replacements for
+## each, hashed. Taken on the 160 m code: this is what an old save's seed must give.
+const OLD_POCKETS_HASH: int = 639962704
+const OLD_REPLACEMENTS_HASH: int = 1291208380
 const OLD_PLANTS: int = 545
 const OLD_PLANTS_HASH: int = 532874052
 
@@ -73,8 +77,8 @@ func test_old_found_blocks_and_pockets_are_where_they_were() -> String:
 
 func test_the_new_ring_holds_no_block_or_pocket_for_now() -> String:
 	for seed_value: int in [SEED, SEED_B]:
-		for x: int in range(-59, 59):
-			for z: int in range(-59, 59):
+		for x: int in range(-60, 60):
+			for z: int in range(-60, 60):
 				var cell := Vector2i(x, z)
 				if not Terrain.in_old_land(cell) and not ReferenceBlock.at(seed_value, cell).is_empty():
 					return "The ring has a block at %s." % cell
@@ -145,4 +149,29 @@ func test_the_walker_reaches_115_m_and_not_past_the_edge() -> String:
 	for at: Vector2 in [Vector2(Terrain.HALF_M + 1.0, 0), Vector2(0, -Terrain.HALF_M - 1.0), Vector2(200, 200)]:
 		if Walker._is_free(at):
 			return "The walker can stand past the edge at %s." % at
+	return ""
+
+
+func test_240_old_farms_keep_their_pockets_and_replacements() -> String:
+	var cells_hash: int = 17
+	var next_hash: int = 17
+	var none: Dictionary = {}
+	for i: int in range(1, 241):
+		var seed_value: int = i * 7919
+		var cells: Array[Vector2i] = OrePocket.cells(seed_value)
+		for cell: Vector2i in cells:
+			cells_hash = (cells_hash * 31 + cell.x * 100 + cell.y) & 0xffffffff
+			if not Terrain.in_old_land(cell):
+				return "Seed %d has a pocket outside the old land at %s." % [seed_value, cell]
+		var extra: Array[Vector2i] = []
+		var from: Vector2i = cells[0]
+		for _step: int in 4:
+			var grown: Vector2i = OrePocket.replacement(seed_value, from, none, none, extra)
+			next_hash = (next_hash * 31 + grown.x * 100 + grown.y) & 0xffffffff
+			if grown != OrePocket.NONE and not Terrain.in_old_land(grown):
+				return "Seed %d grows a pocket outside the old land at %s." % [seed_value, grown]
+			extra.append(grown)
+			from = grown
+	if cells_hash != OLD_POCKETS_HASH or next_hash != OLD_REPLACEMENTS_HASH:
+		return "Old farms' pockets changed: %d, %d." % [cells_hash, next_hash]
 	return ""

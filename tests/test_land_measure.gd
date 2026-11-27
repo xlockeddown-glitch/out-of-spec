@@ -42,8 +42,8 @@ func test_small_ground_builds() -> String:
 	holder.free()
 	if float(built["ms"]) <= 0.0:
 		return "no build time was measured"
-	# 64 m is 4 by 4 chunks of 16 by 16 squares, 6 corners each.
-	if built["chunks"] != 16 or built["vertices"] != 16 * 16 * 16 * 6:
+	# 64 m is 4 by 4 chunks of 16 by 16 squares, each chunk 17 by 17 shared points.
+	if built["chunks"] != 16 or built["vertices"] != 16 * 17 * 17:
 		return "wrong mesh count: %s" % str(built)
 	if built["points"] != 65 * 65:
 		return "wrong point count: %d" % built["points"]

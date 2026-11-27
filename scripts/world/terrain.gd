@@ -103,13 +103,19 @@ static var _natural: PackedFloat32Array = PackedFloat32Array()
 ## the ground at the edge.
 static func natural(point: Vector2i) -> float:
 	if _natural.is_empty():
+		var width: int = SIZE_M + 1
 		var found := PackedFloat32Array()
-		found.resize((SIZE_M + 1) * (SIZE_M + 1))
-		var i: int = 0
+		found.resize(width * width)
+		# The old land first: the ring eases from its edge, so it can reuse those heights.
+		for z: int in range(-OLD_HALF_M, OLD_HALF_M + 1):
+			for x: int in range(-OLD_HALF_M, OLD_HALF_M + 1):
+				found[(z + HALF_M) * width + x + HALF_M] = _work_out(x, z)
 		for z: int in range(-HALF_M, HALF_M + 1):
 			for x: int in range(-HALF_M, HALF_M + 1):
-				found[i] = natural_on(Vector2i(x, z), HALF_M)
-				i += 1
+				var out_m: int = maxi(absi(x), absi(z))
+				if out_m > OLD_HALF_M:
+					var edge := Vector2i(clampi(x, -OLD_HALF_M, OLD_HALF_M), clampi(z, -OLD_HALF_M, OLD_HALF_M))
+					found[(z + HALF_M) * width + x + HALF_M] = _ring(Vector2i(x, z), HALF_M, found[(edge.y + HALF_M) * width + edge.x + HALF_M])
 		_natural = found
 	return _natural[(clampi(point.y, -HALF_M, HALF_M) + HALF_M) * (SIZE_M + 1) + clampi(point.x, -HALF_M, HALF_M) + HALF_M]
 
@@ -141,8 +147,15 @@ static func natural_on(point: Vector2i, half_m: int) -> float:
 	if out_m <= OLD_HALF_M:
 		return _work_out(point.x, point.y)
 	var edge := Vector2i(clampi(point.x, -OLD_HALF_M, OLD_HALF_M), clampi(point.y, -OLD_HALF_M, OLD_HALF_M))
+	return _ring(point, half_m, _work_out(edge.x, edge.y))
+
+
+## A point past the old edge: eased from the old edge's height `edge_m` to the ground
+## with its rim at the new edge.
+static func _ring(point: Vector2i, half_m: int, edge_m: float) -> float:
+	var out_m: int = maxi(absi(point.x), absi(point.y))
 	var along: float = float(out_m - OLD_HALF_M) / float(maxi(half_m - OLD_HALF_M, 1))
-	var eased: float = lerpf(_work_out(edge.x, edge.y), _work_out(point.x, point.y, half_m), _ease(along))
+	var eased: float = lerpf(edge_m, _work_out(point.x, point.y, half_m), _ease(along))
 	return roundf(eased * HEIGHT_PARTS) / HEIGHT_PARTS
 
 

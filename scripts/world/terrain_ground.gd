@@ -131,32 +131,32 @@ func lie_at(at: Vector3, forward: Vector3, half_length_m: float, half_width_m: f
 
 
 func _build(chunk: Vector2i) -> void:
+	# One vertex for each point, shared by the faces around it: a point's slope and
+	# tint do not depend on the face, so it looks as before with a sixth of the vertices.
 	var points := PackedVector3Array()
 	var normals := PackedVector3Array()
 	var tints := PackedColorArray()
-	for x: int in range(chunk.x, chunk.x + CHUNK_M):
-		for z: int in range(chunk.y, chunk.y + CHUNK_M):
-			_add_face(points, normals, [Vector2i(x, z), Vector2i(x + 1, z), Vector2i(x, z + 1)])
-			_add_face(points, normals, [Vector2i(x + 1, z), Vector2i(x + 1, z + 1), Vector2i(x, z + 1)])
-			for corner: int in [_index(x, z), _index(x + 1, z), _index(x, z + 1), _index(x + 1, z), _index(x + 1, z + 1), _index(x, z + 1)]:
-				tints.append(_tints[corner])
+	var indices := PackedInt32Array()
+	var side: int = CHUNK_M + 1
+	for x: int in range(chunk.x, chunk.x + side):
+		for z: int in range(chunk.y, chunk.y + side):
+			points.append(_point(x, z))
+			normals.append(_normal(x, z))
+			tints.append(_tints[_index(x, z)])
+	for x: int in CHUNK_M:
+		for z: int in CHUNK_M:
+			# Corners run clockwise from above.
+			var here: int = x * side + z
+			indices.append_array([here, here + side, here + 1, here + side, here + side + 1, here + 1])
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = points
 	arrays[Mesh.ARRAY_NORMAL] = normals
 	arrays[Mesh.ARRAY_COLOR] = tints
+	arrays[Mesh.ARRAY_INDEX] = indices
 	var mesh := ArrayMesh.new()
 	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	_chunks[chunk].mesh = mesh
-
-
-## Corners run clockwise from above. Each takes the slope of the land around it,
-## not of its own face, so a slope is not shaded in zigzags where the squares'
-## diagonals alternate.
-func _add_face(points: PackedVector3Array, normals: PackedVector3Array, corners: Array[Vector2i]) -> void:
-	for corner: Vector2i in corners:
-		points.append(_point(corner.x, corner.y))
-		normals.append(_normal(corner.x, corner.y))
 
 
 func _normal(x: int, z: int) -> Vector3:

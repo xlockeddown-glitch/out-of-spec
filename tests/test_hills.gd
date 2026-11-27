@@ -162,7 +162,7 @@ func test_a_rover_saved_inside_a_hill_comes_back_on_it() -> String:
 		problem = "It must come back on top of the hill."
 	rover.global_position = Vector3(300, -900, 0)
 	rover._put_back_on_land()
-	if rover.global_position.x > Terrain.HALF_M or rover.global_position.y < Terrain.height(Vector2(79, 0), _none):
+	if rover.global_position.x > Terrain.HALF_M or rover.global_position.y < Terrain.height(Vector2(Terrain.HALF_M - 1.0, 0), _none):
 		problem = "It must come back onto the land."
 	rover.global_position = Vector3(3, 0.0, 2)
 	rover._put_back_on_land()

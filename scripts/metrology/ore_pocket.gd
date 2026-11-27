@@ -46,7 +46,7 @@ static func cells(world_seed: int) -> Array[Vector2i]:
 		rng.seed = hash("%d:ore" % world_seed)
 		while _cells.size() < COUNT:
 			var cell := Vector2i(rng.randi_range(-limit, limit - 1), rng.randi_range(-limit, limit - 1))
-			if Terrain.can_dig(cell) and not Terrain.is_near_water(cell) and not HillDressing.is_at_rock(cell) and not cell in _cells and ReferenceBlock.at(world_seed, cell).is_empty():
+			if Terrain.in_old_land(cell) and Terrain.can_dig(cell) and not Terrain.is_near_water(cell) and not HillDressing.is_at_rock(cell) and not cell in _cells and ReferenceBlock.at(world_seed, cell).is_empty():
 				_cells.append(cell)
 	return _cells
 
@@ -66,7 +66,7 @@ static func replacement(world_seed: int, from: Vector2i, dug: Dictionary, found:
 		var cell := Vector2i(rng.randi_range(-limit, limit - 1), rng.randi_range(-limit, limit - 1))
 		if maxi(absi(cell.x - from.x), absi(cell.y - from.y)) < MOVE_CELLS or dug.has(cell) or found.has(cell) or built.has(cell):
 			continue
-		if cell in originals or cell in extra or not Terrain.can_dig(cell) or Terrain.is_near_water(cell):
+		if cell in originals or cell in extra or not Terrain.in_old_land(cell) or not Terrain.can_dig(cell) or Terrain.is_near_water(cell):
 			continue
 		if not HillDressing.is_at_rock(cell) and ReferenceBlock.at(world_seed, cell).is_empty():
 			return cell
