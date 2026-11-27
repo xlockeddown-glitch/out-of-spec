@@ -68,7 +68,7 @@ func _ready() -> void:
 ## The rover this screen is with: in the tunnels, the one below (a console's field rover too).
 func _rover_here() -> String:
 	var scene: Node = get_tree().current_scene
-	if scene != null and scene.scene_file_path == SceneSwitcher.TUNNELS_SCENE:
+	if scene != null and SceneSwitcher.is_zone_scene(scene.scene_file_path):
 		return GameState.TUNNEL_ROVER
 	return GameState.rover_here()
 

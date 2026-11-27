@@ -44,6 +44,7 @@ const SHOWN_BY: Dictionary = {
 	&"rover_lights_changed": ["rover_lights"],
 	&"beacons_changed": ["beacons_placed"],
 	&"finds_changed": ["finds_taken"],
+	&"pump_changed": ["pump_owned", "pools_drained"],
 	&"lifts_changed": ["lifts_repaired", "deepest_depth"],
 	&"lab_sitter_changed": ["lab_sitter"],
 	&"shuttle_license_changed": ["shuttle_licensed"],

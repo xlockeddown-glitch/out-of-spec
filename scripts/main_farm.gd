@@ -60,6 +60,8 @@ var _verb_prompt: VerbPrompt
 ## the tire gauge against the WD-1 without going into the dome.
 @onready var _cal_pad: ParkingPad = %FieldCalPad
 @onready var _tunnel_pad: ParkingPad = %TunnelPad
+## The Flooded Aquifer's sinkhole and the pad on it (built in _ready, like the notice board).
+var _aquifer_pad: ParkingPad
 ## The farm notice board and the pad by it (NoticeBoard), built in _ready.
 var _notice_pad: ParkingPad
 
@@ -86,6 +88,7 @@ var _inspect_left: float = 0.0
 var _armed_standard: String = ""
 ## The zone the tunnel mouth leads to (data/zones.json).
 const TUNNELS_ZONE: StringName = &"lava_tubes"
+const AQUIFER_ZONE: StringName = &"flooded_aquifer"
 
 ## This player asked to move the rover; the host said yes.
 var _moving: bool = false
@@ -100,6 +103,7 @@ var _tunnel_warned_day: int = -1
 const VERB_NOTICE: String = "Read notices"
 const VERB_CAL_PAD: String = "Calibrate"
 const VERB_TUNNEL: String = "Enter tunnels"
+const VERB_SINKHOLE: String = "Enter sinkhole"
 const VERB_TRADE: String = "Trade with Bram"
 const VERB_TERMINAL: String = "Open terminal"
 const VERB_ROVER: String = "Get in rover"
@@ -113,6 +117,7 @@ const HINT_CLEAR_PX: float = 90.0
 
 
 func _ready() -> void:
+	_build_sinkhole()
 	_build_notice_board()
 	_setup_hint_and_prompt()
 	_rover.uplink_changed.connect(_on_uplink_changed)
@@ -182,6 +187,8 @@ func _ready() -> void:
 	_cal_pad.rover_entered.connect(_on_rover_entered_cal_pad)
 	_tunnel_pad.rover_entered.connect(func() -> void: _hud.push_log("TUNNEL MOUTH: press " + Controls.prompt(&"interact") + " to enter."))
 	_tunnel_pad.rover_exited.connect(func() -> void: _tunnel_warned_day = -1)
+	_aquifer_pad.rover_entered.connect(func() -> void: _hud.push_log("SINKHOLE: press " + Controls.prompt(&"interact") + " to go down."))
+	_aquifer_pad.rover_exited.connect(func() -> void: _tunnel_warned_day = -1)
 	_notice_pad.rover_entered.connect(func() -> void: _hud.push_log("FARM NOTICE BOARD: press " + Controls.prompt(&"interact") + " to read it."))
 	_hud.trade_pressed.connect(_try_trade)
 	_hud.wheel_service_pressed.connect(_try_wheel_service)
@@ -243,6 +250,7 @@ func _setup_hint_and_prompt() -> void:
 	_hover_hint.add_theme_font_size_override(&"font_size", HINT_FONT_SIZE)
 	_cal_pad.verb = VERB_CAL_PAD
 	_tunnel_pad.verb = VERB_TUNNEL
+	_aquifer_pad.verb = VERB_SINKHOLE
 	_bram_bay.verb = VERB_TRADE
 	_notice_pad.verb = VERB_NOTICE
 	_verb_prompt = VerbPrompt.new()
@@ -270,6 +278,8 @@ func verb_target() -> Dictionary:
 		pad = _cal_pad if _rover.is_stopped() and not GameState.field_cal_ready().is_empty() else null
 	elif _tunnel_pad.rover_inside:
 		pad = _tunnel_pad if _tunnel_open() else null
+	elif _aquifer_pad != null and _aquifer_pad.rover_inside:
+		pad = _aquifer_pad if _tunnel_open() else null
 	elif _bram_bay.rover_inside:
 		pad = _bram_bay if not GameState.has_wide_treads else null
 	if pad == null:
@@ -743,7 +753,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if TunnelRecall.closed(GameClock.elapsed_days):
 			_hud.push_log("TUNNEL MOUTH: " + TunnelRecall.text("closed_text"))
 		else:
-			SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+			SceneSwitcher.swap_to(SceneSwitcher.scene_for_zone(GameState.rover_zone))
 	elif away and not event is InputEventJoypadMotion and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
 		get_viewport().set_input_as_handled()
 		_say_if_away()
@@ -755,7 +765,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_try_field_cal()
 	elif event.is_action_pressed(&"interact") and _tunnel_pad.rover_inside:
 		get_viewport().set_input_as_handled()
-		_enter_tunnels()
+		_enter_zone(TUNNELS_ZONE)
+	elif event.is_action_pressed(&"interact") and _aquifer_pad.rover_inside:
+		get_viewport().set_input_as_handled()
+		_enter_zone(AQUIFER_ZONE)
 	elif event.is_action_pressed(&"interact") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_trade()
@@ -1222,8 +1235,9 @@ func _say_if_away() -> void:
 		_hud.push_log(_rover.away_text())
 
 
-## Takes the rover in and goes with it.
-func _enter_tunnels() -> void:
+## Takes the rover in and goes with it: into the tunnels at the mouth, or down the
+## Aquifer's sinkhole.
+func _enter_zone(zone: StringName) -> void:
 	if _moving:
 		return
 	# Soft gate (zones doc section 7.1): under the band's start, say so and wait
@@ -1232,19 +1246,20 @@ func _enter_tunnels() -> void:
 	# Skipped when the host will refuse anyway (the mouth is closed after the
 	# rescue hour, or someone else drives): the player then sees only that refusal.
 	var refused: bool = TunnelRecall.closed(GameClock.elapsed_days) or not CoopRovers.driver(GameState.rover_here()) in ["", GameState.local_player_id]
-	var warning: String = "" if refused else ZoneData.warning_text(TUNNELS_ZONE, GameState.lab_level())
+	var warning: String = "" if refused else ZoneData.warning_text(zone, GameState.lab_level())
+	var label: String = "SINKHOLE" if zone == AQUIFER_ZONE else "TUNNEL MOUTH"
 	if warning != "" and _tunnel_warned_day != int(GameClock.elapsed_days):
 		_tunnel_warned_day = int(GameClock.elapsed_days)
-		_hud.push_log("TUNNEL MOUTH: %s Press %s again to go in, or drive off the pad to stay." % [warning, Controls.prompt(&"interact")])
+		_hud.push_log("%s: %s Press %s again to go in, or drive off the pad to stay." % [label, warning, Controls.prompt(&"interact")])
 		return
 	_tunnel_warned_day = -1
 	_moving = true
-	var problem: String = await FarmCommands.request(&"move_rover", [true])
+	var problem: String = await FarmCommands.request(&"move_rover_aquifer" if zone == AQUIFER_ZONE else &"move_rover", [true])
 	if not is_inside_tree():
 		return
 	if problem != "":
 		_moving = false
-		_hud.push_log("TUNNEL MOUTH: " + problem)
+		_hud.push_log(label + ": " + problem)
 		return
 	_move_granted = true
 	_on_rover_place_changed()
@@ -1254,7 +1269,7 @@ func _enter_tunnels() -> void:
 func _on_rover_place_changed() -> void:
 	if _move_granted and _rover.away_text() != "":
 		_move_granted = false
-		SceneSwitcher.go_to(SceneSwitcher.TUNNELS_SCENE)
+		SceneSwitcher.go_to(SceneSwitcher.scene_for_zone(GameState.rover_zone))
 	elif not _moving:
 		_say_if_away()
 
@@ -1279,6 +1294,46 @@ func _build_notice_board() -> void:
 	shape.position = Vector3(0.0, 1.5, 0.0)
 	_notice_pad.add_child(shape)
 	world.add_child(_notice_pad)
+
+
+## The Flooded Aquifer's sinkhole south of the plateau [PLACEHOLDER spot: GameState.
+## AQUIFER_PAD]: a dark hollow with a wet rim, and the pad the rover parks on.
+func _build_sinkhole() -> void:
+	var world: Node3D = $WorldView/WorldViewport/World
+	var rim_material := StandardMaterial3D.new()
+	rim_material.albedo_color = ScopeTheme.TERRA_DARK.lerp(ScopeTheme.TEAL, 0.2)
+	rim_material.roughness = 0.6
+	var hollow_material := StandardMaterial3D.new()
+	hollow_material.albedo_color = ScopeTheme.GLASS_DEEP
+	hollow_material.roughness = 0.2
+	var rim := CSGCylinder3D.new()
+	rim.name = "SinkholeRim"
+	rim.radius = 2.6
+	rim.height = 0.12
+	rim.sides = 16
+	rim.material = rim_material
+	rim.position = GameState.AQUIFER_PAD + Vector3(0.0, 0.06, 0.0)
+	world.add_child(rim)
+	var hollow := CSGCylinder3D.new()
+	hollow.name = "SinkholeHollow"
+	hollow.radius = 1.8
+	hollow.height = 0.14
+	hollow.sides = 16
+	hollow.material = hollow_material
+	hollow.position = GameState.AQUIFER_PAD + Vector3(0.0, 0.07, 0.0)
+	world.add_child(hollow)
+	_aquifer_pad = ParkingPad.new()
+	_aquifer_pad.name = "SinkholePad"
+	_aquifer_pad.collision_layer = 0
+	_aquifer_pad.collision_mask = 2
+	_aquifer_pad.position = GameState.AQUIFER_PAD
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(4.0, 3.0, 4.0)
+	shape.shape = box
+	shape.position = Vector3(0.0, 1.5, 0.0)
+	_aquifer_pad.add_child(shape)
+	world.add_child(_aquifer_pad)
 
 
 ## The soil probe was clicked: its text and the plot's readout, and the read is

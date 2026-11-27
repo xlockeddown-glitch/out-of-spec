@@ -32,7 +32,7 @@ signal walkers_told(poses: Dictionary)
 signal recalled(step: String)
 
 ## Raise it whenever two versions could disagree about the farm or the messages.
-const PROTOCOL: int = 34
+const PROTOCOL: int = 35
 const DEFAULT_PORT: int = 24711
 const MAX_PLAYERS: int = 4
 
