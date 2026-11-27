@@ -19,15 +19,15 @@ const ROCKS: Array[Vector4] = [
 	Vector4(12.5, -85.5, 1.0, 0.55),
 	Vector4(-2.5, -88.0, 0.7, 0.4),
 ]
-## A rock's sphere is 2 high at scale 1; this share of its (stretched) height is
-## under the ground when it stands on level ground, so it sits in the ground.
+## A rock's sphere is 2 high at scale 1; this share of its stretched upper half is
+## under the ground on level ground (with the lower half, 67.5 % of it is buried).
 const BURIED_SHARE: float = 0.35
 ## A rock keeps this far (plus its own radius) from a built thing, a rock or a
 ## fissure, and from a lamp. Plants only need their own size.
 const SPOT_CLEAR_M: float = 1.0
 const LAMP_CLEAR_M: float = 1.0
 ## The pad's approach: this far to each side of the road line, from the pad's far
-## edge to this many metres south of the pad, stays open.
+## edge to this many metres south of the pad's middle, stays open.
 const APPROACH_HALF_M: float = 3.5
 const APPROACH_LENGTH_M: float = 12.0
 const ROCK_COLOR := Color(0.82, 0.9, 0.96)

@@ -103,9 +103,9 @@ func test_the_rules_refuse_a_bad_rock() -> String:
 		Vector4(1.8, -62.0, 0.8, 0.5): "beside the road",
 		Vector4(pad.x, pad.y - 1.0, 0.6, 0.4): "the pad",
 		Vector4(pad.x + 2.7, pad.y - 1.0, 0.6, 0.4): "the pad's sign",
-		Vector4(pad.x - 4.0, pad.y - 1.0, 1.4, 0.5): "the pad's edge cells (a wide rock)",
+		Vector4(5.95, pad.y, 2.05, 0.5): "the sign's cells under a wide rock's edge (its corners miss them)",
 		Vector4(-3.0, -72.0, 0.6, 0.4): "the approach, off the road",
-		Vector4(-3.0, pad.y + 1.0, 0.9, 0.5): "the approach, grazing the pad's edge by its radius",
+		Vector4(-3.0, pad.y - BiomeData.PAD_HALF_M - 0.5, 0.9, 0.5): "the approach, grazing the pad's far edge by its radius",
 		Vector4(0.0, 0.0, 0.8, 0.5): "the plot",
 		Vector4(60.0, 0.0, 0.8, 0.5): "not in the flats",
 		Vector4(0.0, -300.0, 0.8, 0.5): "off the land",
@@ -121,7 +121,7 @@ func test_a_rock_is_refused_on_a_lamp() -> String:
 	for lamp: Vector2 in RoadLamps.spots(&"frost_flats"):
 		# Only the lamps that every earlier rule lets through reach the lamp rule:
 		# put the rock a little off the lamp and then on it, and the lamp decides.
-		var off := Vector4(lamp.x + FrostDressing.LAMP_CLEAR_M + 0.6 + 0.01, lamp.y, 0.6, 0.4)
+		var off := Vector4(lamp.x + signf(lamp.x) * (FrostDressing.LAMP_CLEAR_M + 0.6 + 0.01), lamp.y, 0.6, 0.4)
 		var on := Vector4(lamp.x, lamp.y, 0.6, 0.4)
 		if not FrostDressing.clear(off):
 			continue
@@ -159,7 +159,7 @@ func test_rocks_sit_on_the_ground_and_stand_the_set_height() -> String:
 		var node := dressing.get_child(i) as MeshInstance3D
 		var top: float = node.position.y + node.scale.y
 		var low: float = FrostDressing.ground_y(rock, none)
-		if top < FrostDressing.top_y(rock, none) - 0.001 or top < _highest(rock, none) + rock.w - 0.001:
+		if absf(top - FrostDressing.top_y(rock, none)) > 0.001 or top < _highest(rock, none) + rock.w - 0.001:
 			problem = "The rock at (%s, %s) tops out at %s, under the highest ground plus its height" % [rock.x, rock.y, top]
 		if node.position.y - node.scale.y > low:
 			problem = "The rock at (%s, %s) hangs in the air" % [rock.x, rock.y]
