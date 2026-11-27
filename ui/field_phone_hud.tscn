@@ -53,7 +53,6 @@ size_flags_horizontal = 3
 [node name="CreditsLabel" type="Label" parent="Bezel/Screen/Content/ClockRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.65, 0.14, 1)
 theme_override_font_sizes/font_size = 22
 text = "0 CR"
 
@@ -125,7 +124,6 @@ layout_mode = 2
 
 [node name="DriftCaption" type="Label" parent="Bezel/Screen/Content"]
 layout_mode = 2
-theme_type_variation = &"ScopeCaption"
 theme_override_font_sizes/font_size = 18
 text = "STEERING DRIFT (AS-FOUND)"
 
@@ -146,7 +144,6 @@ horizontal_alignment = 1
 [node name="ToleranceLabel" type="Label" parent="Bezel/Screen/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_type_variation = &"ScopeCaption"
 theme_override_font_sizes/font_size = 16
 text = "TOL --"
 horizontal_alignment = 1
@@ -155,7 +152,6 @@ horizontal_alignment = 1
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 72)
 layout_mode = 2
-theme_type_variation = &"ScopePhoneKey"
 focus_mode = 0
 theme_override_font_sizes/font_size = 26
 text = "ZERO STEERING  [R]"
@@ -177,7 +173,6 @@ size_flags_horizontal = 3
 [node name="OreLabel" type="Label" parent="Bezel/Screen/Content/RelayRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.22, 0.88, 0.78, 1)
 theme_override_font_sizes/font_size = 18
 text = "ORE 0   "
 
@@ -221,7 +216,6 @@ layout_mode = 2
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.65, 0.14, 1)
 theme_override_font_sizes/font_size = 16
 autowrap_mode = 3
 
@@ -239,7 +233,6 @@ layout_mode = 2
 
 [node name="LogCaption" type="Label" parent="Bezel/Screen/Content"]
 layout_mode = 2
-theme_type_variation = &"ScopeCaption"
 theme_override_font_sizes/font_size = 18
 text = "DISPATCH LOG"
 

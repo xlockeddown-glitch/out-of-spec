@@ -2274,3 +2274,9 @@ Ryan picked "Mix": keep the putty case and terracotta band, and put cream cards 
 - Three cards: header (day, time, credits), drift (caption, big reading in dark ink, state chip, tolerance, ZERO key) and the dispatch log. The state chip is a dark pill with the band colour as text and edge: teal in band, amber guard band, red only out of tolerance. Credits are dark ink, deep red only when negative.
 - Stay on the glass: title, credibility/lab/contract, lights, gauge set, the jobs list and ACCEPT keys, signal, relay, ore, spools, the two putty keys, Bram's shop and standards, the wheel key. Reason: they are keys or status lines that read well on dark, and fewer cards keeps the phone from growing.
 - Every row, text, key, signal and order is unchanged; same size (460 x 1048 px at 1080p).
+
+## Field phone round 3: review fixes (PR 227)
+- Stale per-node font colours on the Ore, Bram, Credits and Status labels are gone from the scene; the theme and code own the colours. The link label starts muted until the uplink is set.
+- Outline key: clear face, muted border, 2 px bottom when disabled or pressed. The state chip restyles only when its band changes, from prebuilt styles.
+- Left alone on purpose: amber lights and the amber NO ROVER label stay amber (state colours, not card ink).
+- project.godot sets no GDScript warning levels, so unsafe_cast and unsafe_call_argument stay Godot defaults (not errors); the casts are typed anyway.

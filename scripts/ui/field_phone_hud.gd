@@ -52,6 +52,10 @@ var _gauge_label: Label
 var _jobs_box: VBoxContainer
 ## Holds _jobs_box; scrolls when the jobs are taller than JOBS_MAX_HEIGHT.
 var _jobs_scroll: ScrollContainer
+## The state chip on the drift card, and its three styles (one per band colour), built once.
+var _status_chip: PanelContainer
+var _status_color: Color = COLOR_OK
+var _chip_styles: Dictionary[Color, StyleBoxFlat] = {}
 
 @onready var _bars: Array[ColorRect] = [%Bar1, %Bar2, %Bar3, %Bar4]
 @onready var _relay_label: Label = %RelayLabel
@@ -166,6 +170,7 @@ func _ready() -> void:
 	clock_row.get_parent().add_child(_jobs_scroll)
 	clock_row.get_parent().move_child(_jobs_scroll, _gauge_label.get_index() + 1)
 	_jobs_box.minimum_size_changed.connect(_fit_jobs_scroll)
+	_link_label.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
 	_card_the_drift()
 	_card_the_header()
 	_card_the_log()
@@ -175,8 +180,8 @@ func _ready() -> void:
 ## of the theme's, at the scene's original margins) so _scale_scene_nodes scales
 ## their margins with the rest; then the terracotta band goes across the top.
 func _style_case() -> void:
-	var bezel: PanelContainer = $Bezel
-	var screen: PanelContainer = $Bezel/Screen
+	var bezel := get_node("Bezel") as PanelContainer
+	var screen := get_node("Bezel/Screen") as PanelContainer
 	var case_box := theme.get_stylebox(&"panel", ScopeTheme.PHONE_CASE).duplicate() as StyleBoxFlat
 	case_box.set_content_margin(SIDE_TOP, 40.0)
 	case_box.set_content_margin(SIDE_BOTTOM, 40.0)
@@ -223,7 +228,9 @@ func _card_the_drift() -> void:
 	var chip := PanelContainer.new()
 	chip.name = "StatusChip"
 	chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	chip.add_theme_stylebox_override(&"panel", _chip_style(COLOR_OK))
+	for state_color: Color in [COLOR_OK, COLOR_WARN, COLOR_FAIL]:
+		_chip_styles[state_color] = _chip_style(state_color)
+	chip.add_theme_stylebox_override(&"panel", _chip_styles[COLOR_OK])
 	for node: Node in [first, _drift_value, _status_label, _tolerance_label, _zero_button]:
 		node.reparent(rows, false)
 	# The chip goes where the status label was.
@@ -234,6 +241,7 @@ func _card_the_drift() -> void:
 	_ink(_drift_value)
 	_ink(_tolerance_label, ScopeTheme.CARD_INK_MUTED)
 	_status_label.add_theme_color_override(&"font_color", COLOR_OK)
+	_status_chip = chip
 	_zero_button.theme_type_variation = ScopeTheme.PHONE_KEY_OUTLINE
 
 
@@ -463,18 +471,11 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 		_jobs_box.remove_child(child)
 		child.queue_free()
 	# Accepted jobs are a plain readout (ink); the note is a muted caption.
-	var shown: Array[Array] = [[("\n".join(active) if not active.is_empty() else ""), false],
-		[(note if offers.is_empty() else ""), true]]
-	for entry: Array in shown:
-		if str(entry[0]) == "":
-			continue
-		var label := Label.new()
-		label.text = str(entry[0])
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.add_theme_font_size_override("font_size", scaled_font(14))
-		if bool(entry[1]):
-			label.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
-		_jobs_box.add_child(label)
+	if not active.is_empty():
+		_add_jobs_label("
+".join(active), false)
+	if offers.is_empty() and note != "":
+		_add_jobs_label(note, true)
 	# Offers you can accept come first; `index` stays the board's own.
 	var order: Array[int] = []
 	for i: int in offers.size():
@@ -495,6 +496,16 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 		var index: int = i
 		button.pressed.connect(func() -> void: accept_job_pressed.emit(index))
 		_jobs_box.add_child(button)
+
+
+func _add_jobs_label(text: String, muted: bool) -> void:
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", scaled_font(14))
+	if muted:
+		label.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
+	_jobs_box.add_child(label)
 
 
 ## As tall as the job list, up to JOBS_MAX_HEIGHT; it scrolls beyond that.
@@ -522,5 +533,8 @@ func push_log(line: String) -> void:
 func _set_status(text: String, color: Color) -> void:
 	_status_label.text = text
 	# The state is the chip (dark pill, state colour); the reading stays dark ink.
-	_status_label.add_theme_color_override("font_color", color)
-	(_status_label.get_parent() as PanelContainer).add_theme_stylebox_override(&"panel", _chip_style(color))
+	# Restyled only when the band changes: set_drift runs every frame while driving.
+	if _status_color != color:
+		_status_color = color
+		_status_label.add_theme_color_override(&"font_color", color)
+		_status_chip.add_theme_stylebox_override(&"panel", _chip_styles[color])

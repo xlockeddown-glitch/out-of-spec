@@ -173,14 +173,15 @@ static func _build() -> Theme:
 	t.set_type_variation(PHONE_KEY_OUTLINE, &"Button")
 	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
 		var key: StyleBoxFlat = (t.get_stylebox(state, PHONE_KEY) as StyleBoxFlat).duplicate() as StyleBoxFlat
-		key.bg_color = Color(ENAMEL_INSET, 0.0 if state == &"normal" else 0.45 if state == &"hover" else 0.8)
-		key.border_color = ENAMEL_LIP
+		var live: bool = state == &"hover" or state == &"pressed"
+		key.bg_color = Color(ENAMEL_INSET, (0.45 if state == &"hover" else 0.8) if live else 0.0)
+		key.border_color = CARD_INK_MUTED
 		key.set_border_width_all(2)
-		key.border_width_bottom = 2 if state == &"pressed" else 4
+		key.border_width_bottom = 4 if state == &"hover" or state == &"normal" else 2
 		t.set_stylebox(state, PHONE_KEY_OUTLINE, key)
 	for color_name: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_focus_color"]:
 		t.set_color(color_name, PHONE_KEY_OUTLINE, CARD_INK)
-	t.set_color(&"font_disabled_color", PHONE_KEY_OUTLINE, CARD_INK_MUTED)
+	t.set_color(&"font_disabled_color", PHONE_KEY_OUTLINE, Color(CARD_INK, 0.45))
 	# The drop-down list.
 	t.set_stylebox(&"panel", &"PopupMenu", box(GLASS_DEEP, TEAL, 2, 6, 6))
 	t.set_stylebox(&"hover", &"PopupMenu", box(Color(TEAL, 0.25), TEAL, 0, 4, 4))
