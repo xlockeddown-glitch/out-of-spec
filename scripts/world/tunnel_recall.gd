@@ -12,6 +12,8 @@ const PATH: String = "tunnel_recall/"
 const NOTHING: String = ""
 const WARN: String = "warn"
 const RESCUE: String = "rescue"
+## The steps the host may tell a guest.
+const STEPS: Array[String] = [WARN, RESCUE]
 
 
 static func number(key: String, fallback: float) -> float:

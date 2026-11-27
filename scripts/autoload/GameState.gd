@@ -702,7 +702,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
-	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players",
+	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players",
 	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip",
 ]
 
@@ -1038,7 +1038,10 @@ func farm_from_dict(data: Dictionary) -> String:
 	player_places.clear()
 	_recall_warned_day = 0
 	_recall_rescued_day = 0
+	_guest_warned_day.clear()
+	_guest_rescued_day.clear()
 	_console_arrivals.clear()
+	_trip_players.clear()
 	_rescue_notes.clear()
 	_ore_at_entry = -1
 	zone_heat_trip = false
@@ -4157,9 +4160,21 @@ func report_place(place: String, depth: int, player_id: String = "") -> String:
 	var reason: String = ZonePresence.problem(place, depth, player_id, player_id, here)
 	if reason != "":
 		return reason
+	var on_trip: bool = rover_zone != "" and (_trip_players.has(player_id) or (player_places.has(player_id) and place_of(player_id) == rover_zone))
 	player_places[player_id] = [place, depth]
 	if place == ZonePresence.FARM:
 		_trip_players.erase(player_id)  # back on the farm: not on the trip
+		# The last one off the trip (a guest in the dome after the rescue hour walks to the
+		# farm): nobody is left to bring the rover back, so it goes home as for a drop.
+		if on_trip and not FarmCommands.guest and _nobody_on_the_trip():
+			bring_rover_home()
+	else:
+		# Down in a zone is not in bed: whoever goes below leaves it, as for any act.
+		if place != ZonePresence.DOME:
+			(recall_beds if recall_beds != null else CoopBeds).get_up(player_id)
+			# A report after the hour (the clock parked at 05:59:59) is carried out now, not
+			# at a tick that never comes.
+			_tick_recall()
 	return ""
 
 
@@ -4440,8 +4455,9 @@ func move_rover(into_tunnels: bool, player_id: String = "") -> String:
 		return "The rover is already there."
 	if into_tunnels and TunnelRecall.closed(GameClock.elapsed_days):
 		return TunnelRecall.text("closed_text")
-	if into_tunnels and rover_zone != "" and not _places_in(rover_zone).is_empty():
-		return FastTravel.text("field_rover_out")  # players are in there on it
+	# Players in there on it, or still on the trip (a guest up in the dome): the mouth stays shut.
+	if into_tunnels and rover_zone != "" and not (_places_in(rover_zone).is_empty() and _trip_players.is_empty()):
+		return FastTravel.text("field_rover_out")
 	if not CoopRovers.driver(rover_here()) in ["", player_id]:
 		return "Someone else is driving the rover."
 	var who: String = _player(player_id)
@@ -4477,6 +4493,7 @@ func move_rover(into_tunnels: bool, player_id: String = "") -> String:
 		player_places[who] = [ZonePresence.FARM, 0]
 		_console_arrivals.clear()  # the trip is over
 		_trip_players.clear()
+		_ore_at_entry = -1  # no trip: a late rescue has nothing to take ore for
 	rover_place_changed.emit()
 	return ""
 
@@ -4540,7 +4557,7 @@ func leave_zone(player_id: String = "") -> String:
 	player_places[player_id] = [ZonePresence.DOME, 0]
 	_console_arrivals.erase(player_id)
 	_trip_players.erase(player_id)
-	if rover_zone != "" and _places_in(rover_zone).is_empty():
+	if _nobody_on_the_trip():
 		_release_field_rover()
 		_emit_field_rover_changed()
 	return ""
@@ -4608,6 +4625,9 @@ func _release_field_rover() -> void:
 ## that loads in the tunnels late in the night is warned, or rescued, once more.
 var _recall_warned_day: int = 0
 var _recall_rescued_day: int = 0
+## The same for each guest (player -> day), for the guests the host sees below.
+var _guest_warned_day: Dictionary = {}
+var _guest_rescued_day: Dictionary = {}
 ## What the last rescues cost, said on the phone in the morning.
 var _rescue_notes: Array[String] = []
 ## The crystal ore the farm held when the rover went into the tunnels (-1: not
@@ -4625,10 +4645,13 @@ var _trip_players: Dictionary = {}
 var recall_in_tunnels: Callable = Callable()
 ## Only tests set it: stands in for CoopBeds, and makes the rescue run at once.
 var recall_beds: Object = null
+## Only tests set it: stands in for CoopSession.tell_recall(player_id, step).
+var recall_told: Callable = Callable()
 
 
-## The local player stands in the basalt tunnels. The host cannot see where a
-## guest is (the scene is the guest's own), so a guest is not looked at here.
+## The local player stands in the basalt tunnels. A guest's scene is the guest's own:
+## the host knows where a guest is only from the place the guest reported
+## (`player_places`, see _guests_below).
 func _local_in_tunnels() -> bool:
 	if recall_in_tunnels.is_valid():
 		return bool(recall_in_tunnels.call())
@@ -4636,38 +4659,114 @@ func _local_in_tunnels() -> bool:
 	return scene != null and scene.scene_file_path == SceneSwitcher.TUNNELS_SCENE
 
 
-## Host: warns the player in the tunnels at the warning hour and has them
-## carried out at the rescue hour, once each a day. Guests never run this.
+## Host: the guests the host has below, in a zone and not on the farm or in the dome
+## (the same rule as for the host itself), in a fixed order.
+func _guests_below() -> Array[String]:
+	var found: Array[String] = []
+	for who: Variant in player_places:
+		if str(who) != local_player_id and not place_of(str(who)) in [ZonePresence.DOME, ZonePresence.FARM]:
+			found.append(str(who))
+	found.sort()
+	return found
+
+
+## Host: warns each player in the tunnels at the warning hour and has them
+## carried out at the rescue hour, once each a day (the host's own, and each guest's
+## own, so one rescue never uses up another's). Guests never run this.
 func _tick_recall() -> void:
 	# Rover not in the tunnels: the player walks out with E as today [ASSUMPTION].
-	if FarmCommands.guest or not rover_in_tunnels or not _local_in_tunnels():
-		return
-	# Out through the pad but still fading out of the tunnels scene: already home.
-	if player_places.has(local_player_id) and place_of(local_player_id) in [ZonePresence.DOME, ZonePresence.FARM]:
+	if FarmCommands.guest or not rover_in_tunnels:
 		return
 	var day: int = GameClock.get_day_index()
-	match TunnelRecall.phase(GameClock.elapsed_days, _recall_warned_day, _recall_rescued_day):
-		TunnelRecall.WARN:
-			_recall_warned_day = day
-			post_phone(TunnelRecall.text("warn_text"))
-		TunnelRecall.RESCUE:
+	var host_warned: bool = false
+	var out: Array[String] = []
+	if _host_below():
+		match TunnelRecall.phase(GameClock.elapsed_days, _recall_warned_day, _recall_rescued_day):
+			TunnelRecall.WARN:
+				_recall_warned_day = day
+				host_warned = true
+				post_phone(TunnelRecall.text("warn_text"))
+			TunnelRecall.RESCUE:
+				out.append(local_player_id)
+	for guest_id: String in _guests_below():
+		match TunnelRecall.phase(GameClock.elapsed_days, int(_guest_warned_day.get(guest_id, 0)), int(_guest_rescued_day.get(guest_id, 0))):
+			TunnelRecall.WARN:
+				_guest_warned_day[guest_id] = day
+				# On their own phone: the shared log is everyone's. The host's own line
+				# already reaches a guest through that log, so it is not told twice.
+				if not host_warned:
+					_tell_guest(guest_id, TunnelRecall.WARN)
+			TunnelRecall.RESCUE:
+				out.append(guest_id)
+	if not out.is_empty():
+		_start_carry_out(out)
+
+
+## The host is in the tunnels (out through the pad but still fading out of the tunnels
+## scene: already home).
+func _host_below() -> bool:
+	return _local_in_tunnels() and not (player_places.has(local_player_id) and place_of(local_player_id) in [ZonePresence.DOME, ZonePresence.FARM])
+
+
+## Not inside the clock's own signal: the day may end and the scene change.
+func _start_carry_out(players: Array[String]) -> void:
+	if recall_beds != null:
+		_carry_out(players)
+	else:
+		_carry_out.call_deferred(players)
+
+
+## Host: says one guest the recall's step (CoopSession.tell_recall).
+func _tell_guest(player_id: String, step: String) -> void:
+	if recall_told.is_valid():
+		recall_told.call(player_id, step)
+	else:
+		CoopSession.tell_recall(player_id, step)
+
+
+## Still below, at the moment of the carrying: the rover is in the tunnels and the
+## player is there (a guest in a zone, the host in the tunnels scene).
+func _carry_out_due(player_id: String) -> bool:
+	if not rover_in_tunnels:
+		return false
+	if player_id == local_player_id:
+		return _host_below()
+	return player_places.has(player_id) and not place_of(player_id) in [ZonePresence.DOME, ZonePresence.FARM]
+
+
+## The crew carries these players out of the tunnels, all of them as one act: each
+## bill is paid and the rover comes home when nobody is left on the trip BEFORE any is
+## put in bed (the last into bed ends the day, and a player still below then would be
+## left under it). The farm is sent to the guests, then each is in bed (so the
+## all-in-bed rule counts them), a guest is told to open the farm and the local
+## player's farm scene opens. One who left the zone in the moment since the hour is not
+## carried out or charged, and the day it would have been is not used up.
+func _carry_out(players: Array[String]) -> void:
+	var day: int = GameClock.get_day_index()
+	var carried: Array[String] = []
+	for player_id: String in players:
+		if not _carry_out_due(player_id):
+			continue
+		if player_id == local_player_id:
 			_recall_warned_day = day
 			_recall_rescued_day = day
-			# Not inside the clock's own signal: the day may end and the scene change.
-			if recall_beds != null:
-				_carry_out(local_player_id)
-			else:
-				_carry_out.call_deferred(local_player_id)
-
-
-## The crew carries `player_id` out of the tunnels: the cost is paid, the rover
-## comes home, the player is in bed (so the all-in-bed rule counts them) and, if
-## they are the local player, the farm scene opens.
-func _carry_out(player_id: String) -> void:
-	rescue_from_tunnels(player_id)
-	(recall_beds if recall_beds != null else CoopBeds).recall_to_bed(player_id)
-	if is_inside_tree() and player_id == local_player_id:
-		SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE)
+		else:
+			_guest_warned_day[player_id] = day
+			_guest_rescued_day[player_id] = day
+		rescue_from_tunnels(player_id)
+		carried.append(player_id)
+	if carried.is_empty():
+		return
+	if not FarmCommands.guest:
+		CoopSync.send_farm()  # the guests see the bill and the rover before the words
+	var beds: Object = recall_beds if recall_beds != null else CoopBeds
+	for player_id: String in carried:
+		beds.recall_to_bed(player_id)
+	for player_id: String in carried:
+		if player_id != local_player_id:
+			_tell_guest(player_id, TunnelRecall.RESCUE)
+		elif is_inside_tree():
+			SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE)
 
 
 ## Host: pays for a rescue and brings the rover home. Returns the cost
@@ -4684,18 +4783,25 @@ func rescue_from_tunnels(player_id: String = "") -> Dictionary:
 		player_places[leaving] = [ZonePresence.FARM, 0]  # carried out, to bed
 	var ore: int = 0 if _console_arrivals.has(leaving) else ore_carried_in()
 	_console_arrivals.erase(leaving)
+	_trip_players.erase(leaving)  # carried out: off the trip
+	# A drive lease of theirs on the rover below ends with the trip.
+	if CoopRovers.driver(TUNNEL_ROVER) == leaving:
+		CoopRovers.release(leaving)
 	var bill: Dictionary = TunnelRecall.cost(credits, ore)
 	if bill["credits"] > 0:
 		add_credits(-int(bill["credits"]))
 	if bill["ore"] > 0:
 		crystal_ore -= int(bill["ore"])
 		ore_changed.emit(crystal_ore)
+		# That ore is taken: the next one carried out of this trip is not charged for it
+		# again, only for ore gained since [PLACEHOLDER].
+		_ore_at_entry = crystal_ore
 	# With nobody else recorded below, the rover goes: the farm's lent one comes home, a
 	# field one is released (else the farm keeps rover_in_tunnels, and a save would send
 	# Continue and a second rescue back down). While someone is still recorded there it stays.
 	# [KNOWN LIMIT] a guest still fading in is not recorded yet: the unacknowledged
 	# airlock race (a follow-up needs host-acknowledged arrivals).
-	if rover_zone != "" and _places_in(rover_zone).is_empty():
+	if _nobody_on_the_trip():
 		bring_rover_home()  # lent: home; field: released with its scoped emit
 	post_phone(TunnelRecall.text("rescue_text") % who.to_lower())
 	var line: String

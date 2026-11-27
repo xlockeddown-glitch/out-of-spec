@@ -106,8 +106,8 @@ func test_the_lent_flag_survives_a_save_and_old_saves_read_it_from_the_zone() ->
 
 func test_the_protocol_and_the_commands_and_the_sync_know_fast_travel() -> String:
 	var problems: Array[String] = []
-	if SessionScript.PROTOCOL != 23:
-		problems.append("Fast travel changes what is sent: protocol 23, got %d" % SessionScript.PROTOCOL)
+	if SessionScript.PROTOCOL != 24:
+		problems.append("Fast travel changes what is sent: protocol 24, got %d" % SessionScript.PROTOCOL)
 	for action: StringName in [&"fast_travel", &"leave_zone"]:
 		if not action in FarmCommands.ACTIONS:
 			problems.append("%s is not a farm command" % action)
@@ -345,34 +345,33 @@ func test_the_host_in_a_zone_by_fast_travel_is_carried_to_bed_at_two() -> String
 	return "\n".join(problems)
 
 
-func test_a_guest_in_a_zone_is_not_rescued_today() -> String:
-	# Pins today's rule: the host's recall looks at the host's own screen only.
-	# Rescuing guests is the next change; this test then changes with it.
+func test_a_guest_in_a_zone_is_rescued_at_two_and_a_guests_copy_rescues_nobody() -> String:
 	var gs: GameStateScript = _state()
 	var guest: String = _in_dome(gs, "player_2")
+	gs.credits = 200
 	_at(12.0, func() -> String:
 		gs.fast_travel(ZONE, guest)
 		return "")
 	var beds: _NoBeds = _NoBeds.new()
 	gs.recall_beds = beds
 	gs.recall_in_tunnels = func() -> bool: return false  # the host is not in the zone
-	_at(2.5, func() -> String:
-		gs._tick_recall()
-		return "")
-	var problems: Array[String] = []
-	if not beds.put_to_bed.is_empty() or gs.rover_zone != ZONE:
-		problems.append("A guest below at 02:00 is left alone (bed %s, zone '%s')" % [beds.put_to_bed, gs.rover_zone])
 	var held: bool = FarmCommands.guest
 	FarmCommands.guest = true
-	gs.recall_in_tunnels = func() -> bool: return true
 	_at(2.5, func() -> String:
 		gs._tick_recall()
 		return "")
 	FarmCommands.guest = held
-	if not beds.put_to_bed.is_empty():
-		problems.append("A guest's copy must not rescue")
+	var problems: Array[String] = []
+	if not beds.put_to_bed.is_empty() or gs.credits != 200 or gs.rover_zone != ZONE:
+		problems.append("A guest's copy must not rescue (bed %s, %d CR, zone '%s')" % [beds.put_to_bed, gs.credits, gs.rover_zone])
+	_at(2.5, func() -> String:
+		gs._tick_recall()
+		return "")
+	if beds.put_to_bed != [guest] or gs.credits != 150 or gs.rover_zone != "" or gs.place_of(guest) != ZonePresence.FARM:
+		problems.append("The host rescues a guest below: bed %s, %d CR, zone '%s', at %s" % [beds.put_to_bed, gs.credits, gs.rover_zone, gs.place_of(guest)])
 	gs.free()
-	return "\n".join(problems)
+	return "
+".join(problems)
 
 
 # --- Review round one -----------------------------------------------------------------------
@@ -502,7 +501,7 @@ func test_leaving_the_zone_is_checked_on_the_host() -> String:
 	return "\n".join(problems)
 
 
-func test_rescuing_the_host_leaves_the_rover_to_a_guest_still_below() -> String:
+func test_rescuing_the_host_leaves_the_rover_to_a_guest_on_the_trip_in_the_dome() -> String:
 	var gs: GameStateScript = _state()
 	var me: String = _in_dome(gs)
 	var guest: String = _in_dome(gs, "player_2")
@@ -510,6 +509,7 @@ func test_rescuing_the_host_leaves_the_rover_to_a_guest_still_below() -> String:
 		gs.fast_travel(ZONE, me)
 		gs.fast_travel(ZONE, guest)
 		return "")
+	gs.player_places[guest] = [ZonePresence.DOME, 0]  # came up to the dome: still on the trip, not below
 	gs.recall_in_tunnels = func() -> bool: return true
 	var beds: _NoBeds = _NoBeds.new()
 	gs.recall_beds = beds
@@ -519,8 +519,8 @@ func test_rescuing_the_host_leaves_the_rover_to_a_guest_still_below() -> String:
 	var problems: Array[String] = []
 	if beds.put_to_bed != [me]:
 		problems.append("Only the host goes to bed: %s" % [beds.put_to_bed])
-	if gs.rover_zone != ZONE or not gs.rover_transforms.has(gs.TUNNEL_ROVER) or gs.place_of(guest) != ZONE:
-		problems.append("The guest keeps the field rover and the zone")
+	if gs.rover_zone != ZONE or not gs.rover_transforms.has(gs.TUNNEL_ROVER) or gs.place_of(guest) != ZonePresence.DOME:
+		problems.append("The guest in the dome keeps the field rover on the trip")
 	# And while it is occupied the mouth stays shut.
 	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD)
 	if gs.move_rover(true) == "" or gs.rover_lent:
@@ -1017,8 +1017,8 @@ func test_a_host_who_has_left_by_the_pad_is_not_recalled_in_the_fade() -> String
 	var problems: Array[String] = []
 	if left != "":
 		problems.append("The exit was refused: %s" % left)
-	if not beds.put_to_bed.is_empty() or gs.credits != 200:
-		problems.append("The host is neither charged nor sent to bed after leaving (%s, %d CR)" % [beds.put_to_bed, gs.credits])
+	if beds.put_to_bed != [guest] or gs.credits != 150:
+		problems.append("Only the guest below is charged and put to bed, not the host who left (%s, %d CR)" % [beds.put_to_bed, gs.credits])
 	gs.free()
 	return "
 ".join(problems)

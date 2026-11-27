@@ -56,6 +56,13 @@ static func for_scene(path: String) -> Array:
 	return []
 
 
+## True if the scene `path` is a zone (not the farm, the dome or a menu): where the
+## 02:00 recall carries a player out of.
+static func in_zone(path: String) -> bool:
+	var at: Array = for_scene(path)
+	return not at.is_empty() and not at[0] in [FARM, DOME]
+
+
 ## What to send next: `latest` if it is not what the host last acknowledged, else
 ## nothing. Only the newest place is ever sent, so an older trip can never land
 ## after a newer one.

@@ -13,6 +13,7 @@ signal _answered(answer: Variant)
 class _Session:
 	extends Node
 	signal player_left(player_id: String)
+	signal recalled(step: String)
 
 
 func _state() -> GameStateScript:

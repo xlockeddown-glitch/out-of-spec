@@ -576,8 +576,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif away and event.is_action_pressed(&"interact"):
 		# The rover is already in the tunnels: joining it is no new trip, so no
 		# soft-gate warning here (it was given, or skipped, when it went in).
+		# Shut after the rescue hour all the same: the dome's door says no then too.
 		get_viewport().set_input_as_handled()
-		SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+		if TunnelRecall.closed(GameClock.elapsed_days):
+			_hud.push_log("TUNNEL MOUTH: " + TunnelRecall.text("closed_text"))
+		else:
+			SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
 	elif away and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
 		get_viewport().set_input_as_handled()
 		_say_if_away()

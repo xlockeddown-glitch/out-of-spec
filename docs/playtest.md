@@ -113,4 +113,10 @@ Good to know first. The console in the dome puts a player in the rover that is a
 
 9. **The wait for the host · 2 min** — On PC B use the dome console and, while it waits for an answer, press **Esc** and quit to the title screen. Expect the title screen, not a stuck dome. ☐ Pass ☐ Fail
 
-Not covered: the 02:00 rescue of a guest who is still in a zone when the day ends, and a real two-PC run (these steps have not been run on two PCs yet).
+10. **The 02:00 rescue · 8 min** — On PC B drive the rover into the tunnel mouth and stay in the hub. On PC A stay on the farm and wait for 00:00 (or set the clock). Expect PC B's phone to warn of the recall, and PC A's phone not to. At 02:00 expect PC B to be carried out to the farm, the rover home on PC A's pad, and 50 CR gone once. Put PC A to bed. Expect the day to end. ☐ Pass ☐ Fail
+
+11. **Two below · 8 min** — Rejoin PC B. Take the rover in on PC A, bring PC B in by the dome console, and wait for 02:00. Expect both carried out, 100 CR gone in all, and the rover home only after both. Expect the day to end with both in bed. ☐ Pass ☐ Fail
+
+12. **Out before 02:00 · 4 min** — Take PC B down again and, after the warning, walk PC B back to the farm. Expect no charge at 02:00. ☐ Pass ☐ Fail
+
+Not covered: a real two-PC run (these steps have not been run on two PCs yet).
