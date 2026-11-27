@@ -51,12 +51,15 @@ func here_refusal() -> String:
 	if clock.paused:
 		return "The clock is paused."
 	var scene: Node = session.get_tree().current_scene if session.is_inside_tree() else null
-	return scene_refusal(scene.scene_file_path if scene != null else "")
+	var path: String = scene.scene_file_path if scene != null else ""
+	return scene_refusal(path, GameState.camp_scene_open(path))
 
 
-## Beds are on the farm, and nowhere else (no scene counts as elsewhere).
-static func scene_refusal(scene_path: String) -> String:
-	if scene_path != SceneSwitcher.FARM_SCENE:
+## Beds are on the farm, and nowhere else (no scene counts as elsewhere), but for an
+## open camp's hub (`camp_ok`, see GameState.camp_scene_open; the host still checks the
+## rover and the supplies, zones doc 6.2).
+static func scene_refusal(scene_path: String, camp_ok: bool = false) -> String:
+	if scene_path != SceneSwitcher.FARM_SCENE and not camp_ok:
 		return "Go to bed from the farm, not the dome, the tunnels or a menu."
 	return ""
 

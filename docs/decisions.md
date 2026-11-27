@@ -2,6 +2,18 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: Camp-outs (zones step 12)
+
+One camp, in the Lava Tubes hub: shut until Two Sunsets is taken, supplies from the shared wallet, and a night there is going to bed with no rescue fee. Every number below is a [PLACEHOLDER] for Ryan to tune:
+
+- `Camp.CELLS` `lava_tubes` (16, 12) [PLACEHOLDER], on the hub's depth 0 (never reseeded). The tent, mat, bedroll and heater look is a [PLACEHOLDER].
+- `SUPPLY_COST_CREDITS` 30 [PLACEHOLDER] a night, from the shared wallet; `MAX_SUPPLIES` 3 [PLACEHOLDER] nights held.
+- `REACH_M` 4.0 [PLACEHOLDER] for the rover at the camp, and `HOST_REACH_SLACK_M` 1.5 [PLACEHOLDER] for what the host's word of the rover lags.
+- Two Sunsets: Orin, personal, gate lab level 5 [PLACEHOLDER], one night, a 30 XP certificate [PLACEHOLDER], his two lines [PLACEHOLDER]. Built, because a `camp` quest key (opens the camp when taken) and the counter `camp_night` were all the quest system needed.
+- The messages ("The camp is shut: a quest opens it.", "No supplies for the night...") are [PLACEHOLDER] wording.
+- Chosen where the brief left it open: a second ask while asleep is not a second night; a camper is exempt only while in bed, and the exemption ends at 06:00; a guest who drops while camped is forgotten (no refund of the supply); a late joiner gets `camps_open` and the supplies with the farm sync; the host now refuses a guest going to bed in any zone but an open camp; the camp is used from the rover.
+- PROTOCOL 35 to 36, once, because of the new command (`buy_camp_supplies`) and the synced fields.
+
 ## 2026-11-27: Flooded Aquifer look (feat/aquifer-look)
 
 Restyled the Flooded Aquifer's pools, pump crate, and notice sign in `scripts/world/flooded_aquifer.gd` using `TunnelLook` constants and primitive builders (part 3 of the tunnel look; walls came from PR 242). Looks only — no changes to `AquiferDepth` rules, pool boxes, `is_shallow`, `buy_pump`, collision shapes/layers, node names, or `PROTOCOL`. Every colour, size, and hash choice is a [PLACEHOLDER]:
