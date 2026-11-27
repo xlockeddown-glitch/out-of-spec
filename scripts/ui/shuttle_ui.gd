@@ -3,8 +3,8 @@ extends Control
 ## The landing pad terminal's panel (biomes.md section 6 step 12): one launch
 ## window line for each moon, the fare, whether the farm holds the shuttle license
 ## and a Book button for each moon. A press sends `book_shuttle` for one person and
-## shows the reason it came back with. A booking that goes through (Phobos, for one) takes
-## this screen to the moon's hub at once; Deimos still answers "no hub yet". It looks like FastTravelUI. Esc closes it.
+## shows the reason it came back with. A booking that goes through (Phobos or Deimos) takes
+## this screen to the moon's hub at once. It looks like FastTravelUI. Esc closes it.
 
 const TEAL: Color = SkillsUI.TEAL
 const TEXT: Color = SkillsUI.TEXT

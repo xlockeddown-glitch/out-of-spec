@@ -108,6 +108,14 @@
     "display_name": "Mug Ring",
     "description": "A ring of dried coffee on the bench top. Somebody set a mug down here, and it was not you."
   },
+  "deimos_cache": {
+    "display_name": "Smuggler Cache",
+    "description": "A stack of ochre crates under one tidy padlock, swept clean of dust on purpose. Locked. Needs a key or a proof. [later]"
+  },
+  "deimos_test_pod": {
+    "display_name": "Test Pod",
+    "description": "A pale pod with fogged glass, warm to the hand through the frost. Something in it has been kept comfortable. Sealed. [later]"
+  },
   "phobos_shed_skin": {
     "display_name": "Shed Skin by the Grille",
     "description": "A papery shed skin, caught on the torn mesh of a service-tunnel grille. Something went through here, and it was warm in there."

@@ -230,7 +230,7 @@ func test_the_clock_and_the_command_share_one_rule() -> String:
 	for entry: Array in [["farm", 0], ["dome", 0], ["lava_tubes", 0], ["lava_tubes", 1]]:
 		if ZonePresence.place_problem(entry[0], entry[1]) != "" or ZonePresence.table_problem({ "player_2": entry }) != "":
 			return "%s was refused" % [entry]
-	return "" if ZoneData.is_playable(&"lava_tubes") and ZoneData.is_playable(&"phobos") and not ZoneData.is_playable(&"deimos") and not ZoneData.is_playable(&"flooded_aquifer") else "Playable zones are wrong."
+	return "" if ZoneData.is_playable(&"lava_tubes") and ZoneData.is_playable(&"phobos") and ZoneData.is_playable(&"deimos") and not ZoneData.is_playable(&"flooded_aquifer") else "Playable zones are wrong."
 
 
 func test_only_the_newest_place_is_sent() -> String:

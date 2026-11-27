@@ -63,7 +63,7 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	_clock.text = "%s   %s CR   %s" % [GameClock.format_now(), SP811.integer(GameState.credits), Shuttle.text("hub_title")]
+	_clock.text = "%s   %s CR   %s" % [GameClock.format_now(), SP811.integer(GameState.credits), _title()]
 	if _toast_left > 0.0:
 		_toast_left -= delta
 	else:
@@ -73,6 +73,24 @@ func _process(delta: float) -> void:
 		_since_s += delta
 		if _since_s > GRACE_S:
 			_trip_not_seen()
+
+
+## What differs between the moons' hubs: which moon, the title line, where the parts stand
+## and what the board says. DeimosHub overrides these (and _build_world).
+func _moon() -> String:
+	return MOON
+
+
+func _title() -> String:
+	return Shuttle.text("hub_title")
+
+
+func _spots() -> Dictionary[String, Vector3]:
+	return SPOTS
+
+
+func _board_text() -> String:
+	return Shuttle.text("hub_board_log")
 
 
 func _has_trip() -> bool:
@@ -109,7 +127,7 @@ func _trip_not_seen() -> void:
 		_go_home()
 		return
 	_asking = true
-	var problem: Variant = await FarmCommands.request(&"report_place", [MOON, 0])
+	var problem: Variant = await FarmCommands.request(&"report_place", [_moon(), 0])
 	_asking = false
 	_since_s = 0.0
 	if not is_inside_tree() or _has_trip():
@@ -299,7 +317,7 @@ func _label(text: String, at: Vector3, size: int, colour: Color) -> Label3D:
 
 
 func _make_console() -> Clickable:
-	var at: Vector3 = SPOTS["Console"]
+	var at: Vector3 = _spots()["Console"]
 	var root := Node3D.new()
 	root.name = "ConsoleDesk"
 	root.position = at
@@ -315,9 +333,9 @@ func _make_console() -> Clickable:
 
 
 func _make_board() -> Clickable:
-	var at: Vector3 = SPOTS["Board"]
+	var at: Vector3 = _spots()["Board"]
 	add_child(_part("BoardPanel", at + Vector3(0.0, 1.6, 0.0), Vector3(3.0, 1.8, 0.12), Color(0.25, 0.2, 0.14)))
-	add_child(_label(Shuttle.text("hub_board_log"), at + Vector3(0.0, 1.6, 0.1), 24, Color(0.95, 0.9, 0.75)))
+	add_child(_label(_board_text(), at + Vector3(0.0, 1.6, 0.1), 24, Color(0.95, 0.9, 0.75)))
 	var click: Clickable = _clickable(Clickable.new(), at + Vector3(0.0, 1.5, 0.0), Vector3(3.2, 2.2, 0.8), Shuttle.text("hub_hint_board"))
 	click.name = "Board"
 	return click
@@ -349,7 +367,7 @@ func _make_hatch() -> Clickable:
 
 ## The metres from the walker to a part, flat.
 func distance_to(part_name: String) -> float:
-	var at: Vector3 = SPOTS[part_name]
+	var at: Vector3 = _spots()[part_name]
 	return Vector2(walker.global_position.x - at.x, walker.global_position.z - at.z).length()
 
 
@@ -372,7 +390,7 @@ func _on_console() -> void:
 
 func _on_board() -> void:
 	if _near("Board"):
-		_toast(Shuttle.text("hub_board_log"))
+		_toast(_board_text())
 
 
 func _on_hatch() -> void:
