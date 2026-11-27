@@ -13,6 +13,12 @@ const ROVER_KEYS: Array[StringName] = [
 ## On foot, these only say so.
 const FARM_KEYS: Array[StringName] = [
 	&"interact", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill", &"swap_scene"]
+## On foot, these verbs of the rover only say so.
+const ON_FOOT_REFUSED: Array[StringName] = [
+	&"place_stone", &"block_stack", &"sell_lin", &"stone_kind", &"check_block", &"open_robots", &"survey"]
+## Bram's standards, in catalog order.
+const BUY_ACTIONS: Array[StringName] = [
+	&"buy_1", &"buy_2", &"buy_3", &"buy_4", &"buy_5", &"buy_6", &"buy_7", &"buy_8", &"buy_9"]
 ## A clicked prop's text stays in the hover label this long, like the dome's toast.
 const INSPECT_SECONDS: float = 3.0
 ## Long descriptions stay up longer.
@@ -179,6 +185,7 @@ func _ready() -> void:
 	_hud.get_parent().add_child(SkillsUI.new())
 	_hud.get_parent().add_child(QuestsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())
+	_hud.get_parent().add_child(ActionsMenuUI.new(ActionsMenuUI.farm_actions()))
 	_say_if_away()
 	_robots_ui = RobotsUI.new()
 	_hud.get_parent().add_child(_robots_ui)
@@ -565,12 +572,12 @@ func _input(event: InputEvent) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var away: bool = _rover.away_text() != ""
-	if _is_key(event, KEY_F):
+	if event.is_action_pressed(&"get_out_in"):
 		get_viewport().set_input_as_handled()
 		_get_out_or_in()
 	elif CoopWalkers.on_foot():
 		if (FARM_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key))
-				or [KEY_B, KEY_J, KEY_L, KEY_N, KEY_Q, KEY_T, KEY_V].any(func(key: Key) -> bool: return _is_key(event, key))):
+				or ON_FOOT_REFUSED.any(func(key: StringName) -> bool: return event.is_action_pressed(key))):
 			get_viewport().set_input_as_handled()
 			_refuse_on_foot()
 	elif away and event.is_action_pressed(&"interact"):
@@ -594,13 +601,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"interact") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_trade()
-	elif _is_key(event, KEY_L) and _bram_bay.rover_inside:
+	elif event.is_action_pressed(&"sell_lin") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_sell_to_lin()
-	elif _is_key(event, KEY_Y) and _bram_bay.rover_inside:
+	elif event.is_action_pressed(&"wheel_service") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_wheel_service()
-	elif _is_key(event, KEY_T) and _bram_bay.rover_inside:
+	elif event.is_action_pressed(&"open_robots") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_robots_ui.open()
 	elif event.is_action_pressed(&"rover_dig"):
@@ -609,40 +616,37 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"rover_fill"):
 		get_viewport().set_input_as_handled()
 		_rover.queue_command(RoverController.Command.FILL)
-	elif _is_key(event, KEY_B):
+	elif event.is_action_pressed(&"place_stone"):
 		get_viewport().set_input_as_handled()
 		_place_stone()
-	elif _is_key(event, KEY_N):
+	elif event.is_action_pressed(&"stone_kind"):
 		get_viewport().set_input_as_handled()
 		_cycle_stone_kind()
-	elif _is_key(event, KEY_Q):
+	elif event.is_action_pressed(&"check_block"):
 		get_viewport().set_input_as_handled()
 		_check_with_block()
-	elif _is_key(event, KEY_J):
+	elif event.is_action_pressed(&"block_stack"):
 		get_viewport().set_input_as_handled()
 		_build_block_stack()
-	elif _is_key(event, KEY_V):
+	elif event.is_action_pressed(&"survey"):
 		get_viewport().set_input_as_handled()
 		_survey()
-	elif _is_key(event, KEY_C):
+	elif event.is_action_pressed(&"cycle_seed"):
 		get_viewport().set_input_as_handled()
 		var seed: String = GameState.cycle_seed()
 		_hud.push_log("SEED: %s, %s CR, %s days, soil moisture target %s %%" % [
 			GameState.crop_name(seed), SP811.integer(GameState.seed_cost(seed)),
 			SP811.integer(int(GameState.crop(seed).get("growth_days", 0))),
 			SP811.number(float(GameState.crop(seed).get("soil_moisture_target", 0.0)) * 100.0, 0)])
-	elif not away and (_is_key(event, KEY_BRACKETLEFT) or _is_key(event, KEY_BRACKETRIGHT)):
-		var cell: Vector3i = _rover.cell_under()
-		var step: int = -1 if _is_key(event, KEY_BRACKETLEFT) else 1
+	elif not away and _setpoint_step(event) != 0:
 		get_viewport().set_input_as_handled()
-		if GameState.plantings.has(cell):
-			_adjust_setpoint(cell, step)
+		if event is InputEventJoypadButton:
+			_pad_setpoint(_setpoint_step(event))
 		else:
-			GameState.adjust_planting_offset(step)
-			_hud.push_log(GameState.planting_offset_text())
-	elif event is InputEventKey and event.pressed and not event.echo and _bram_bay.rover_inside:
+			_step_setpoint(_setpoint_step(event))
+	elif _bram_bay.rover_inside and _buy_index(event) >= 0:
 		# [1], [2], ... buy Bram's Tier 1 standards in catalog order.
-		var index: int = (event as InputEventKey).physical_keycode - KEY_1
+		var index: int = _buy_index(event)
 		var catalog: Array[String] = GameState.bram_catalog()
 		if GameState.tier1_unlocked and index >= 0 and index < catalog.size():
 			get_viewport().set_input_as_handled()
@@ -662,6 +666,42 @@ func _adjust_setpoint(cell: Vector3i, step: int) -> void:
 		_hud.push_log(GameState.crop_status_text(cell))
 
 
+## LB and RB together open the actions menu, so a shoulder press waits a moment
+## and gives way if the menu opened.
+func _pad_setpoint(step: int) -> void:
+	await get_tree().create_timer(ActionsMenuUI.CHORD_GRACE_S).timeout
+	if is_inside_tree() and not QuestsUI.other_panel_open(get_tree()):
+		_step_setpoint(step)
+
+
+func _step_setpoint(step: int) -> void:
+	var cell: Vector3i = _rover.cell_under()
+	if GameState.plantings.has(cell):
+		_adjust_setpoint(cell, step)
+	else:
+		GameState.adjust_planting_offset(step)
+		_hud.push_log(GameState.planting_offset_text())
+
+
+## -1 for set point down ([ or LB), 1 for up (] or RB), else 0.
+func _setpoint_step(event: InputEvent) -> int:
+	if event.is_action_pressed(&"setpoint_down") or _is_key(event, KEY_BRACKETLEFT):
+		return -1
+	if event.is_action_pressed(&"setpoint_up") or _is_key(event, KEY_BRACKETRIGHT):
+		return 1
+	return 0
+
+
+## Which of Bram's standards a press buys: 0 for [1], and so on; -1 for no buy press.
+func _buy_index(event: InputEvent) -> int:
+	for i: int in BUY_ACTIONS.size():
+		if event.is_action_pressed(BUY_ACTIONS[i]):
+			return i
+	return -1
+
+
+## Only for the brackets: on German QWERTZ they are AltGr+8 and AltGr+9, which
+## the keys' own actions don't see.
 func _is_key(event: InputEvent, keycode: Key) -> bool:
 	var key := event as InputEventKey
 	if key == null or not key.pressed or key.echo:

@@ -68,7 +68,8 @@ static func is_alone() -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"ui_cancel"):
+	# Esc and the pad's Start open it. Esc and the pad's B close it, so B never opens it.
+	if event.is_action_pressed(&"open_pause") or (visible and event.is_action_pressed(&"ui_cancel")):
 		get_viewport().set_input_as_handled()
 		if visible:
 			close()

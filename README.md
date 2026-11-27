@@ -78,12 +78,13 @@ Open `project.godot` in Godot 4.7 and press F5. The farm saves each morning and 
 | F | Get out of the stopped rover on the farm and walk (WASD), or get back in from 6 m |
 | R or ZERO STEERING button | Re-zero steering drift remotely |
 | E | At a pad, bay, tunnel mouth or the catch cup: use it (field cal pad, enter or leave the tunnels, trade 6 crystal ore for wide treads, open the catch cup by the Sentinel) |
-| 1, 2, ... (in Bram's bay) | Buy Bram's Tier 1 standards in catalog order, once unlocked (press twice to confirm) |
+| 1, 2, 3, 4, 5, 6, 7, 8, 9 (in Bram's bay) | Buy Bram's Tier 1 standards in catalog order, once unlocked (press twice to confirm) |
 | L (in Bram's bay) | Sell the harvest bin to Lin |
 | L (in the tunnels) | Rover lights on or low (the Sentinel bolts from lights on) |
 | T (in Bram's bay) | Robots panel |
 | Y (in Bram's bay) | Bram re-torques the rover's wheel nuts, once they are due. While his quest "To the Click" is open, Torque to Spec plays first: hold Space, let go at the click line, Esc skips |
 | K | Skills panel |
+| O | Quests panel |
 | F7 | Co-op panel (host or see who is here) |
 | Esc | Close a panel |
 | F9 (debug builds) | Skip to the next morning |

@@ -46,7 +46,7 @@ func _ready() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	var toggled: bool = key != null and key.pressed and not key.echo and key.keycode == KEY_K
+	var toggled: bool = event.is_action_pressed(&"open_skills")
 	if not visible:
 		if toggled:
 			get_viewport().set_input_as_handled()

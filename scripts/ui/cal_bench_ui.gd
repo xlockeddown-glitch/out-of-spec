@@ -114,6 +114,8 @@ func open(instrument_id: String = "hygrometer") -> void:
 	var index: int = maxi(_ids.find(instrument_id), 0)
 	_instrument_option.select(index)
 	_on_instrument_selected(index)
+	# So the pad's D-pad and A work without a mouse.
+	_instrument_option.grab_focus()
 
 
 ## Instruments in service right now: buying a Tier 1 standard from Bram adds

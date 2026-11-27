@@ -45,61 +45,155 @@ window/stretch/mode="canvas_items"
 
 rover_forward={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":87,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194320,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":87), Object(InputEventKey,"device":-1,"physical_keycode":4194320), Object(InputEventJoypadMotion,"device":-1,"axis":1,"axis_value":-1.0), Object(InputEventJoypadMotion,"device":-1,"axis":5,"axis_value":1.0)]
 }
 rover_reverse={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":83,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194322,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":83), Object(InputEventKey,"device":-1,"physical_keycode":4194322), Object(InputEventJoypadMotion,"device":-1,"axis":1,"axis_value":1.0), Object(InputEventJoypadMotion,"device":-1,"axis":4,"axis_value":1.0)]
 }
 rover_steer_left={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":65,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194319,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":65), Object(InputEventKey,"device":-1,"physical_keycode":4194319), Object(InputEventJoypadMotion,"device":-1,"axis":0,"axis_value":-1.0)]
 }
 rover_steer_right={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":68,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-, Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194321,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":68), Object(InputEventKey,"device":-1,"physical_keycode":4194321), Object(InputEventJoypadMotion,"device":-1,"axis":0,"axis_value":1.0)]
 }
 rover_till={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":32,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":32), Object(InputEventJoypadButton,"device":-1,"button_index":8,"pressed":true)]
 }
 rover_zero_steering={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":82,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":82), Object(InputEventJoypadButton,"device":-1,"button_index":12,"pressed":true)]
 }
 rover_dig={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":71,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":71), Object(InputEventJoypadButton,"device":-1,"button_index":2,"pressed":true)]
 }
 rover_lights={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":76,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":76), Object(InputEventJoypadButton,"device":-1,"button_index":11,"pressed":true)]
 }
 rover_fill={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":72,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":72), Object(InputEventJoypadButton,"device":-1,"button_index":3,"pressed":true)]
 }
 interact={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"physical_keycode":69)]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":69), Object(InputEventJoypadButton,"device":-1,"button_index":0,"pressed":true)]
 }
 swap_scene={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194306,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
-]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":4194306), Object(InputEventJoypadButton,"device":-1,"button_index":4,"pressed":true)]
+}
+open_pause={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":4194305), Object(InputEventJoypadButton,"device":-1,"button_index":6,"pressed":true)]
+}
+get_out_in={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":70), Object(InputEventJoypadButton,"device":-1,"button_index":7,"pressed":true)]
+}
+place_stone={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":66)]
+}
+stone_kind={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":78), Object(InputEventJoypadButton,"device":-1,"button_index":14,"pressed":true)]
+}
+check_block={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":81)]
+}
+block_stack={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":74)]
+}
+survey={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":86)]
+}
+cycle_seed={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":67), Object(InputEventJoypadButton,"device":-1,"button_index":13,"pressed":true)]
+}
+sell_lin={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":76)]
+}
+wheel_service={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":89)]
+}
+open_robots={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":84)]
+}
+setpoint_down={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":91), Object(InputEventJoypadButton,"device":-1,"button_index":9,"pressed":true)]
+}
+setpoint_up={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":93), Object(InputEventJoypadButton,"device":-1,"button_index":10,"pressed":true)]
+}
+open_quests={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":79)]
+}
+open_skills={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":75)]
+}
+open_coop={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":4194338)]
+}
+ui_accept={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":4194309), Object(InputEventKey,"device":-1,"keycode":4194310), Object(InputEventKey,"device":-1,"keycode":32), Object(InputEventJoypadButton,"device":-1,"button_index":0,"pressed":true)]
+}
+ui_cancel={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":4194305), Object(InputEventJoypadButton,"device":-1,"button_index":1,"pressed":true)]
+}
+buy_1={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":49)]
+}
+buy_2={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":50)]
+}
+buy_3={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":51)]
+}
+buy_4={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":52)]
+}
+buy_5={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":53)]
+}
+buy_6={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":54)]
+}
+buy_7={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":55)]
+}
+buy_8={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":56)]
+}
+buy_9={
+"deadzone": 0.2,
+"events": [Object(InputEventKey,"device":-1,"keycode":57)]
 }
 
 [layer_names]

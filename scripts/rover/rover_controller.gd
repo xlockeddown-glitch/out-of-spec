@@ -28,6 +28,12 @@ signal fill_rejected(reason: String)
 ## Set by the menu panel while the game runs on behind it (co-op): this screen
 ## then reads no driving keys, as with none held. Rover and walker both obey it.
 static var input_blocked: bool = false
+
+
+## With a pad connected and a panel open, the stick moves the panel's focus and
+## drives nothing. Keyboard play, with no pad, is as it was.
+static func panel_has_stick(tree: SceneTree) -> bool:
+	return tree != null and not Input.get_connected_joypads().is_empty() and QuestsUI.other_panel_open(tree)
 ## Said when there is no ground to dig; the screens add where to dig.
 const ROCK_REFUSAL: String = "This rock can't be dug."
 
@@ -312,7 +318,7 @@ func _physics_process(delta: float) -> void:
 		_till_presses.clear()
 		_applied_throttle = 0.0
 		_applied_steer = 0.0
-	var throttle: float = 0.0 if on_foot else 0.0 if input_blocked else Input.get_axis(&"rover_reverse", &"rover_forward")
+	var throttle: float = 0.0 if on_foot else 0.0 if input_blocked or panel_has_stick(get_tree()) else Input.get_axis(&"rover_reverse", &"rover_forward")
 	var moves: bool = CoopRovers.moves_here(rover_id, throttle != 0.0 or (not _following and not is_stopped()))
 	if moves == _following:
 		_set_following(not moves)
@@ -420,7 +426,7 @@ func _raycast_to_relay() -> bool:
 
 func _sample_local_input(throttle: float) -> void:
 	# +steer = left = +yaw about Y.
-	var steer: float = 0.0 if input_blocked else Input.get_axis(&"rover_steer_right", &"rover_steer_left")
+	var steer: float = 0.0 if input_blocked or panel_has_stick(get_tree()) else Input.get_axis(&"rover_steer_right", &"rover_steer_left")
 	_frames.append(UplinkFrame.new(_uplink_clock, throttle, steer))
 	for press: Dictionary in _till_presses:
 		queue_command(Command.TILL, str(press["seed"]), int(press["offset"]))

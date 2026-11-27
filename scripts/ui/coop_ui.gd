@@ -80,7 +80,7 @@ func _process(_delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	var toggled: bool = key != null and key.pressed and not key.echo and key.keycode == KEY_F7
+	var toggled: bool = event.is_action_pressed(&"open_coop")
 	if not _panel.visible:
 		if toggled:
 			get_viewport().set_input_as_handled()

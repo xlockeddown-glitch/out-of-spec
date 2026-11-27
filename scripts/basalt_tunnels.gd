@@ -120,6 +120,7 @@ func _ready() -> void:
 	_hud.get_parent().add_child(SkillsUI.new())
 	_hud.get_parent().add_child(QuestsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())
+	_hud.get_parent().add_child(ActionsMenuUI.new(ActionsMenuUI.PANEL_ACTIONS))
 	_hud.get_parent().add_child(_cup)
 	_cup.closed.connect(_on_cup_closed)
 	if _rover.away_text() == "":
