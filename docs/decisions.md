@@ -13,6 +13,7 @@ A new hire tends the lab for one day; a one-use reward books her free. Everythin
 - **Left out:** feeding the spiders. There is no code path that feeds a spider, and she uses only paths that exist.
 - **Reward:** `lab_sitter` in `one_use_rewards` (farm, no percent). Using it books her free and spends it once, only after the checks pass. No quest pays it yet; Beacon Run is not an obvious fit. The data check (`one_use_problem`) learned the kind: farm-held, no percent.
 - **Save and sync:** `lab_sitter` is in `SAVED_LATER` (old saves have none) and in `FarmSync.SHOWN_BY`. `CoopSession.PROTOCOL` 24 to 25.
+- **Review round 1:** the morning runs tally and growth, robot cards, the sitter, then dawn's soil check (`_note_dawn_soil`), so her trims count for the new day and robots pick spools first. `book_lab_sitter(for_day, ...)` is refused if the day is not the next one as the console showed it, so a booking across 06:00 never books the wrong day. She is booked before the fee or reward moves, and a free fee spends no reward.
 - **Out of scope:** camps, sprinklers, paying someone for several days.
 
 ## 2026-11-26: Surface biomes proposal (design only)

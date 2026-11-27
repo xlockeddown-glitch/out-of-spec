@@ -22,6 +22,8 @@ var _focus_before: Control
 ## The zone whose warning was shown, so the next press on it goes.
 var _warned: String = ""
 var _going: bool = false
+## True while a booking waits for the host.
+var _booking: bool = false
 ## The destinations the rows were built from, so a rover update that changes none
 ## of them leaves the rows (and the button with focus) alone.
 var _shown: Array[Dictionary] = []
@@ -46,6 +48,7 @@ func _ready() -> void:
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override(&"separation", 8)
 	column.add_child(_rows)
+	column.add_child(PlanBoardUI._label(LabSitter.text("title"), TEAL, 20))
 	var sitter := HBoxContainer.new()
 	_sitter_label = PlanBoardUI._label("", TEXT, 18)
 	_sitter_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -62,8 +65,9 @@ func _ready() -> void:
 	_close_button.pressed.connect(close)
 	column.add_child(_close_button)
 	GameState.rover_place_changed.connect(_on_place_changed)
-	GameState.lab_sitter_changed.connect(_refresh_sitter)
+	GameState.lab_sitter_changed.connect(_on_sitter_changed)
 	GameState.one_use_changed.connect(_refresh_sitter)
+	GameClock.day_started.connect(_on_day_started)
 	hide()
 
 
@@ -143,7 +147,7 @@ func _refresh() -> void:
 
 
 func _on_go(place: Dictionary) -> void:
-	if _going:
+	if _going or _booking:
 		return
 	var id: String = str(place["id"])
 	var warning: String = str(place["warning"])
@@ -153,6 +157,7 @@ func _on_go(place: Dictionary) -> void:
 		return
 	_going = true
 	FastTravel.pending = true
+	_refresh_sitter()
 	var problem: String = await FarmCommands.request(&"fast_travel", [id])
 	if not is_inside_tree():
 		FastTravel.pending = false
@@ -161,6 +166,7 @@ func _on_go(place: Dictionary) -> void:
 		_going = false
 		FastTravel.pending = false
 		_status.text = problem
+		_refresh_sitter()
 		return
 	# A guest's copy of the farm may come after the host's yes.
 	var waited: float = 0.0
@@ -172,11 +178,28 @@ func _on_go(place: Dictionary) -> void:
 		waited += 0.1
 	_going = false
 	FastTravel.pending = false
+	_refresh_sitter()
 	if GameState.rover_zone != id:
 		_status.text = FastTravel.text("no_zone")
 		return
 	close()
 	SceneSwitcher.go_to(SceneSwitcher.TUNNELS_SCENE)
+
+
+## Her booking changed (here or from a teammate): an old refusal is stale.
+func _on_sitter_changed() -> void:
+	_status.text = ""
+	_refresh_sitter()
+
+
+## A new day moves "tomorrow", so the row is told again.
+func _on_day_started(_day: int) -> void:
+	_refresh_sitter()
+
+
+## The day a booking made now would cover, as this screen shows it.
+func _sitter_day() -> int:
+	return LabSitter.booked_day(GameClock.get_day_index())
 
 
 ## What the sitter's line says: she is booked for a day, or what a day of her
@@ -190,15 +213,22 @@ func _refresh_sitter() -> void:
 	else:
 		var free: bool = GameState.one_use_count(GameState.ONE_USE_SITTER, GameState.local_player_id) > 0
 		var price: String = LabSitter.text("free_text") if free else LabSitter.text("fee_text") % SP811.integer(LabSitter.fee())
-		_sitter_label.text = LabSitter.text("offer_text") % [LabSitter.sitter_name(), price]
-	_sitter_button.disabled = booked
+		_sitter_label.text = LabSitter.text("offer_text") % [LabSitter.sitter_name(), SP811.integer(_sitter_day()), price]
+	_sitter_button.disabled = booked or _booking or _going
+	if _sitter_button.disabled and _sitter_button.has_focus():
+		_close_button.grab_focus()
 
 
-## The host books her; a refusal is shown as it came.
+## The host books her for the day the row showed; a refusal is shown as it came.
 func _on_book_sitter() -> void:
-	_sitter_button.disabled = true
-	var problem: String = await FarmCommands.request(&"book_lab_sitter", [])
+	if _booking or _going:
+		return
+	_booking = true
+	_refresh_sitter()
+	var problem: String = await FarmCommands.request(&"book_lab_sitter", [_sitter_day()])
+	_booking = false
 	if not is_inside_tree():
 		return
+	_warned = ""
 	_status.text = problem
 	_refresh_sitter()

@@ -3448,25 +3448,30 @@ func _grow_pockets(day: int) -> void:
 		pockets_changed.emit()
 
 
-## Books the lab sitter for the next day. Returns "" when booked, else why not.
-## She is booked from the console in the dome, one day at a time, and costs
-## LabSitter.fee() CR from the shared wallet, or one lab_sitter reward.
-func book_lab_sitter(player_id: String = "") -> String:
+## Books the lab sitter for `for_day`, which must be the next day as the screen
+## showed it (so a booking that crosses the 06:00 rollover is refused, not moved a
+## day). Returns "" when booked, else why not. She is booked from the console in
+## the dome, one day at a time, and costs LabSitter.fee() CR from the shared
+## wallet, or one lab_sitter reward.
+func book_lab_sitter(for_day: int, player_id: String = "") -> String:
 	if place_of(_player(player_id)) != ZonePresence.DOME:
 		return LabSitter.text("console_in_dome")
+	var day: int = LabSitter.booked_day(GameClock.get_day_index())
+	if for_day != day:
+		return LabSitter.text("new_day")
 	if LabSitter.is_booked(lab_sitter):
 		return LabSitter.text("already")
-	var free: bool = one_use_count(ONE_USE_SITTER) > 0
 	var fee: int = LabSitter.fee()
+	var free: bool = fee > 0 and one_use_count(ONE_USE_SITTER) > 0
 	if not free and credits < fee:
 		return LabSitter.text("short") % [SP811.integer(fee), SP811.integer(credits)]
-	var day: int = LabSitter.booked_day(GameClock.get_day_index())
+	# Booked before the money moves, so a screen that hears the charge sees her.
+	lab_sitter = LabSitter.new_booking(day)
 	if free:
 		_spend_one_use(ONE_USE_SITTER)
 		post_phone(QuestEngine.one_use_used_line(ONE_USE_SITTER))
 	else:
 		add_credits(-fee)
-	lab_sitter = LabSitter.new_booking(day)
 	lab_sitter_changed.emit()
 	post_phone(LabSitter.text("booked_text") % [LabSitter.sitter_name(), SP811.integer(day),
 		LabSitter.text("free_text") if free else LabSitter.text("fee_text") % SP811.integer(fee)])
@@ -3479,8 +3484,8 @@ func _open_lab_sitter(day: int) -> void:
 		_sitter_tend()
 
 
-## 06:00 after her day: the last of the work, then the Dispatch line, and she
-## is done. Run before the crops grow so her watering counts for the day.
+## 06:00 after her day: the last of the work (anything that came up during the
+## day), then the Dispatch line, and she is done. Run after the robots' cards.
 func _close_lab_sitter(day: int) -> void:
 	if not LabSitter.is_booked(lab_sitter) or day <= int(lab_sitter["day"]):
 		return
@@ -3535,10 +3540,14 @@ func _on_day_started(day: int) -> void:
 	_morning = true
 	_charge_overdue_credibility(day)
 	_expire_jobs(day)
-	_close_lab_sitter(day)
-	_grow_crops(watered)
+	# The day that ended is tallied and grown first. Then the robots, then the
+	# sitter (on her booked day and the one after), so her trims count for the
+	# new day and crops that finish at dawn are ready. Dawn's soil check is last.
+	_grow_crops(watered, false)
 	_run_robot_cards()
+	_close_lab_sitter(day)
 	_open_lab_sitter(day)
+	_note_dawn_soil()
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)
@@ -7119,7 +7128,7 @@ func _note_soil_excursions(notify: bool = true) -> void:
 ## half a day of its stated growth time, however late in the day it went in.
 ## With no `water` (the cistern ran dry) that day's growth is skipped, so
 ## each crop grows again from the next morning, with nothing else lost.
-func _grow_crops(water: bool = true) -> void:
+func _grow_crops(water: bool = true, dawn: bool = true) -> void:
 	if plantings.is_empty():
 		return
 	_note_soil_excursions()
@@ -7134,8 +7143,16 @@ func _grow_crops(water: bool = true) -> void:
 		var age: float = morning - float(planting.get("planted_at", morning))
 		if water and age >= float(planting["days_grown"]) + 1.0 - GROWTH_DAY_MIN:
 			planting["days_grown"] = int(planting["days_grown"]) + 1
-	# Soil out of band at 06:00 also counts against the new day, even if it
-	# drifts back in before anything checks again.
+	if dawn:
+		_note_dawn_soil()
+
+
+## Soil out of band at 06:00 also counts against the new day, even if it
+## drifts back in before anything checks again. The morning runs this last,
+## after the robots and the lab sitter have trimmed, so their work counts.
+func _note_dawn_soil() -> void:
+	if plantings.is_empty():
+		return
 	_note_soil_excursions(false)
 	crops_changed.emit()
 

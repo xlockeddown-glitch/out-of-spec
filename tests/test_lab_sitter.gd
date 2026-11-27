@@ -106,11 +106,11 @@ func test_a_saved_booking_is_checked() -> String:
 func test_booking_takes_the_fee_once_and_books_the_next_day() -> String:
 	var gs: GameStateScript = _state(500)
 	var problems: Array[String] = []
-	if gs.book_lab_sitter() != "":
+	if gs.book_lab_sitter(4) != "":
 		problems.append("A booking with enough credits was refused.")
 	if gs.credits != 460 or gs.lab_sitter != { "day": 4, "watered": 0, "spools": 0 }:
 		problems.append("40 CR taken and day 4 booked: %d, %s" % [gs.credits, gs.lab_sitter])
-	if gs.book_lab_sitter() == "" or gs.credits != 460:
+	if gs.book_lab_sitter(4) == "" or gs.credits != 460:
 		problems.append("A second booking was allowed or took credits again: %d" % gs.credits)
 	if _lines(gs, LabSitter.sitter_name()) != 1:
 		problems.append("The phone must say the booking once.")
@@ -121,16 +121,16 @@ func test_booking_takes_the_fee_once_and_books_the_next_day() -> String:
 func test_booking_is_refused_short_of_credits_and_away_from_the_dome() -> String:
 	var gs: GameStateScript = _state(39)
 	var problems: Array[String] = []
-	var reason: String = gs.book_lab_sitter()
+	var reason: String = gs.book_lab_sitter(4)
 	if reason == "" or not gs.lab_sitter.is_empty() or gs.credits != 39 or not reason.contains("40 CR"):
 		problems.append("39 CR must not book her, and the reason names the fee: '%s'" % reason)
 	gs.credits = 500
 	gs.player_places[HOST] = [ZonePresence.FARM, 0]
-	if gs.book_lab_sitter() != LabSitter.text("console_in_dome") or not gs.lab_sitter.is_empty() or gs.credits != 500:
+	if gs.book_lab_sitter(4) != LabSitter.text("console_in_dome") or not gs.lab_sitter.is_empty() or gs.credits != 500:
 		problems.append("Away from the dome's console nothing is booked or paid.")
 	gs.player_places[HOST] = [ZonePresence.DOME, 0]
 	gs.credits = 40
-	if gs.book_lab_sitter() != "" or gs.credits != 0:
+	if gs.book_lab_sitter(4) != "" or gs.credits != 0:
 		problems.append("Exactly 40 CR must book her.")
 	_done(gs)
 	return "\n".join(problems)
@@ -143,7 +143,7 @@ func test_the_reward_books_her_free_and_is_spent_once() -> String:
 		problems.append("The farm could not be given the reward.")
 	if gs.give_one_use(GameStateScript.ONE_USE_SITTER, HOST):
 		problems.append("A player was given the farm's reward.")
-	if gs.book_lab_sitter() != "":
+	if gs.book_lab_sitter(4) != "":
 		problems.append("The reward did not book her with 10 CR in the wallet.")
 	if gs.credits != 10 or gs.one_use_count(GameStateScript.ONE_USE_SITTER) != 0 or gs.lab_sitter.is_empty():
 		problems.append("Free means no credits taken and the reward spent: %d, %d" % [gs.credits, gs.one_use_count(GameStateScript.ONE_USE_SITTER)])
@@ -156,18 +156,75 @@ func test_the_reward_books_her_free_and_is_spent_once() -> String:
 func test_a_refused_booking_keeps_the_reward() -> String:
 	var gs: GameStateScript = _state(500)
 	gs.give_one_use(GameStateScript.ONE_USE_SITTER, GameStateScript.FARM_HOLDER)
+	gs.give_one_use(GameStateScript.ONE_USE_SITTER, GameStateScript.FARM_HOLDER)
 	gs.player_places[HOST] = [ZonePresence.FARM, 0]
-	var refused: String = gs.book_lab_sitter()
+	var refused: String = gs.book_lab_sitter(4)
 	var kept: int = gs.one_use_count(GameStateScript.ONE_USE_SITTER)
 	gs.player_places[HOST] = [ZonePresence.DOME, 0]
-	gs.book_lab_sitter()
-	var again: String = gs.book_lab_sitter()
+	gs.book_lab_sitter(4)
+	var again: String = gs.book_lab_sitter(4)
 	var left: int = gs.one_use_count(GameStateScript.ONE_USE_SITTER)
 	_done(gs)
-	if refused == "" or kept != 1:
+	if refused == "" or kept != 2:
 		return "A booking refused away from the dome must keep the reward."
-	if again == "" or left != 0:
+	if again == "" or left != 1:
 		return "A second booking must be refused and must not spend a reward."
+	return ""
+
+
+func test_a_booking_for_the_wrong_day_is_refused_and_costs_nothing() -> String:
+	var gs: GameStateScript = _state(500)
+	gs.give_one_use(GameStateScript.ONE_USE_SITTER, GameStateScript.FARM_HOLDER)
+	var problems: Array[String] = []
+	for wrong: int in [3, 5]:
+		if gs.book_lab_sitter(wrong) != LabSitter.text("new_day") or not gs.lab_sitter.is_empty():
+			problems.append("A booking for day %d, with day 4 next, was not refused." % wrong)
+	if gs.credits != 500 or gs.one_use_count(GameStateScript.ONE_USE_SITTER) != 1:
+		problems.append("A refused booking took the reward or credits.")
+	# The screen showed day 4; the clock crossed 06:00 before the host ran it.
+	GameClock.elapsed_days = 3.0
+	if gs.book_lab_sitter(4) == "" or not gs.lab_sitter.is_empty():
+		problems.append("A booking sent for day 4 on day 4 must not book day 5.")
+	if gs.book_lab_sitter(5) != "" or int(gs.lab_sitter.get("day", 0)) != 5:
+		problems.append("The new tomorrow, day 5, can be booked: %s" % [gs.lab_sitter])
+	_done(gs)
+	return "
+".join(problems)
+
+
+func test_a_booking_is_in_place_before_the_money_and_reward_move() -> String:
+	var gs: GameStateScript = _state(500)
+	gs.give_one_use(GameStateScript.ONE_USE_SITTER, GameStateScript.FARM_HOLDER)
+	var seen: Array = []
+	gs.one_use_changed.connect(func() -> void: seen.append(gs.lab_sitter.duplicate()))
+	gs.credits_changed.connect(func(_c: int) -> void: seen.append(gs.lab_sitter.duplicate()))
+	gs.book_lab_sitter(4)
+	gs.lab_sitter = {}
+	gs.book_lab_sitter(4)
+	var problems: Array[String] = []
+	if seen.size() != 2 or seen[0].is_empty() or seen[1].is_empty():
+		problems.append("A screen hearing the reward or the charge must already see her booked: %s" % [seen])
+	if gs.credits != 460:
+		problems.append("The second booking, with no reward left, took 40 CR: %d" % gs.credits)
+	_done(gs)
+	return "
+".join(problems)
+
+
+func test_a_free_fee_does_not_spend_a_reward() -> String:
+	var gs: GameStateScript = _state(500)
+	gs.give_one_use(GameStateScript.ONE_USE_SITTER, GameStateScript.FARM_HOLDER)
+	var table: Dictionary = DataManager._raw[&"economy"]
+	var shipped: Dictionary = table["lab_sitter"]
+	var cheap: Dictionary = shipped.duplicate()
+	cheap["fee_credits"] = 0
+	table["lab_sitter"] = cheap
+	var booked: String = gs.book_lab_sitter(4)
+	table["lab_sitter"] = shipped
+	var kept: int = gs.one_use_count(GameStateScript.ONE_USE_SITTER)
+	_done(gs)
+	if booked != "" or kept != 1:
+		return "A day that costs nothing must keep the reward: '%s', %d left." % [booked, kept]
 	return ""
 
 
@@ -176,17 +233,17 @@ func test_the_booking_command_runs_for_the_host_and_a_guest() -> String:
 	var commands: Node = CommandsScript.new()
 	commands.state = gs
 	var problems: Array[String] = []
-	if not &"book_lab_sitter" in CommandsScript.ACTIONS or commands.problem(&"book_lab_sitter", []) != "":
-		problems.append("book_lab_sitter must be a farm command that takes no arguments.")
-	if commands.problem(&"book_lab_sitter", [3]) == "":
-		problems.append("An argument must be refused.")
+	if not &"book_lab_sitter" in CommandsScript.ACTIONS or commands.problem(&"book_lab_sitter", [4]) != "":
+		problems.append("book_lab_sitter must be a farm command that takes the day.")
+	if commands.problem(&"book_lab_sitter", []) == "" or commands.problem(&"book_lab_sitter", ["x"]) == "":
+		problems.append("A booking with no day, or a word for the day, must be refused.")
 	gs.player_places[GUEST] = [ZonePresence.FARM, 0]
-	if commands.execute(GUEST, &"book_lab_sitter", []) == "" or not gs.lab_sitter.is_empty():
+	if commands.execute(GUEST, &"book_lab_sitter", [4]) == "" or not gs.lab_sitter.is_empty():
 		problems.append("A guest away from the dome booked her.")
 	gs.player_places[GUEST] = [ZonePresence.DOME, 0]
-	if commands.execute(GUEST, &"book_lab_sitter", []) != "" or gs.lab_sitter.is_empty() or gs.credits != 460:
+	if commands.execute(GUEST, &"book_lab_sitter", [4]) != "" or gs.lab_sitter.is_empty() or gs.credits != 460:
 		problems.append("A guest in the dome could not book her from the shared wallet: %d" % gs.credits)
-	if commands.execute(HOST, &"book_lab_sitter", []) == "" or gs.credits != 460:
+	if commands.execute(HOST, &"book_lab_sitter", [4]) == "" or gs.credits != 460:
 		problems.append("The host booked her a second time.")
 	commands.free()
 	_done(gs)
@@ -199,7 +256,7 @@ func test_she_waters_by_the_set_point_trim_and_only_once_a_round() -> String:
 	var gs: GameStateScript = _state()
 	_plant(gs, CELL, 5)
 	_plant(gs, OTHER, 0)
-	gs.book_lab_sitter()
+	gs.book_lab_sitter(4)
 	var problems: Array[String] = []
 	var over: float = float(gs.plantings[CELL]["setpoint"])
 	if not is_equal_approx(over, _target(gs, CELL) + 0.05):
@@ -226,7 +283,7 @@ func test_she_collects_the_domes_spool_and_a_tanks_once() -> String:
 	gs.enclosures[SPECIES]["molt_stage"] = int(GameStateScript.MoltStage.MOLTED)
 	var before: int = gs.optical_silk_spools
 	var xp_before: Dictionary = gs.player_skill_xp.duplicate(true)
-	gs.book_lab_sitter()
+	gs.book_lab_sitter(4)
 	gs._open_lab_sitter(4)
 	var problems: Array[String] = []
 	if gs.optical_silk_spools != before + 2 or gs.lab_sitter["spools"] != 2:
@@ -248,7 +305,7 @@ func test_she_never_calibrates_or_touches_a_reading() -> String:
 	gs.molt_stage = GameStateScript.MoltStage.MOLTED
 	for id: Variant in gs.sensors:
 		(gs.sensors[id] as DriftingSensor).advance_days(40.0)
-	gs.book_lab_sitter()
+	gs.book_lab_sitter(4)
 	var before: Array = _bench_state(gs)
 	var drifted: bool = false
 	for entry: Variant in before.slice(2):
@@ -270,7 +327,7 @@ func test_the_day_closes_with_the_dispatch_line_and_she_is_done() -> String:
 	var gs: GameStateScript = _state()
 	_plant(gs, CELL, 5)
 	gs.molt_stage = GameStateScript.MoltStage.MOLTED
-	gs.book_lab_sitter()
+	gs.book_lab_sitter(4)
 	GameClock.elapsed_days = 3.0
 	gs._on_day_started(4)
 	var problems: Array[String] = []
@@ -294,9 +351,65 @@ func test_the_day_closes_with_the_dispatch_line_and_she_is_done() -> String:
 	return "\n".join(problems)
 
 
+func test_the_closing_round_does_the_work_that_came_up_during_her_day() -> String:
+	var gs: GameStateScript = _state()
+	gs.book_lab_sitter(4)
+	gs._open_lab_sitter(4)
+	if gs.lab_sitter["watered"] != 0 or gs.lab_sitter["spools"] != 0:
+		return "The morning had nothing to do: %s" % [gs.lab_sitter]
+	# During day 4 a plot is planted off its target and a spool comes ready.
+	GameClock.elapsed_days = 3.0
+	_plant(gs, CELL, 5)
+	gs.molt_stage = GameStateScript.MoltStage.MOLTED
+	GameClock.elapsed_days = 4.0
+	gs._close_lab_sitter(5)
+	var problems: Array[String] = []
+	if absf(float(gs.plantings[CELL]["setpoint"]) - _target(gs, CELL)) > 0.0001:
+		problems.append("The closing round did not trim the new plot: %s" % [gs.plantings[CELL]["setpoint"]])
+	if gs.optical_silk_spools != 1:
+		problems.append("The closing round did not collect the spool.")
+	if _lines(gs, "Plots trimmed to their target: 1") != 1 or _lines(gs, "Spools collected: 1") != 1:
+		problems.append("The report must give the day's totals: %s" % [gs.phone_log])
+	_done(gs)
+	return "
+".join(problems)
+
+
+func test_her_trim_counts_for_the_booked_day_and_robots_come_first() -> String:
+	var gs: GameStateScript = _state()
+	gs.till(CELL)
+	gs.plant_crop(CELL, "lensberry", 6)
+	var cell_plant: Dictionary = gs.plantings[CELL]
+	var problems: Array[String] = []
+	if str(cell_plant["crop_id"]) != "lensberry":
+		return "The setup could not plant a lensberry."
+	gs.book_lab_sitter(4)
+	# Day 3 ends out of band; day 4's morning she trims; day 4 must stay in band.
+	gs._note_soil_excursions(false)
+	if not bool(cell_plant.get("out_today", false)):
+		problems.append("The setup: a plot 6 steps over must be out of band today.")
+	GameClock.elapsed_days = 3.0
+	gs._on_day_started(4)
+	if absf(float(cell_plant["setpoint"]) - _target(gs, CELL)) > 0.0001:
+		problems.append("She did not trim the lensberry in the morning.")
+	if bool(cell_plant.get("out_today", false)):
+		problems.append("Her morning trim must count for day 4: the plot was marked out of band at dawn.")
+	if int(cell_plant["out_of_band_days"]) != 1:
+		problems.append("Day 3 counts once: %d" % int(cell_plant["out_of_band_days"]))
+	GameClock.elapsed_days = 4.0
+	gs._on_day_started(5)
+	GameClock.elapsed_days = 5.0
+	gs._on_day_started(6)
+	if int(cell_plant["out_of_band_days"]) != 1:
+		problems.append("Days 4 and 5 were on target but counted: %d" % int(cell_plant["out_of_band_days"]))
+	_done(gs)
+	return "
+".join(problems)
+
+
 func test_a_booking_that_was_slept_past_still_closes() -> String:
 	var gs: GameStateScript = _state()
-	gs.book_lab_sitter()
+	gs.book_lab_sitter(4)
 	gs._close_lab_sitter(4)
 	var still: bool = not gs.lab_sitter.is_empty()
 	gs._close_lab_sitter(9)
@@ -309,7 +422,7 @@ func test_a_booking_that_was_slept_past_still_closes() -> String:
 
 func test_the_booking_is_saved_and_an_old_save_has_none() -> String:
 	var gs: GameStateScript = _state()
-	gs.book_lab_sitter()
+	gs.book_lab_sitter(4)
 	gs.lab_sitter["watered"] = 2
 	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
 	var problems: Array[String] = []
@@ -349,7 +462,7 @@ func test_a_guest_is_shown_the_booking() -> String:
 	if joined != "" or not guest.lab_sitter.is_empty():
 		problems.append("A guest joined a farm with none booked: '%s', %s" % [joined, guest.lab_sitter])
 	FarmCommands.guest = false
-	host.book_lab_sitter()
+	host.book_lab_sitter(4)
 	FarmCommands.guest = true
 	var heard: Array[int] = [0]
 	guest.lab_sitter_changed.connect(func() -> void: heard[0] += 1)
