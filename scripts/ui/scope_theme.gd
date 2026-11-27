@@ -34,6 +34,11 @@ const GLASS: StringName = &"ScopeGlass"
 const CARD: StringName = &"ScopeCard"
 const CAPTION: StringName = &"ScopeCaption"
 const TITLE: StringName = &"ScopeTitle"
+## The field phone's own variations (its case, its glass, its small keys, its top band).
+const PHONE_CASE: StringName = &"ScopePhoneCase"
+const PHONE_GLASS: StringName = &"ScopePhoneGlass"
+const PHONE_KEY: StringName = &"ScopePhoneKey"
+const PHONE_BAND: StringName = &"ScopePhoneBand"
 
 ## The focus ring: thick, teal, with a soft glow [PLACEHOLDER].
 const FOCUS_BORDER: int = 5
@@ -108,6 +113,17 @@ static func _build() -> Theme:
 	_variation(t, HEADER, &"PanelContainer", &"panel", header)
 	_variation(t, GLASS, &"PanelContainer", &"panel", box(SHADOW, GLASS_DEEP, 5, 10, 16))
 	_variation(t, CARD, &"PanelContainer", &"panel", card_box())
+	# The field phone: a rounded putty handheld around dark glass, a terracotta band
+	# across its top, smaller keys so two fit side by side [PLACEHOLDER].
+	var body := box(ENAMEL, TERRA_DARK, 4, 28, 22)
+	body.border_width_bottom = 9
+	body.shadow_color = Color(0, 0, 0, 0.5)
+	body.shadow_size = 10
+	_variation(t, PHONE_CASE, &"PanelContainer", &"panel", body)
+	_variation(t, PHONE_GLASS, &"PanelContainer", &"panel", box(SHADOW, GLASS_DEEP, 3, 10, 22))
+	var band := box(TERRA, TERRA_DARK, 2, 7, 0)
+	band.border_width_bottom = 4
+	_variation(t, PHONE_BAND, &"PanelContainer", &"panel", band)
 	# Labels: ink on the glass; a caption and a title.
 	t.set_color(&"font_color", &"Label", INK)
 	t.set_type_variation(CAPTION, &"Label")
@@ -123,6 +139,14 @@ static func _build() -> Theme:
 		_button_styles(t, kind, GLASS_CARD, GLASS_LINE, INK, INK_DIM)
 	t.set_color(&"font_color", &"CheckButton", INK)
 	# The drop-down list.
+	t.set_type_variation(PHONE_KEY, &"Button")
+	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
+		var key: StyleBoxFlat = (t.get_stylebox(state, &"Button") as StyleBoxFlat).duplicate()
+		key.content_margin_left = 8
+		key.content_margin_right = 8
+		key.content_margin_top = 6
+		key.content_margin_bottom = 6
+		t.set_stylebox(state, PHONE_KEY, key)
 	t.set_stylebox(&"panel", &"PopupMenu", box(GLASS_DEEP, TEAL, 2, 6, 6))
 	t.set_stylebox(&"hover", &"PopupMenu", box(Color(TEAL, 0.25), TEAL, 0, 4, 4))
 	t.set_color(&"font_color", &"PopupMenu", INK)

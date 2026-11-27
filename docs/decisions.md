@@ -2259,3 +2259,11 @@ Ryan: the start of the game needs a few tips and an idea of what you are doing (
 - **Outside a test.** Suite construction is checked like a test. After the last test the runner awaits two frames and fails the run ("N script error(s) outside any test") if the logger count is above what was pinned on tests, constructions and the probe.
 - **Guard probe, every run.** Before the suite the runner runs `crash_on_null` and `plain_pass` from `tests/helpers/crashing_suite.gd` and counts a fault into `failed` if the crash is not caught or the pass fails. It prints one expected SCRIPT ERROR block, announced by a line before it. `RUNNER_SELFTEST=1` adds a null return, a failure message and await-then-crash and await-then-pass cases. The helper sits in `tests/helpers/`, so the runner never picks it up as a suite.
 - **Result.** The full suite (1570 tests) still passes, with the probe on every run: no hidden script errors on main and none outside a test.
+
+## The field phone in the Scope family [PLACEHOLDER] (2026-11-27, feat/phone-scope)
+Ryan: redo the phone UI to be similar to the Meridian style, not an exact replica.
+- Its own device, not a copy of the bench: a rounded putty case with a terracotta edge and a terracotta band across the top, dark #1D222B glass inside, small putty keys. New ScopeTheme variations ScopePhoneCase, ScopePhoneGlass, ScopePhoneBand, ScopePhoneKey; the bench and the quest board look as before.
+- Same layout, rows, wording, keys and signals as before (Ryan liked the old phone). The earlier PR 127 look (metal case, needle gauge, message cards) stays out. The drift reading now sits on one Scope card.
+- The key hints still follow Controls.shown_pad (the brackets show the pad button on a pad); no separate pad badge was added, since the phone's keys are not focus targets.
+- Size is unchanged: PHONE_SCALE 0.8, the phone still starts at LEFT_ANCHOR (0.7952, 1527 px of 1920) and the case is the same 456 x 1040 px at 1080p.
+- Colours: green terminal text became Scope ink (white), muted captions (INK_MUTED) and teal for good states; amber and red keep their meaning. Nothing is saved or sent.

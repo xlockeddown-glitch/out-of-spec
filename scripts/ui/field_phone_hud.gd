@@ -2,6 +2,8 @@ class_name FieldPhoneHUD
 extends Control
 ## Right-side handheld field phone. Presentation only: renders state handed to
 ## it and emits intent signals. No gameplay rules live here.
+## Its own device in the Meridiani Scope family (ScopeTheme): a putty case with a
+## terracotta band around dark glass, the same rows and keys as before.
 
 signal zero_steering_pressed
 signal slot_spool_pressed
@@ -27,7 +29,7 @@ const JOBS_MAX_HEIGHT: float = 130.0 # before PHONE_SCALE; [PLACEHOLDER] room fo
 ## The dispatch log always keeps room for this many lines, px (before PHONE_SCALE).
 const LOG_MIN_HEIGHT: float = 80.0
 const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
-const COLOR_BAR_OFF := Color(0.14, 0.22, 0.2)
+const COLOR_BAR_OFF := ScopeTheme.GLASS_LINE
 const COLOR_OK := DriftingSensor.COLOR_IN_BAND
 const COLOR_WARN := DriftingSensor.COLOR_GUARDBAND
 const COLOR_FAIL := DriftingSensor.COLOR_OUT_OF_TOLERANCE
@@ -113,6 +115,8 @@ static func scaled_font(base: int) -> int:
 
 func _ready() -> void:
 	anchor_left = LEFT_ANCHOR
+	theme = ScopeTheme.theme()
+	_style_case()
 	_refresh_keys()
 	_scale_scene_nodes(self)
 	_zero_button.pressed.connect(func() -> void: zero_steering_pressed.emit())
@@ -122,6 +126,7 @@ func _ready() -> void:
 	_wheels_button = Button.new()
 	_wheels_button.name = "WheelServiceButton"
 	_wheels_button.focus_mode = Control.FOCUS_NONE
+	_wheels_button.theme_type_variation = ScopeTheme.PHONE_KEY
 	_wheels_button.custom_minimum_size = Vector2(0, scaled(40.0))
 	_wheels_button.add_theme_font_size_override("font_size", scaled_font(15))
 	_wheels_button.pressed.connect(func() -> void: wheel_service_pressed.emit())
@@ -162,6 +167,47 @@ func _ready() -> void:
 	clock_row.get_parent().add_child(_jobs_scroll)
 	clock_row.get_parent().move_child(_jobs_scroll, _gauge_label.get_index() + 1)
 	_jobs_box.minimum_size_changed.connect(_fit_jobs_scroll)
+	_card_the_drift()
+
+
+## The case and the glass carry the Scope styles. They are set as overrides (copies
+## of the theme's, at the scene's original margins) so _scale_scene_nodes scales
+## their margins with the rest; then the terracotta band goes across the top.
+func _style_case() -> void:
+	var bezel: PanelContainer = $Bezel
+	var screen: PanelContainer = $Bezel/Screen
+	var case_box: StyleBoxFlat = theme.get_stylebox(&"panel", ScopeTheme.PHONE_CASE).duplicate()
+	case_box.set_content_margin(SIDE_TOP, 40.0)
+	case_box.set_content_margin(SIDE_BOTTOM, 40.0)
+	bezel.add_theme_stylebox_override(&"panel", case_box)
+	screen.add_theme_stylebox_override(&"panel", theme.get_stylebox(&"panel", ScopeTheme.PHONE_GLASS).duplicate())
+	var band := PanelContainer.new()
+	band.name = "Band"
+	band.theme_type_variation = ScopeTheme.PHONE_BAND
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	band.offset_left = scaled(20.0 + 70.0)
+	band.offset_right = -scaled(20.0 + 70.0)
+	band.offset_top = scaled(20.0 + 14.0)
+	band.offset_bottom = scaled(20.0 + 28.0)
+	add_child(band)
+
+
+## The drift reading sits on a Scope card, as the bench's result does.
+func _card_the_drift() -> void:
+	var content: Node = _drift_value.get_parent()
+	var first: Node = content.get_node("DriftCaption")
+	var card := PanelContainer.new()
+	card.name = "DriftCard"
+	var edge := ScopeTheme.card_box()
+	edge.set_content_margin_all(scaled(8.0))
+	card.add_theme_stylebox_override(&"panel", edge)
+	var rows := VBoxContainer.new()
+	card.add_child(rows)
+	content.add_child(card)
+	content.move_child(card, first.get_index())
+	for node: Node in [first, _drift_value, _status_label, _tolerance_label]:
+		node.reparent(rows, false)
 
 
 ## Scales what the scene file sets by hand (written at the original size):
@@ -228,7 +274,7 @@ func set_relay(slotted: bool, damaged: bool, spools: String, can_slot: bool) -> 
 	_relay_status_label.text = "RELAY: STOCK TRANSCEIVER" if not slotted \
 			else "RELAY: DAMAGED SILK" if damaged else "RELAY: OPTICAL SILK"
 	_relay_status_label.add_theme_color_override(
-		"font_color", Color(0.4, 0.7, 0.45) if not slotted else COLOR_WARN if damaged else Color(0.45, 0.9, 1))
+		"font_color", ScopeTheme.INK_MUTED if not slotted else COLOR_WARN if damaged else ScopeTheme.TEAL)
 	_spool_label.text = "SILK SPOOLS %s" % spools
 	_slot_spool_button.disabled = not can_slot
 
@@ -329,7 +375,7 @@ func show_standards(offers: Array[Dictionary], note: String) -> void:
 			label.text = note
 			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			label.add_theme_font_size_override("font_size", scaled_font(14))
-			label.add_theme_color_override("font_color", Color(0.4, 0.7, 0.45))
+			label.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
 			_standards_box.add_child(label)
 		return
 	for offer: Dictionary in offers:
@@ -337,6 +383,7 @@ func show_standards(offers: Array[Dictionary], note: String) -> void:
 		button.text = str(offer["text"])
 		button.disabled = bool(offer["disabled"])
 		button.focus_mode = Control.FOCUS_NONE
+		button.theme_type_variation = ScopeTheme.PHONE_KEY
 		button.custom_minimum_size = Vector2(0, scaled(40.0))
 		button.add_theme_font_size_override("font_size", scaled_font(15))
 		var id: String = str(offer["id"])
@@ -374,6 +421,7 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 		button.disabled = bool(offers[i]["disabled"])
 		button.tooltip_text = str(offers[i].get("tooltip", ""))
 		button.focus_mode = Control.FOCUS_NONE
+		button.theme_type_variation = ScopeTheme.PHONE_KEY
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.add_theme_font_size_override("font_size", scaled_font(13))
 		var index: int = i
