@@ -3,7 +3,8 @@ extends Node3D
 ## Low lamp posts along each spoke biome's road (docs/design/biomes.md section 6,
 ## step 9), dark while the biome is closed and warm once it is open (BiomeData.is_open
 ## from the lab level and the audits done). A hint only: nothing is blocked and no
-## road changes. The Basalt Ridge has no road, so its pad's corners carry the lamps.
+## road changes. The Basalt Ridge has no road, so its pad's corners and the way to its tunnel mouth
+## carry the lamps.
 ## Lamps sit just outside a road's strip, off pads, signs and built things, and ride
 ## the ground as dug leaves it. Meshes and numbers are stand-ins [PLACEHOLDER]; no
 ## OmniLight, only an emissive head. Nothing is saved or sent: it reads lab_xp and
@@ -18,6 +19,12 @@ const SIDE_M: float = 4.0
 const SPOT_CLEAR_M: float = 0.5
 ## A padless biome's lamps stand this far off the pad's middle on each axis.
 const PAD_LAMP_M: float = 2.8
+## The Basalt Ridge's extra lamps (step 10), along the lit way from its pad to the
+## tunnel mouth: two north of the way and one south of it, all clear of the pad's own
+## corner lamps and of the tunnel pad and mouth [PLACEHOLDER].
+const BASALT_WAY_SPOTS: Array[Vector2] = [Vector2(25.2, -22.6), Vector2(22.5, -22.8), Vector2(23.5, -14.5)]
+## No two lamps of a biome stand closer than this.
+const MIN_GAP_M: float = 1.5
 const POST_HEIGHT_M: float = 1.1
 const HEAD_SIZE_M: float = 0.28
 
@@ -36,7 +43,8 @@ static func lamp_ids() -> Array[StringName]:
 
 
 ## Where a biome's lamps stand (x, z): along its road every SPACING_M, alternating
-## sides, or at its pad's corners when it has no road. Spots that would sit on a road
+## sides, or at its pad's corners when it has no road (the Basalt Ridge adds three
+## along its way to the tunnel mouth). Spots that would sit on a road
 ## cell, a pad or sign cell, or a built thing are dropped. Worked out once.
 static func spots(id: StringName) -> Array[Vector2]:
 	if not lamp_ids().has(id):
@@ -52,6 +60,10 @@ static func spots(id: StringName) -> Array[Vector2]:
 				var spot: Vector2 = at + corner * PAD_LAMP_M
 				if _clear(spot):
 					found.append(spot)
+			if id == &"basalt_ridge":
+				for spot: Vector2 in BASALT_WAY_SPOTS:
+					if _clear(spot) and _apart(spot, found):
+						found.append(spot)
 		_spots[id] = found
 	return _spots[id]
 
@@ -86,6 +98,14 @@ static func _along(line: Array[Vector2]) -> Array[Vector2]:
 			next += SPACING_M
 		walked += length
 	return out
+
+
+## Whether `at` keeps MIN_GAP_M from every lamp already in `found`.
+static func _apart(at: Vector2, found: Array[Vector2]) -> bool:
+	for other: Vector2 in found:
+		if at.distance_to(other) < MIN_GAP_M:
+			return false
+	return true
 
 
 ## Whether a lamp may stand at `at`: on land, off every road cell, pad and sign cell,
