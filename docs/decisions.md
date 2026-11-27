@@ -2,6 +2,18 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: Phobos strays and the Strays quest (feat/phobos-strays)
+
+Phobos part 2: a stray in the service tunnel can be caught, Odalys's `strays` quest is built on it, and the caught spider is marked as station stock.
+
+- **Catch:** `GameState.catch_stray(stray_index, layout_day, player_id)` is a farm command (`FarmCommands`, allowed on a moon). It refuses a player not on Phobos, a stray not placed for today, a screen still drawn from another day, and a stray already caught today. It adds the Banded Regolith Runner through `catch_species` (a new `CATCHABLE` entry), so there is still one tank a species. A later catch takes the stray out and counts for the catcher but adds no second tank; this is so every co-op player can finish their own quest.
+- **Marker:** `GameState.enclosure_origins` (species id to `phobos_station`), beside the tank record, because `_is_tank` takes exactly three fields. `enclosure_text` ends "Station stock, caught in a Phobos service tunnel" for a marked tank.
+- **Caught today:** `GameState.strays_caught` is `{day, ids}`, pruned to today. Both new fields are in `SAVED_LATER` (old saves load) and in `FarmSync.SHOWN_BY` (`enclosures_changed` and the new `strays_changed`).
+- **Quest:** `strays` (personal, Odalys, one step, done by `catch_stray`); offered after a player has reached Phobos (`reached_<moon>` counts, added in `book_shuttle`, no XP). An old save has no such count and is offered the quest after its next trip.
+- **Protocol:** 38 to 39, once, for the new command.
+- **[PLACEHOLDER] choices:** 100 Husbandry XP for the quest; "being on Phobos" standing in for "being in the service tunnel" (no hub-versus-tunnel presence exists); the three strays a day and the seven spots (from part 1); Odalys's two lines; the station-stock wording; the phone line when the Runner is added.
+- **Left out:** smuggler caches, terraform pods, Deimos strays, breeding moon stock, any new look, and a dome tank to look at.
+
 ## 2026-11-27: Dome gamepad pointer (feat/dome-pad)
 
 Moved the dome's gamepad selection logic out of `dome_interior.gd` into a dedicated `DomePadPointer` node (`scripts/dome/dome_pad_pointer.gd`) and added additive `set_hover(on)` and `activate()` methods on `Clickable` (`scripts/world/clickable.gd`) shared by both mouse and pad paths so farm and Phobos Clickables are unchanged.

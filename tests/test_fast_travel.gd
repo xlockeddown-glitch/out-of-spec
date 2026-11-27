@@ -106,8 +106,8 @@ func test_the_lent_flag_survives_a_save_and_old_saves_read_it_from_the_zone() ->
 
 func test_the_protocol_and_the_commands_and_the_sync_know_fast_travel() -> String:
 	var problems: Array[String] = []
-	if SessionScript.PROTOCOL != 38:
-		problems.append("Fast travel changes what is sent: protocol 38, got %d" % SessionScript.PROTOCOL)
+	if SessionScript.PROTOCOL != 39:
+		problems.append("Fast travel changes what is sent: protocol 39, got %d" % SessionScript.PROTOCOL)
 	for action: StringName in [&"fast_travel", &"leave_zone"]:
 		if not action in FarmCommands.ACTIONS:
 			problems.append("%s is not a farm command" % action)

@@ -259,6 +259,8 @@
         "daily_block_done": "The steering check is on file. Warmly, Dispatch.",
         "a_clean_line_offer": "Dispatch again. Your uplink reaches my desk a little late and a little chewed. I am told you have a silk spool on the shelf. Seat it in the relay, and take your time lowering it. The slot is narrower than it looks.",
         "a_clean_line_done": "Your line is on my board and it is holding. I have filed the old static under weather. Warmly, Dispatch.",
+        "strays_offer": "Dispatch. You have been on Phobos. The old station kept tarantulas, and when the station was shut a few were never counted out. They have been living in the warm service tunnel since, and the logbook does not know them. Catch one. I have no paperwork for it and would like to have some.",
+        "strays_done": "A station tarantula, caught in the tunnel and now in the dome's records. I have filed it as stock, which it was before it was a stray. Warmly, Dispatch.",
         "a_clean_line_reference": "That went in dead center. I heard the line clear from here, and I am four hundred kilometers up. Warmly, Dispatch."
       }
     },

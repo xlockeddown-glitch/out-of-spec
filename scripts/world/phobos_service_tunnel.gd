@@ -5,15 +5,16 @@ extends Node3D
 ## thermal vents, grating floor, old station signage, a ladder back up to the
 ## hub, and a few daily-placed Banded Regolith Runner strays to inspect.
 ##
-## Part 2 (catching a stray and Odalys's "Strays" quest) is intentionally left
-## out of this PR. Every number, colour, and hash choice is a [PLACEHOLDER].
+## Part 2: clicking a stray asks the host to catch it (FarmCommands catch_stray). A
+## caught stray vanishes for everyone, and the first one goes to a tank in the dome as
+## station stock. Every number, colour, and hash choice is a [PLACEHOLDER].
 
 const SCENE_PATH: String = "res://scenes/phobos_service_tunnel.tscn"
 const TITLE_TEXT: String = "PHOBOS // SERVICE TUNNEL"
 const AMBIENT_HINT: String = "Warm station conduit. Click the ladder to climb back up, or inspect a stray."
 const LADDER_HINT: String = "Ladder up to Phobos hub"
 const STRAY_HINT: String = "Banded Regolith Runner (stray)"
-const STRAY_INSPECT_TEXT: String = "A stray Banded Regolith Runner from the old station. Odalys will want to hear about this. [later]"
+const STRAY_CAUGHT_TEXT: String = "Caught. A Banded Regolith Runner, station stock. Odalys will want to hear."
 const TOO_FAR_TEXT: String = "Move closer."
 const SIGN_TEXT: String = "SECTOR 04 // THERMAL CONDUIT"
 
@@ -48,6 +49,9 @@ var camera: IsoCamera
 var ladder_click: Clickable
 var stray_clicks: Array[Clickable] = []
 var stray_nodes: Array[Node3D] = []
+## The spot index (STRAY_SPOTS) of each stray node, in the same order.
+var stray_indices: Array[int] = []
+var _catching: bool = false
 
 var _hint: Label
 var _clock: Label
@@ -86,6 +90,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	if GameState.strays_changed.is_connected(_show_strays):
+		GameState.strays_changed.disconnect(_show_strays)
 	if GameState.loadouts_changed.is_connected(_dress_walker):
 		GameState.loadouts_changed.disconnect(_dress_walker)
 
@@ -312,6 +318,7 @@ func _build_strays(day: int) -> void:
 		spider.set_meta(&"base_yaw", yaw)
 		group.add_child(spider)
 		stray_nodes.append(spider)
+		stray_indices.append(indices[i])
 
 		var click := Clickable.new()
 		click.name = "StrayClick_%d" % i
@@ -324,9 +331,11 @@ func _build_strays(day: int) -> void:
 		shape.shape = box
 		click.add_child(shape)
 		click.position = spot + Vector3(0.0, 0.3, 0.0)
-		click.clicked.connect(_on_stray_clicked.bind(spot))
+		click.clicked.connect(_on_stray_clicked.bind(spot, indices[i], day))
 		group.add_child(click)
 		stray_clicks.append(click)
+	GameState.strays_changed.connect(_show_strays)
+	_show_strays()
 
 
 func _add_collider(body_name: String, at: Vector3, size: Vector3) -> void:
@@ -402,10 +411,26 @@ func _on_ladder() -> void:
 	_swap_to(SceneSwitcher.PHOBOS_SCENE)
 
 
-func _on_stray_clicked(at: Vector3) -> void:
-	if not _near(at):
+func _on_stray_clicked(at: Vector3, stray_index: int, layout_day: int) -> void:
+	if not _near(at) or _catching:
 		return
-	_toast(STRAY_INSPECT_TEXT)
+	# The host decides (a guest's click only asks); this screen changes when it says so.
+	_catching = true
+	var problem: Variant = await FarmCommands.request(&"catch_stray", [stray_index, layout_day])
+	_catching = false
+	if not is_inside_tree():
+		return
+	_toast(str(problem) if str(problem) != "" else STRAY_CAUGHT_TEXT)
+
+
+## A stray caught today is gone from this screen, whoever caught it.
+func _show_strays() -> void:
+	var caught: Array[int] = GameState.strays_caught_today()
+	for i: int in stray_nodes.size():
+		var gone: bool = stray_indices[i] in caught
+		stray_nodes[i].visible = not gone
+		stray_clicks[i].visible = not gone
+		stray_clicks[i].collision_layer = 0 if gone else 8
 
 
 func _toast(text: String) -> void:
