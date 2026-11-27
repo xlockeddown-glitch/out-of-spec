@@ -3,7 +3,10 @@ extends RefCounted
 
 const STEEPEST_DEG: float = 15.0
 const ANTENNA_M: float = 2.0
+## The old 160 m land (|x|, |z| <= 80), frozen before the land grew to 240 m. Never change it.
 const HASH: int = 1162163701
+## The whole 240 m land.
+const LAND_HASH: int = 758204189
 
 var _none: Dictionary[Vector2i, int] = {}
 
@@ -43,16 +46,27 @@ func test_there_are_hills_and_valleys_within_bounds() -> String:
 
 func test_the_same_land_on_every_pc() -> String:
 	# Hashing every height catches any change; saves and co-op count on none.
+	# HASH is the old 160 m land's, frozen before the land grew: the middle is unchanged.
+	var hashed: int = 17
+	for z: int in range(-Terrain.OLD_HALF_M, Terrain.OLD_HALF_M + 1):
+		for x: int in range(-Terrain.OLD_HALF_M, Terrain.OLD_HALF_M + 1):
+			var parts: float = _at(x, z) * Terrain.HEIGHT_PARTS
+			if absf(Terrain._work_out(x, z) - _at(x, z)) > 0.0:
+				return "What was kept for (%d, %d) is not what it works out to." % [x, z]
+			hashed = (hashed * 31 + int(parts)) & 0xffffffff
+	return "" if hashed == HASH else "The old middle changed: its hash is %d." % hashed
+
+
+func test_the_same_240_m_land_on_every_pc() -> String:
+	# The whole land, ring included, as heights in whole parts of a meter.
 	var hashed: int = 17
 	for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
 		for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
 			var parts: float = _at(x, z) * Terrain.HEIGHT_PARTS
 			if parts != roundf(parts):
 				return "The height at (%d, %d) is not a whole number of parts." % [x, z]
-			if absf(Terrain._work_out(x, z) - _at(x, z)) > 0.0:
-				return "What was kept for (%d, %d) is not what it works out to." % [x, z]
 			hashed = (hashed * 31 + int(parts)) & 0xffffffff
-	return "" if hashed == HASH else "The land changed: its hash is %d." % hashed
+	return "" if hashed == LAND_HASH else "The land changed: its hash is %d." % hashed
 
 
 func test_the_road_to_the_relay_is_level() -> String:

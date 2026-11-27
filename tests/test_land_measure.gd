@@ -51,13 +51,13 @@ func test_small_ground_builds() -> String:
 
 
 func test_bigger_land_keeps_todays_land_exactly() -> String:
-	# The 240 m land is today's ground on every point of today's 160 m, rim band included.
+	# A bigger land is today's ground on every point of the old 160 m, rim band included.
 	var wrong: int = 0
 	var first := Vector2i.ZERO
-	for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
-		for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
+	for z: int in range(-Terrain.OLD_HALF_M, Terrain.OLD_HALF_M + 1):
+		for x: int in range(-Terrain.OLD_HALF_M, Terrain.OLD_HALF_M + 1):
 			var at := Vector2i(x, z)
-			if Terrain.natural_on(at, 120) != Terrain.natural(at):
+			if Terrain.natural_on(at, 120) != Terrain._work_out(x, z):
 				wrong += 1
 				first = at
 	if wrong > 0:
@@ -69,7 +69,7 @@ func test_bigger_land_joins_the_edge_smoothly() -> String:
 	# Past the old edge the ground eases from the edge's height, with no step.
 	for at: Vector2i in [Vector2i(81, 0), Vector2i(0, -81), Vector2i(81, 81), Vector2i(-81, 40)]:
 		var edge := Vector2i(clampi(at.x, -80, 80), clampi(at.y, -80, 80))
-		if absf(Terrain.natural_on(at, 120) - Terrain.natural(edge)) > 0.3:
+		if absf(Terrain.natural_on(at, 120) - Terrain._work_out(edge.x, edge.y)) > 0.3:
 			return "a step at the old edge, at %s" % str(at)
 	return ""
 

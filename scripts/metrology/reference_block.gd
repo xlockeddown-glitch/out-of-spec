@@ -30,7 +30,8 @@ const VERDICT_UNCLEAR: String = "unclear"
 ## are rolled after the angle, so the angle and its true value are as they were.
 ## size_index is the block's first choice only: GaugeSet.pieces moves it to a free size.
 static func at(world_seed: int, cell: Vector2i) -> Dictionary:
-	if not Terrain.can_dig(cell):
+	# Only the old land holds blocks, as it always did; the new ring holds none for now.
+	if not Terrain.in_old_land(cell) or not Terrain.can_dig(cell):
 		return {}
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("%d:block:%d:%d" % [world_seed, cell.x, cell.y])

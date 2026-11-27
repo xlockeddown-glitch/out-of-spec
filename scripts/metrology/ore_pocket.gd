@@ -32,14 +32,16 @@ static var _cells_seed: int = 0
 
 
 ## The cells that hold a pocket on the farm with `world_seed`: the first few drawn
-## that can be dug, are not by water and hold no reference block. One stream, as a hash of each cell
+## that can be dug, are not by water and hold no reference block. They are drawn over
+## the old land (OLD_HALF_M) so an old farm's pockets stay where they were; the new ring
+## has none. One stream, as a hash of each cell
 ## would put them in clumps. Kept for the next call: don't change what it gives.
 static func cells(world_seed: int) -> Array[Vector2i]:
 	if _cells.is_empty() or _cells_seed != world_seed:
 		_cells.clear()
 		_cells_seed = world_seed
 		@warning_ignore("integer_division")
-		var limit: int = Terrain.HALF_M / Terrain.CELL_M
+		var limit: int = Terrain.OLD_HALF_M / Terrain.CELL_M
 		var rng := RandomNumberGenerator.new()
 		rng.seed = hash("%d:ore" % world_seed)
 		while _cells.size() < COUNT:
@@ -56,7 +58,7 @@ static func cells(world_seed: int) -> Array[Vector2i]:
 ## block and has no stone piece (`built`) on it. NONE if no draw fits.
 static func replacement(world_seed: int, from: Vector2i, dug: Dictionary, found: Dictionary, extra: Array[Vector2i], built: Dictionary = {}) -> Vector2i:
 	@warning_ignore("integer_division")
-	var limit: int = Terrain.HALF_M / Terrain.CELL_M
+	var limit: int = Terrain.OLD_HALF_M / Terrain.CELL_M
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("%d:ore:%d,%d:%d" % [world_seed, from.x, from.y, extra.size()])
 	var originals: Array[Vector2i] = cells(world_seed)

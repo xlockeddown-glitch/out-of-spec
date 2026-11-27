@@ -3,7 +3,8 @@ extends RefCounted
 
 const FarmScene: PackedScene = preload("res://scenes/main_farm.tscn")
 ## The ground outside the wash as it was before the wash was cut: every whole meter's
-## height in 1/256 m, hashed as 17 * 31 + height each, in order.
+## height in 1/256 m, hashed as 17 * 31 + height each, in order, over the old 160 m
+## land (the ring added later has no wash).
 const LAND_HASH: int = 93351249
 
 var _none: Dictionary[Vector2i, int] = {}
@@ -40,8 +41,8 @@ func _ellipse_points() -> Array[Vector2]:
 func test_the_land_is_the_same_outside_the_wash() -> String:
 	var hashed: int = 17
 	var changed: int = 0
-	for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
-		for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
+	for z: int in range(-Terrain.OLD_HALF_M, Terrain.OLD_HALF_M + 1):
+		for x: int in range(-Terrain.OLD_HALF_M, Terrain.OLD_HALF_M + 1):
 			if Terrain.wash_out(Vector2(x, z)) >= Terrain.WASH_REACH:
 				hashed = (hashed * 31 + roundi(Terrain.natural(Vector2i(x, z)) * 256.0)) & 0xffffffff
 			elif absf(Terrain.natural(Vector2i(x, z)) - Terrain._land(x, z)) > 1.0 / Terrain.HEIGHT_PARTS:
