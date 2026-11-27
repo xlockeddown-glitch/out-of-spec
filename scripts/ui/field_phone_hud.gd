@@ -167,6 +167,8 @@ func _ready() -> void:
 	clock_row.get_parent().move_child(_jobs_scroll, _gauge_label.get_index() + 1)
 	_jobs_box.minimum_size_changed.connect(_fit_jobs_scroll)
 	_card_the_drift()
+	_card_the_header()
+	_card_the_log()
 
 
 ## The case and the glass carry the Scope styles. They are set as overrides (copies
@@ -192,21 +194,84 @@ func _style_case() -> void:
 	add_child(band)
 
 
-## The drift reading sits on a Scope card, as the bench's result does.
+## A cream card (ScopePhoneCard) with a VBox inside; margins are scaled by hand.
+func _make_card(card_name: String) -> VBoxContainer:
+	var card := PanelContainer.new()
+	card.name = card_name
+	card.theme_type_variation = ScopeTheme.PHONE_CARD
+	var cream := theme.get_stylebox(&"panel", ScopeTheme.PHONE_CARD).duplicate() as StyleBoxFlat
+	cream.set_content_margin_all(scaled(8.0))
+	card.add_theme_stylebox_override(&"panel", cream)
+	var rows := VBoxContainer.new()
+	card.add_child(rows)
+	return rows
+
+
+func _ink(label: Label, color: Color = ScopeTheme.CARD_INK) -> void:
+	label.add_theme_color_override(&"font_color", color)
+
+
+## The drift reading sits on a cream card: the number big in dark ink, the state a
+## coloured chip, the zero key outlined.
 func _card_the_drift() -> void:
 	var content: Node = _drift_value.get_parent()
 	var first: Node = content.get_node("DriftCaption")
-	var card := PanelContainer.new()
-	card.name = "DriftCard"
-	var edge := ScopeTheme.card_box()
-	edge.set_content_margin_all(scaled(8.0))
-	card.add_theme_stylebox_override(&"panel", edge)
-	var rows := VBoxContainer.new()
-	card.add_child(rows)
+	var rows := _make_card("DriftCard")
+	var card: Node = rows.get_parent()
 	content.add_child(card)
 	content.move_child(card, first.get_index())
-	for node: Node in [first, _drift_value, _status_label, _tolerance_label]:
+	var chip := PanelContainer.new()
+	chip.name = "StatusChip"
+	chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	chip.add_theme_stylebox_override(&"panel", _chip_style(COLOR_OK))
+	for node: Node in [first, _drift_value, _status_label, _tolerance_label, _zero_button]:
 		node.reparent(rows, false)
+	# The chip goes where the status label was.
+	rows.add_child(chip)
+	rows.move_child(chip, _status_label.get_index())
+	_status_label.reparent(chip, false)
+	_ink(first as Label, ScopeTheme.CARD_INK_MUTED)
+	_ink(_drift_value)
+	_ink(_tolerance_label, ScopeTheme.CARD_INK_MUTED)
+	_status_label.add_theme_color_override(&"font_color", COLOR_OK)
+	_zero_button.theme_type_variation = ScopeTheme.PHONE_KEY_OUTLINE
+
+
+func _chip_style(state: Color) -> StyleBoxFlat:
+	var style := ScopeTheme.state_chip_box(state)
+	style.content_margin_left = scaled(12.0)
+	style.content_margin_right = scaled(12.0)
+	style.content_margin_top = scaled(2.0)
+	style.content_margin_bottom = scaled(2.0)
+	return style
+
+
+## Day, time and credits on one cream card.
+func _card_the_header() -> void:
+	var row: Node = _credits_label.get_parent()
+	var content: Node = row.get_parent()
+	var rows := _make_card("HeaderCard")
+	var card: Node = rows.get_parent()
+	content.add_child(card)
+	content.move_child(card, row.get_index())
+	row.reparent(rows, false)
+	_ink(_clock_label)
+	_ink(_credits_label)
+
+
+## The dispatch log on a cream card.
+func _card_the_log() -> void:
+	var caption: Node = _log_label.get_parent().get_node("LogCaption")
+	var content: Node = _log_label.get_parent()
+	var rows := _make_card("LogCard")
+	var card := rows.get_parent() as Control
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(card)
+	content.move_child(card, caption.get_index())
+	caption.reparent(rows, false)
+	_log_label.reparent(rows, false)
+	_ink(caption as Label, ScopeTheme.CARD_INK_MUTED)
+	_ink(_log_label)
 
 
 ## Scales what the scene file sets by hand (written at the original size):
@@ -284,7 +349,8 @@ func set_clock(text: String) -> void:
 
 func set_credits(credits: int) -> void:
 	_credits_label.text = "%s CR" % SP811.integer(credits)
-	_credits_label.add_theme_color_override("font_color", COLOR_FAIL if credits < 0 else COLOR_WARN)
+	# On cream: dark ink, a deep red only when the lab is in debt.
+	_credits_label.add_theme_color_override("font_color", ScopeTheme.CARD_ALERT if credits < 0 else ScopeTheme.CARD_INK)
 
 
 ## e.g. "TRUSTED, 40 % to ACCREDITED" from GameState.credibility_text(), and
@@ -455,5 +521,6 @@ func push_log(line: String) -> void:
 
 func _set_status(text: String, color: Color) -> void:
 	_status_label.text = text
+	# The state is the chip (dark pill, state colour); the reading stays dark ink.
 	_status_label.add_theme_color_override("font_color", color)
-	_drift_value.add_theme_color_override("font_color", color)
+	(_status_label.get_parent() as PanelContainer).add_theme_stylebox_override(&"panel", _chip_style(color))

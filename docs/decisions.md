@@ -2267,3 +2267,10 @@ Ryan: redo the phone UI to be similar to the Meridian style, not an exact replic
 - The key hints still follow Controls.shown_pad (the brackets show the pad button on a pad); no separate pad badge was added, since the phone's keys are not focus targets.
 - Size is unchanged: PHONE_SCALE 0.8, the phone still starts at LEFT_ANCHOR (0.744, 1428 px of 1920) and the case is the same 460 x 1048 px at 1080p.
 - Colours: green terminal text became Scope ink (white), muted captions (INK_MUTED) and teal for good states; amber and red keep their meaning. Nothing is saved or sent.
+
+### Phone round 2: "Mix", cream cards on the dark glass [PLACEHOLDER] (2026-11-27)
+Ryan picked "Mix": keep the putty case and terracotta band, and put cream cards on the dark glass (idea from his phone_cards concept, not its exact colours).
+- New ScopeTheme variations ScopePhoneCard (cream ENAMEL_TOP, 6 px radius, thin dark edge) and ScopePhoneKeyOutline (clear face, putty edge, dark ink). New named colours CARD_INK, CARD_INK_MUTED and CARD_ALERT: text on cream is never the light INK.
+- Three cards: header (day, time, credits), drift (caption, big reading in dark ink, state chip, tolerance, ZERO key) and the dispatch log. The state chip is a dark pill with the band colour as text and edge: teal in band, amber guard band, red only out of tolerance. Credits are dark ink, deep red only when negative.
+- Stay on the glass: title, credibility/lab/contract, lights, gauge set, the jobs list and ACCEPT keys, signal, relay, ore, spools, the two putty keys, Bram's shop and standards, the wheel key. Reason: they are keys or status lines that read well on dark, and fewer cards keeps the phone from growing.
+- Every row, text, key, signal and order is unchanged; same size (460 x 1048 px at 1080p).

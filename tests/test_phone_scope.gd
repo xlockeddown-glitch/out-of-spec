@@ -30,10 +30,42 @@ func test_the_phone_uses_the_scope_theme() -> String:
 		problem = "The screen must be the dark Scope glass."
 	elif (band.get_theme_stylebox("panel") as StyleBoxFlat).bg_color != ScopeTheme.TERRA:
 		problem = "The band across the top must be terracotta."
-	elif hud._zero_button.theme_type_variation != ScopeTheme.PHONE_KEY 			or (hud._zero_button.get_theme_stylebox("normal") as StyleBoxFlat).content_margin_left != 8.0:
-		problem = "The keys must be the small phone keys."
+	elif hud._zero_button.theme_type_variation != ScopeTheme.PHONE_KEY_OUTLINE 			or (hud._zero_button.get_theme_stylebox("normal") as StyleBoxFlat).content_margin_left != 8.0:
+		problem = "The zero key must be the small outlined phone key."
 	elif (hud._zero_button.get_theme_stylebox("normal") as StyleBoxFlat).border_width_bottom > 4:
 		problem = "The phone keys' bottom edge must fit their small margins."
+	_free(hud)
+	return problem
+
+
+func test_the_cards_are_cream_with_dark_ink_and_a_state_chip() -> String:
+	var hud: FieldPhoneHUD = _hud()
+	var problem: String = ""
+	var cards: Array[PanelContainer] = []
+	for card_name: String in ["HeaderCard", "DriftCard", "LogCard"]:
+		cards.append(hud.get_node("Bezel/Screen/Content/" + card_name) as PanelContainer)
+	var texts: Array[Label] = [hud._clock_label, hud._credits_label, hud._drift_value, hud._tolerance_label, hud._log_label]
+	hud.set_credits(5)
+	for card: PanelContainer in cards:
+		if card.theme_type_variation != ScopeTheme.PHONE_CARD:
+			problem = "%s must carry ScopePhoneCard." % card.name
+		elif (card.get_theme_stylebox("panel") as StyleBoxFlat).bg_color != ScopeTheme.ENAMEL_TOP:
+			problem = "%s must be cream." % card.name
+	for label: Label in texts:
+		if problem == "" and label.get_theme_color("font_color") == ScopeTheme.INK:
+			problem = "Text on a card must be dark ink, not the light INK: %s" % label.name
+	var chip: PanelContainer = hud._status_label.get_parent()
+	var cases: Array = [[DriftingSensor.Band.IN_BAND, ScopeTheme.TEAL], [DriftingSensor.Band.GUARDBAND, ScopeTheme.AMBER],
+		[DriftingSensor.Band.OUT_OF_TOLERANCE, ScopeTheme.RED]]
+	for entry: Array in cases:
+		hud.set_drift(0.3, entry[0])
+		var want: Color = entry[1]
+		if problem == "" and (hud._status_label.get_theme_color("font_color") != want 				or (chip.get_theme_stylebox("panel") as StyleBoxFlat).border_color != want 				or (chip.get_theme_stylebox("panel") as StyleBoxFlat).bg_color != ScopeTheme.GLASS_DEEP):
+			problem = "The state chip must follow the band %d." % entry[0]
+	if problem == "" and chip.get_parent().get_parent().name != &"DriftCard":
+		problem = "The chip must sit on the drift card."
+	if problem == "" and hud._clock_label.get_parent().get_parent().get_parent() != cards[0]:
+		problem = "Day, time and credits must sit on the header card."
 	_free(hud)
 	return problem
 
