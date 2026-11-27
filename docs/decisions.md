@@ -2,6 +2,20 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-26: The 02:00 rescue for guests (zones sections 6.1 and 12.4)
+
+The recall now covers every connected guest the host has below. Everything is a [PLACEHOLDER] or an [ASSUMPTION] unless Ryan says otherwise; the numbers and words are still `economy.json` `tunnel_recall`.
+
+- **Who:** each player whose `player_places` entry is in a zone (not the farm, not the dome) while the rover is in the tunnels. The host is judged as before; each guest has their own warned-day and rescued-day marks (`_guest_warned_day`, `_guest_rescued_day`, host-only, NOT_SAVED), so it is once a day per player.
+- **Warning:** a guest is warned on their own phone by the host's new `RECALL` message. The shared phone log is everyone's and cannot be aimed, so the guest's screen shows the same `warn_text` from its own data.
+- **Rescue:** `rescue_from_tunnels(guest)` then `CoopBeds.recall_to_bed(guest)`, then the host tells the guest `RECALL rescue` and the guest's screen leaves the zone scene for the farm if it is still in one. A guest who left the zone since the hour (or who dropped) is not charged and not carried; the check is made again when the carry-out runs.
+- **Fee [PLACEHOLDER]:** 50 CR per rescued player from the shared wallet, so two guests below cost 100. Never below 0, the rest waived, as for the host.
+- **Ore [ASSUMPTION]:** ore is never taken twice. A rescue takes a third of the ore gained since the baseline and then moves the baseline to what is left, so the next player carried out of the same trip pays only for ore gained after that. Console arrivals still pay credits only.
+- **Rover:** it comes home only when nobody is left on the trip (`_nobody_on_the_trip`). A guest up in the dome who is still on the trip keeps it out, and now keeps the mouth shut too, so a mouth entry cannot take away the rover a guest is still on.
+- **Day's end:** a rescued guest counts as in bed, so a host asleep alone on the farm still ends the day when the last guest is carried out.
+- **Protocol:** `CoopSession.PROTOCOL` 23 to 24 (a new `RECALL` message, host to one guest, a step string from `TunnelRecall.STEPS`). A guest that sends one is dropped. No save change.
+- **Known limits:** a guest still fading into a zone after their rescue is not rescued again today. A guest in the dome with a console request waiting cannot be moved by `go_to` while the swap is blocked. The real two-PC run is still to do.
+
 ## 2026-11-26: Zone data (zones step 2)
 
 Built zones.md section 13 item 2: `data/zones.json`, the `ZoneData` reader and a data check. No scene, no rule, no UI; nothing reads it yet.

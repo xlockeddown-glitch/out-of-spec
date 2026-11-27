@@ -27,13 +27,16 @@ signal rover_told(rover_id: String, driver_id: String, pose: Array)
 ## (player -> pose). See CoopWalkers.
 signal walked(player_id: String, pose: Array)
 signal walkers_told(poses: Dictionary)
+## Guest: the host says the 02:00 recall is warning this player or carrying them out
+## ("warn" or "rescue", see TunnelRecall). Said to the one player it is about.
+signal recalled(step: String)
 
 ## Raise it whenever two versions could disagree about the farm or the messages.
-const PROTOCOL: int = 23
+const PROTOCOL: int = 24
 const DEFAULT_PORT: int = 24711
 const MAX_PLAYERS: int = 4
 
-enum { HELLO, COMMAND, WELCOME, REFUSED, JOINED, LEFT, ANSWER, STATE, DRIVE, ROVER, WALK, WALKERS }
+enum { HELLO, COMMAND, WELCOME, REFUSED, JOINED, LEFT, ANSWER, STATE, DRIVE, ROVER, WALK, WALKERS, RECALL }
 
 const REASONS: Dictionary = {
 	"full": "The farm is full.",
@@ -233,6 +236,20 @@ func tell_walkers(poses: Dictionary) -> void:
 	for id: int in _links:
 		if _links[id]["player"] != "" and not _links[id].get("gone", false):
 			_put(id, message, false)
+
+
+## Host: tells one guest the recall is warning them or carrying them out (`step` is
+## one of TunnelRecall.STEPS). The words are the guest's own (data/economy.json), so
+## only the step goes. False if it can't be sent.
+func tell_recall(player_id: String, step: String) -> bool:
+	if not _hosting or not step in TunnelRecall.STEPS:
+		return false
+	var message: PackedByteArray = var_to_bytes([RECALL, step])
+	var sent: bool = false
+	for id: int in _links:
+		if _links[id]["player"] == player_id and player_id != "" and not _links[id].get("gone", false):
+			sent = _put(id, message) or sent
+	return sent
 
 
 ## Only these kinds of data: nothing that is, holds or calls an object.
@@ -452,6 +469,12 @@ func _guest_read(packet: PackedByteArray) -> bool:
 			return false
 		if _accepted:
 			walkers_told.emit(poses)
+		return true
+	if _is_shape(message, [RECALL, TYPE_STRING]):
+		if not message[1] in TunnelRecall.STEPS:
+			return false
+		if _accepted:
+			recalled.emit(message[1])
 		return true
 	if not _accepted:
 		if _is_shape(message, [REFUSED, TYPE_STRING]):
