@@ -68,13 +68,6 @@ func _ready() -> void:
 			_build(Vector2i(x, z))
 
 
-func _unhandled_input(event: InputEvent) -> void:
-	# Debug builds only: F8 paints the ground by biome (biomes.md section 6, step 4).
-	var key := event as InputEventKey
-	if OS.is_debug_build() and key and key.pressed and not key.echo and key.physical_keycode == KEY_F8:
-		show_biomes(not _biome_view)
-
-
 ## Paints the ground by biome (true) or restores its own tints (false), a debug view.
 ## Heights, collision and digging are untouched. Only play's size has biomes.
 func show_biomes(on: bool) -> void:

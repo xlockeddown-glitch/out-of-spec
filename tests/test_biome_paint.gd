@@ -44,7 +44,7 @@ func test_paint_on_colours_each_biome() -> String:
 	for id: StringName in _samples():
 		var at: Vector2i = _samples()[id]
 		if BiomeData.biome_at(Vector2(at)) != id:
-			fail = "The marker of %s is not in %s." % [id, id]
+			fail = "The marker of %s is not in its biome." % id
 		elif _mesh_colour(ground, at.x, at.y) != BiomeData.tint(id):
 			fail = "The ground at the %s marker is not its colour." % id
 	ground.free()
