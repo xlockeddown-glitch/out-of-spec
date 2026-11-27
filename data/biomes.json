@@ -1,5 +1,5 @@
 {
-  "_note": "Biomes (docs/design/biomes.md section 6 step 3). The farm hub and the five biomes of section 7.1 on the 240 m land (|x| and |z| up to 120 m; x east, z south, the farm at 0, 0). Every number, tint and sign line is a [PLACEHOLDER]. centre and marker are [x, z] in metres. reach_m is how far the biome runs from its centre. bearing_deg is the way out of the farm, 0 up to 360, 0 north (-z), 90 east, clockwise; the farm has none. role is hub (the farm), spoke (a road out of the farm) or open (the Badlands: the open land between the roads, which takes every point no other biome claims). band is the zone-level band the content is tuned for (zones.md section 2), never a gate; the Badlands band is the Earthworks 1 to 30 of biomes.md section 2. tint is a bright colour for the F8 debug overlay (TerrainGround.show_biomes). ground_tint is the colour the real ground leans toward in play (step 5): it multiplies the height tint, then the ground shader multiplies by its base (0.42, 0.5, 0.3), so it is a pale or dark multiplier, never a final colour; white (the farm) changes nothing. sign is the soft-gate warning on the biome's marker (a sign and a 4 by 4 m rover pad; information, never a wall) and names no key. entrances lists the zones that start in the biome: {zone, at}, zone a zones.json id (each claimed once) and at where the way in is, or null when it is not placed yet; the second ways in (colony_mine, deimos) and the unplaced ones are [PLACEHOLDER]. Existing places stay where they are: the tunnel mouth (20.5, -19) belongs to the Basalt Ridge, the relay (-70, -70) and the whole relay road (x = z) to the Lab Quarter after the farm, and the Aquifer sinkhole is new, in the Badlands (Question 12). Each marker's 4 by 4 m pad keeps clear of the plot, the built things and rocks, the relay road, and every other marker, and stands on ground that varies under 0.25 m (the old land's heights cannot change, so the pads go where it is near flat). Read by scripts/world/biome_data.gd; nothing in play reads it yet.",
+  "_note": "Biomes (docs/design/biomes.md section 6 step 3). The farm hub and the five biomes of section 7.1 on the 240 m land (|x| and |z| up to 120 m; x east, z south, the farm at 0, 0). Every number, tint and sign line is a [PLACEHOLDER]. centre and marker are [x, z] in metres. reach_m is how far the biome runs from its centre. bearing_deg is the way out of the farm, 0 up to 360, 0 north (-z), 90 east, clockwise; the farm has none. role is hub (the farm), spoke (a road out of the farm) or open (the Badlands: the open land between the roads, which takes every point no other biome claims). band is the zone-level band the content is tuned for (zones.md section 2), never a gate; the Badlands band is the Earthworks 1 to 30 of biomes.md section 2. tint is a bright colour for the F8 debug overlay (TerrainGround.show_biomes). ground_tint is the colour the real ground leans toward in play (step 5): it multiplies the height tint, then the ground shader multiplies by its base (0.42, 0.5, 0.3), so it is a pale or dark multiplier, never a final colour; white (the farm) changes nothing. sign is the soft-gate warning on the biome's marker (a sign and a 4 by 4 m rover pad; information, never a wall) and names no key. entrances lists the zones that start in the biome: {zone, at}, zone a zones.json id (each claimed once) and at where the way in is, or null when it is not placed yet; the second ways in (colony_mine, deimos) and the unplaced ones are [PLACEHOLDER]. Existing places stay where they are: the tunnel mouth (20.5, -19) belongs to the Basalt Ridge, the relay (-70, -70) and the whole relay road (x = z) to the Lab Quarter after the farm, and the Aquifer sinkhole is new, in the Badlands (Question 12). Each marker's 4 by 4 m pad keeps clear of the plot, the built things and rocks, the relay road, and every other marker, and stands on ground that varies under 0.25 m (the old land's heights cannot change, so the pads go where it is near flat). Read by scripts/world/biome_data.gd; nothing in play reads it yet. road (step 8) is a list of [x, z] waypoints, from the edge of the farm's level circle (33 m from the middle, within 2 m) to the edge of the biome's rover pad, painted as a pale dusty strip 3 m wide with a 1 m soft edge and kept free of digging and new stone; it keeps clear of the plot, the built things, rocks and fissures and the pad's sign. Empty for the farm and for the Basalt Ridge, whose marker already stands at the farm's edge. Every waypoint is a [PLACEHOLDER].",
   "biomes": [
     {
       "id": "farm",
@@ -21,6 +21,7 @@
         -4,
         -16
       ],
+      "road": [],
       "entrances": []
     },
     {
@@ -44,6 +45,16 @@
         -41,
         -29
       ],
+      "road": [
+        [
+          -27,
+          -19
+        ],
+        [
+          -41,
+          -27
+        ]
+      ],
       "entrances": []
     },
     {
@@ -66,6 +77,20 @@
       "marker": [
         69,
         21
+      ],
+      "road": [
+        [
+          31,
+          11
+        ],
+        [
+          51,
+          17.5
+        ],
+        [
+          67,
+          21
+        ]
       ],
       "entrances": [
         {
@@ -98,6 +123,7 @@
         28,
         -17
       ],
+      "road": [],
       "entrances": [
         {
           "zone": "lava_tubes",
@@ -134,7 +160,17 @@
       "sign": "Frost Flats: lab level 18 and up. Ice, long drives, a heater for the rover.",
       "marker": [
         0,
-      -78
+        -78
+      ],
+      "road": [
+        [
+          0,
+          -34
+        ],
+        [
+          0,
+          -76
+        ]
       ],
       "entrances": [
         {
@@ -163,6 +199,16 @@
       "marker": [
         0,
         87
+      ],
+      "road": [
+        [
+          0,
+          33
+        ],
+        [
+          0,
+          85
+        ]
       ],
       "entrances": [
         {

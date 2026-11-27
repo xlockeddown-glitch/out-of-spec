@@ -499,3 +499,12 @@ func test_the_sign_texts_name_no_key() -> String:
 		if not text.begins_with(BiomeData.display_name(id) + ":"):
 			return "%s's sign must open with its name: '%s'" % [id, text]
 	return ""
+
+
+## Every row carries a road (step 8); the full road checks are in test_biome_roads.
+func test_every_row_has_a_road_list_and_a_bad_road_is_refused() -> String:
+	for id: StringName in BiomeData.ids():
+		if not (BiomeData.raw_rows().filter(func(r: Variant) -> bool: return (r as Dictionary)["id"] == String(id))[0] as Dictionary).has("road"):
+			return "%s has no road field" % id
+	var rows: Array = _with("frost_flats", "road", [[0, -33], [0, -50]])
+	return _has_line(rows, "road")

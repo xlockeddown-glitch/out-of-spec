@@ -252,7 +252,7 @@ func test_the_water_can_not_be_dug_in_or_beside() -> String:
 	var beside: Vector2i = Terrain.cell_at(Terrain.WASH_AT + Vector2(Terrain.WASH_RADII.x + 0.5, 0.0))
 	if Terrain.dig_problem(beside, _none) != why:
 		return "The cell beside the water must be refused."
-	var far: Vector2i = Terrain.cell_at(Terrain.WASH_AT + Vector2(0.0, Terrain.WASH_RADII.y + 5.0))
+	var far: Vector2i = Terrain.cell_at(Terrain.WASH_AT - Vector2(0.0, Terrain.WASH_RADII.y + 5.0))
 	if Terrain.dig_problem(far, _none) != "":
 		return "Digging far from the water says \"%s\"." % Terrain.dig_problem(far, _none)
 	return ""

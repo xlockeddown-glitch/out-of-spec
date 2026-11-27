@@ -133,7 +133,7 @@ func test_digging_keeps_off_the_edge_and_level_ground() -> String:
 			Vector2i(0, 0), Vector2i(14, 0), Vector2i(16, 0), Vector2i(-17, 0), Vector2i(0, 14), Vector2i(-35, -35), Vector2i(-31, -35)]:
 		if Terrain.dig_problem(cell, {}) == "" or Terrain.dug_problem({ cell: 1 }) == "":
 			return "%s must not be dug." % cell
-	for cell: Vector2i in [Vector2i(-59, 20), Vector2i(58, 38), Vector2i(17, 0), Vector2i(0, -18), Vector2i(-29, -35)]:
+	for cell: Vector2i in [Vector2i(-59, 20), Vector2i(58, 38), Vector2i(17, 0), Vector2i(4, -18), Vector2i(-29, -35)]:
 		if Terrain.dig_problem(cell, {}) != "":
 			return "%s must be dug." % cell
 	return ""
