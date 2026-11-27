@@ -46,9 +46,15 @@ func _ready() -> void:
 	if status_led:
 		status_led.material_override = _led_mat
 	if tarantula:
-		for child: Node in tarantula.get_children():
-			if child is GeometryInstance3D:
-				(child as GeometryInstance3D).material_override = _body_mat
+		if RareSpiderLook.has_look(species_id):
+			for child: Node in tarantula.get_children():
+				if child is GeometryInstance3D:
+					(child as GeometryInstance3D).visible = false
+			tarantula.add_child(RareSpiderLook.build(species_id))
+		else:
+			for child: Node in tarantula.get_children():
+				if child is GeometryInstance3D:
+					(child as GeometryInstance3D).material_override = _body_mat
 	if species_id == "":
 		GameState.molt_changed.connect(_on_molt_changed)
 	else:

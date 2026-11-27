@@ -2345,3 +2345,17 @@ Ryan asked for a picker: name the character and choose 6 slots of 4 parts (Head 
 - **Picker.** `PickerUI`: name field, six rows with arrows, the part name and a trade-off line (a look-only part says so). P, or CHARACTER AND TRACTOR in the actions menu for a pad. Modal group, holds the rover's input while open. Offered once when a new farm starts (a local flag set only after the new farm began, nothing saved). P is ignored while the name field has the focus (Esc still closes). Phobos dresses its walker with the same parts. A guest joining a farm is not offered the picker, and a pad cannot type a name yet (no on-screen keyboard); both are noted for Ryan.
 - **Multipliers [PLACEHOLDER].** Twin-Cell Battery Pack accel 1.2, speed 0.95; Folding Solar Array speed 1.1, accel 0.7; Silk-Coil Harmonic Cell accel 1.3, brake 1.3, speed 0.9; Wide Crawler Tracks wade 1.25, speed 0.85, turn 0.8; Rock-Climber Wheels wade 1.15, turn 1.1, speed 0.9; Six-Wheel Survey Bogie speed 1.1, turn 0.85.
 - **[PLACEHOLDER].** Key P, name limit 16, "Operator" for the unnamed, all shapes, colours, sizes and words, the once-on-new-game offer.
+
+## Rare moon tarantulas: species table and dome looks (2026-11-27, feat/rare-tarantulas)
+
+Added the four rare moon/pod tarantula rows to `data/tarantula_species.json` (`tier: "rare"`) matching Ryan's concept art in `art_inbox/tarantulas_rare/parts/`, plus primitive-mesh dome terrarium looks (`scripts/dome/rare_spider_look.gd`):
+
+- **Species & zones (`docs/design/zones.md` §2 "the hook is one rule"):**
+  - `banded_regolith_runner` (Banded Regolith Runner, *Phobopelma vittata*): `found_in: "phobos"`, hook `colour_band` (amber/cream chevron band).
+  - `rime_carapace_spinner` (Rime Carapace Spinner, *Cryopelma pruinosa*): `found_in: "ice_caves"` (heated terraform test pod), hook `frost` (pale frost-rime dorsal ridge).
+  - `brass_glint_reticle` (Brass Glint Reticle, *Deimopelma aurichalcum*): `found_in: "deimos"` (warm smuggler crate), hook `glint` (amber/cream dorsal glint facets).
+  - `low_g_titan_carapace` (Low-G Titan Carapace, *Baropelma gigas*): `found_in: "deimos"`, hook `size` (larger scale + terracotta carapace plate).
+- **Zero live-game impact while uncaught:** Audited every reader of `tarantula_species` (`DataManager.gd`, `GameState.gd`, `dome_interior.gd`, `catch_cup_ui.gd`, `FarmSync.gd`, `terrarium.gd`). Every reader uses single-record lookup (`DataManager.get_record`); none enumerates all rows. Uncaught rare species add no enclosure, quest, robot, save field, or network change.
+- **Dome look:** `RareSpiderLook` builds a primitive-mesh spider using `ScopeTheme` colours only (no raw hex literals) and attaches inside `Terrarium` when `species_id` is a rare species, inheriting existing empty/pre-molt/exuvia visibility and dim overlay rules.
+- **Numbers [PLACEHOLDER]:** Wider moon-adapted climate bands (`zones.md` §10): Banded Regolith Runner 23 °C (±5.5 °C), 58 % (±18 %), 10 d, grade 3, yield 3, 15 % lag cut; Rime Carapace Spinner 20 °C (±5.0 °C), 74 % (±16 %), 11 d, grade 3, yield 3, 18 % lag cut; Brass Glint Reticle 24 °C (±6.0 °C), 52 % (±20 %), 12 d, grade 4, yield 3, 20 % lag cut; Low-G Titan Carapace 22 °C (±6.5 °C), 60 % (±20 %), 14 d, grade 4, yield 4, 22 % lag cut; Titan scale 1.38×.
+
