@@ -4475,7 +4475,7 @@ func report_place(place: String, depth: int, player_id: String = "") -> String:
 	if Shuttle.is_moon(place) and depth != 0:
 		return Shuttle.text("not_away_text")
 	# A moon is reached by booking the shuttle, never by a report.
-	if Shuttle.is_moon(place) and not shuttle_trips.has(player_id):
+	if Shuttle.is_moon(place) and str((shuttle_trips.get(player_id, {}) as Dictionary).get("moon", "")) != place:
 		return Shuttle.text("not_away_text")
 	if not Shuttle.is_moon(place) and shuttle_trips.has(player_id) and Shuttle.is_moon(place_of(player_id)):
 		return Shuttle.text("home_by_console_text")

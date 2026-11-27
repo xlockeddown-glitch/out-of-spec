@@ -192,7 +192,7 @@ func test_trip_problem_names_each_reason_in_turn() -> String:
 	return "\n".join(problems)
 
 
-func test_book_shuttle_refuses_with_the_reason_and_charges_nothing() -> String:
+func test_book_shuttle_refuses_the_unlicensed_and_lets_an_open_deimos_booking_through() -> String:
 	var gs: GameStateScript = _state(500)
 	_park_at_terminal(gs)
 	var problems: Array[String] = []
@@ -210,7 +210,7 @@ func test_book_shuttle_refuses_with_the_reason_and_charges_nothing() -> String:
 	return "\n".join(problems)
 
 
-func test_book_shuttle_from_a_guest_is_refused_with_the_reason() -> String:
+func test_book_shuttle_from_a_guest_books_and_pays_each_their_own_fare() -> String:
 	var gs: GameStateScript = _state(500)
 	_park_at_terminal(gs)
 	var commands: Node = CommandsScript.new()
@@ -238,7 +238,7 @@ func test_book_shuttle_from_a_guest_is_refused_with_the_reason() -> String:
 	return "\n".join(problems)
 
 
-func test_book_shuttle_checks_where_and_how_many_before_the_hub() -> String:
+func test_book_shuttle_checks_where_and_how_many_before_the_fare() -> String:
 	var gs: GameStateScript = _state(500)
 	var problems: Array[String] = []
 	gs.shuttle_licensed = true

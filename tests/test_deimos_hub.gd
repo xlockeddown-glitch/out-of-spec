@@ -206,3 +206,85 @@ func test_the_hub_scene_builds_with_its_console_board_cache_and_pod_signs() -> S
 	(Engine.get_main_loop() as SceneTree).root.remove_child(hub)
 	hub.free()
 	return "\n".join(problems)
+
+
+func test_booking_just_inside_the_close_goes_and_at_the_close_is_refused() -> String:
+	var gs: GameStateScript = _state(500)
+	var problems: Array[String] = []
+	GameClock.elapsed_days = 59.9 * HOUR
+	if not Shuttle.is_open(Shuttle.DEIMOS, GameClock.elapsed_days):
+		problems.append("Deimos is still up at 59.9 h.")
+	# A trip that would pass 02:00 is a different refusal; only the window matters here.
+	var inside: String = Shuttle.trip_problem(Shuttle.DEIMOS, 20, true, 500, 1, GameClock.elapsed_days, true)
+	if inside.contains(Shuttle.text("moon_down_text").substr(0, 8)) and Shuttle.is_open(Shuttle.DEIMOS, GameClock.elapsed_days):
+		problems.append("Just inside the close is not refused for the window: '%s'" % inside)
+	GameClock.elapsed_days = 60.0 * HOUR
+	var at_close: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
+	if Shuttle.is_open(Shuttle.DEIMOS, GameClock.elapsed_days) or at_close != Shuttle.text("moon_down_text") % Shuttle.window_line(Shuttle.DEIMOS, GameClock.elapsed_days) or gs.credits != 500:
+		problems.append("At 60 h the window is shut and the booking refused for it: '%s', %d CR" % [at_close, gs.credits])
+	_done(gs)
+	return "
+".join(problems)
+
+
+func test_a_forged_report_of_the_wrong_moon_is_ignored() -> String:
+	var gs: GameStateScript = _state(500)
+	var problems: Array[String] = []
+	gs.shuttle_trips[HOST] = { "moon": Shuttle.PHOBOS, "ends_at": 1.0e9 }
+	gs.player_places[HOST] = [Shuttle.PHOBOS, 0]
+	var forged: String = gs.report_place(Shuttle.DEIMOS, 0, HOST)
+	if forged == "" or gs.place_of(HOST) != Shuttle.PHOBOS:
+		problems.append("A Phobos traveller cannot report Deimos: '%s', %s" % [forged, gs.place_of(HOST)])
+	gs.shuttle_trips[HOST] = { "moon": Shuttle.DEIMOS, "ends_at": 1.0e9 }
+	var right: String = gs.report_place(Shuttle.DEIMOS, 0, HOST)
+	if right != "" or gs.place_of(HOST) != Shuttle.DEIMOS:
+		problems.append("A Deimos traveller may report Deimos: '%s', %s" % [right, gs.place_of(HOST)])
+	var held: Dictionary = GameState.shuttle_trips.duplicate(true)
+	GameState.shuttle_trips = { GameState.local_player_id: { "moon": Shuttle.PHOBOS, "ends_at": 1.0e9 } }
+	var hub: DeimosHub = (load(SceneSwitcher.DEIMOS_SCENE) as PackedScene).instantiate() as DeimosHub
+	(Engine.get_main_loop() as SceneTree).root.add_child(hub)
+	if hub._has_trip():
+		problems.append("A Phobos trip is not a trip to Deimos.")
+	(Engine.get_main_loop() as SceneTree).root.remove_child(hub)
+	hub.free()
+	GameState.shuttle_trips = held
+	_done(gs)
+	return "
+".join(problems)
+
+
+func test_a_saved_deimos_trip_opens_the_deimos_hub_on_restore() -> String:
+	var me: String = GameState.local_player_id
+	var held: Dictionary = bytes_to_var(var_to_bytes(SaveGame.snapshot()))
+	var held_open: bool = SaveGame.farm_open
+	var problems: Array[String] = []
+	GameState.shuttle_trips = { me: { "moon": Shuttle.DEIMOS, "ends_at": GameClock.elapsed_days + 0.1 } }
+	GameState.player_places[me] = [Shuttle.DEIMOS, 0]
+	var data: Dictionary = bytes_to_var(var_to_bytes(SaveGame.snapshot()))
+	var problem: String = SaveGame.restore(data)
+	if problem != "" or SaveGame.open_scene != SceneSwitcher.DEIMOS_SCENE:
+		problems.append("A save with the host on Deimos opens its hub: '%s', %s" % [problem, SaveGame.open_scene])
+	SaveGame.restore(held)
+	SaveGame.farm_open = held_open
+	return "
+".join(problems)
+
+
+func test_the_board_is_painted_short_and_the_window_line_is_read_fresh() -> String:
+	var hub: DeimosHub = (load(SceneSwitcher.DEIMOS_SCENE) as PackedScene).instantiate() as DeimosHub
+	(Engine.get_main_loop() as SceneTree).root.add_child(hub)
+	var problems: Array[String] = []
+	var held: float = GameClock.elapsed_days
+	if hub._board_painted() != Shuttle.text("deimos_board_notice") or hub._board_painted().length() > 80:
+		problems.append("The painted board is the short notice: %s" % hub._board_painted())
+	GameClock.elapsed_days = 3.0 * HOUR
+	var up: String = hub._board_text()
+	GameClock.elapsed_days = 70.0 * HOUR
+	var down: String = hub._board_text()
+	GameClock.elapsed_days = held
+	if up == down or not down.contains(Shuttle.window_line(Shuttle.DEIMOS, 70.0 * HOUR)):
+		problems.append("The toast's window line follows the clock.")
+	(Engine.get_main_loop() as SceneTree).root.remove_child(hub)
+	hub.free()
+	return "
+".join(problems)

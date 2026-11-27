@@ -93,8 +93,16 @@ func _board_text() -> String:
 	return Shuttle.text("hub_board_log")
 
 
+## What the board panel shows, painted once: short and unchanging. The toast says
+## `_board_text()`, which may carry things that change (a shuttle window).
+func _board_painted() -> String:
+	return _board_text()
+
+
+## True while the host has this player on a trip to THIS moon.
 func _has_trip() -> bool:
-	return GameState.shuttle_trips.has(GameState.local_player_id)
+	var trip: Variant = GameState.shuttle_trips.get(GameState.local_player_id)
+	return trip is Dictionary and str((trip as Dictionary).get("moon", "")) == _moon()
 
 
 func _on_trips_changed() -> void:
@@ -335,7 +343,7 @@ func _make_console() -> Clickable:
 func _make_board() -> Clickable:
 	var at: Vector3 = _spots()["Board"]
 	add_child(_part("BoardPanel", at + Vector3(0.0, 1.6, 0.0), Vector3(3.0, 1.8, 0.12), Color(0.25, 0.2, 0.14)))
-	add_child(_label(_board_text(), at + Vector3(0.0, 1.6, 0.1), 24, Color(0.95, 0.9, 0.75)))
+	add_child(_label(_board_painted(), at + Vector3(0.0, 1.6, 0.1), 24, Color(0.95, 0.9, 0.75)))
 	var click: Clickable = _clickable(Clickable.new(), at + Vector3(0.0, 1.5, 0.0), Vector3(3.2, 2.2, 0.8), Shuttle.text("hub_hint_board"))
 	click.name = "Board"
 	return click

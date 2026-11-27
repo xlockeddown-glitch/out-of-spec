@@ -435,7 +435,7 @@ func test_more_people_than_are_present_is_refused() -> String:
 	return ""
 
 
-func test_a_guest_at_the_terminal_gets_the_hub_refusal_and_pays_nothing() -> String:
+func test_a_guest_at_the_terminal_books_deimos_and_pays_one_fare() -> String:
 	var gs: GameStateScript = _state()
 	var commands: Node = CommandsScript.new()
 	commands.state = gs

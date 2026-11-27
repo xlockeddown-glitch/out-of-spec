@@ -39,7 +39,13 @@ func _spots() -> Dictionary[String, Vector3]:
 	return DEIMOS_SPOTS
 
 
-## The notice, then the shuttle window as it stands now: a shut window is said here.
+## The painted board: the short notice only (the window line would go stale on a panel).
+func _board_painted() -> String:
+	return Shuttle.text("deimos_board_notice")
+
+
+## The notice, then the shuttle window as it stands now, read fresh each time the board
+## is clicked: a shut window is said here.
 func _board_text() -> String:
 	return "%s %s" % [Shuttle.text("deimos_board_notice"),
 		Shuttle.text("deimos_board_window") % Shuttle.window_line(DEIMOS, GameClock.elapsed_days)]
