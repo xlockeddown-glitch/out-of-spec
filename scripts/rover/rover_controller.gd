@@ -41,6 +41,8 @@ func _panel_open() -> bool:
 
 ## Said when there is no ground to dig; the screens add where to dig.
 const ROCK_REFUSAL: String = "This rock can't be dug."
+const STOP_FIRST: String = "Stop the rover first."
+const MOVED_REFUSAL: String = "You moved away. Dig cancelled."
 
 ## Following another player's driving: how fast it closes in, and from how far it
 ## jumps there instead; and how far ahead of the last word it runs [PLACEHOLDER].
@@ -78,6 +80,10 @@ class UplinkCommand:
 	var seed_id: String
 	## Planting offset (set point steps) selected when a TILL was sent.
 	var offset_steps: int
+	## A DIG: the cell lit when the key was pressed (the one it digs) and where the
+	## rover stood, so a small drift keeps the dig and a large one cancels it.
+	var cell: Vector2i = Vector2i.MAX
+	var origin: Vector3 = Vector3.ZERO
 
 	func _init(p_sent_at: float, p_command: int, p_seed_id: String = "", p_offset_steps: int = 0) -> void:
 		sent_at = p_sent_at
@@ -122,6 +128,11 @@ class UplinkCommand:
 @export var ground_snap_m: float = 0.5
 ## It digs the cell this far ahead of its middle [PLACEHOLDER].
 @export var dig_reach_m: float = 2.0
+## A dig in flight holds while the rover drifts no further than this from where the
+## key was pressed, m, and it must roll no faster than this when it lands, m/s
+## [PLACEHOLDER]. Past the distance the dig is cancelled.
+@export var dig_drift_m: float = 0.75
+@export var dig_drift_speed_mps: float = 0.6
 ## Half the length of its body, for staying above ground that rises.
 @export var half_length_m: float = 1.2
 
@@ -329,6 +340,7 @@ func _physics_process(delta: float) -> void:
 		_set_following(not moves)
 	if not on_foot:
 		_sample_local_input(throttle if moves else 0.0)
+	_cancel_drifted_digs()
 	_deliver_uplink()
 	if moves:
 		_drive(delta)
@@ -349,7 +361,11 @@ func queue_command(command: Command, seed_id: String = "", offset_steps: int = 0
 	if command == Command.TILL and seed_id == "":
 		seed_id = GameState.current_seed()
 		offset_steps = GameState.planting_offset_steps
-	_commands.append(UplinkCommand.new(_uplink_clock, command, seed_id, offset_steps))
+	var sent := UplinkCommand.new(_uplink_clock, command, seed_id, offset_steps)
+	if command == Command.DIG:
+		sent.cell = dig_target()
+		sent.origin = global_position
+	_commands.append(sent)
 
 
 func get_current_lag() -> float:
@@ -461,7 +477,7 @@ func _execute(cmd: UplinkCommand) -> void:
 		Command.ZERO_STEERING:
 			_zero_steering()
 		Command.DIG:
-			_change_ground(true)
+			_change_ground(true, cmd.cell)
 		Command.FILL:
 			_change_ground(false)
 
@@ -594,17 +610,56 @@ func dig_cell() -> Vector2i:
 	return Terrain.cell_at(Vector2(at.x, at.z))
 
 
-## Digs or fills in front of it. It must stand, so that the cell outlined is the
-## cell dug [ASSUMPTION].
-func _change_ground(deeper: bool) -> void:
+## The cell a dig acts on, and so the cell the outline lights: the one a dig in
+## flight was pressed for, else the one in front now. The command and the outline
+## both ask here.
+func dig_target() -> Vector2i:
+	for cmd: UplinkCommand in _commands:
+		if cmd.command == Command.DIG:
+			return cmd.cell
+	return dig_cell()
+
+
+## True when this rover can dig at all on this screen (the outline is shown, teal or
+## amber): on the farm's ground, in the world, not out on foot or away.
+func can_aim_dig() -> bool:
+	return visible and ground != null and not CoopWalkers.on_foot() and not GameState.rover_is_away(rover_id)
+
+
+## Why a dig pressed now would not work, or "": the rover rolling too fast, then the
+## host's own rule for the cell (GameState.dig_problem, the same call dig() makes).
+func dig_problem() -> String:
+	if absf(_speed_mps) > dig_drift_speed_mps:
+		return STOP_FIRST
+	return GameState.dig_problem(dig_target())
+
+
+## Drops a dig in flight once the rover has drifted past the allowance, and says so.
+func _cancel_drifted_digs() -> void:
+	for i: int in range(_commands.size() - 1, -1, -1):
+		var cmd: UplinkCommand = _commands[i]
+		if cmd.command == Command.DIG and _drift_from(cmd.origin) > dig_drift_m:
+			_commands.remove_at(i)
+			dig_rejected.emit(MOVED_REFUSAL)
+
+
+func _drift_from(origin: Vector3) -> float:
+	return Vector2(global_position.x - origin.x, global_position.z - origin.z).length()
+
+
+## Digs or fills in front of it. A fill must stand, so that the cell outlined is the
+## cell filled [ASSUMPTION]. A dig may roll a little (dig_drift_speed_mps) and
+## digs the cell it was pressed for (`pressed`, else the one in front).
+func _change_ground(deeper: bool, pressed: Vector2i = Vector2i.MAX) -> void:
 	var rejected: Signal = dig_rejected if deeper else fill_rejected
 	if ground == null:
 		rejected.emit(ROCK_REFUSAL if deeper else "There is nothing to fill here.")
 		return
-	if not is_stopped():
-		rejected.emit("Stop the rover first.")
+	if (absf(_speed_mps) > dig_drift_speed_mps) if deeper else not is_stopped():
+		rejected.emit(STOP_FIRST)
 		return
-	var cell := Vector3i(dig_cell().x, 0, dig_cell().y)
+	var target: Vector2i = pressed if deeper and pressed != Vector2i.MAX else dig_cell()
+	var cell := Vector3i(target.x, 0, target.y)
 	var problem: String
 	if deeper:
 		problem = await FarmCommands.request(&"dig", [cell])

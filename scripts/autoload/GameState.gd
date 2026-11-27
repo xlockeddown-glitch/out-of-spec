@@ -7002,12 +7002,7 @@ func is_live_pocket(at: Vector2i) -> bool:
 ## gets Earthworks XP for a step deeper than the cell has been, and for a block.
 func dig(cell: Vector3i, player_id: String = "") -> String:
 	var at := Vector2i(cell.x, cell.z)
-	var pocket: bool = not found_pockets.has(at) and (at in OrePocket.cells(world_seed) or at in new_pockets)
-	var problem: String = Terrain.dig_problem(at, dug, pocket) if cell.y == 0 else "This ground can't be dug."
-	if stone_pieces.has(at):
-		problem = STONE_IN_THE_WAY
-	if problem == "" and cell.y == 0:
-		problem = StonePieces.dig_beside_pad_problem(at, dug)
+	var problem: String = dig_problem(at) if cell.y == 0 else "This ground can't be dug."
 	if problem == "":
 		dug[at] = dug.get(at, 0) + 1
 		if dug[at] > dug_paid.get(at, 0):
@@ -7031,6 +7026,19 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 
 
 const STONE_IN_THE_WAY: String = "Stone is built here. Take it up first."
+
+
+## Why a cell can't be dug one step deeper now, or "". The one rule: dig() answers
+## with it and the dig outline lights the cell by it, so the outline is teal exactly
+## when the dig would work.
+func dig_problem(at: Vector2i) -> String:
+	var pocket: bool = not found_pockets.has(at) and (at in OrePocket.cells(world_seed) or at in new_pockets)
+	if stone_pieces.has(at):
+		return STONE_IN_THE_WAY
+	var problem: String = Terrain.dig_problem(at, dug, pocket)
+	if problem == "":
+		problem = StonePieces.dig_beside_pad_problem(at, dug)
+	return problem
 
 
 ## Builds a piece of `kind` (StonePieces) on a cell of Terrain (y = 0), or with
