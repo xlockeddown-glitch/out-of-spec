@@ -223,7 +223,7 @@
         "read_the_probe_offer": "Click the soil probe in the plot and read what it says. Then ask whether it is right.",
         "read_the_probe_done": "That is what it says. Whether it is right is a different question.",
         "first_calibration_offer": "Calibrate one instrument at the bench in the dome. Any one. The hygrometer is overdue.",
-        "first_calibration_done": "One calibration, on the record. When day 2 comes there will be a job from me about the soil probe: The Thirsty Probe.",
+        "first_calibration_done": "One calibration, on the record. I have a job about the soil probe next: The Thirsty Probe.",
         "thirsty_probe_reference": "I checked your zero against my own scale. Twice. I found nothing to complain about. I did look.",
         "daily_reeds_offer": "Three Biscuit Reeds, in spec.",
         "daily_reeds_done": "Three. In spec. I weighed them anyway."

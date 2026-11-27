@@ -1128,10 +1128,10 @@ func _build_notice_board() -> void:
 	_notice_pad.name = "NoticeBoardPad"
 	_notice_pad.collision_layer = 0
 	_notice_pad.collision_mask = 2
-	_notice_pad.position = NoticeBoard.FARM_POSITION + Vector3(0.0, 0.0, 2.0)
+	_notice_pad.position = NoticeBoard.FARM_POSITION
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(4.0, 3.0, 3.0)
+	box.size = NoticeBoard.PAD_SIZE
 	shape.shape = box
 	shape.position = Vector3(0.0, 1.5, 0.0)
 	_notice_pad.add_child(shape)
@@ -1139,23 +1139,30 @@ func _build_notice_board() -> void:
 
 
 ## The soil probe was clicked: its text and the plot's readout, and the read is
-## counted (FarmCommands read_probe) for the Read the Probe starter job.
+## counted (FarmCommands read_probe) for the Read the Probe starter job. A refusal
+## is shown too.
 func _read_probe(text: String) -> void:
 	_show_inspect(text + " " + GameState.soil_probe_text())
-	await FarmCommands.request(&"read_probe")
+	var refused: Variant = await FarmCommands.request(&"read_probe")
+	if is_inside_tree() and refused is String and refused != "":
+		_hud.push_log(refused)
 
 
 ## Interact at the farm notice board: the host takes any starter job offered (a
-## guest asks for it) and the board's lines go to the phone log. A guest reads its
-## own copy of the quests, which the host keeps up to date; with none yet, what the
-## host answered.
+## guest asks for it) and the board's lines go to the phone log. A refusal is one
+## plain line (the host's answer begins with "BOARD:" when it was allowed). A
+## guest reads its own copy of the quests, which the host keeps up to date; with
+## none yet, what the host answered.
 func _read_notice_board() -> void:
-	var answer: Variant = await FarmCommands.request(&"read_farm_board")
+	var answer: String = str(await FarmCommands.request(&"read_farm_board"))
 	if not is_inside_tree():
+		return
+	if not answer.begins_with("BOARD:"):
+		_hud.push_log(answer)
 		return
 	var own: Variant = GameState.player_quest_state.get(GameState.local_player_id, {})
 	var lines: Array[String] = NoticeBoard.farm_lines(QuestEngine.quests(), GameState.quest_state, own if own is Dictionary else {}, true)
 	if FarmCommands.guest and GameState.quest_state.is_empty():
-		lines.assign(str(answer).split("\n"))
+		lines.assign(answer.split("\n"))
 	for line: String in lines:
 		_hud.push_log(line)

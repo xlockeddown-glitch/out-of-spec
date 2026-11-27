@@ -11,8 +11,13 @@ const FARM: String = "farm"
 ## The farm board's place: by the dome's airlock, south of the plot, clear of the
 ## crate and pallet, the weather mast, Bram's bay and the road to the tunnels.
 const FARM_POSITION := Vector3(1.5, 0.0, 17.5)
-## How near the rover must be to use it, in metres [PLACEHOLDER].
-const REACH_M: float = 4.0
+## How near the rover must be to use it, in metres [PLACEHOLDER]. It reaches the
+## corners of PAD_SIZE (3.5 m each way is 4.95 m, and the rover's own middle may be a
+## little further out than the part of it that touches the pad).
+const REACH_M: float = 6.5
+## The pad round the board that shows the prompt: centred on the board, so a rover
+## drives up to it from the farm side as well as from behind.
+const PAD_SIZE := Vector3(7.0, 3.0, 7.0)
 
 
 ## True if a rover at `at` is near enough to the farm board to read it.

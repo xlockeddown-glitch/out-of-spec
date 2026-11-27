@@ -108,11 +108,13 @@ const COUNTING: Array[String] = ["count", "counter"]
 ## step key that names an input action for the board to show the key of.
 const BOARD_KEY: String = "board"
 const PROMPT_KEY: String = "prompt"
+## A `where` key with this in front matches rows whose value is NOT the one given.
+const NOT_PREFIX: String = "not_"
 ## The checks check_value() knows: what a step's `check` may be, and with
-## `always` and `day_at_least` (WHENS) what a `when` may be.
+## `always`, `day_at_least` and `day_at_most` (WHENS) what a `when` may be.
 const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due", "beacons_placed"]
 ## A `when` that is not a step check (offer_holds).
-const WHENS: Array[String] = ["always", "day_at_least"]
+const WHENS: Array[String] = ["always", "day_at_least", "day_at_most"]
 ## A reward of skill XP is "xp_<skill id>".
 const XP_PREFIX: String = "xp_"
 ## A reward of an XP certificate: the XP it is worth in the one skill its holder
@@ -210,6 +212,19 @@ static func update(farm: Node, present: Array[String], offers: bool = true, play
 	if _update_dailies(farm, all, present, offers, played):
 		changed = true
 	return changed
+
+
+## The farm notice board's own look: takes up the starter jobs (quests with
+## `board` set) that are offered and not yet taken, and nothing else, so a command
+## never offers other quests. True if one was taken up. Host only.
+static func offer_board(farm: Node, present: Array[String]) -> bool:
+	var taken: bool = false
+	for quest: Dictionary in quests():
+		if str(quest.get(BOARD_KEY, "")) == NoticeBoard.FARM and data_problem(quest) == "" \
+				and not farm.quest_state.has(str(quest["id"])):
+			if _update_one(farm, quest, farm.quest_state, present, true, ""):
+				taken = true
+	return taken
 
 
 # --- Daily asks (section 6, D2) -------------------------------------------------
@@ -870,6 +885,10 @@ static func offer_holds(farm: Node, offer: Dictionary, present: Array[String], o
 		return true
 	if when == "day_at_least":
 		return GameClock.get_day_index() >= int(offer.get("day", 0))
+	# A young farm only, and not once the quest named in `unless_taken` is under way.
+	if when == "day_at_most":
+		var taken: String = str(offer.get("unless_taken", ""))
+		return GameClock.get_day_index() <= int(offer.get("day", 0)) and (taken == "" or not farm.quest_state.has(taken))
 	var as_step: Dictionary = offer.duplicate()
 	as_step["check"] = when
 	return check_value(farm, as_step, present, owner) >= step_need(as_step)
@@ -1051,7 +1070,10 @@ static func _count_rows(farm: Node, log_name: String, where: Variant) -> int:
 	for row: Variant in farm.get(LOGS[log_name]):
 		var matches: bool = row is Dictionary
 		for key: Variant in where:
-			if matches and not _same((row as Dictionary).get(key), where[key]):
+			# A key that starts with not_ wants the row's value to differ.
+			var negated: bool = str(key).begins_with(NOT_PREFIX)
+			var field: String = str(key).trim_prefix(NOT_PREFIX) if negated else str(key)
+			if matches and _same((row as Dictionary).get(field), where[key]) == negated:
 				matches = false
 		if matches:
 			count += 1
