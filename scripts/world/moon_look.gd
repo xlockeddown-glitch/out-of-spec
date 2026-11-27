@@ -58,6 +58,18 @@ const SCONCE_RANGE_M: float = 7.5
 const CONSOLE_LIGHT_ENERGY: float = 0.45
 const CONSOLE_LIGHT_RANGE_M: float = 5.0
 
+## Phobos warm service tunnel palette & lights [PLACEHOLDER].
+const TUNNEL_SKY := Color(0.03, 0.025, 0.022)
+const TUNNEL_AMBIENT := Color(0.28, 0.23, 0.20)
+const TUNNEL_WALL := Color(0.22, 0.23, 0.26)
+const TUNNEL_GRATE := Color(0.30, 0.32, 0.35)
+const TUNNEL_PIPE_WARM: Color = ScopeTheme.TERRA
+const TUNNEL_PIPE_STEEL: Color = ScopeTheme.INK_DIM
+const TUNNEL_VENT_GLOW: Color = ScopeTheme.AMBER
+const TUNNEL_WARM_LIGHT := Color(1.0, 0.78, 0.56)
+const TUNNEL_LIGHT_ENERGY: float = 1.15
+const TUNNEL_LIGHT_RANGE_M: float = 15.0
+
 static var _unshaded_cache: Dictionary = {}
 
 
