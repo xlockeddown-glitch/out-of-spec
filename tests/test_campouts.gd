@@ -470,8 +470,8 @@ func test_a_guest_who_drops_while_camped_is_forgotten() -> String:
 	return problem
 
 
-func test_the_protocol_is_37() -> String:
-	return "" if CoopSession.PROTOCOL == 37 else "PROTOCOL is %d, not 37." % CoopSession.PROTOCOL
+func test_the_protocol_is_38() -> String:
+	return "" if CoopSession.PROTOCOL == 38 else "PROTOCOL is %d, not 38." % CoopSession.PROTOCOL
 
 
 # --- The quest --------------------------------------------------------------------------

@@ -46,6 +46,7 @@ const SHOWN_BY: Dictionary = {
 	&"finds_changed": ["finds_taken"],
 	&"pump_changed": ["pump_owned", "pools_drained"],
 	&"mine_changed": ["mine_gate_open", "mine_props", "rooms_shored"],
+	&"ice_changed": ["cold_since"],
 	&"camps_changed": ["camps_open", "camp_supplies"],
 	&"lifts_changed": ["lifts_repaired", "deepest_depth"],
 	&"lab_sitter_changed": ["lab_sitter"],
