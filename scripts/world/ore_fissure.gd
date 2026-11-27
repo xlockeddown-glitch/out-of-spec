@@ -21,6 +21,8 @@ func _ready() -> void:
 	_visual = _build_visual()
 	add_child(_visual)
 	GameState.fissures_changed.connect(_refresh)
+	GameState.terrain_changed.connect(_settle)
+	_settle()
 	_refresh()
 
 
@@ -32,6 +34,17 @@ func is_available() -> bool:
 func is_in_reach(world_pos: Vector3) -> bool:
 	var d := Vector2(world_pos.x - global_position.x, world_pos.z - global_position.z)
 	return d.length() <= MINE_RADIUS_M
+
+
+## Sits on the ground as it is, with any digging (a fissure's spot is on the
+## hills now, and an old save may have dug cells there). The scene's y is 0.
+func _settle() -> void:
+	position.y = ground_y(position, GameState.dug)
+
+
+## The ground height under a fissure at `at` (its x and z), given the digging.
+static func ground_y(at: Vector3, dug: Dictionary[Vector2i, int]) -> float:
+	return Terrain.height(Vector2(at.x, at.z), dug)
 
 
 func _refresh() -> void:

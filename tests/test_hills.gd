@@ -120,6 +120,9 @@ func test_nothing_in_the_scene_floats_or_is_buried() -> String:
 
 
 func _not_on_level(of: Node, under: Transform3D) -> String:
+	# The ore fissures stand on the Badlands hills and set their own height (OreFissure).
+	if of.name == &"Fissures":
+		return ""
 	var here: Transform3D = under * (of as Node3D).transform if of is Node3D else under
 	# The plateau rim's rocks are the widest near the edge, 1 m each way.
 	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(-1, 1), Vector2(1, 1)]:
