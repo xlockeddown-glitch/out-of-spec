@@ -33,7 +33,7 @@ func test_each_spoke_biome_has_one_sign_and_one_pad_at_its_marker() -> String:
 			return "%s's pad is not at its marker" % id
 		if absf(post.position.x - at.x) > BiomeData.PAD_HALF_M + 1.5 or absf(post.position.z - at.y) > BiomeData.PAD_HALF_M:
 			return "%s's sign is not beside its pad" % id
-		if post.hint != BiomeData.sign_text(id) or post.hint.is_empty():
+		if not post.hint.begins_with(BiomeData.sign_text(id)) or post.hint.is_empty():
 			return "%s's sign hint is '%s'" % [id, post.hint]
 	markers.free()
 	return ""

@@ -111,6 +111,7 @@ func _ready() -> void:
 	pit_water.changed.connect(_rover.leave_deep_water)
 	$WorldView/WorldViewport/World.add_child(pit_water)
 	$WorldView/WorldViewport/World.add_child(BiomeMarkers.new())
+	$WorldView/WorldViewport/World.add_child(RoadLamps.new())
 	var stone_view := StonePiecesView.new()
 	stone_view.name = "StonePieces"
 	$WorldView/WorldViewport/World.add_child(stone_view)
