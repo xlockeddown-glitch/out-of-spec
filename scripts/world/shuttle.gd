@@ -21,6 +21,9 @@ const EPSILON_H: float = 0.000001
 const TERMINAL_AT := Vector2(7.5, 100.0)
 const REACH_M: float = 5.0
 const HOST_SLACK_M: float = 1.5
+## Where a traveller who comes home stands on the farm: beside the terminal, on foot,
+## 1.1 m west of it and off the slab [PLACEHOLDER].
+const RETURN_AT := Vector2(6.4, 100.0)
 
 
 static func number(key: String, fallback: float) -> float:
@@ -139,6 +142,25 @@ static func window_line(moon: String, elapsed_days: float) -> String:
 	if up:
 		return text("deimos_open_text") % span_text((closes_at(moon, elapsed_days) - elapsed_days) * 24.0)
 	return text("deimos_next_text") % [span_text((start - elapsed_days) * 24.0), SP811.integer(floori(start) + 1), clock_text(start)]
+
+
+## When a trip that leaves at `elapsed_days` ends on its own, in elapsed days.
+static func trip_end(elapsed_days: float) -> float:
+	return elapsed_days + trip_hours() / 24.0
+
+
+## "" or why `trip` (one row of GameState.shuttle_trips) is not one: a moon with a hub
+## and a finite end.
+static func trip_shape_problem(trip: Variant) -> String:
+	if not trip is Dictionary:
+		return "is not a dictionary"
+	var row: Dictionary = trip
+	if row.size() != 2 or not row.get("moon") is String or not is_moon(row["moon"]) 			or not ZoneData.is_playable(StringName(row["moon"])):
+		return "has a moon with no hub"
+	var ends: Variant = row.get("ends_at")
+	if not ends is float or not is_finite(ends) or ends < 0.0:
+		return "has an end that is not a time"
+	return ""
 
 
 ## "" or why the farm can't use the shuttle yet: the license is the farm's.

@@ -2,6 +2,18 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: The Phobos hub and the trip (zones step 17, first half)
+
+Phobos is playable; Deimos is the next PR. Every number, shape and line is a [PLACEHOLDER]. No low-gravity physics yet, and no new species, finds or quest: the escapee hook is a station log line and one sign to inspect.
+
+- **The hub is its own scene,** built in code from boxes (a deck slab, craters, a flat-shaded Mars, the parked shuttle, a station module, the console, a board, a torn grille with a shed skin, a hatch). The hatch says "Service tunnels: sealed. [later]". Walking is `PhobosWalker`, a flat-deck copy of the farm walker's controls. Nothing was added to main_farm, so its `_ready` does not change.
+- **Booking:** `book_shuttle` takes the fare once from the shared wallet, records `GameState.shuttle_trips` (player id to moon and end time in elapsed days; saved, shown to guests) and sets the player's place to Phobos. Only one person flies for now (a party of two or more gets "one seat" [PLACEHOLDER: parties come later]). The booking player's screen opens the hub when the answer comes (ShuttleUI).
+- **The way home** is the return console (`shuttle_home`, a host command allowed in Phobos) or the end of the 6 h trip, run by the host's clock. It ignores the windows and costs nothing [PLACEHOLDER]. The player stands on foot at the Landing pad beside the terminal. The hub sees its trip end (`shuttle_trips_changed`) and opens the farm; there is no new message, so a guest's screen follows the synced trip. A screen that never got its trip goes home after 3 s.
+- **The farm's night:** a moon's traveller is never warned, charged or "rescued from the tunnels". `trip_problem` already stops a booking running past 02:00; a straggler there (a forced trip, a clock jump) is sent home free the same way. A guest who drops on Phobos has the trip ended (`forget_place`); a load past the end brings the host home; a load before it continues on Phobos.
+- **No other way on or off:** `report_place` refuses a moon without a trip, and a report of anywhere else from a moon with a trip. Fast travel and the dome never list moons. A player on a moon can do only the report, `shuttle_home` and the XP certificate.
+- **The rover:** the farm rover stays where it is. Booking from inside it lets go of the player's drive lease (as getting out does), so they leave it on the farm, and they return on foot at the pad.
+- **`CoopSession.PROTOCOL` 31 to 32:** a new command and a new synced field.
+
 ## 2026-11-27: The Landing Field pad and terminal (biomes step 12)
 
 `LandingDressing` and `ShuttleUI` give the shuttle rules a place. Every number and line is a [PLACEHOLDER].

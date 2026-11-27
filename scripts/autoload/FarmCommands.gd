@@ -10,7 +10,7 @@ const ACTIONS: Array[StringName] = [
 	&"adjust_setpoint", &"book_lab_sitter", &"book_shuttle", &"build_block_stack", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
 	&"calibrate_at_bench", &"catch_sentinel", &"change_depth", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"enter_vent", &"fast_travel", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
 	&"harvest_crop", &"hit_boulder", &"leave_zone", &"mine_fissure", &"move_rover", &"place_beacon", &"place_stone", &"plant_crop", &"read_farm_board", &"read_probe", &"release_robot", &"remove_robot_card", &"repair_lift", &"report_place",
-	&"sell_harvest_to_lin", &"send_to_oirm", &"service_wheels", &"set_interlock_override", &"set_rover_lights", &"slot_spool_into_relay", &"spend_xp_certificate",
+	&"sell_harvest_to_lin", &"send_to_oirm", &"service_wheels", &"set_interlock_override", &"set_rover_lights", &"shuttle_home", &"slot_spool_into_relay", &"spend_xp_certificate",
 	&"start_lab_grow", &"survey_ore", &"take_find", &"till", &"use_lift", &"zero_steering",
 ]
 ## What a player in bed may do and stay in bed: going to bed, paperwork, and
@@ -30,6 +30,10 @@ const BELOW_ONLY: Array[StringName] = [
 const AT_CELL: Array[StringName] = [&"adjust_setpoint", &"dig", &"fill", &"harvest_crop", &"place_stone", &"plant_crop", &"till"]
 const CELL_REACH_M: float = 6.0
 const FAR_REFUSAL: String = "Too far from the rover."
+## What someone on a moon may ask for: the way home, saying where they are, and
+## paperwork. The farm's work waits at the farm (zones doc section 8.1).
+const ON_A_MOON: Array[StringName] = [&"report_place", &"shuttle_home", &"spend_xp_certificate"]
+const MOON_REFUSAL: String = "You are away on the shuttle. Take the return shuttle home first."
 const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
 ## Actions that may carry a mini-game's score after their own arguments: a whole
 ## number. The host cuts it to what it allows (MinigameScore.allowed, or
@@ -84,6 +88,8 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 	var reason: String = "No player is named." if player_id == "" else problem(action, arguments)
 	if reason == "" and CoopWalkers.is_out(player_id) and not action in CoopWalkers.ON_FOOT:
 		reason = CoopWalkers.REFUSAL
+	if reason == "" and Shuttle.is_moon(_farm().place_of(player_id)) and not action in ON_A_MOON:
+		reason = MOON_REFUSAL
 	if reason == "" and player_id != _farm().local_player_id and not is_within_reach(action, arguments):
 		reason = FAR_REFUSAL
 		CoopSession.note_refusal(player_id, "refused %s: too far from the rover" % action)

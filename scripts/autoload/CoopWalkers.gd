@@ -30,7 +30,7 @@ const GRACE_MS: int = 1500
 const STOPPED_MPS: float = 0.05
 const FARTHEST_M: float = 500.0
 ## What someone on foot may still ask for [ASSUMPTION].
-const ON_FOOT: Array[StringName] = [&"get_into_rover", &"get_up", &"book_shuttle", &"go_to_bed", &"read_probe", &"report_place", &"spend_xp_certificate"]
+const ON_FOOT: Array[StringName] = [&"get_into_rover", &"get_up", &"book_shuttle", &"go_to_bed", &"read_probe", &"report_place", &"shuttle_home", &"spend_xp_certificate"]
 const REFUSAL: String = "On foot. Get in the rover first."
 
 ## Player -> pose.
@@ -135,6 +135,14 @@ func get_out(player_id: String, x: float, z: float, now: int = Time.get_ticks_ms
 	_heard_at[player_id] = now
 	_reach.erase(player_id)
 	return ""
+
+
+## Host: puts a player on foot at `at`, as the shuttle's return does (the pad, not the
+## rover's side). The caller has judged the place.
+func stand(player_id: String, at: Vector3, now: int = Time.get_ticks_msec()) -> void:
+	out[player_id] = [at.x, at.y, at.z, 0.0, 0.0]
+	_heard_at[player_id] = now
+	_reach.erase(player_id)
 
 
 ## Host: "" or why not.

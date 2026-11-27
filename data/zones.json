@@ -62,7 +62,7 @@
       "band": [21, 40],
       "hazards": ["low_gravity", "dust", "launch_window"],
       "finds": ["station_data", "robot_parts", "tarantulas", "gauge_blocks"],
-      "hub_scene": "",
+      "hub_scene": "res://scenes/phobos_hub.tscn",
       "entrance": "Shuttle from the pad; needs the shuttle license.",
       "tarantula_hook": "Station escapees, adapted in warm service tunnels: a new moon-adapted form with a wider climate band.",
       "notes": "Escaped station stock; the Larder is the only story exception (Ryan, 14.1 answer 10); exotic low-expansion gauge blocks (14.1 answer 11)."

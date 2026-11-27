@@ -107,8 +107,8 @@ func test_zones_for_level_allows_overlap() -> String:
 func test_the_tunnels_row_and_unknown_ids() -> String:
 	if ZoneData.hub_scene(&"lava_tubes") != "res://scenes/basalt_tunnels.tscn":
 		return "The Lava Tubes hub is the basalt tunnels scene."
-	if ZoneData.hub_scene(&"phobos") != "":
-		return "Phobos has no scene yet."
+	if ZoneData.hub_scene(&"phobos") != SceneSwitcher.PHOBOS_SCENE or ZoneData.hub_scene(&"deimos") != "":
+		return "Phobos has its hub scene (step 17, first half) and Deimos has none yet."
 	if ZoneData.hub_scene(&"lava_tubes") != SceneSwitcher.TUNNELS_SCENE:
 		return "The row and SceneSwitcher disagree about the tunnels scene."
 	if ZoneData.has_zone(&"nowhere") or not ZoneData.zone(&"nowhere").is_empty() or ZoneData.band(&"nowhere") != Vector2i.ZERO:
