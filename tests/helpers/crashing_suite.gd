@@ -19,3 +19,15 @@ func plain_pass() -> String:
 
 func plain_fail() -> String:
 	return "nope"
+
+
+func await_then_crash() -> String:
+	await Engine.get_main_loop().process_frame
+	var node: Node = null
+	node.queue_free()
+	return ""
+
+
+func await_then_pass() -> String:
+	await Engine.get_main_loop().process_frame
+	return ""
