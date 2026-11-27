@@ -56,6 +56,23 @@ func test_the_robots_panel_stays_clear_of_the_phone() -> String:
 	return "" if ok else "The robots panel must end where the phone begins."
 
 
+func test_the_phone_size_follows_its_one_scale() -> String:
+	var hud: FieldPhoneHUD = _hud()
+	var title: Label = hud.get_node("Bezel/Screen/Content/Title")
+	var problem: String = ""
+	if title.get_theme_font_size("font_size") != roundi(26.0 * FieldPhoneHUD.PHONE_SCALE):
+		problem = "The title font must be its original size times PHONE_SCALE."
+	elif not is_equal_approx(hud.anchor_left, FieldPhoneHUD.LEFT_ANCHOR):
+		problem = "The phone must start at LEFT_ANCHOR."
+	hud.free()
+	for path: String in ["res://scenes/main_farm.tscn", "res://scenes/basalt_tunnels.tscn"]:
+		var world: Control = (load(path) as PackedScene).instantiate().get_node("WorldView")
+		if not is_equal_approx(world.anchor_right, FieldPhoneHUD.LEFT_ANCHOR):
+			problem = "The world view in %s must end where the phone begins." % path
+		world.get_parent().free()
+	return problem
+
+
 func test_esc_opens_and_closes_the_pause_panel() -> String:
 	var pause := PauseUI.new()
 	(Engine.get_main_loop() as SceneTree).root.add_child(pause)
