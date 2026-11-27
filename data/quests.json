@@ -265,6 +265,10 @@
     { "id": "free_lab_refit", "display_name": "A free refit of one lab area", "holder": "farm",
       "text": "The next lab space cleared to fit out again costs nothing.",
       "held_line": "LAB: The next space you clear for refit costs nothing.",
-      "used_line": "LAB: The refit was free. That one is spent." }
+      "used_line": "LAB: The refit was free. That one is spent." },
+    { "id": "lab_sitter", "display_name": "A free day of the lab sitter", "holder": "farm",
+      "text": "Dana Pike minds the lab for one day, free.",
+      "held_line": "LAB: Dana Pike will mind the lab for one day, free. Book her at the dome console.",
+      "used_line": "LAB: Dana Pike's day was free. That one is spent." }
   ]
 }

@@ -2,6 +2,20 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-26: The lab sitter (zones step 11, sections 9 and 14.1)
+
+A new hire tends the lab for one day; a one-use reward books her free. Everything is a [PLACEHOLDER] or an [ASSUMPTION] unless Ryan says otherwise.
+
+- **Who:** a new character (Ryan overrode the doc: not Lin, not Chet). Name "Dana Pike" [PLACEHOLDER], in `data/economy.json`; no art and no body, she is booked from the dome console.
+- **Booking:** `book_lab_sitter`, a host-run command guests send via `FarmCommands.ACTIONS`. 40 CR [PLACEHOLDER] from the shared wallet, taken once. Refused away from the dome, when she is already booked, or when the wallet is short. The booked day is always the next one [ASSUMPTION].
+- **Her day:** waters (a set-point trim to each plot's target through `adjust_setpoint`, like the robot WATER card) and collects the dome's spool and each tank's spool (as the Manager, so no skill XP; shared lab XP still counts). Done once on the booked morning and once more at the next rollover, then a Dispatch-voice phone line and the booking clears.
+- **Never:** she does not calibrate and never reads or changes drift or as-found readings; a bench check is not hers to make.
+- **Left out:** feeding the spiders. There is no code path that feeds a spider, and she uses only paths that exist.
+- **Reward:** `lab_sitter` in `one_use_rewards` (farm, no percent). Using it books her free and spends it once, only after the checks pass. No quest pays it yet; Beacon Run is not an obvious fit. The data check (`one_use_problem`) learned the kind: farm-held, no percent.
+- **Save and sync:** `lab_sitter` is in `SAVED_LATER` (old saves have none) and in `FarmSync.SHOWN_BY`. `CoopSession.PROTOCOL` 24 to 25.
+- **Review round 1:** the morning runs tally and growth, robot cards, the sitter, then dawn's soil check (`_note_dawn_soil`), so her trims count for the new day and robots pick spools first. `book_lab_sitter(for_day, ...)` is refused if the day is not the next one as the console showed it, so a booking across 06:00 never books the wrong day. She is booked before the fee or reward moves, and a free fee spends no reward.
+- **Out of scope:** camps, sprinklers, paying someone for several days.
+
 ## 2026-11-26: Surface biomes proposal (design only)
 
 Ryan after playtesting: the map needs a better layout, with biomes and the farm at the centre. `docs/design/biomes.md` proposes five surface biomes (Lab Quarter, Badlands, Basalt Ridge, Frost Flats, Landing Field) joined to zone entrances, two layouts, one big scene, props moved but ground not. No code or data changed. Ryan answered all 12 the same day (`biomes.md` §7.1): hub and spokes, five biomes, no gates, land grows to about 240 m (the doc keeps the old 160 m middle's ground so old saves are safe), Bram at the farm's edge, parking pads, tint and props only, a farm quest board for first-hour tips, no digging on roads or pads, old saves keep their ground, the Aquifer sinkhole first.

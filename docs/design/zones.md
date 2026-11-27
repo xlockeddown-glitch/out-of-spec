@@ -283,19 +283,19 @@ The same things as today: instrument drift (the clock runs), plants needing wate
 | **A friend at home** (co-op) | Anything a player does | |
 | **Robots** | Water, collect spool, calibrate, per their cards (`data/robots.json`, `equipment_skills_robots.md`) | Anything they have no card for; they never calibrate themselves |
 | **Sprinklers** [ASSUMPTION, NEW] | Water the plot on a timer, so the plants live while you are away | Anything else; a cost per day in water |
-| **The helper (§9.3)** | Waters, feeds the spiders, keeps the dome neat | Calibrate: a helper's bench check is **not traceable** [ASSUMPTION] |
+| **The helper (§9.3)** | Waters, collects spools (feeding the spiders waits for a code path) | Calibrate: a helper's bench check is **not traceable** [ASSUMPTION] |
 
 ### 9.3 Hire a helper
 
-- **Who:** Lin, who already runs the greenhouse and is learning the dome. [ASSUMPTION; Chet, once he is an errand runner, is a second choice]
-- **Cost:** about 40 CR a day [PLACEHOLDER], paid from the shared wallet, from the terminal's "tend the lab" line or from Lin.
+- **Who:** a new hire, the lab sitter: a new character, name and look [PLACEHOLDER]. Not Lin and not Chet (Ryan, section 14.1).
+- **Cost:** about 40 CR a day [PLACEHOLDER], paid from the shared wallet, from the dome console's "tend the lab" line.
 - **What she does** for one game day: waters the plants, feeds the spiders, collects the day's spools and logs "kept in good order". **She does not calibrate**: a traceable calibration needs a person at the bench, and the as-found must be honest.
-- **She is not a robot.** She says something; you get a phone line at the end of the day (Dispatch voice).
+- **She is not a robot and has no body.** She is booked from a terminal. She says something; you get a phone line at the end of the day (Dispatch voice).
 - **Tie to quests:** several lines can give a **free helper day** as a reward (next).
 
 ### 9.4 A quest reward version
 
-The one-use rewards system already holds the shape: `one_use_rewards` in `data/quests.json` (id, name, holder, a percent, lines). A new reward **`lab_sitter`**, holder **farm**, text "Lin minds the lab for one day, free", used when the helper is booked [PLACEHOLDER]. It needs no percent. This is a data change plus one more kind of use, which the data check (`one_use`) would learn. [ASSUMPTION] It is a good prize for the first deep quest of a zone, since it is the thing a first trip most needs.
+The one-use rewards system already holds the shape: `one_use_rewards` in `data/quests.json` (id, name, holder, a percent, lines). A new reward **`lab_sitter`**, holder **farm**, text "(the sitter) minds the lab for one day, free", used when the helper is booked [PLACEHOLDER]. It needs no percent. This is a data change plus one more kind of use, which the data check (`one_use`) would learn. [ASSUMPTION] It is a good prize for the first deep quest of a zone, since it is the thing a first trip most needs.
 
 ### 9.5 Co-op at home and away
 
@@ -446,7 +446,8 @@ Each PR logs its decisions in `docs/decisions.md` and names its placeholders.
 10. **Co-op hardening.** Two-PC test of players in different zones, late join, a guest dropping mid-trip. **Highest-risk PR; second reviewer and a two-PC test.**
    - **Built (step 10).** The host-run zone commands were audited for players in different places, a late joiner and a guest who drops. Fixed: a guest who drops while the last one in a zone sends the rover home (`forget_place` calls `bring_rover_home`: the lent rover to the pad, a console field rover released, its heat trip and lease gone), where before the rover stayed out with nobody on the farm able to reach it; and `take_find` and `place_beacon` now read the rover from `_rover_pose_now` like the vents and the lift, not from a save of the host's own rover. Tests in `tests/test_zone_coop.gd` (real loopback sessions): different depths at once, a late guest told the finds, lifts, deepest depth, beacons, rover and places, and a guest dropping with the lease, the place, the rover and the beds. `docs/playtest.md` has a two-PC checklist. Review round 1 added: the rover also comes home when the last one on the trip drops from the dome or the host stops hosting, guest `move_rover`, `catch_sentinel` and `set_rover_lights` are held to the sender's place, a rover pose with an old epoch is dropped, and the day waits for the rover to be home. No protocol change (stays 23). **Not covered:** the real two-PC run, which is still to do.
    - **Built (guest rescue).** At 00:00 and 02:00 the host also handles every guest its `player_places` table has in a zone: a warning on that guest's own phone (the new `RECALL` message), and at 02:00 `rescue_from_tunnels(guest)` plus `CoopBeds.recall_to_bed(guest)`, then the guest's screen leaves the zone for the farm. Once a day per player; 50 CR per rescued player [PLACEHOLDER]; ore taken once per trip (the baseline moves after a take) [ASSUMPTION]; the rover comes home only when nobody is left on the trip, and a guest in the dome on the trip also keeps the mouth shut. A guest who left the zone since the warning, or dropped, is not charged. `CoopSession.PROTOCOL` 23 to 24. Tests in `tests/test_guest_rescue.gd`. See decisions.md, 2026-11-26 (the 02:00 rescue for guests).
-11. **Helper and the reward.** Lin tends the lab; the `lab_sitter` one-use reward.
+11. **Helper and the reward.** The new-hire lab sitter tends the lab; the `lab_sitter` one-use reward.
+   - **Built (step 11).** The sitter is data (`data/economy.json` `lab_sitter`: name "Dana Pike" [PLACEHOLDER], fee 40 CR [PLACEHOLDER], every line of text) and `LabSitter` (`scripts/world/lab_sitter.gd`: the pure rules). `book_lab_sitter` is a host-run command a guest can send (`FarmCommands.ACTIONS`), from the dome console panel. It refuses away from the dome, when she is already booked, and when the shared wallet is short; it takes the fee once, or spends a held `lab_sitter` reward instead (free), and books her for the next day [ASSUMPTION]. The booking (`GameState.lab_sitter`: day, watered, spools) is saved (`SAVED_LATER`, old saves have none) and shown to guests (`FarmSync.SHOWN_BY`). On the booked day she waters (a set-point trim to each plot's target, the code robots and players use, `adjust_setpoint`) and collects spools (`collect_spool`, `collect_enclosure_spool`, as the Manager, no skill XP; the shared lab XP still counts). At the next rollover she does it once more, a Dispatch-voice phone line says what was done and the booking clears. She never calibrates and never touches a drift or as-found reading. **Left out:** feeding the spiders, since no code path feeds a spider today (to do when one exists). `lab_sitter` is in `one_use_rewards` (farm, no percent) and the one-use data check now knows it (`QuestEngine.one_use_problem`); no quest pays it yet (Beacon Run is not an obvious fit). `CoopSession.PROTOCOL` 24 to 25.
 12. **Camp-outs.** The camp spot, supplies, and `CoopBeds` learning that a camp is a bed.
 13. **Flooded Aquifer.** One PR: hub, depth 1, pump, water hazard.
 14. **Abandoned Colony Mine.** One PR: hub, gate key quest, collapse hazard.
@@ -467,7 +468,7 @@ Each has a recommended option first.
 2. **Who tends the lab for hire?**
    - (a) Lin (recommended: she already runs the greenhouse).
    - (b) Chet, once he is an errand runner.
-   - (c) A new hire.
+   - (c) A new hire. (Ryan chose this one, section 14.1.)
 3. **What does the rescue cost?**
    - (a) 50 CR plus some carried ore [PLACEHOLDER], finds kept, no extra drift hit, the crew brings the rover home (recommended: small, as you asked; the same as §6.1).
    - (b) 50 CR only.
@@ -536,7 +537,7 @@ All of these are [ASSUMPTION]s unless noted.
 - Hubs are never hard-gated by level; the moons need the license and the Mine hub needs the gate-key quest (§7.2).
 - Every number in §7.2 and "a lift every third depth" are [PLACEHOLDER]s.
 - The shuttle license needs lab level 20 and an OIRM account; an expedition permit needs 30 (§7.2).
-- Lin tends the lab for about 40 CR a day, cannot calibrate, and a free helper day is a `lab_sitter` one-use reward (§9).
+- A new-hire sitter (name and look [PLACEHOLDER]) tends the lab for about 40 CR a day, cannot calibrate, and a free helper day is a `lab_sitter` one-use reward (§9).
 - Sprinklers are a future item (§9.2).
 - Cast placement: Orin in the Lava Tubes, Vance in the Aquifer and Ice Caves, Bram in the Mine, Odalys on Phobos, Kestrel on Deimos (§2, §10.3).
 - Real tarantulas only live in sealed warm places; the thermal-vent morph near the warm vents and a damp-moss or cold morph are guesses (§2).
