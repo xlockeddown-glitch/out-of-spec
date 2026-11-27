@@ -34,6 +34,10 @@ const PUFF_SIZE_M: float = 0.5
 
 static var _spots: Array[Vector2] = []
 static var _spots_ready: bool = false
+## The hill's natural plants, worked out once: HillDressing.plants() rebuilds the
+## whole list on every call, and `clear` runs once per vent.
+static var _plants: Array[HillDressing.Placed] = []
+static var _plants_ready: bool = false
 
 var _vents: Array[Node3D] = []
 
@@ -52,6 +56,15 @@ static func spots() -> Array[Vector2]:
 ## Forget the worked-out spots (for tests that reload the table).
 static func reset() -> void:
 	_spots_ready = false
+	_plants_ready = false
+
+
+## The natural hill plants (shrubs and poppies), cached.
+static func plants() -> Array[HillDressing.Placed]:
+	if not _plants_ready:
+		_plants = HillDressing.plants()
+		_plants_ready = true
+	return _plants
 
 
 ## Whether a vent may stand at `at`: inside the Basalt Ridge, off the plot, roads,
@@ -78,7 +91,7 @@ static func clear(at: Vector2) -> bool:
 			var way: Variant = BiomeData.entrance_at(id, zone)
 			if way is Vector2 and at.distance_to(way as Vector2) < ENTRANCE_CLEAR_M:
 				return false
-	for plant: HillDressing.Placed in HillDressing.plants():
+	for plant: HillDressing.Placed in plants():
 		if absf(at.x - plant.at.x) < plant.half_m() + VENT_HALF_M and absf(at.y - plant.at.z) < plant.half_m() + VENT_HALF_M:
 			return false
 	for lamp: Vector2 in RoadLamps.spots(&"basalt_ridge"):

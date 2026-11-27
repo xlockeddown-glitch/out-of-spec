@@ -76,6 +76,23 @@ func test_no_vent_stands_where_it_must_not() -> String:
 		for lamp: Vector2 in RoadLamps.spots(&"basalt_ridge"):
 			if at.distance_to(lamp) < 1.0:
 				return "The vent at %s is on a lamp" % at
+		for plant: HillDressing.Placed in HillDressing.plants():
+			if absf(at.x - plant.at.x) < plant.half_m() + BasaltDressing.VENT_HALF_M and absf(at.y - plant.at.z) < plant.half_m() + BasaltDressing.VENT_HALF_M:
+				return "The vent at %s is on a plant at %s" % [at, plant.at]
+	return ""
+
+
+func test_a_vent_is_refused_on_a_hill_plant() -> String:
+	var tried: int = 0
+	for plant: HillDressing.Placed in HillDressing.plants():
+		var at := Vector2(plant.at.x, plant.at.z)
+		if BiomeData.biome_at(at) != &"basalt_ridge":
+			continue
+		tried += 1
+		if BasaltDressing.clear(at):
+			return "A vent was allowed on the plant at %s" % at
+	if tried == 0:
+		return "No hill plant stands in the Basalt Ridge to try"
 	return ""
 
 
