@@ -38,7 +38,7 @@
       "band": [12, 30],
       "hazards": ["collapse", "bad_air", "old_charges"],
       "finds": ["ore", "lost_gear", "robot_parts", "gauge_blocks"],
-      "hub_scene": "",
+      "hub_scene": "res://scenes/colony_mine.tscn",
       "entrance": "A sealed gate on the plateau road, opened by a key quest.",
       "tarantula_hook": "",
       "notes": ""

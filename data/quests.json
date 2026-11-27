@@ -293,6 +293,17 @@
       "rewards": { "credits": 60, "lab_xp": 100, "phone": "npcs/bram/quests/to_the_click_done" }
     },
     {
+      "id": "the_gate_key", "kind": "lab", "giver": "bram", "title": "The Gate Key", "scope": "farm", "zone": "colony_mine",
+      "gates": { "lab_level": 10 },
+      "offer": { "when": "always" },
+      "offer_line": "npcs/bram/quests/the_gate_key_offer",
+      "steps": [
+        { "id": "prove", "text": "Show Bram you can work rock: mine two fissures in the Lava Tubes.",
+          "check": "counter", "counter": "mine_fissure", "whose": "farm", "at_least": 2 }
+      ],
+      "rewards": { "credits": 80, "lab_xp": 150, "mine_gate": true, "phone": "npcs/bram/quests/the_gate_key_done" }
+    },
+    {
       "id": "beacon_run", "kind": "story", "giver": "orin", "title": "Beacon Run", "scope": "farm", "zone": "lava_tubes",
       "gates": { "lab_level": 5 },
       "offer": { "when": "always" },
