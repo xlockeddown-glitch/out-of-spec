@@ -17,6 +17,8 @@ var _status: Label
 var _close_button: Button
 var _focus_before: Control
 var _busy: bool = false
+## Where a booked screen goes; only tests set it (the real swap would change the scene).
+var change_scene: Callable = Callable()
 
 
 ## The panel's lines for a farm at `elapsed_days`: a window line for each moon, the
@@ -129,4 +131,17 @@ func _on_book(moon: String) -> void:
 	if problem == "":
 		# Booked and paid: the shuttle has left, and this screen is at the moon's hub.
 		close()
-		SceneSwitcher.go_to(SceneSwitcher.PHOBOS_SCENE)
+		_enter_hub(moon)
+
+
+## This screen goes to `moon`'s hub, unless it is there or on its way: a guest's screen
+## follows the host's synced trip (SceneSwitcher.reconcile_trip), which can come first.
+func _enter_hub(moon: String) -> void:
+	var hub: String = ZoneData.hub_scene(StringName(moon))
+	var current: Node = get_tree().current_scene if is_inside_tree() else null
+	if hub == "" or SceneSwitcher.is_busy() or (current != null and current.scene_file_path == hub):
+		return
+	if change_scene.is_valid():
+		change_scene.call(hub)
+	else:
+		SceneSwitcher.go_to(hub)

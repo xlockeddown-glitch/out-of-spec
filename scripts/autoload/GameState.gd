@@ -3529,7 +3529,9 @@ func grant_shuttle_license() -> void:
 ## the farm, or driving its rover. The farm rover stays where it is: a player who
 ## books from inside it is out of it (the lease is let go), and walks home to the pad
 ## on the way back. The sender's screen changes to the hub when the answer comes
-## (ShuttleUI). Returns "" when booked, else why not.
+## (ShuttleUI). A player in bed who books is woken by the act (FarmCommands). With friends
+## in, the day cannot end until the traveller is home: the trip ends by its clock or the
+## 02:00 recall at the latest, so the wait is bounded. Returns "" when booked, else why not.
 func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
 	var id: String = _player(player_id)
 	var at: Variant = standing_at(id)
@@ -3591,11 +3593,35 @@ func _return_traveller(player_id: String, line: String) -> void:
 	var moon: String = str(shuttle_trips.get(player_id, {}).get("moon", ""))
 	shuttle_trips.erase(player_id)
 	player_places[player_id] = [ZonePresence.FARM, 0]
-	var at := Vector3(Shuttle.RETURN_AT.x, 0.0, Shuttle.RETURN_AT.y)
-	at.y = Terrain.height(Vector2(at.x, at.z), dug)
-	CoopWalkers.stand(player_id, at)
+	_stand_at_pad(player_id)
 	shuttle_trips_changed.emit()
 	post_phone(line % Shuttle.moon_name(moon) if moon != "" else line % "the moon")
+
+
+## Host: puts a returned traveller on foot at the landing pad. With the farm rover away
+## (a field trip has it) there is nothing to be on foot beside, so they are put among
+## the players there with no walker: a walker with no rover could never get in, and the
+## rover coming home would only fold them into it. The spot is the pad's return spot, or
+## the nearest dry one if that was dug under or flooded; a player's own building is not
+## checked (there is no cheap query for it) [ASSUMPTION]. The silence clock does not
+## start here but at their first farm report or pose (CoopWalkers.heard), as their
+## screen has the host's next send, a fade and a load to get through first.
+func _stand_at_pad(player_id: String) -> void:
+	if rover_is_away(ROVER):
+		CoopWalkers.out.erase(player_id)
+		return
+	CoopWalkers.stand(player_id, _pad_spot(), Time.get_ticks_msec() + CoopWalkers.ARRIVAL_MS)
+
+
+func _pad_spot() -> Vector3:
+	var base := Vector2(Shuttle.RETURN_AT.x, Shuttle.RETURN_AT.y)
+	for ring: int in 7:
+		for step: int in (1 if ring == 0 else 8):
+			var angle: float = TAU * float(step) / 8.0
+			var at: Vector2 = base + Vector2(cos(angle), sin(angle)) * 1.5 * float(ring)
+			if maxf(absf(at.x), absf(at.y)) <= Terrain.HALF_M and not Terrain.is_deep(at):
+				return Vector3(at.x, Terrain.height(at, dug), at.y)
+	return Vector3(base.x, Terrain.height(base, dug), base.y)
 
 
 ## A farm opens (a load, or a guest joining): the host's own trip goes on if it is still
@@ -3611,6 +3637,7 @@ func _settle_trips_on_load() -> void:
 		elif TunnelRecall.closed(GameClock.elapsed_days) or GameClock.elapsed_days >= float(shuttle_trips[id]["ends_at"]):
 			var moon: String = str(shuttle_trips[id]["moon"])
 			shuttle_trips.erase(id)
+			_stand_at_pad(id)
 			post_phone(Shuttle.text("trip_over_text") % Shuttle.moon_name(moon))
 		else:
 			player_places[id] = [str(shuttle_trips[id]["moon"]), 0]
@@ -4396,6 +4423,9 @@ func report_place(place: String, depth: int, player_id: String = "") -> String:
 	var reason: String = ZonePresence.problem(place, depth, player_id, player_id, here)
 	if reason != "":
 		return reason
+	# A moon has no depth: no tunnel, no dig.
+	if Shuttle.is_moon(place) and depth != 0:
+		return Shuttle.text("not_away_text")
 	# A moon is reached by booking the shuttle, never by a report.
 	if Shuttle.is_moon(place) and not shuttle_trips.has(player_id):
 		return Shuttle.text("not_away_text")
@@ -4404,6 +4434,7 @@ func report_place(place: String, depth: int, player_id: String = "") -> String:
 	var on_trip: bool = rover_zone != "" and (_trip_players.has(player_id) or (player_places.has(player_id) and place_of(player_id) == rover_zone))
 	player_places[player_id] = [place, depth]
 	if place == ZonePresence.FARM:
+		CoopWalkers.heard(player_id)  # a traveller back on foot has spoken: the silence clock starts
 		_trip_players.erase(player_id)  # back on the farm: not on the trip
 		# The last one off the trip (a guest in the dome after the rescue hour walks to the
 		# farm): nobody is left to bring the rover back, so it goes home as for a drop.

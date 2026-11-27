@@ -25,6 +25,8 @@ func _ready() -> void:
 	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_fade)
+	GameState.shuttle_trips_changed.connect(reconcile_trip)
+	scene_swapped.connect(func(_path: String) -> void: reconcile_trip())
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -63,6 +65,20 @@ func trip_holds_dome(scene_path: String) -> bool:
 ## (STOP HOSTING, quitting), so a stuck wait cannot hold the player in the dome.
 func swap_blocked(path: String, scene_path: String) -> bool:
 	return path != TITLE_SCENE and trip_holds_dome(scene_path)
+
+
+## A guest's screen follows the host's word on its trip (the synced shuttle_trips), not
+## the answer to its booking, which can be lost: on a trip but still at the farm or the
+## dome, it goes to the moon's hub. The other way (a hub with no trip) is the hub's own
+## doing, which asks the host first. Returns the scene it set out for, or "".
+func reconcile_trip() -> String:
+	if not FarmCommands.guest:
+		return ""
+	var current: Node = get_tree().current_scene
+	var to: String = Shuttle.hub_to_join(GameState.shuttle_trips.get(GameState.local_player_id), current.scene_file_path if current != null else "")
+	if to != "":
+		go_to(to)
+	return to
 
 
 ## Like swap_to, but after a swap in progress instead of not at all.

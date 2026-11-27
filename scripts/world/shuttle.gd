@@ -229,3 +229,13 @@ static func terminal_near(where: Variant, slack: float = 0.0) -> bool:
 		return false
 	var at: Vector3 = where
 	return Vector2(TERMINAL_AT.x - at.x, TERMINAL_AT.y - at.z).length() <= REACH_M + slack
+
+
+## The scene a screen that shows `current` must go to for the host's `trip` (the entry of
+## the synced shuttle_trips for this player, or null): the moon's hub when they are on a
+## trip but their screen is still the farm or the dome, else "". A screen follows the
+## host's word, not the answer to its booking (that answer can be lost).
+static func hub_to_join(trip: Variant, current: String) -> String:
+	if not trip is Dictionary or not current in [SceneSwitcher.FARM_SCENE, SceneSwitcher.DOME_SCENE]:
+		return ""
+	return ZoneData.hub_scene(StringName(str((trip as Dictionary).get("moon", ""))))

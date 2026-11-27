@@ -22,6 +22,8 @@ const ARRIVE_AT := Vector3(-2.0, 0.0, 7.0)
 ## never got it is not stranded [PLACEHOLDER].
 const GRACE_S: float = 3.0
 const TOAST_SECONDS: float = 4.0
+## The moon this hub is.
+const MOON: String = Shuttle.PHOBOS
 
 ## Where the parts stand: name -> position.
 const SPOTS: Dictionary[String, Vector3] = {
@@ -45,6 +47,9 @@ var _seen_trip: bool = false
 var _since_s: float = 0.0
 var _leaving: bool = false
 var _busy: bool = false
+var _asking: bool = false
+## Where the way home goes; only tests set it (the real swap would change the scene).
+var change_scene: Callable = Callable()
 
 
 func _ready() -> void:
@@ -64,10 +69,10 @@ func _process(delta: float) -> void:
 	else:
 		var hovered: Clickable = Clickable.hovered
 		_hint.text = hovered.hint if hovered != null and hovered.hint != "" else Shuttle.text("hub_low_gravity")
-	if not _seen_trip:
+	if not _seen_trip and not _asking:
 		_since_s += delta
 		if _since_s > GRACE_S:
-			_go_home()
+			_trip_not_seen()
 
 
 func _has_trip() -> bool:
@@ -87,7 +92,30 @@ func _go_home() -> void:
 	if _leaving:
 		return
 	_leaving = true
-	SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE)
+	if change_scene.is_valid():
+		change_scene.call(SceneSwitcher.FARM_SCENE)
+	else:
+		SceneSwitcher.go_to(SceneSwitcher.FARM_SCENE)
+
+
+## No trip has come for this player in GRACE_S. On the host that is final: the trip is
+## theirs and there is none. A guest may only have a late send, so the host is asked
+## (report_place for this moon is accepted exactly while the host has them on a trip,
+## and changes nothing): "not away" brings them home; any other answer (they are away,
+## or the host did not answer) keeps them here for another grace, and the synced trip
+## then comes, or the host's word at the next ask does.
+func _trip_not_seen() -> void:
+	if not FarmCommands.guest:
+		_go_home()
+		return
+	_asking = true
+	var problem: Variant = await FarmCommands.request(&"report_place", [MOON, 0])
+	_asking = false
+	_since_s = 0.0
+	if not is_inside_tree() or _has_trip():
+		return
+	if str(problem) == Shuttle.text("not_away_text"):
+		_go_home()
 
 
 # --- Build ----------------------------------------------------------------------

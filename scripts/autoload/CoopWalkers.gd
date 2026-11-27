@@ -24,6 +24,10 @@ const SNAP_M: float = 17.0
 const HEIGHT_M: float = 5.0
 ## A guest silent this long is back in the rover [PLACEHOLDER].
 const SILENT_MS: int = 5000
+## A returned traveller's screen has this long to load the farm and say a word before
+## the silence clock counts: the host's send, the fade and the load come first
+## [PLACEHOLDER].
+const ARRIVAL_MS: int = 30000
 ## A guest's own getting out or in holds this long against older word from the
 ## host [PLACEHOLDER].
 const GRACE_MS: int = 1500
@@ -143,6 +147,12 @@ func stand(player_id: String, at: Vector3, now: int = Time.get_ticks_msec()) -> 
 	out[player_id] = [at.x, at.y, at.z, 0.0, 0.0]
 	_heard_at[player_id] = now
 	_reach.erase(player_id)
+
+
+## Host: a player's first word on the farm after a return: the silence clock starts now.
+func heard(player_id: String, now: int = Time.get_ticks_msec()) -> void:
+	if is_out(player_id) and _heard_at.get(player_id, 0) > now:
+		_heard_at[player_id] = now
 
 
 ## Host: "" or why not.

@@ -134,8 +134,8 @@ func test_every_refusal_charges_nothing_and_leaves_no_trip() -> String:
 func test_deimos_still_has_no_hub_and_fast_travel_never_offers_phobos() -> String:
 	var gs: GameStateScript = _state(500)
 	var problems: Array[String] = []
+	GameClock.elapsed_days = 3.0 * HOUR  # inside Phobos' window, so only the missing hub refuses
 	var deimos: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
-	GameClock.elapsed_days = 3.0 * HOUR
 	if deimos != Shuttle.text("no_hub_text") % "Deimos" or gs.credits != 500:
 		problems.append("Deimos is refused for the missing hub: '%s', %d CR" % [deimos, gs.credits])
 	if not ZoneData.is_playable(&"phobos") or ZoneData.is_playable(&"deimos"):
@@ -439,4 +439,314 @@ func test_the_hub_scene_loads_headless_with_its_console_board_sign_and_hatch() -
 			problems.append("No trip is seen on a fresh hub.")
 	(Engine.get_main_loop() as SceneTree).root.remove_child(hub)
 	hub.free()
+	return "\n".join(problems)
+
+
+# --- The client side: a screen follows the host's word on its trip -----------------------------
+
+const TRIP_FAR: float = 1.0e9
+
+
+func _hub() -> PhobosHub:
+	var hub: PhobosHub = (load(SceneSwitcher.PHOBOS_SCENE) as PackedScene).instantiate() as PhobosHub
+	(Engine.get_main_loop() as SceneTree).root.add_child(hub)
+	return hub
+
+
+func _drop_hub(hub: PhobosHub) -> void:
+	(Engine.get_main_loop() as SceneTree).root.remove_child(hub)
+	hub.free()
+
+
+## The scenes the hub was told to open, in order (the real swap is not made).
+func _goes(hub: PhobosHub) -> Array[String]:
+	var seen: Array[String] = []
+	hub.change_scene = func(path: String) -> void: seen.append(path)
+	return seen
+
+
+func _my_trip(on: bool) -> void:
+	if on:
+		GameState.shuttle_trips[GameState.local_player_id] = { "moon": Shuttle.PHOBOS, "ends_at": TRIP_FAR }
+	else:
+		GameState.shuttle_trips.erase(GameState.local_player_id)
+
+
+## The host answers a guest's asks with `answer`; `asked` collects what was asked.
+func _host_says(answer: String, asked: Array) -> void:
+	FarmCommands.guest = true
+	FarmCommands.remote = func(action: StringName, arguments: Array) -> Variant:
+		asked.append([action, arguments])
+		return answer
+
+
+func _guest_off() -> void:
+	FarmCommands.guest = false
+	FarmCommands.remote = Callable()
+
+
+func test_the_hub_goes_home_when_its_trip_goes_and_not_before_or_twice() -> String:
+	var held: Dictionary = GameState.shuttle_trips.duplicate(true)
+	_my_trip(true)
+	var hub: PhobosHub = _hub()
+	var seen: Array[String] = _goes(hub)
+	var problems: Array[String] = []
+	if not hub._seen_trip:
+		problems.append("A hub opened on a trip has seen it.")
+	hub._on_trips_changed()
+	hub._process(10.0)
+	if not seen.is_empty():
+		problems.append("The hub stays while the trip is on: %s" % [seen])
+	_my_trip(false)
+	hub._on_trips_changed()
+	hub._on_trips_changed()
+	hub._process(10.0)
+	if seen != [SceneSwitcher.FARM_SCENE]:
+		problems.append("The hub goes home once when the trip ends: %s" % [seen])
+	_drop_hub(hub)
+	GameState.shuttle_trips = held
+	return "\n".join(problems)
+
+
+func test_the_hub_gives_a_late_trip_its_grace_and_the_host_leaves_after_it() -> String:
+	var held: Dictionary = GameState.shuttle_trips.duplicate(true)
+	_my_trip(false)
+	var hub: PhobosHub = _hub()
+	var seen: Array[String] = _goes(hub)
+	var problems: Array[String] = []
+	hub._process(PhobosHub.GRACE_S - 1.0)
+	if not seen.is_empty():
+		problems.append("No trip yet, inside the grace: the hub waits.")
+	_my_trip(true)
+	hub._on_trips_changed()
+	hub._process(PhobosHub.GRACE_S * 4.0)
+	if not seen.is_empty():
+		problems.append("A trip that came inside the grace keeps the hub open: %s" % [seen])
+	_drop_hub(hub)
+	_my_trip(false)
+	var empty: PhobosHub = _hub()
+	var left: Array[String] = _goes(empty)
+	empty._process(PhobosHub.GRACE_S + 0.5)
+	if left != [SceneSwitcher.FARM_SCENE]:
+		problems.append("On the host a hub with no trip after the grace goes home: %s" % [left])
+	_drop_hub(empty)
+	GameState.shuttle_trips = held
+	return "\n".join(problems)
+
+
+## Review A, scenario 2: the guest's hub is open but the farm send that carries the trip
+## is later than the grace. The hub asks the host, and stays.
+func test_a_guests_hub_asks_the_host_after_the_grace_and_stays_while_the_host_has_them_away() -> String:
+	var held: Dictionary = GameState.shuttle_trips.duplicate(true)
+	_my_trip(false)
+	var asked: Array = []
+	_host_says("", asked)
+	var hub: PhobosHub = _hub()
+	var seen: Array[String] = _goes(hub)
+	var problems: Array[String] = []
+	hub._process(PhobosHub.GRACE_S + 0.5)
+	if asked != [[&"report_place", [Shuttle.PHOBOS, 0]]]:
+		problems.append("The guest's hub asks the host where it is: %s" % [asked])
+	if not seen.is_empty():
+		problems.append("The host has them away: the guest stays on the moon, not %s" % [seen])
+	_my_trip(true)
+	hub._on_trips_changed()
+	hub._process(PhobosHub.GRACE_S * 4.0)
+	if not seen.is_empty() or asked.size() != 1:
+		problems.append("The late trip arrives: the hub stays and asks no more: %s, %d asks" % [seen, asked.size()])
+	_drop_hub(hub)
+	_guest_off()
+	GameState.shuttle_trips = held
+	return "\n".join(problems)
+
+
+func test_a_guests_hub_goes_home_when_the_host_says_they_are_not_away_but_not_for_no_answer() -> String:
+	var held: Dictionary = GameState.shuttle_trips.duplicate(true)
+	_my_trip(false)
+	var problems: Array[String] = []
+	var asked: Array = []
+	_host_says(Shuttle.text("not_away_text"), asked)
+	var hub: PhobosHub = _hub()
+	var seen: Array[String] = _goes(hub)
+	hub._process(PhobosHub.GRACE_S + 0.5)
+	if seen != [SceneSwitcher.FARM_SCENE]:
+		problems.append("The host says not away: home, got %s" % [seen])
+	_drop_hub(hub)
+	_guest_off()  # no host to ask: "Not connected to the host."
+	FarmCommands.guest = true
+	var silent: PhobosHub = _hub()
+	var stayed: Array[String] = _goes(silent)
+	silent._process(PhobosHub.GRACE_S + 0.5)
+	if not stayed.is_empty():
+		problems.append("No answer from the host is not 'not away': the guest stays, got %s" % [stayed])
+	_drop_hub(silent)
+	_guest_off()
+	GameState.shuttle_trips = held
+	return "\n".join(problems)
+
+
+## Review A, scenario 1: the booking answer never reached the guest, so its screen is
+## still the farm. Its synced trip (the host's word) takes it to the hub.
+func test_a_guest_still_on_the_farm_with_a_trip_goes_to_the_moons_hub() -> String:
+	var trip: Dictionary = { "moon": Shuttle.PHOBOS, "ends_at": TRIP_FAR }
+	var problems: Array[String] = []
+	for path: String in [SceneSwitcher.FARM_SCENE, SceneSwitcher.DOME_SCENE]:
+		if Shuttle.hub_to_join(trip, path) != SceneSwitcher.PHOBOS_SCENE:
+			problems.append("A trip and the screen at %s: the hub." % path)
+	for case: Array in [[trip, SceneSwitcher.PHOBOS_SCENE], [null, SceneSwitcher.FARM_SCENE], [trip, SceneSwitcher.TITLE_SCENE],
+			[trip, SceneSwitcher.TUNNELS_SCENE], ["junk", SceneSwitcher.FARM_SCENE], [{ "moon": Shuttle.DEIMOS }, SceneSwitcher.FARM_SCENE]]:
+		if Shuttle.hub_to_join(case[0], str(case[1])) != "":
+			problems.append("%s must stay where it is." % [case])
+	if not GameState.shuttle_trips_changed.is_connected(SceneSwitcher.reconcile_trip) or SceneSwitcher.scene_swapped.get_connections().is_empty():
+		problems.append("The reconciler runs on a trip change and on a scene swap.")
+	if SceneSwitcher.reconcile_trip() != "":
+		problems.append("Only a guest's screen is reconciled; the host's own trip is its own.")
+	return "\n".join(problems)
+
+
+# --- The booking panel -------------------------------------------------------------------------------
+
+func test_a_booking_that_goes_through_opens_the_moons_hub_and_a_refusal_or_a_gone_panel_does_not() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var problems: Array[String] = []
+	var asked: Array = []
+	for case: Array in [["", [SceneSwitcher.PHOBOS_SCENE]], ["No seat.", []], ["gone", []]]:
+		var ui := ShuttleUI.new()
+		tree.root.add_child(ui)
+		ui.open()
+		var seen: Array[String] = []
+		ui.change_scene = func(path: String) -> void: seen.append(path)
+		FarmCommands.guest = true
+		var answer: String = "" if case[0] == "gone" else str(case[0])
+		var leaves: bool = case[0] == "gone"
+		FarmCommands.remote = func(action: StringName, arguments: Array) -> Variant:
+			asked.append([action, arguments])
+			if leaves:
+				tree.root.remove_child(ui)  # the panel left the tree during the ask
+			return answer
+		await ui._on_book(Shuttle.PHOBOS)
+		if seen != case[1]:
+			problems.append("Answer '%s': the screen goes to %s, not %s" % [case[0], case[1], seen])
+		if ui.get_parent() != null:
+			tree.root.remove_child(ui)
+		ui.free()
+	_guest_off()
+	if ZoneData.hub_scene(&"phobos") != SceneSwitcher.PHOBOS_SCENE:
+		problems.append("The booking uses the moon's hub scene from the zone data.")
+	if asked.size() != 3 or asked[0] != [&"book_shuttle", [Shuttle.PHOBOS, ShuttleUI.PARTY]]:
+		problems.append("The panel asks the host to book: %s" % [asked])
+	return "\n".join(problems)
+
+
+# --- Load and save --------------------------------------------------------------------------------------
+
+func test_a_restored_farm_opens_the_hub_for_the_hosts_own_running_trip_only() -> String:
+	var me: String = GameState.local_player_id
+	var held: Dictionary = bytes_to_var(var_to_bytes(SaveGame.snapshot()))
+	var held_open: bool = SaveGame.farm_open
+	var problems: Array[String] = []
+	GameState.shuttle_trips = { me: { "moon": Shuttle.PHOBOS, "ends_at": GameClock.elapsed_days + 0.1 } }
+	GameState.player_places[me] = [Shuttle.PHOBOS, 0]
+	var data: Dictionary = bytes_to_var(var_to_bytes(SaveGame.snapshot()))
+	data["farm"]["shuttle_trips"][GUEST] = { "moon": Shuttle.PHOBOS, "ends_at": GameClock.elapsed_days + 0.1 }
+	var problem: String = SaveGame.restore(data)
+	if problem != "" or SaveGame.open_scene != SceneSwitcher.PHOBOS_SCENE:
+		problems.append("A save with the host away opens the hub: '%s', %s" % [problem, SaveGame.open_scene])
+	if not GameState.shuttle_trips.has(me) or GameState.shuttle_trips.has(GUEST):
+		problems.append("The host's trip stays and a guest's is dropped: %s" % [GameState.shuttle_trips.keys()])
+	data["farm"]["shuttle_trips"][me]["ends_at"] = float(data["clock"]["elapsed_days"]) - 0.01
+	problem = SaveGame.restore(data)
+	if problem != "" or SaveGame.open_scene != SceneSwitcher.FARM_SCENE or not GameState.shuttle_trips.is_empty():
+		problems.append("A save past the trip's end opens the farm: '%s', %s" % [problem, SaveGame.open_scene])
+	SaveGame.restore(held)
+	SaveGame.farm_open = held_open
+	return "\n".join(problems)
+
+
+func test_a_load_drops_another_players_trip_and_keeps_the_hosts() -> String:
+	var gs: GameStateScript = _state(500)
+	var problems: Array[String] = []
+	_away(gs, GameClock.elapsed_days + 0.2, HOST)
+	_away(gs, GameClock.elapsed_days + 0.2, GUEST)
+	gs._settle_trips_on_load()
+	if not gs.shuttle_trips.has(HOST) or gs.shuttle_trips.has(GUEST):
+		problems.append("The host's trip goes on, the guest's is dropped: %s" % [gs.shuttle_trips.keys()])
+	if gs.place_of(HOST) != Shuttle.PHOBOS:
+		problems.append("The host is still on the moon.")
+	_done(gs)
+	return "\n".join(problems)
+
+
+# --- Returns, spots and the walker's silence --------------------------------------------------------------
+
+## Review B, scenario 1: the guest's screen needs longer than SILENT_MS to learn of the end
+## and load the farm; the host must not take it for gone.
+func test_a_returned_traveller_is_not_put_back_in_the_rover_before_it_has_spoken() -> String:
+	var gs: GameStateScript = _state(500)
+	var held_players: Array[String] = CoopSession.players.duplicate()
+	CoopSession.players = [HOST, GUEST]
+	var problems: Array[String] = []
+	_away(gs, GameClock.elapsed_days + 0.2, GUEST)
+	var then: int = Time.get_ticks_msec()
+	if gs.shuttle_home(GUEST) != "" or not CoopWalkers.is_out(GUEST):
+		problems.append("The guest stands at the pad.")
+	CoopWalkers.tick(then + CoopWalkers.SILENT_MS * 4)
+	if not CoopWalkers.is_out(GUEST):
+		problems.append("Twenty seconds on, with the guest still loading: it is still on foot.")
+	var said: String = gs.report_place(ZonePresence.FARM, 0, GUEST)
+	if said != "" or CoopWalkers._heard_at[GUEST] > Time.get_ticks_msec():
+		problems.append("The guest's first farm report starts the silence clock: '%s'" % said)
+	CoopWalkers.tick(Time.get_ticks_msec() + CoopWalkers.SILENT_MS + 1000)
+	if CoopWalkers.is_out(GUEST):
+		problems.append("A guest silent after its report is back in the rover.")
+	CoopSession.players = held_players
+	_done(gs)
+	return "\n".join(problems)
+
+
+## Review B, scenario 2, decided: with the field rover away there is nothing to stand
+## beside, so the traveller is put on the farm with no walker.
+func test_a_traveller_back_while_the_rover_is_away_is_at_the_farm_but_not_on_foot() -> String:
+	var gs: GameStateScript = _state(500)
+	var problems: Array[String] = []
+	_away(gs, GameClock.elapsed_days + 0.2, GUEST)
+	gs.rover_zone = "tunnels"
+	gs.rover_lent = true
+	if gs.shuttle_home(GUEST) != "":
+		problems.append("The way home is open.")
+	if gs.place_of(GUEST) != ZonePresence.FARM or gs.shuttle_trips.has(GUEST):
+		problems.append("The guest is at the farm with no trip.")
+	if CoopWalkers.is_out(GUEST):
+		problems.append("No walker is stood beside a rover that is away.")
+	gs.rover_lent = false
+	gs.rover_zone = ""
+	_done(gs)
+	return "\n".join(problems)
+
+
+func test_the_return_spot_is_the_pads_when_dry_and_never_in_deep_water() -> String:
+	var gs: GameStateScript = _state(500)
+	var spot: Vector3 = gs._pad_spot()
+	var problems: Array[String] = []
+	if Vector2(spot.x - Shuttle.RETURN_AT.x, spot.z - Shuttle.RETURN_AT.y).length() > 0.01 and not Terrain.is_deep(Shuttle.RETURN_AT):
+		problems.append("A dry return spot is used as it is: %s" % spot)
+	if Terrain.is_deep(Vector2(spot.x, spot.z)):
+		problems.append("The walker is never stood in deep water.")
+	_done(gs)
+	return "\n".join(problems)
+
+
+func test_a_report_of_a_moon_with_a_depth_is_refused_and_a_traveller_cannot_go_to_bed() -> String:
+	var gs: GameStateScript = _state(500)
+	var commands: Node = _commands(gs)
+	var problems: Array[String] = []
+	_away(gs, GameClock.elapsed_days + 0.2)
+	var deep: String = gs.report_place(Shuttle.PHOBOS, 3, HOST)
+	if deep == "" or gs.depth_of(HOST) != 0 or gs.place_of(HOST) != Shuttle.PHOBOS:
+		problems.append("A moon has no depth: '%s', %d" % [deep, gs.depth_of(HOST)])
+	var bed: Variant = commands.execute(HOST, &"go_to_bed", [])
+	if bed != FarmCommands.MOON_REFUSAL:
+		problems.append("A traveller on a moon cannot go to bed: '%s'" % bed)
+	commands.free()
+	_done(gs)
 	return "\n".join(problems)
