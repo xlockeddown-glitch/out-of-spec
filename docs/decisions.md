@@ -14,6 +14,15 @@ One camp, in the Lava Tubes hub: shut until Two Sunsets is taken, supplies from 
 - Chosen where the brief left it open: a second ask while asleep is not a second night; a camper is exempt only while in bed, and the exemption ends at 06:00; a guest who drops while camped is forgotten (no refund of the supply); a late joiner gets `camps_open` and the supplies with the farm sync; the host now refuses a guest going to bed in any zone but an open camp; the camp is used from the rover.
 - PROTOCOL 35 to 36, once, because of the new command (`buy_camp_supplies`) and the synced fields.
 
+## 2026-11-27: Flooded Aquifer look (feat/aquifer-look)
+
+Restyled the Flooded Aquifer's pools, pump crate, and notice sign in `scripts/world/flooded_aquifer.gd` using `TunnelLook` constants and primitive builders (part 3 of the tunnel look; walls came from PR 242). Looks only — no changes to `AquiferDepth` rules, pool boxes, `is_shallow`, `buy_pump`, collision shapes/layers, node names, or `PROTOCOL`. Every colour, size, and hash choice is a [PLACEHOLDER]:
+
+- **Palette (`TunnelLook`):** added `FROST`, `WET_STONE`, `SILT`, `SILT_DARK`, `WATER_SHALLOW`, `WATER_DEEP`, and `HOSE`, plus `TunnelLook.flat_mat_unique()` for per-instance mutable materials.
+- **Pools:** each pool slab (`Pool_<id>`) gets its own fresh `StandardMaterial3D` via `flat_mat_unique()` (shallow translucent aqua `SHALLOW_ALPHA = 0.68`, deep dark cavern water `DEEP_ALPHA = 0.88`, drained opaque damp `SILT`) so mutating or draining one pool never leaks into another pool or `TunnelLook`'s shared cache. Deterministic coordinate-hash (`_hash()`) wet-stone & frost rim curbing, submerged stepping stones (shallow), dark basin liner (deep), mud pockets/pebbles (drained), nearby floor frost plates, and one cool `PoolGlow` `OmniLight3D` over the hub pool (`HUB_POOL_LIGHT_ENERGY = 0.6`, `HUB_POOL_LIGHT_RANGE_M = 8.0`).
+- **Hub props:** `PumpCrate` rebuilt on pallet skids with steel corner posts, brass trim strip, coiled rubber hose, and a stem-mounted pressure gauge; `NoticeSign` reuses `LavaHubProps.board_node("Vance: [later]")` with a light frost cap and frosted footplates.
+- **Tests:** `tests/test_aquifer_look.gd` verifies deterministic pool builds, isolated per-pool materials with zero cache leak, preserved named nodes, and unchanged collision/holds.
+
 ## 2026-11-27: The Flooded Aquifer (zones step 13)
 
 Hub, depth 1, pump and water hazard, all from primitives. No pressure drop, wet-pack spoilage, quests or walkers yet; Vance's notice reads "[later]". Every number and look below is a [PLACEHOLDER] for Ryan to tune:

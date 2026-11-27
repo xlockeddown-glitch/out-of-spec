@@ -19,6 +19,14 @@ const BRASS: Color = ScopeTheme.AMBER
 const REGOLITH: Color = ScopeTheme.TERRA
 const REGOLITH_DARK: Color = ScopeTheme.TERRA_DARK
 const ICE: Color = ScopeTheme.INK
+## Flooded Aquifer cold/wet palette tones [PLACEHOLDER].
+const FROST := Color(0.76, 0.87, 0.92)
+const WET_STONE := Color(0.18, 0.23, 0.28)
+const SILT := Color(0.28, 0.26, 0.25)
+const SILT_DARK := Color(0.20, 0.19, 0.20)
+const WATER_SHALLOW := Color(0.24, 0.64, 0.68)
+const WATER_DEEP := Color(0.09, 0.27, 0.36)
+const HOSE := Color(0.22, 0.24, 0.27)
 const CREAM: Color = ScopeTheme.ENAMEL_TOP
 const CRYSTAL: Color = ScopeTheme.TEAL
 const BROKEN_RED: Color = ScopeTheme.RED
@@ -57,6 +65,15 @@ static func flat_mat(color: Color) -> StandardMaterial3D:
 	material.albedo_color = color
 	material.roughness = MATTE_ROUGHNESS
 	_flat_cache[color] = material
+	return material
+
+
+## Fresh (uncached) flat-matte StandardMaterial3D for callers that mutate alpha,
+## roughness, or albedo per instance (e.g. FloodedAquifer pools).
+static func flat_mat_unique(color: Color, roughness: float = MATTE_ROUGHNESS) -> StandardMaterial3D:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = roughness
 	return material
 
 

@@ -9,6 +9,15 @@ const CRATE: String = "crate"
 const SIGN: String = "sign"
 const POOL: String = "pool"
 
+## Pool water & silt material parameters [PLACEHOLDER].
+const SHALLOW_ALPHA: float = 0.68
+const DEEP_ALPHA: float = 0.88
+const SHALLOW_ROUGHNESS: float = 0.25
+const DEEP_ROUGHNESS: float = 0.18
+const SILT_ROUGHNESS: float = 0.72
+const HUB_POOL_LIGHT_ENERGY: float = 0.6
+const HUB_POOL_LIGHT_RANGE_M: float = 8.0
+
 ## The pools drained when this scene was built; the pump changing them builds it again.
 var _built_drained: Array = []
 var _water: Node3D
@@ -41,45 +50,225 @@ func _build_zone() -> void:
 		_draw_sign()
 
 
-## A pool: a slab of water (lighter where it is shallow, dark where it is deep), or the
-## mud it leaves when drained. Pure looks.
+## Deterministic integer hash from cell/pool coordinates (no global RNG) [PLACEHOLDER].
+static func _hash(x: int, y: int, salt: int = 0) -> int:
+	var h: int = (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
+	h = ((h >> 16) ^ h) * 0x45d9f3b
+	return absi((h >> 16) ^ h)
+
+
+## A pool: translucent cold water (brighter shallow vs dark deep) or damp silt
+## when drained, framed by wet-stone & ice rims and nearby frost patches. Pure
+## looks; each pool gets its own unique surface material so draining or mutating
+## one pool never leaks into another pool or TunnelLook's shared cache.
 func _draw_pool(pool: Dictionary, pool_id: String) -> void:
 	var box: Rect2 = AquiferDepth.pool_metres(pool)
+	var rect: Rect2i = pool["rect"]
 	var drained: bool = bool(pool["drained"])
-	var material: StandardMaterial3D = LavaHubProps._flat(ScopeTheme.TERRA_DARK.lerp(ScopeTheme.GLASS_DEEP, 0.5)) if drained \
-			else LavaHubProps._flat(ScopeTheme.TEAL.lerp(ScopeTheme.GLASS_DEEP, 0.35 if AquiferDepth.is_shallow(pool) else 0.75))
-	if not drained:
+	var shallow: bool = AquiferDepth.is_shallow(pool)
+	var centre: Vector2 = box.get_center()
+
+	var material: StandardMaterial3D
+	if drained:
+		material = TunnelLook.flat_mat_unique(TunnelLook.SILT, SILT_ROUGHNESS)
+	elif shallow:
+		material = TunnelLook.flat_mat_unique(TunnelLook.WATER_SHALLOW, SHALLOW_ROUGHNESS)
 		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-		material.albedo_color.a = 0.8
-	var slab: MeshInstance3D = LavaHubProps._part(LavaHubProps._box(Vector3(box.size.x, 0.05, box.size.y)),
-			Vector3(box.get_center().x, 0.03, box.get_center().y), material)
+		material.albedo_color.a = SHALLOW_ALPHA
+	else:
+		material = TunnelLook.flat_mat_unique(TunnelLook.WATER_DEEP, DEEP_ROUGHNESS)
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.albedo_color.a = DEEP_ALPHA
+
+	var slab: MeshInstance3D = TunnelLook.part(TunnelLook.box(Vector3(box.size.x, 0.05, box.size.y)),
+			Vector3(centre.x, 0.03, centre.y), material)
 	slab.name = "Pool_" + pool_id
 	_water.add_child(slab)
-	if pool_id != "":
-		var text: String = "%s %s" % [pool_id.to_upper(), "DRAINED" if drained else ("WADE" if AquiferDepth.is_shallow(pool) else "DEEP")]
-		_water.add_child(LavaHubProps._label(text, Vector3(box.get_center().x, 1.3, box.get_center().y)))
+
+	var trim := Node3D.new()
+	trim.name = "PoolTrim_" + pool_id
+	_water.add_child(trim)
+	_add_pool_rim(trim, box, rect)
+	_add_pool_bed_detail(trim, box, rect, drained, shallow)
+	_add_pool_frost(trim, box, rect)
+
+	if pool_id == "":
+		var glow := OmniLight3D.new()
+		glow.name = "PoolGlow"
+		glow.position = Vector3(centre.x, 1.4, centre.y)
+		glow.light_color = TunnelLook.FROST
+		glow.light_energy = HUB_POOL_LIGHT_ENERGY
+		glow.omni_range = HUB_POOL_LIGHT_RANGE_M
+		trim.add_child(glow)
+	else:
+		var text: String = "%s %s" % [pool_id.to_upper(), "DRAINED" if drained else ("WADE" if shallow else "DEEP")]
+		_water.add_child(TunnelLook.label(text, Vector3(centre.x, 1.3, centre.y), TunnelLook.CRYSTAL))
 
 
-## The crate that sells the pump: a box with an amber band and a sign.
+## Stepped wet-stone and ice curbing hugging the four edges of a pool [PLACEHOLDER].
+func _add_pool_rim(parent: Node3D, box: Rect2, rect: Rect2i) -> void:
+	var wet_mat: Material = TunnelLook.flat_mat(TunnelLook.WET_STONE)
+	var ice_mat: Material = TunnelLook.flat_mat(TunnelLook.FROST)
+	var dark_mat: Material = TunnelLook.flat_mat(TunnelLook.BASALT_DARK)
+	var step_m: float = 1.15
+	var rim_w: float = 0.24
+	var idx: int = 0
+
+	# North & south edges.
+	var cols: int = maxi(int(round(box.size.x / step_m)), 2)
+	var seg_x: float = box.size.x / float(cols)
+	for side: float in [-1.0, 1.0]:
+		var z: float = box.get_center().y + side * (box.size.y * 0.5 + rim_w * 0.35)
+		for i: int in cols:
+			var h_val: int = _hash(rect.position.x + i, rect.position.y + int(side), idx)
+			idx += 1
+			var x: float = box.position.x + (float(i) + 0.5) * seg_x
+			var height: float = 0.07 + float(h_val % 4) * 0.02
+			var mat: Material = ice_mat if (h_val % 3 == 0) else (wet_mat if (h_val % 3 == 1) else dark_mat)
+			parent.add_child(TunnelLook.part(TunnelLook.box(Vector3(seg_x * 0.92, height, rim_w)),
+					Vector3(x, height * 0.5, z), mat))
+
+	# West & east edges.
+	var rows: int = maxi(int(round(box.size.y / step_m)), 2)
+	var seg_z: float = box.size.y / float(rows)
+	for side: float in [-1.0, 1.0]:
+		var x: float = box.get_center().x + side * (box.size.x * 0.5 + rim_w * 0.35)
+		for j: int in rows:
+			var h_val: int = _hash(rect.position.x + int(side), rect.position.y + j, 100 + idx)
+			idx += 1
+			var z: float = box.position.y + (float(j) + 0.5) * seg_z
+			var height: float = 0.07 + float(h_val % 4) * 0.02
+			var mat: Material = ice_mat if (h_val % 3 == 0) else wet_mat
+			parent.add_child(TunnelLook.part(TunnelLook.box(Vector3(rim_w, height, seg_z * 0.92)),
+					Vector3(x, height * 0.5, z), mat))
+
+
+## Surface & bed details that differentiate drained silt, shallow wading, and deep water [PLACEHOLDER].
+func _add_pool_bed_detail(parent: Node3D, box: Rect2, rect: Rect2i, drained: bool, shallow: bool) -> void:
+	var centre: Vector2 = box.get_center()
+	if drained:
+		var mud_mat: Material = TunnelLook.flat_mat(TunnelLook.SILT_DARK)
+		var pebble_mat: Material = TunnelLook.flat_mat(TunnelLook.WET_STONE)
+		var ice_mat: Material = TunnelLook.flat_mat(TunnelLook.ICE)
+		for i: int in 5:
+			var hx: int = _hash(rect.position.x, rect.position.y, 200 + i * 2)
+			var hz: int = _hash(rect.position.x, rect.position.y, 201 + i * 2)
+			var ox: float = (float(hx % 100) / 100.0 - 0.5) * (box.size.x - 1.0)
+			var oz: float = (float(hz % 100) / 100.0 - 0.5) * (box.size.y - 1.0)
+			var w: float = 0.55 + float(hx % 5) * 0.14
+			var d: float = 0.45 + float(hz % 5) * 0.12
+			parent.add_child(TunnelLook.part(TunnelLook.box(Vector3(w, 0.03, d)),
+					Vector3(centre.x + ox, 0.055, centre.y + oz), mud_mat))
+			if i < 3:
+				var p_mat: Material = ice_mat if i == 0 else pebble_mat
+				parent.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.24, 0.08, 0.22)),
+						Vector3(centre.x - ox * 0.7, 0.07, centre.y - oz * 0.7), p_mat, Vector3(0.0, float(hx % 45), 0.0)))
+	elif shallow:
+		var stone_mat: Material = TunnelLook.flat_mat(TunnelLook.WET_STONE)
+		var mid_mat: Material = TunnelLook.flat_mat(TunnelLook.BASALT_MID)
+		for i: int in 4:
+			var hx: int = _hash(rect.position.x, rect.position.y, 300 + i * 2)
+			var hz: int = _hash(rect.position.x, rect.position.y, 301 + i * 2)
+			var ox: float = (float(hx % 100) / 100.0 - 0.5) * (box.size.x - 1.2)
+			var oz: float = (float(hz % 100) / 100.0 - 0.5) * (box.size.y - 1.2)
+			var mat: Material = stone_mat if (i % 2 == 0) else mid_mat
+			parent.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.58, 0.03, 0.48)),
+					Vector3(centre.x + ox, 0.015, centre.y + oz), mat, Vector3(0.0, float(hx % 30), 0.0)))
+	else:
+		# Deep basin dark liner + faint cold inner contour to read as deep water [PLACEHOLDER].
+		var liner_w: float = maxf(box.size.x - 0.5, 0.5)
+		var liner_d: float = maxf(box.size.y - 0.5, 0.5)
+		parent.add_child(TunnelLook.part(TunnelLook.box(Vector3(liner_w, 0.02, liner_d)),
+				Vector3(centre.x, 0.008, centre.y), TunnelLook.flat_mat(TunnelLook.BASALT_DARK)))
+		parent.add_child(TunnelLook.part(TunnelLook.box(Vector3(liner_w * 0.72, 0.015, liner_d * 0.72)),
+				Vector3(centre.x, 0.014, centre.y), TunnelLook.flat_mat(TunnelLook.WATER_DEEP.darkened(0.35))))
+
+
+## Thin frost and rime plates clinging to the rock floor just outside the pool rim [PLACEHOLDER].
+func _add_pool_frost(parent: Node3D, box: Rect2, rect: Rect2i) -> void:
+	var frost_mat: Material = TunnelLook.flat_mat(TunnelLook.FROST)
+	var ice_mat: Material = TunnelLook.flat_mat(TunnelLook.ICE)
+	var centre: Vector2 = box.get_center()
+	for i: int in 6:
+		var h: int = _hash(rect.position.x, rect.position.y, 400 + i)
+		var edge: int = i % 4
+		var t: float = (float((h >> 3) % 80) / 100.0) - 0.4
+		var out: float = 0.34 + float(h % 4) * 0.11
+		var px: float = centre.x
+		var pz: float = centre.y
+		if edge == 0:
+			px += t * box.size.x
+			pz -= box.size.y * 0.5 + out
+		elif edge == 1:
+			px += t * box.size.x
+			pz += box.size.y * 0.5 + out
+		elif edge == 2:
+			px -= box.size.x * 0.5 + out
+			pz += t * box.size.y
+		else:
+			px += box.size.x * 0.5 + out
+			pz += t * box.size.y
+		var w: float = 0.44 + float((h >> 6) % 4) * 0.14
+		var d: float = 0.36 + float((h >> 9) % 4) * 0.12
+		var mat: Material = frost_mat if (i % 2 == 0) else ice_mat
+		parent.add_child(TunnelLook.part(TunnelLook.box(Vector3(w, 0.025, d)),
+				Vector3(px, 0.014, pz), mat, Vector3(0.0, float(h % 35) - 17.0, 0.0)))
+
+
+## The crate that sells the pump: pallet skids, steel-framed regolith crate,
+## brass collar, coiled rubber hose, pressure gauge, and label [PLACEHOLDER].
 func _draw_crate() -> void:
 	var crate := Node3D.new()
 	crate.name = "PumpCrate"
 	crate.position = AquiferDepth.crate_position()
 	_depth_props.add_child(crate)
-	crate.add_child(LavaHubProps._part(LavaHubProps._box(Vector3(1.2, 0.9, 0.9)), Vector3(0.0, 0.45, 0.0), LavaHubProps._flat(ScopeTheme.TERRA)))
-	crate.add_child(LavaHubProps._part(LavaHubProps._box(Vector3(1.25, 0.12, 0.95)), Vector3(0.0, 0.6, 0.0), LavaHubProps._glow(ScopeTheme.AMBER, 0.6)))
-	crate.add_child(LavaHubProps._label("PUMP CRATE", Vector3(0.0, 1.6, 0.0)))
+	var dark_mat: Material = TunnelLook.flat_mat(TunnelLook.BASALT_DARK)
+	var steel_mat: Material = TunnelLook.flat_mat(TunnelLook.STEEL)
+	var body_mat: Material = TunnelLook.flat_mat(TunnelLook.REGOLITH)
+	var wood_mat: Material = TunnelLook.flat_mat(TunnelLook.TIMBER)
+	var brass_mat: Material = TunnelLook.flat_mat(TunnelLook.BRASS)
+	var hose_mat: Material = TunnelLook.flat_mat(TunnelLook.HOSE)
+	var cream_mat: Material = TunnelLook.flat_mat(TunnelLook.CREAM)
+
+	# Pallet base & runners.
+	for z_off: float in [-0.36, 0.36]:
+		crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.38, 0.08, 0.16)), Vector3(0.0, 0.04, z_off), dark_mat))
+	crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.42, 0.06, 1.04)), Vector3(0.0, 0.11, 0.0), wood_mat))
+
+	# Main crate housing + corner steel frame posts + brass band.
+	crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.16, 0.78, 0.84)), Vector3(0.0, 0.53, 0.0), body_mat))
+	for sx: float in [-0.57, 0.57]:
+		for sz: float in [-0.41, 0.41]:
+			crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.10, 0.84, 0.10)), Vector3(sx, 0.54, sz), steel_mat))
+	crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.26, 0.10, 0.94)), Vector3(0.0, 0.62, 0.0), TunnelLook.glow_mat(TunnelLook.BRASS, 0.5)))
+	crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.22, 0.08, 0.90)), Vector3(0.0, 0.96, 0.0), steel_mat))
+
+	# Coiled pump hose resting on the crate top with a brass coupling.
+	crate.add_child(TunnelLook.part(TunnelLook.cylinder(0.28, 0.08), Vector3(-0.22, 1.04, 0.0), hose_mat))
+	crate.add_child(TunnelLook.part(TunnelLook.cylinder(0.24, 0.08), Vector3(-0.22, 1.11, 0.0), hose_mat))
+	crate.add_child(TunnelLook.part(TunnelLook.cylinder(0.12, 0.16), Vector3(-0.22, 1.08, 0.0), dark_mat))
+	crate.add_child(TunnelLook.part(TunnelLook.cylinder(0.06, 0.18), Vector3(0.04, 1.08, 0.16), brass_mat, Vector3(0.0, 0.0, 90.0)))
+
+	# Pressure gauge on a brass stem.
+	crate.add_child(TunnelLook.part(TunnelLook.cylinder(0.04, 0.22), Vector3(0.34, 1.10, 0.18), brass_mat))
+	crate.add_child(TunnelLook.part(TunnelLook.cylinder(0.13, 0.06), Vector3(0.34, 1.24, 0.18), brass_mat, Vector3(90.0, 0.0, 0.0)))
+	crate.add_child(TunnelLook.part(TunnelLook.cylinder(0.10, 0.07), Vector3(0.34, 1.24, 0.18), cream_mat, Vector3(90.0, 0.0, 0.0)))
+	crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.03, 0.09, 0.08)), Vector3(0.35, 1.26, 0.18), TunnelLook.flat_mat(TunnelLook.CRYSTAL), Vector3(0.0, 0.0, -28.0)))
+
+	crate.add_child(TunnelLook.label("PUMP CRATE", Vector3(0.0, 1.65, 0.0), TunnelLook.CRYSTAL))
 
 
-## The notice board sign: a post and a board. Vance's notice is for later.
+## The notice board sign: matches the Lava hub's notice board with a light coat
+## of Aquifer frost on the cap and footplates. Vance's notice is for later [PLACEHOLDER].
 func _draw_sign() -> void:
-	var board := Node3D.new()
+	var board: Node3D = LavaHubProps.board_node("Vance: [later]")
 	board.name = "NoticeSign"
 	board.position = AquiferDepth.sign_position()
 	_depth_props.add_child(board)
-	board.add_child(LavaHubProps._part(LavaHubProps._box(Vector3(0.12, 1.6, 0.12)), Vector3(0.0, 0.8, 0.0), LavaHubProps._flat(ScopeTheme.INK_DIM)))
-	board.add_child(LavaHubProps._part(LavaHubProps._box(Vector3(1.4, 0.7, 0.08)), Vector3(0.0, 1.6, 0.0), LavaHubProps._flat(ScopeTheme.ENAMEL)))
-	board.add_child(LavaHubProps._label("Vance: [later]", Vector3(0.0, 2.3, 0.0)))
+	var frost_mat: Material = TunnelLook.flat_mat(TunnelLook.FROST)
+	board.add_child(TunnelLook.part(TunnelLook.box(Vector3(2.04, 0.04, 0.18)), Vector3(0.0, 1.74, 0.0), frost_mat))
+	for x: float in [-0.82, 0.82]:
+		board.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.34, 0.03, 0.34)), Vector3(x, 0.018, 0.0), frost_mat))
 
 
 func _process(_delta: float) -> void:
