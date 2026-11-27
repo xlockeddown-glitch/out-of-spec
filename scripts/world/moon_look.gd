@@ -151,7 +151,8 @@ static func add_outer_rocks(parent: Node3D, moon_salt: int, boulder_col: Color, 
 	for i: int in count:
 		var h: int = hash_int(i * 7, moon_salt, 100 + i)
 		var angle: float = TAU * float(i) / float(count) + float(h % 20) * 0.015
-		var dist: float = 25.0 + float((h >> 4) % 9)
+		# Past PhobosWalker.EDGE_M (34 m) plus the rock's half-depth, so no one walks through a rock.
+		var dist: float = PhobosWalker.EDGE_M + 2.0 + float((h >> 4) % 3) * 0.5
 		var px: float = cos(angle) * dist
 		var pz: float = sin(angle) * dist
 		var w: float = 1.4 + float((h >> 7) % 5) * 0.45
