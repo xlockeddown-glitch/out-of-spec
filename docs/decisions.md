@@ -2,6 +2,10 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-26: Surface biomes proposal (design only)
+
+Ryan after playtesting: the map needs a better layout, with biomes and the farm at the centre. `docs/design/biomes.md` proposes five surface biomes (Lab Quarter, Badlands, Basalt Ridge, Frost Flats, Landing Field) joined to zone entrances, two layouts, one big scene, props moved but ground not. No code or data changed; 12 open questions await Ryan.
+
 ## 2026-11-26: The 02:00 rescue for guests (zones sections 6.1 and 12.4)
 
 The recall now covers every connected guest the host has below. Everything is a [PLACEHOLDER] or an [ASSUMPTION] unless Ryan says otherwise; the numbers and words are still `economy.json` `tunnel_recall`.
