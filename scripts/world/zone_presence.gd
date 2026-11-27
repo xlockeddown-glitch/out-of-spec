@@ -23,6 +23,8 @@ static func is_place(place: String) -> bool:
 static func _max_depth(place: String) -> int:
 	if place == AquiferDepth.ZONE:
 		return AquiferDepth.MAX_DEPTH
+	if place == IceDepth.ZONE:
+		return IceDepth.MAX_DEPTH
 	return MineDepth.MAX_DEPTH if place == MineDepth.ZONE else MAX_DEPTH
 
 
@@ -58,7 +60,7 @@ static func for_scene(path: String) -> Array:
 		return [DOME, 0]
 	for id: StringName in ZoneData.ids():
 		if path != "" and ZoneData.hub_scene(id) == path:
-			return [String(id), ZoneDepth.local_depth if String(id) in [ZoneDepth.ZONE, AquiferDepth.ZONE, MineDepth.ZONE] else 0]
+			return [String(id), ZoneDepth.local_depth if String(id) in [ZoneDepth.ZONE, AquiferDepth.ZONE, MineDepth.ZONE, IceDepth.ZONE] else 0]
 	return []
 
 

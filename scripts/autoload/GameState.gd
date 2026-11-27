@@ -17,6 +17,7 @@ signal beacons_changed
 ## A find was taken below the Lava Tubes.
 signal finds_changed
 signal pump_changed  # the farm's pump was bought, or a pool was pumped dry
+signal ice_changed  # the Ice Caves' cold stamps changed (someone came in, left, or bought a heater)
 signal mine_changed  # the Colony Mine's gate opened, shoring props were bought, or a room was shored
 signal camps_changed  # a camp was opened for the farm, or its supplies were bought or used
 ## A lift was repaired, or the deepest depth reached in a zone grew.
@@ -221,6 +222,9 @@ var mine_gate_open: bool = false
 var mine_props: int = 0
 ## The Mine's rooms shored today: zone id -> { "day": int, "ids": [rockfall ids] }, like pools_drained.
 var rooms_shored: Dictionary = {}
+## The Ice Caves' cold, per player: player id -> the GameClock.elapsed_days stamp the cold counts from
+## (when they came in, or last bought a heater). Host-run, saved, synced; IceDepth.cold reads it.
+var cold_since: Dictionary = {}
 ## The lift stations repaired, for good: zone id -> Array of the depths (ZoneDepth).
 ## Never reset, never expires. Shared by the farm.
 var lifts_repaired: Dictionary = {}
@@ -327,7 +331,7 @@ var rover_zone: String = "":
 		rover_zone = value
 		# Depth is only below the Lava Tubes: it goes when the rover really leaves them
 		# (setting the same zone again, as a load does, keeps it).
-		if value != old and value != TUNNELS_ZONE and value != AquiferDepth.ZONE and value != MineDepth.ZONE:
+		if value != old and value != TUNNELS_ZONE and value != AquiferDepth.ZONE and value != MineDepth.ZONE and value != IceDepth.ZONE:
 			rover_depth = 0
 		if value != old:
 			zone_heat_trip = false  # a heat trip is one rover trip: every way the rover leaves or arrives ends it
@@ -388,6 +392,11 @@ const MINE_PAD: Vector3 = Vector3(12.0, 0.0, -34.0)
 ## a rover that is told to go in is never refused for distance [PLACEHOLDER].
 const MINE_TRIGGER_OFFSET: Vector3 = Vector3(0.0, 0.0, 1.5)
 const MINE_TRIGGER_SIZE: Vector3 = Vector3(5.0, 3.0, 3.0)
+## Where the farm's rover goes into the Ice Caves: a ramp at the map's north edge [PLACEHOLDER]. Within
+## TUNNEL_PAD_REACH_M of it the rover is on the pad; the trigger box sits in front of the ramp, as the Mine's.
+const ICE_PAD: Vector3 = Vector3(-12.0, 0.0, -76.0)
+const ICE_TRIGGER_OFFSET: Vector3 = Vector3(0.0, 0.0, 1.5)
+const ICE_TRIGGER_SIZE: Vector3 = Vector3(5.0, 3.0, 3.0)
 ## Host: where each player is, as player id -> [place, depth] (ZonePresence). A
 ## player not in it is on the farm. Not saved: a loaded farm has everyone on the
 ## farm. A guest holds the host's copy, from the clock (FarmSync).
@@ -758,7 +767,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -785,6 +794,7 @@ func farm_to_dict() -> Dictionary:
 	out["finds_taken"] = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	out["pools_drained"] = ZoneDepth.prune(pools_drained, GameClock.get_day_index())
 	out["rooms_shored"] = ZoneDepth.prune(rooms_shored, GameClock.get_day_index())
+	out["cold_since"] = _cold_in_caves()  # the stamps of whoever is in the caves: the rest are stale
 	return out
 
 
@@ -822,6 +832,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return MineDepth.shored_problem(data["rooms_shored"])
 	if data.has("mine_props") and MineDepth.props_problem(data["mine_props"]) != "":
 		return MineDepth.props_problem(data["mine_props"])
+	if data.has("cold_since") and IceDepth.cold_problem(data["cold_since"]) != "":
+		return IceDepth.cold_problem(data["cold_since"])
 	if data.has("mine_gate_open") and not data["mine_gate_open"] is bool:
 		return "'mine_gate_open' is not a yes or no."
 	if data.has("pump_owned") and not data["pump_owned"] is bool:
@@ -899,7 +911,7 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var depth: Variant = data.get("rover_depth", 0)
 	if depth is int and (depth < 0 or depth > ZoneDepth.max_depth_of(str(data.get("rover_zone", TUNNELS_ZONE)))):
 		return "'rover_depth' is out of range."
-	if depth is int and depth > 0 and not data.get("rover_zone", "") in [TUNNELS_ZONE, AquiferDepth.ZONE, MineDepth.ZONE]:
+	if depth is int and depth > 0 and not data.get("rover_zone", "") in [TUNNELS_ZONE, AquiferDepth.ZONE, MineDepth.ZONE, IceDepth.ZONE]:
 		return "'rover_depth' is set for a rover that is not in a zone with depths."
 	if data.has("rover_lent") and not data["rover_lent"] is bool:
 		return "'rover_lent' is not a yes or no."
@@ -3763,7 +3775,7 @@ func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
 	add_credits(-Shuttle.fare())
 	var ends_at: float = Shuttle.trip_end(GameClock.elapsed_days)
 	shuttle_trips[id] = { "moon": moon, "ends_at": ends_at }
-	player_places[id] = [moon, 0]
+	_set_place(id, moon, 0)
 	_trip_players.erase(id)
 	# Off the farm's ground: out of the rover (it stays parked where it is) and not
 	# among the walkers there.
@@ -3807,7 +3819,7 @@ func _end_due_trips() -> void:
 func _return_traveller(player_id: String, line: String) -> void:
 	var moon: String = str(shuttle_trips.get(player_id, {}).get("moon", ""))
 	shuttle_trips.erase(player_id)
-	player_places[player_id] = [ZonePresence.FARM, 0]
+	_set_place(player_id, ZonePresence.FARM, 0)
 	_stand_at_pad(player_id)
 	shuttle_trips_changed.emit()
 	post_phone(line % Shuttle.moon_name(moon) if moon != "" else line % "the moon")
@@ -3856,7 +3868,7 @@ func _settle_trips_on_load() -> void:
 			# forget everyone, so the host opens at the farm in the rover, as on any load.
 			post_phone(Shuttle.text("trip_over_text") % Shuttle.moon_name(moon))
 		else:
-			player_places[id] = [str(shuttle_trips[id]["moon"]), 0]
+			_set_place(id, str(shuttle_trips[id]["moon"]), 0)
 
 
 ## Where a player stands on the farm: their walking pose if they are out, else the
@@ -4574,6 +4586,9 @@ func add_rover_usage(meters: float, player_id: String = "", rover_id: String = "
 	# lent. The farm rover on the farm never does.
 	var hot_rover: bool = rover_id == TUNNEL_ROVER or (rover_lent and rover_id == ROVER)
 	var heat: float = ZoneHazards.DRIFT_MULTIPLIER if zone_heat_trip and hot_rover else 1.0
+	# The Ice Caves' cold multiplies it the same way, for the driver, once the pack is past the threshold.
+	if hot_rover and rover_zone == IceDepth.ZONE:
+		heat *= IceDepth.drift_multiplier(cold_of(player_id if player_id != "" else local_player_id))
 	steering.add_usage(meters * heat * skill_factor("steering_usage", player_id))
 	add_tire_usage(meters * heat)
 	# The wheels that wear are the farm rover's: a field rover's metres are not
@@ -4649,7 +4664,7 @@ func report_place(place: String, depth: int, player_id: String = "") -> String:
 	if not Shuttle.is_moon(place) and shuttle_trips.has(player_id) and Shuttle.is_moon(place_of(player_id)):
 		return Shuttle.text("home_by_console_text")
 	var on_trip: bool = rover_zone != "" and (_trip_players.has(player_id) or (player_places.has(player_id) and place_of(player_id) == rover_zone))
-	player_places[player_id] = [place, depth]
+	_set_place(player_id, place, depth)
 	if place == ZonePresence.FARM:
 		CoopWalkers.heard(player_id)  # a traveller back on foot has spoken: the silence clock starts
 		_trip_players.erase(player_id)  # back on the farm: not on the trip
@@ -4665,6 +4680,57 @@ func report_place(place: String, depth: int, player_id: String = "") -> String:
 			# at a tick that never comes.
 			_tick_recall()
 	return ""
+
+
+## Host: puts a player at [place, depth], and starts or ends their cold with it.
+func _set_place(player_id: String, place: String, depth: int) -> void:
+	var was_cold: bool = player_places.has(player_id) and place_of(player_id) == IceDepth.ZONE
+	player_places[player_id] = [place, depth]
+	_track_cold(player_id, was_cold)
+
+
+## Host: a player's cold stamp follows where they are. Coming into the caves stamps now (and
+## replaces any stale stamp); anywhere else has none. Tells the guests when it changed.
+func _track_cold(player_id: String, was_in_caves: bool) -> void:
+	if FarmCommands.guest:
+		return
+	var in_caves: bool = player_places.has(player_id) and place_of(player_id) == IceDepth.ZONE
+	if in_caves and not was_in_caves:
+		cold_since[player_id] = GameClock.elapsed_days
+		ice_changed.emit()
+	elif not in_caves and cold_since.has(player_id):
+		cold_since.erase(player_id)
+		ice_changed.emit()
+
+
+## Host: drops the stamps of everyone who is not in the caves.
+func _prune_cold() -> void:
+	if FarmCommands.guest:
+		return
+	var kept: Dictionary = _cold_in_caves()
+	if kept.size() != cold_since.size():
+		cold_since = kept
+		ice_changed.emit()
+
+
+## The cold stamps of the players the host has in the caves.
+func _cold_in_caves() -> Dictionary:
+	if FarmCommands.guest:
+		return cold_since.duplicate()
+	var kept: Dictionary = {}
+	for who: Variant in cold_since:
+		if place_of(str(who)) == IceDepth.ZONE:
+			kept[who] = cold_since[who]
+	return kept
+
+
+## A player's cold in the Ice Caves, 0 to 100 %: 0 for anyone not in them. The host knows who is
+## in the caves; a guest reads the stamp the host sent (it has one only while in them).
+func cold_of(player_id: String = "") -> float:
+	var who: String = player_id if player_id != "" else local_player_id
+	if not cold_since.has(who) or (not FarmCommands.guest and place_of(who) != IceDepth.ZONE):
+		return 0.0
+	return IceDepth.cold(float(cold_since[who]), GameClock.elapsed_days)
 
 
 ## Where a player is; the farm for one the host has not heard from.
@@ -4690,6 +4756,7 @@ func forget_place(player_id: String) -> void:
 	var was: String = place_of(player_id) if player_places.has(player_id) else ""
 	var on_trip: bool = _trip_players.has(player_id)
 	player_places.erase(player_id)
+	_track_cold(player_id, was == IceDepth.ZONE)
 	_campers.erase(player_id)  # a camper who drops is out of bed (CoopBeds drops them too)
 	_console_arrivals.erase(player_id)
 	_trip_players.erase(player_id)
@@ -4729,6 +4796,7 @@ func clear_other_places() -> void:
 			shuttle_trips_changed.emit()
 	if mine != null:
 		player_places[local_player_id] = mine
+	_prune_cold()
 	var kept: bool = _trip_players.has(local_player_id)
 	_trip_players.clear()
 	if kept:
@@ -4782,16 +4850,17 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 		return reason
 	var aquifer: bool = rover_zone == AquiferDepth.ZONE
 	var mine: bool = rover_zone == MineDepth.ZONE
+	var ice: bool = rover_zone == IceDepth.ZONE
 	if target_depth < 0 or target_depth > ZoneDepth.max_depth_of(rover_zone) or absi(target_depth - rover_depth) != 1:
 		return "There is no way there from here."
 	var going_down: bool = target_depth > rover_depth
-	var down_at: Vector3 = AquiferDepth.hatch_position() if aquifer else (MineDepth.hatch_position() if mine else ZoneDepth.descent_position(rover_depth))
+	var down_at: Vector3 = AquiferDepth.hatch_position() if aquifer else (MineDepth.hatch_position() if mine else (IceDepth.hatch_position() if ice else ZoneDepth.descent_position(rover_depth)))
 	var there: Vector3 = down_at if going_down else ZoneDepth.ascent_position()
 	reason = _rover_reach_problem(there, rover_zone)
 	if reason != "":
 		return reason
 	var pose: Transform3D = ZoneDepth.arrival_pose(target_depth, going_down, false)
-	if (aquifer or mine) and not going_down:
+	if (aquifer or mine or ice) and not going_down:
 		pose = Transform3D(Basis.IDENTITY, down_at + Vector3(0.0, 0.05, TunnelRock.CELL_M))  # beside the Aquifer's or Mine's hatch
 	_move_rover_to(target_depth, pose)
 	return ""
@@ -4802,7 +4871,7 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 ## second after the rover stops): the host and solo player, or a player who is in the
 ## tunnels at the rover's depth; or, while someone drives, that player. Returns "" or why.
 func _rover_trip_problem(player_id: String) -> String:
-	if not rover_zone in [TUNNELS_ZONE, AquiferDepth.ZONE, MineDepth.ZONE]:
+	if not rover_zone in [TUNNELS_ZONE, AquiferDepth.ZONE, MineDepth.ZONE, IceDepth.ZONE]:
 		return "The rover is not in a zone."
 	var driver: String = CoopRovers.driver(TUNNEL_ROVER)
 	if driver == "":
@@ -4980,8 +5049,16 @@ func move_rover_mine(into: bool, player_id: String = "") -> String:
 	return _move_rover(MineDepth.ZONE, into, player_id)
 
 
+## Host: the same for the Ice Caves' ramp at the north edge. No key: below IceDepth.SOFT_LEVEL
+## the entrance only warns (main_farm); the rover goes in all the same.
+func move_rover_ice(into: bool, player_id: String = "") -> String:
+	return _move_rover(IceDepth.ZONE, into, player_id)
+
+
 ## Where a zone's mouth is on the farm.
 func _mouth_of(zone: String) -> Vector3:
+	if zone == IceDepth.ZONE:
+		return ICE_PAD
 	if zone == AquiferDepth.ZONE:
 		return AQUIFER_PAD
 	if zone == MineDepth.ZONE:
@@ -5031,10 +5108,10 @@ func _move_rover(zone: String, into_tunnels: bool, player_id: String) -> String:
 	rover_lent = into_tunnels
 	if into_tunnels:
 		# Said now, not when its screen reports: a drop in the fade still counts as below.
-		player_places[who] = [zone, 0]
+		_set_place(who, zone, 0)
 		_trip_players[who] = true
 	else:
-		player_places[who] = [ZonePresence.FARM, 0]
+		_set_place(who, ZonePresence.FARM, 0)
 		_console_arrivals.clear()  # the trip is over
 		_trip_players.clear()
 		_ore_at_entry = -1  # no trip: a late rescue has nothing to take ore for
@@ -5077,7 +5154,7 @@ func fast_travel(zone_id: String, player_id: String = "") -> String:
 		zone_heat_trip = false  # a new trip from the hub
 		rover_transforms[TUNNEL_ROVER] = TUNNEL_START
 		rover_epoch += 1
-	player_places[player_id] = [zone_id, rover_depth]
+	_set_place(player_id, zone_id, rover_depth)
 	_trip_players[player_id] = true
 	_console_arrivals[player_id] = true
 	if plan != FastTravel.JOIN:
@@ -5102,7 +5179,7 @@ func leave_zone(player_id: String = "") -> String:
 	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
 	if at == null or (at as Vector3).distance_to(TUNNEL_EXIT) > TUNNEL_PAD_REACH_M:
 		return "The rover is not on the pad."
-	player_places[player_id] = [ZonePresence.DOME, 0]
+	_set_place(player_id, ZonePresence.DOME, 0)
 	_console_arrivals.erase(player_id)
 	_trip_players.erase(player_id)
 	if _nobody_on_the_trip():
@@ -5330,7 +5407,7 @@ func rescue_from_tunnels(player_id: String = "") -> Dictionary:
 	var who: String = performer_name(_player(player_id))
 	var leaving: String = player_id if player_id != "" else local_player_id
 	if player_places.has(leaving) or rover_zone != "":
-		player_places[leaving] = [ZonePresence.FARM, 0]  # carried out, to bed
+		_set_place(leaving, ZonePresence.FARM, 0)  # carried out, to bed
 	var ore: int = 0 if _console_arrivals.has(leaving) else ore_carried_in()
 	_console_arrivals.erase(leaving)
 	_trip_players.erase(leaving)  # carried out: off the trip
@@ -5887,9 +5964,10 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 	var day: int = GameClock.get_day_index()
 	if layout_day != day:
 		return "That was yesterday's floor. Look again."
-	var zone: String = rover_zone if rover_zone in [AquiferDepth.ZONE, MineDepth.ZONE] else ZoneDepth.ZONE
+	var zone: String = rover_zone if rover_zone in [AquiferDepth.ZONE, MineDepth.ZONE, IceDepth.ZONE] else ZoneDepth.ZONE
 	var aquifer: bool = zone == AquiferDepth.ZONE
 	var mine: bool = zone == MineDepth.ZONE
+	var ice: bool = zone == IceDepth.ZONE
 	finds_taken = ZoneDepth.prune(finds_taken, day)
 	rooms_shored = ZoneDepth.prune(rooms_shored, day)
 	var today: Dictionary = {}
@@ -5897,6 +5975,8 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 		today = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day))
 	elif mine:
 		today = MineDepth.layout(world_seed, rover_depth, day, MineDepth.shored_today(rooms_shored, day))
+	elif ice:
+		today = IceDepth.layout(world_seed, rover_depth, day)
 	else:
 		today = ZoneDepth.layout(world_seed, ZoneDepth.ZONE, rover_depth, day)
 	var taken: Array = ZoneDepth.taken_today(finds_taken, zone, day)
@@ -5919,7 +5999,7 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 	if reason != "":
 		return reason
 	var kind: String = str(ZoneDepth.find_in(today, find_id)["kind"])
-	var pay: Dictionary = AquiferDepth.reward(kind) if aquifer else (MineDepth.reward(kind) if mine else ZoneDepth.reward(kind))
+	var pay: Dictionary = AquiferDepth.reward(kind) if aquifer else (MineDepth.reward(kind) if mine else (IceDepth.reward(kind) if ice else ZoneDepth.reward(kind)))
 	finds_taken = ZoneDepth.with_taken(finds_taken, zone, day, find_id)
 	if pay.has("crystal_ore"):
 		crystal_ore += int(pay["crystal_ore"])
@@ -5938,6 +6018,23 @@ func open_mine_gate() -> String:
 	if not mine_gate_open:
 		mine_gate_open = true
 		mine_changed.emit()
+	return ""
+
+
+## Host: the player buys a heater cartridge at the Ice Caves hub's crate: IceDepth.HEATER_COST_CREDITS
+## from the farm's wallet [PLACEHOLDER], charged once, and their cold starts again from now.
+## Returns "" or why not (IceDepth.heater_problem).
+func buy_heater(player_id: String = "") -> String:
+	var who: String = _player(player_id)
+	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+	var near: bool = rover_zone == IceDepth.ZONE and rover_depth == 0 and at != null and IceDepth.near_crate(at)
+	var here: String = place_of(who) if rover_zone == IceDepth.ZONE else ""
+	var reason: String = IceDepth.heater_problem(here, depth_of(who), credits, near)
+	if reason != "":
+		return reason
+	add_credits(-IceDepth.HEATER_COST_CREDITS)
+	cold_since[who] = GameClock.elapsed_days
+	ice_changed.emit()
 	return ""
 
 

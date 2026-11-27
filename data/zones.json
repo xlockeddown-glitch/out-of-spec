@@ -50,7 +50,7 @@
       "band": [18, 35],
       "hazards": ["cold", "slick_ice", "white_out"],
       "finds": ["ice_cores", "minerals", "frozen_probes", "tarantulas"],
-      "hub_scene": "",
+      "hub_scene": "res://scenes/ice_caves.tscn",
       "entrance": "A long drive north, then a ramp.",
       "tarantula_hook": "Terraform test pods: a sealed, heated trial pod under the ice [ASSUMPTION].",
       "notes": ""

@@ -2460,3 +2460,13 @@ Restyled `scripts/world/tunnel_rock.gd` using `TunnelLook` and `ScopeTheme` cons
 
 
 
+
+## Polar Ice Caves hub, depth 1 and the cold (2026-11-27, feat/ice-caves)
+
+Zones step 15. The Ice Caves are now playable: a ramp on the farm, a hub (`scenes/ice_caves.tscn`, `IceCaves`), one depth (`IceDepth`, `IceRock`) and one hazard, the cold. The Lava Tubes, the Aquifer and the Mine are unchanged; `tunnel_look.gd` is not edited (new colours are in `scripts/world/ice_look.gd`).
+
+- **Cold:** per player, host-run, a pure function of a saved stamp (`GameState.cold_since`). 10 % per game hour, clamped to 0 to 100 %. Past 50 % the instruments drift: steering-encoder and tire-gauge wear on a rover driven in the caves is x1.5, and nothing else changes. A HUD log line says so. A heater cartridge (40 credits from the shared wallet, bought at the hub crate) resets it; leaving the caves or the 02:00 recall also resets it.
+- **Protocol:** `CoopSession.PROTOCOL` 37 to 38, once, for the new commands `buy_heater` and `move_rover_ice` and the new synced field `cold_since`.
+- **Test change beyond protocol pins:** `tests/test_zone_presence.gd` pinned the Ice Caves as not playable; they now are, so those expectations moved.
+- **[PLACEHOLDER]:** soft warning below lab level 18 (`IceDepth.SOFT_LEVEL`); ramp spot (-12, 0, -76) and its trigger box (`GameState.ICE_PAD`, `ICE_TRIGGER_OFFSET`, `ICE_TRIGGER_SIZE`); cold rate 10 % per hour (`COLD_PER_HOUR`); threshold 50 % (`COLD_THRESHOLD`); drift x1.5 (`DRIFT_MULTIPLIER`); heater 40 credits (`HEATER_COST_CREDITS`); finds (two ice cores, two minerals, a frozen probe) and rewards (core 10 credits; mineral 1 crystal ore and 6 credits; probe 24 credits); the hub grid (the Lava hub's) and hatch, crate and sign cells; the look (all colours, wall bands, crate and ramp meshes); the notice text "Vance: [later]"; every log line.
+- **Left out on purpose:** slick ice, white-out, the lift, depth 2 and below, the terraform test pod, A Core to Certify, an Ice camp, and the real look.

@@ -254,6 +254,8 @@ static func _layout_of(zone: String, depth: int, world_seed: int, day: int) -> D
 		return AquiferDepth.layout_today(world_seed, depth, day)
 	if zone == MineDepth.ZONE:
 		return MineDepth.layout_today(world_seed, depth, day)
+	if zone == IceDepth.ZONE:
+		return IceDepth.layout(world_seed, depth, day)
 	return layout(world_seed, ZONE, depth, day)
 
 
@@ -263,6 +265,8 @@ static func max_depth_of(zone: String) -> int:
 		return MAX_DEPTH
 	if zone == MineDepth.ZONE:
 		return MineDepth.MAX_DEPTH
+	if zone == IceDepth.ZONE:
+		return IceDepth.MAX_DEPTH
 	return AquiferDepth.MAX_DEPTH if zone == AquiferDepth.ZONE else 0
 
 
@@ -467,12 +471,16 @@ static func reach_problem(there: Vector3, zone: String, known: bool, at: Vector3
 static func _finds_lie_text(zone: String) -> String:
 	if zone == MineDepth.ZONE:
 		return "Finds lie in the Colony Mine, below the hub."
+	if zone == IceDepth.ZONE:
+		return "Finds lie in the Ice Caves, below the hub."
 	return "Finds lie in the Lava Tubes, below the hub." if zone == ZONE else "Finds lie in the Flooded Aquifer, below the hub."
 
 
 static func _rover_not_in_text(want: String) -> String:
 	if want == MineDepth.ZONE:
 		return "The rover is not in the Colony Mine."
+	if want == IceDepth.ZONE:
+		return "The rover is not in the Ice Caves."
 	return "The rover is not in the Lava Tubes." if want == ZONE else "The rover is not in the Flooded Aquifer."
 
 
