@@ -10,6 +10,15 @@ const HIGH_TINT := Color(1.0, 0.82, 0.6)
 const LOW_TINT := Color(0.7, 0.8, 0.8)
 const HIGH_M: float = 6.0
 const LOW_M: float = -1.0
+## How far the real ground leans toward its biome's ground_tint, 0 (none) to 1 (all)
+## [PLACEHOLDER]. It multiplies the height tint, so hills still read and a white
+## ground_tint (the farm) changes nothing.
+const BIOME_STRENGTH: float = 0.5
+## The biome colour is looked up every BIOME_STEP_M metres and averaged over the
+## neighbouring BIOME_BLUR cells each way, then smoothed between, so a biome edge
+## fades over about 2 * (BIOME_BLUR + 1) * BIOME_STEP_M metres [PLACEHOLDER].
+const BIOME_STEP_M: int = 4
+const BIOME_BLUR: int = 1
 
 @export var material: Material
 ## How far the land reaches from its middle. Only LandMeasure sets it, before the
@@ -44,11 +53,14 @@ func _ready() -> void:
 	_levelled = Terrain.level_points.duplicate()
 	_heights.resize((2 * half_m + 1) * (2 * half_m + 1))
 	_tints.resize(_heights.size())
+	var lean := PackedColorArray()
+	if half_m == Terrain.HALF_M:
+		lean = _biome_lean()
 	for z: int in range(-half_m, half_m + 1):
 		for x: int in range(-half_m, half_m + 1):
 			if half_m == Terrain.HALF_M:
 				_heights[_index(x, z)] = Terrain.point_height(Vector2i(x, z), _dug)
-				_tints[_index(x, z)] = _tint(Terrain.natural(Vector2i(x, z)))
+				_tints[_index(x, z)] = _tint(Terrain.natural(Vector2i(x, z))) * lean[_index(x, z)]
 			else:
 				var natural_m: float = Terrain.natural_on(Vector2i(x, z), half_m)
 				_heights[_index(x, z)] = natural_m
@@ -216,6 +228,46 @@ func _normal(x: int, z: int) -> Vector3:
 	var run_x: float = float(mini(x + 1, limit) - maxi(x - 1, -limit))
 	var run_z: float = float(mini(z + 1, limit) - maxi(z - 1, -limit))
 	return Vector3((west - east) / run_x, 1.0, (north - south) / run_z).normalized()
+
+
+## Each point's biome multiplier for the normal look: the biome ground colours on a
+## coarse grid, blurred, then bilinear between. Same data on every machine.
+func _biome_lean() -> PackedColorArray:
+	var n: int = (2 * half_m) / BIOME_STEP_M + 1
+	var by_id: Dictionary[StringName, Color] = {}
+	var coarse := PackedColorArray()
+	coarse.resize(n * n)
+	for j: int in n:
+		for i: int in n:
+			var id: StringName = BiomeData.biome_at(Vector2(i * BIOME_STEP_M - half_m, j * BIOME_STEP_M - half_m))
+			if not by_id.has(id):
+				by_id[id] = Color.WHITE.lerp(BiomeData.ground_tint(id), BIOME_STRENGTH)
+			coarse[j * n + i] = by_id[id]
+	var soft := PackedColorArray()
+	soft.resize(n * n)
+	for j: int in n:
+		for i: int in n:
+			var sum := Color(0, 0, 0, 0)
+			var count: int = 0
+			for dj: int in range(maxi(j - BIOME_BLUR, 0), mini(j + BIOME_BLUR, n - 1) + 1):
+				for di: int in range(maxi(i - BIOME_BLUR, 0), mini(i + BIOME_BLUR, n - 1) + 1):
+					sum += coarse[dj * n + di]
+					count += 1
+			soft[j * n + i] = sum / float(count)
+	var lean := PackedColorArray()
+	lean.resize(_heights.size())
+	for z: int in range(-half_m, half_m + 1):
+		var fz: float = float(z + half_m) / BIOME_STEP_M
+		var j0: int = mini(int(fz), n - 2)
+		var tz: float = fz - j0
+		for x: int in range(-half_m, half_m + 1):
+			var fx: float = float(x + half_m) / BIOME_STEP_M
+			var i0: int = mini(int(fx), n - 2)
+			var tx: float = fx - i0
+			var top: Color = soft[j0 * n + i0].lerp(soft[j0 * n + i0 + 1], tx)
+			var bottom: Color = soft[(j0 + 1) * n + i0].lerp(soft[(j0 + 1) * n + i0 + 1], tx)
+			lean[_index(x, z)] = top.lerp(bottom, tz)
+	return lean
 
 
 func _tint(natural_m: float) -> Color:

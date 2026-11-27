@@ -348,6 +348,7 @@ func test_the_checker_catches_bad_rows() -> String:
 		["band above 99", "landing_field", "band", [20, 120], "landing_field: band 20 to 120"],
 		["band fractional", "lab_quarter", "band", [1.5, 20], "lab_quarter: band edges must be whole levels"],
 		["bad tint", "badlands", "tint", "rust", "badlands: tint rust is not a colour"],
+		["bad ground tint", "badlands", "ground_tint", "rust", "badlands: ground_tint rust is not a colour"],
 		["empty sign", "frost_flats", "sign", " ", "frost_flats: empty sign"],
 		["unknown zone", "basalt_ridge", "entrances", [{"zone": "moon_base", "at": [28, -30]}], "basalt_ridge: entrance 0 zone moon_base is not a zones.json id"],
 		["entrance without at", "lab_quarter", "entrances", [{"zone": "ice_caves"}], "lab_quarter: entrance 0 must be {zone, at}"],
