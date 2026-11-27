@@ -85,7 +85,8 @@ func test_a_terrace_row_reaches_the_plateau_edge_and_every_rock_is_on_the_map() 
 	var at_edge: Array[Vector2i] = []
 	for rock: Vector2i in HillDressing.ROCKS:
 		var half: Vector2 = HillDressing.rock_half_m(rock)
-		var spare := Vector2(Terrain.HALF_M - absf(rock.x) - half.x, Terrain.HALF_M - absf(rock.y) - half.y)
+		# The rocks stand on the old land, as the plateau edge is the old edge.
+		var spare := Vector2(Terrain.OLD_HALF_M - absf(rock.x) - half.x, Terrain.OLD_HALF_M - absf(rock.y) - half.y)
 		if minf(spare.x, spare.y) < 0.0:
 			return "The rock at %s hangs off the map." % rock
 		if HillDressing.ROCK_TURNS.has(rock) and minf(spare.x, spare.y) <= 2.5:

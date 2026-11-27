@@ -3,9 +3,15 @@ class_name Terrain
 ## natural land less what was dug, and every PC works it out alike. It has a
 ## point each meter; digging is by cells of CELL_M, the soil grid's.
 
-## The land is a square this wide, centered on the farm.
-const SIZE_M: int = 160
-const HALF_M: int = 80
+## The land is a square this wide, centered on the farm: 240 m, grown from 160 m
+## [PLACEHOLDER]. Inside the old 160 m the ground is exactly what it was, so old
+## saves keep their places (natural_on); the ring outside is new ground.
+const SIZE_M: int = 240
+const HALF_M: int = 120
+## The old land's size and edge. The old ground, its rim, its rolls and everything
+## drawn from a stream over it (ore pockets, plants) are kept at these.
+const OLD_SIZE_M: int = 160
+const OLD_HALF_M: int = 80
 const CELL_M: int = 2
 ## A dug cell's depth is a whole number of these steps [PLACEHOLDER].
 const DIG_STEP_M: float = 0.5
@@ -97,13 +103,19 @@ static var _natural: PackedFloat32Array = PackedFloat32Array()
 ## the ground at the edge.
 static func natural(point: Vector2i) -> float:
 	if _natural.is_empty():
+		var width: int = SIZE_M + 1
 		var found := PackedFloat32Array()
-		found.resize((SIZE_M + 1) * (SIZE_M + 1))
-		var i: int = 0
+		found.resize(width * width)
+		# The old land first: the ring eases from its edge, so it can reuse those heights.
+		for z: int in range(-OLD_HALF_M, OLD_HALF_M + 1):
+			for x: int in range(-OLD_HALF_M, OLD_HALF_M + 1):
+				found[(z + HALF_M) * width + x + HALF_M] = _work_out(x, z)
 		for z: int in range(-HALF_M, HALF_M + 1):
 			for x: int in range(-HALF_M, HALF_M + 1):
-				found[i] = _work_out(x, z)
-				i += 1
+				var out_m: int = maxi(absi(x), absi(z))
+				if out_m > OLD_HALF_M:
+					var edge := Vector2i(clampi(x, -OLD_HALF_M, OLD_HALF_M), clampi(z, -OLD_HALF_M, OLD_HALF_M))
+					found[(z + HALF_M) * width + x + HALF_M] = _ring(Vector2i(x, z), HALF_M, found[(edge.y + HALF_M) * width + edge.x + HALF_M])
 		_natural = found
 	return _natural[(clampi(point.y, -HALF_M, HALF_M) + HALF_M) * (SIZE_M + 1) + clampi(point.x, -HALF_M, HALF_M) + HALF_M]
 
@@ -120,27 +132,35 @@ static func _from_level(at: Vector2) -> float:
 
 
 ## Only adds, multiplies and roots, which come out alike on every PC.
-static func _work_out(x: int, z: int, half_m: int = HALF_M) -> float:
+static func _work_out(x: int, z: int, half_m: int = OLD_HALF_M) -> float:
 	return roundf(_wash(Vector2(x, z), _land(x, z, half_m)) * HEIGHT_PARTS) / HEIGHT_PARTS
 
 
-## The natural ground at a point if the land were `half_m` out from the middle
-## instead of HALF_M. Inside today's land it is today's ground exactly. Outside,
-## it eases from the height at the old edge (the nearest point of today's land)
-## to the same function with its rim at the new edge, over the way between the two
-## edges. Only for measuring a bigger land (LandMeasure); nothing in play calls it,
-## and it keeps no cache. A land grown for real can use the same rule.
+## The natural ground at a point if the land were `half_m` out from the middle.
+## Inside the old land (OLD_HALF_M) it is the old ground exactly, rim and all.
+## Outside, it eases from the height at the old edge (the nearest point of the old
+## land) to the same function with its rim at the new edge, over the way between
+## the two edges, a smoothstep [PLACEHOLDER: 40 m at 240 m]. natural() is this at
+## HALF_M. It keeps no cache; LandMeasure uses it for other sizes.
 static func natural_on(point: Vector2i, half_m: int) -> float:
 	var out_m: int = maxi(absi(point.x), absi(point.y))
-	if out_m <= HALF_M:
+	if out_m <= OLD_HALF_M:
 		return _work_out(point.x, point.y)
-	var edge := Vector2i(clampi(point.x, -HALF_M, HALF_M), clampi(point.y, -HALF_M, HALF_M))
-	var along: float = float(out_m - HALF_M) / float(maxi(half_m - HALF_M, 1))
-	return lerpf(_work_out(edge.x, edge.y), _work_out(point.x, point.y, half_m), _ease(along))
+	var edge := Vector2i(clampi(point.x, -OLD_HALF_M, OLD_HALF_M), clampi(point.y, -OLD_HALF_M, OLD_HALF_M))
+	return _ring(point, half_m, _work_out(edge.x, edge.y))
+
+
+## A point past the old edge: eased from the old edge's height `edge_m` to the ground
+## with its rim at the new edge.
+static func _ring(point: Vector2i, half_m: int, edge_m: float) -> float:
+	var out_m: int = maxi(absi(point.x), absi(point.y))
+	var along: float = float(out_m - OLD_HALF_M) / float(maxi(half_m - OLD_HALF_M, 1))
+	var eased: float = lerpf(edge_m, _work_out(point.x, point.y, half_m), _ease(along))
+	return roundf(eased * HEIGHT_PARTS) / HEIGHT_PARTS
 
 
 ## The land without the wash.
-static func _land(x: int, z: int, half_m: int = HALF_M) -> float:
+static func _land(x: int, z: int, half_m: int = OLD_HALF_M) -> float:
 	var at := Vector2(x, z)
 	var level_m: float = _from_level(at)
 	if level_m <= 0.0:
@@ -225,13 +245,14 @@ static func is_near_water(cell: Vector2i) -> bool:
 
 ## 0 to 1, from a value at each corner of wide squares.
 static func _roll(x: int, z: int) -> float:
-	# Counted from past the land's corner, so whole division rounds down.
+	# Counted from past the old land's corner, so whole division rounds down and the
+	# old squares are the same. The new land's corner is only 120 m out, still past it.
 	@warning_ignore("integer_division")
-	var col: int = (x + SIZE_M) / ROLL_WIDE_M
+	var col: int = (x + OLD_SIZE_M) / ROLL_WIDE_M
 	@warning_ignore("integer_division")
-	var row: int = (z + SIZE_M) / ROLL_WIDE_M
-	var tx: float = _ease(float((x + SIZE_M) % ROLL_WIDE_M) / ROLL_WIDE_M)
-	var tz: float = _ease(float((z + SIZE_M) % ROLL_WIDE_M) / ROLL_WIDE_M)
+	var row: int = (z + OLD_SIZE_M) / ROLL_WIDE_M
+	var tx: float = _ease(float((x + OLD_SIZE_M) % ROLL_WIDE_M) / ROLL_WIDE_M)
+	var tz: float = _ease(float((z + OLD_SIZE_M) % ROLL_WIDE_M) / ROLL_WIDE_M)
 	var near: float = lerpf(_corner(col, row), _corner(col + 1, row), tx)
 	var far: float = lerpf(_corner(col, row + 1), _corner(col + 1, row + 1), tx)
 	return lerpf(near, far, tz)
@@ -261,6 +282,14 @@ static func _ease(t: float) -> float:
 
 static func cell_at(at: Vector2) -> Vector2i:
 	return Vector2i((at / CELL_M).floor())
+
+
+## Whether a cell is in the old land, the one every old farm's buried blocks and
+## pockets were drawn over (the new ring has none, for now).
+static func in_old_land(cell: Vector2i) -> bool:
+	@warning_ignore("integer_division")
+	var edge: int = OLD_HALF_M / CELL_M - 1
+	return cell.x >= -edge and cell.y >= -edge and cell.x < edge and cell.y < edge
 
 
 ## Whether a cell may be dug at all: not on level ground, nor at the land's edge.

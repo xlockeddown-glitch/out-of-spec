@@ -37,13 +37,13 @@ func test_cells_are_two_meters_from_the_middle() -> String:
 
 
 func test_between_points_the_ground_slopes_evenly() -> String:
-	var dug: Dictionary[Vector2i, int] = { Vector2i(0, 0): 1, Vector2i(39, 39): 1 }
+	var dug: Dictionary[Vector2i, int] = { Vector2i(0, 0): 1, Vector2i(59, 59): 1 }
 	var none: Dictionary[Vector2i, int] = {}
 	if not is_equal_approx(Terrain.height(Vector2(0.5, 1.0), dug), -Terrain.DIG_STEP_M * 0.5):
 		return "Halfway down a side must be half a step down."
-	if not is_equal_approx(Terrain.height(Vector2(79.5, 79.0), dug) - Terrain.height(Vector2(79.5, 79.0), none), -Terrain.DIG_STEP_M * 0.5):
+	if not is_equal_approx(Terrain.height(Vector2(119.5, 119.0), dug) - Terrain.height(Vector2(119.5, 119.0), none), -Terrain.DIG_STEP_M * 0.5):
 		return "The last cell must slope to the land's edge."
-	if not is_equal_approx(Terrain.height(Vector2(200.0, 200.0), dug), Terrain.natural(Vector2i(80, 80))):
+	if not is_equal_approx(Terrain.height(Vector2(200.0, 200.0), dug), Terrain.natural(Vector2i(120, 120))):
 		return "Past the edge must be the ground at the edge."
 	return ""
 
@@ -62,6 +62,32 @@ func test_the_ground_shows_digging_and_filling() -> String:
 		fail = "What is driven on must match what is seen."
 	ground.free()
 	return fail
+
+
+func _chunk_heights(ground: TerrainGround, cell: Vector2i) -> PackedFloat32Array:
+	var chunk: Vector2i = ground._chunk_of(cell * Terrain.CELL_M)
+	var mesh: ArrayMesh = ground._chunks[chunk].mesh as ArrayMesh
+	var found := PackedFloat32Array()
+	for corner: Vector3 in mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]:
+		found.append(corner.y)
+	return found
+
+
+func test_a_dig_redraws_the_chunk_in_the_old_land_and_the_ring() -> String:
+	var ground := TerrainGround.new()
+	ground._ready()
+	for cell: Vector2i in [Vector2i(10, 10), Vector2i(-39, 5), Vector2i(50, 50), Vector2i(-58, 20), Vector2i(20, 58)]:
+		var before: PackedFloat32Array = _chunk_heights(ground, cell)
+		ground.show_dug({ cell: 1 })
+		if _chunk_heights(ground, cell) == before:
+			ground.free()
+			return "Digging %s did not redraw its chunk." % cell
+		ground.show_dug({})
+		if _chunk_heights(ground, cell) != before:
+			ground.free()
+			return "Filling %s did not redraw its chunk." % cell
+	ground.free()
+	return ""
 
 
 func test_a_body_lies_level_on_level_ground_and_tips_into_a_hole() -> String:
@@ -103,11 +129,11 @@ func test_digging_keeps_to_one_step_between_neighbors() -> String:
 
 
 func test_digging_keeps_off_the_edge_and_level_ground() -> String:
-	for cell: Vector2i in [Vector2i(-40, 20), Vector2i(39, 20), Vector2i(20, -40), Vector2i(20, 39), Vector2i(20, 1000),
+	for cell: Vector2i in [Vector2i(-60, 20), Vector2i(59, 20), Vector2i(20, -60), Vector2i(20, 59), Vector2i(20, 1000),
 			Vector2i(0, 0), Vector2i(14, 0), Vector2i(16, 0), Vector2i(-17, 0), Vector2i(0, 14), Vector2i(-35, -35), Vector2i(-31, -35)]:
 		if Terrain.dig_problem(cell, {}) == "" or Terrain.dug_problem({ cell: 1 }) == "":
 			return "%s must not be dug." % cell
-	for cell: Vector2i in [Vector2i(-39, 20), Vector2i(38, 38), Vector2i(17, 0), Vector2i(0, -18), Vector2i(-29, -35)]:
+	for cell: Vector2i in [Vector2i(-59, 20), Vector2i(58, 38), Vector2i(17, 0), Vector2i(0, -18), Vector2i(-29, -35)]:
 		if Terrain.dig_problem(cell, {}) != "":
 			return "%s must be dug." % cell
 	return ""
@@ -115,8 +141,8 @@ func test_digging_keeps_off_the_edge_and_level_ground() -> String:
 
 func test_the_most_digging_there_can_be_never_sinks_level_ground() -> String:
 	var deep: Dictionary[Vector2i, int] = {}
-	for x: int in range(-40, 40):
-		for z: int in range(-40, 40):
+	for x: int in range(-60, 60):
+		for z: int in range(-60, 60):
 			if Terrain.can_dig(Vector2i(x, z)):
 				deep[Vector2i(x, z)] = 1
 	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
@@ -200,7 +226,7 @@ func test_dug_hills_can_be_driven_everywhere() -> String:
 	rng.seed = 7
 	var dug: Dictionary[Vector2i, int] = {}
 	for i: int in 60000:
-		var cell := Vector2i(rng.randi_range(-40, 39), rng.randi_range(-40, 39))
+		var cell := Vector2i(rng.randi_range(-59, 58), rng.randi_range(-59, 58))
 		if Terrain.dig_problem(cell, dug) == "":
 			dug[cell] = dug.get(cell, 0) + 1
 	# Rovers climb 45 degrees, a rise of 1 in 1.

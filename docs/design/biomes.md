@@ -115,7 +115,7 @@ The land is 160 m square today. The times are measured (PR 211, `tools/measure_l
 - Farther out: 100 m is 25 seconds on foot and 17 by rover; 115 m (the 240 m edge) is 29 seconds on foot and 20 by rover.
 - **Walking is for the middle** (farm, Lab Quarter, Landing Field), where the walkers go (`scripts/walker/`).
 - **The rover is for the ring**, as it already is for the dome and the tunnels (`docs/decisions.md`, co-op).
-- **The land grows to about 240 m** (Question 5). The old 160 m middle keeps its heights, and the new outer ring gives the biomes room (§7.1).
+- **The land grows to about 240 m** (Question 5). The old 160 m middle keeps its heights, and the new outer ring gives the biomes room (§7.1). **The land is now 240 m** (step 2, done): `Terrain.HALF_M` is 120, the old edge is `Terrain.OLD_HALF_M` (80), and the ring is plain ground that eases out from the old edge over 40 m.
 
 ### 3.2 How the world is held
 
@@ -201,7 +201,7 @@ The rule is **move props, not ground.**
 Small PRs, one job each, smallest first.
 
 1. **Measure.** A test or dev scene that prints rover top speed, ground build time and uplink dead spots at 160 m and 240 m, to put real numbers in §3.1. No change to play.
-2. **Land size.** Grow the land to about 240 m. Every point inside the old 160 m keeps its height for an existing seed (§7.1); a test checks it.
+2. **Land size. DONE.** The land is 240 m. Every point inside the old 160 m keeps its height for an existing seed (§7.1); tests check it against a frozen hash of the old middle. The new ring has no props, blocks, ore pockets, tints or roads yet.
 3. **Biome table.** `data/biomes.json` and a pure `BiomeData` class (ids, centres, reach, band, tint, zone entrance). Tests only.
    *Built 2026-11-26 (feat/biome-table):* `data/biomes.json` (the farm hub and the five biomes, every number a [PLACEHOLDER]), `scripts/world/biome_data.gd` (`BiomeData`: the check, `biome_at`, `marker`, `tint`, `band`, `sign_text`, zone `entrances` as a list) and `tests/test_biome_data.gd`. Marker pads are checked clear of props, rocks, the plot and the relay road, and near flat; the Lab Quarter covers the whole relay road. Nothing in play reads it yet.
 4. **Paint the map.** A debug overlay (a key) that colours the ground by biome, so Ryan can see layout A against B before art is spent.

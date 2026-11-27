@@ -2,6 +2,16 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-26: The land grows to 240 m (biomes step 2)
+
+`Terrain.SIZE_M` 160 to 240, `HALF_M` 80 to 120; the old edge stays as `OLD_HALF_M` (80) and `OLD_SIZE_M` (160).
+
+- **Ease rule [PLACEHOLDER]:** inside the old 160 m the ground is exactly the old function (rim and all). Outside, it smoothsteps over 40 m from the height at the nearest old-edge point to the same function with its rim at the new edge, rounded to whole 1/256 m parts. Width 40 m is the new edge minus the old edge.
+- **Old saves:** dug cells, found blocks and ore pockets are keyed by coordinates, so they stay put. The reference-block and ore-pocket draws, the plants and the roll offset keep the old size, so the new ring holds none of them for now. Tests freeze the old middle's hash, a dug old land's hash, the blocks, pockets and plants.
+- **Two hashes:** the whole-grid land hash changed (new `LAND_HASH` in `test_hills`); the old one (`HASH`, `test_ford` `LAND_HASH`) now covers only the old middle.
+- **Bounds moved to the new edge:** rover and walker limits, dig grid, pit water, host-side rover and walker clamps, the ground chunks. Hills, props and rocks stay where they are.
+- **Co-op:** no new messages; `CoopSession.PROTOCOL` 26 to 27, since an old build would see a different land.
+
 ## 2026-11-26: The lab sitter (zones step 11, sections 9 and 14.1)
 
 A new hire tends the lab for one day; a one-use reward books her free. Everything is a [PLACEHOLDER] or an [ASSUMPTION] unless Ryan says otherwise.
