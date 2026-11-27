@@ -77,6 +77,9 @@ var _open_tween: Tween
 @onready var _pump_game: PumpToPoints = %PumpGame
 ## Today's bench game for the instrument shown, by name.
 var _game_name_label: Label
+## The day the label was set for, and the game the last play was.
+var _game_name_day: int = -1
+var _played_game: String = MinigameScore.SET_THE_ZERO
 
 
 func _ready() -> void:
@@ -103,6 +106,7 @@ func _ready() -> void:
 	_game_name_label.hide()
 	_game_option.add_sibling(_game_name_label)
 	_careful_check.toggled.connect(MinigameSettings.set_careful)
+	_careful_check.toggled.connect(_on_careful_toggled)
 	GameState.drop_pod_changed.connect(_on_pod_or_oirm_changed.unbind(1))
 	GameState.oirm_changed.connect(_on_pod_or_oirm_changed)
 	GameState.jobs_changed.connect(_on_jobs_changed)
@@ -274,7 +278,7 @@ func _show_game_choices() -> void:
 	_careful_check.disabled = not unlocked
 	_careful_check.set_pressed_no_signal(unlocked and MinigameSettings.careful())
 	_careful_check.text = "CAREFUL" if unlocked else "CAREFUL (Calibration %d)" % level
-	_careful_check.tooltip_text = "Play the bench game on every bench calibration: today's bench game: for a smaller as-left residual (Set the Zero, Fixed Points, Pump to Points) or a smaller operator uncertainty (Hold the Reading)."
+	_careful_check.tooltip_text = "Play the bench game on every bench calibration. Today's game is named beside this: a smaller as-left residual for Set the Zero, Fixed Points and Pump to Points, a smaller operator uncertainty for Hold the Reading."
 	_game_option.select(_game_option.get_item_index(MinigameSettings.mode()))
 
 
@@ -286,10 +290,16 @@ func _on_game_mode_picked(index: int) -> void:
 ## Today's game for the instrument shown, named beside the game setting. Not for
 ## a job, a standard, or a farm with the games off.
 func _show_game_name() -> void:
+	_game_name_day = GameClock.get_day_index()
 	var sensor: DriftingSensor = null if _current_id.begins_with(JOB_PREFIX) else GameState.get_sensor(_current_id)
-	_game_name_label.visible = sensor != null and sensor.role != "standard" and MinigameSettings.mode() != MinigameSettings.Mode.OFF
+	# Only where the game will open: the same test as ZERO / CALIBRATE makes.
+	_game_name_label.visible = sensor != null and sensor.role != "standard" and not _calibrated and _zero_game_due(_current_id)
 	if _game_name_label.visible:
-		_game_name_label.text = "Today: %s" % MinigameScore.game_name(MinigameScore.bench_game(GameState, _current_id))
+		_game_name_label.text = "Today: %s" % MinigameScore.game_name(MinigameScore.bench_game(GameState, _current_id, _game_name_day))
+
+
+func _on_careful_toggled(_on: bool) -> void:
+	_show_game_name()
 
 
 ## Whether ZERO / CALIBRATE opens the bench game for the instrument shown.
@@ -361,6 +371,9 @@ func _on_upgrades_changed() -> void:
 ## A shown job can become impossible as the clock runs (the cancel cutoff
 ## gets too close): redraw it when its button would change.
 func _on_time_advanced() -> void:
+	# A new day can be another game.
+	if visible and _game_name_day != GameClock.get_day_index():
+		_show_game_name()
 	if not visible or not _current_id.begins_with(JOB_PREFIX):
 		return
 	var job: Dictionary = GameState.active_job(_current_id.trim_prefix(JOB_PREFIX))
@@ -385,7 +398,7 @@ func _on_instrument_selected(index: int) -> void:
 
 func _select(index: int) -> void:
 	_current_id = _ids[index]
-	_show_game_name()
+	_game_name_label.hide()
 	_calibrated = false
 	_away = _away_text()
 	_has_reference = GameState.has_bench_reference(_current_id)
@@ -404,6 +417,7 @@ func _select(index: int) -> void:
 			return
 	_calibrate_button.text = CALIBRATE_TEXT
 	_budget = GameState.calibration_budget(_current_id)
+	_show_game_name()
 	_limit = _budget.get("acceptance_limit", sensor.mpe)
 	for meter: BandMeter in [_found_meter, _left_meter]:
 		meter.mpe = sensor.mpe
@@ -573,7 +587,8 @@ func _on_calibrate_pressed() -> void:
 		var subject: String = GameState.instrument_name(id, true)
 		var mode: int = MinigameSettings.mode()
 		var share: float = MinigameScore.sweet_share(GameState, GameState.local_player_id)
-		match MinigameScore.bench_game(GameState, id):
+		_played_game = MinigameScore.bench_game(GameState, id)
+		match _played_game:
 			MinigameScore.HOLD_THE_READING:
 				var slowing: float = MinigameScore.sweet_share(GameState, GameState.local_player_id, MinigameScore.HOLD_SKILL)
 				_hold_game.play(slowing, mode, motion_seed, subject)
@@ -608,6 +623,7 @@ func _on_calibrate_pressed() -> void:
 	# One calibration per session with this instrument; re-enabled when the
 	# player switches instrument or reopens the bench.
 	_calibrated = true
+	_game_name_label.hide()
 	_calibrate_button.disabled = true
 	var sensor: DriftingSensor = GameState.get_sensor(_current_id)
 	# Judged as the host did, with the standard it used.
@@ -659,7 +675,7 @@ func _on_calibrate_pressed() -> void:
 	# The score the host counted. If one was sent and the host counted none (the
 	# kind was no longer new by the time it arrived), that is said too.
 	var zero_text: String = MinigameScore.result_text(int(record.get(MinigameScore.RECORD_KEY, MinigameScore.SKIPPED)),
-		MinigameScore.game_for(GameState, id))
+		_played_game if arguments.size() > 1 else MinigameScore.game_for(GameState, id))
 	if zero_text == "" and arguments.size() > 1:
 		zero_text = MinigameScore.NOT_COUNTED_TEXT
 	if zero_text != "":

@@ -42,6 +42,11 @@ var _score: int = MinigameScore.SKIPPED
 var _rng := RandomNumberGenerator.new()
 ## The real clock at the last frame, in microseconds.
 var _last_usec: int = 0
+## True while frames drive the game (not a test's advance()): a press may then
+## ask how far into the frame it came.
+var _live: bool = false
+var _hint_base: String = ""
+var _hint_skip: bool = false
 
 var _subject_label: Label
 var _stage_label: Label
@@ -78,6 +83,19 @@ func _start_point(_index: int) -> void:
 ## A subclass moves point play on by `seconds`.
 func _step(_seconds: float) -> void:
 	pass
+
+
+## Real seconds from the last step to now, for a press that came between frames:
+## 0 when a test, not frames, drives the game.
+func _press_lag() -> float:
+	if not _live:
+		return 0.0
+	return frame_step((Time.get_ticks_usec() - _last_usec) / 1000000.0)
+
+
+## How soon after the result shows a press goes on (RESULT_ARM_S).
+func _result_arm() -> float:
+	return RESULT_ARM_S
 
 
 ## The one button during play.
@@ -124,6 +142,8 @@ func _ready() -> void:
 	hide()
 	set_process(false)
 	_scale.draw.connect(_draw_scale)
+	# On press, not release: the hold time of a click is not part of the timing.
+	_action_button.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	_action_button.pressed.connect(_on_accept)
 	_skip_button.pressed.connect(skip)
 
@@ -237,13 +257,19 @@ func sweet_half() -> float:
 ## Real seconds, not the farm's: a faster or stopped farm clock must not move the game.
 func _process(_delta: float) -> void:
 	var now: int = Time.get_ticks_usec()
-	advance(frame_step((now - _last_usec) / 1000000.0))
+	_step_frame(frame_step((now - _last_usec) / 1000000.0))
 	_last_usec = now
+	_live = true
 	_refresh_prompts()
 
 
 ## Moves the game on by `seconds`. Tests call it in place of frames.
 func advance(seconds: float) -> void:
+	_live = false
+	_step_frame(seconds)
+
+
+func _step_frame(seconds: float) -> void:
 	if _stage == Stage.IDLE:
 		return
 	_time += seconds
@@ -269,7 +295,7 @@ func _on_accept() -> void:
 		Stage.PLAY:
 			_press_play()
 		Stage.RESULT:
-			if _time >= RESULT_ARM_S:
+			if _time >= _result_arm():
 				_finish(_score)
 	_scale.queue_redraw()
 
@@ -287,13 +313,13 @@ func _point_done(point_score: int) -> void:
 		_stage = Stage.SETTLE
 		_time = 0.0
 		_stage_label.text = "POINT %d TAKEN" % (_point + 1)
-		_hint_label.text = "Now the next point."
+		_set_hint("Now the next point.", false)
 	else:
 		_stage = Stage.RESULT
 		_time = 0.0
 		_score = mean_score(_point_scores)
 		_stage_label.text = "%s DONE" % game_name().to_upper()
-		_hint_label.text = MinigameScore.result_text(_score, game_id())
+		_set_hint(MinigameScore.result_text(_score, game_id()), false)
 		_action_button.disabled = true
 
 
@@ -303,15 +329,32 @@ func _begin_point(index: int) -> void:
 	_time = 0.0
 	_stage_label.text = "POINT %d OF %d" % [index + 1, point_count()]
 	_start_point(index)
-	_hint_label.text = _point_hint() + "\n" + SKIP_HINT % Controls.short_prompt(&"ui_cancel")
+	_set_hint(_point_hint(), true)
 	_scale.queue_redraw()
 
 
 func _finish(with_score: int) -> void:
 	_stage = Stage.IDLE
+	_live = false
 	set_process(false)
 	hide()
 	finished.emit(with_score)
+
+
+## The hint, with the skip line under it while a point is on. The skip line is
+## rebuilt each frame (_refresh_prompts) so it names the device used now.
+func _set_hint(base: String, with_skip: bool) -> void:
+	_hint_base = base
+	_hint_skip = with_skip
+	_show_hint()
+
+
+func _show_hint() -> void:
+	var text: String = _hint_base
+	if _hint_skip:
+		text += "\n" + SKIP_HINT % Controls.short_prompt(&"ui_cancel")
+	if _hint_label.text != text:
+		_hint_label.text = text
 
 
 ## The buttons name the key (or the pad button) the player uses now.
@@ -321,6 +364,7 @@ func _refresh_prompts() -> void:
 	var accept: String = "%s  [%s]" % [action_word(), Controls.short_prompt(&"ui_accept")]
 	if _action_button.text != accept:
 		_action_button.text = accept
+	_show_hint()
 	var cancel: String = "SKIP  [%s]" % Controls.short_prompt(&"ui_cancel")
 	if _skip_button.text != cancel:
 		_skip_button.text = cancel

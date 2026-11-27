@@ -10,11 +10,16 @@ extends BenchGame
 ## and how far the swing reaches (scale units, the scale runs -1 to 1), and the
 ## share of a second, faster wave added to it. All [PLACEHOLDER].
 const POINTS: Array[Dictionary] = [
-	{ "name": "ICE POINT", "value": "0.00 °C", "period_s": 3.4, "reach": 0.55, "extra": 0.0 },
-	{ "name": "BOIL POINT", "value": "100.00 °C", "period_s": 2.4, "reach": 0.7, "extra": 0.3 },
+	{ "name": "ICE POINT", "value": "0.00 °C", "period_s": 6.0, "reach": 0.5, "extra": 0.0 },
+	{ "name": "BOIL POINT", "value": "100.00 °C", "period_s": 5.0, "reach": 0.6, "extra": 0.15 },
 ]
 ## How many times faster the second wave runs than the first.
-const EXTRA_RATIO: float = 2.3
+const EXTRA_RATIO: float = 1.7
+## The green is this much wider than Set the Zero's, so that a perfect press has
+## a window about as long as Set the Zero's fine stop [PLACEHOLDER]. At Standard
+## the slowest crossing (the needle's top speed is about 0.83 scale units a
+## second) is inside the green for about 100 ms; on Sharp about 60 ms.
+const BAND_SCALE: float = 1.5
 
 var _phase: float = 0.0
 var _reading: float = 0.0
@@ -38,6 +43,11 @@ static func read_score(off: float, band_half: float) -> int:
 		return roundi(MinigameScore.MAX_SCORE - (MinigameScore.MAX_SCORE - SetTheZero.SWEET_SCORE) * far)
 	return clampi(floori(SetTheZero.SWEET_SCORE - (far - 1.0) * SetTheZero.SWEET_SCORE / (SetTheZero.MISS_AT - 1.0)),
 		0, SetTheZero.SWEET_SCORE - 1)
+
+
+func play(share: float, mode: int, motion_seed: int, subject: String = "") -> void:
+	super.play(share, mode, motion_seed, subject)
+	_sweet *= BAND_SCALE
 
 
 func game_name() -> String:
@@ -77,7 +87,10 @@ func _step(_seconds: float) -> void:
 func _press_play() -> void:
 	if _time < ARM_S:
 		return
-	_point_done(read_score(_reading, _sweet))
+	# The reading at the press itself, not at the last frame: a crossing is only
+	# tens of milliseconds, shorter than a frame at 30 per second.
+	var at: float = reading_at(_point, (_time + _press_lag()) * _speed, _phase)
+	_point_done(read_score(at, _sweet))
 
 
 func _draw_scale() -> void:

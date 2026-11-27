@@ -16,12 +16,16 @@ const STROKE_JITTER: float = 0.2
 const STROKE_GAP_S: float = 0.12
 ## The pressure that leaks away each second on Standard.
 const LEAK_PER_S: float = 0.1
-## Half the band's width on Standard at Calibration 1 is twice this; wider than
-## Set the Zero's, as a hand pump is coarser.
+## Half the band's width on Standard with no Calibration skill; twice this at
+## Calibration 1. Wider than Set the Zero's, as a hand pump is coarser.
 const BASE_BAND: float = 0.06
 ## Time in the band that takes a point, and the time allowed for a point.
 const DWELL_S: float = 1.5
+## Not scaled by the difficulty's speed [PLACEHOLDER]: Relaxed leaks slower, so it
+## only gets easier.
 const POINT_LIMIT_S: float = 10.0
+## The result takes a press only after this, so the last strokes do not close it.
+const RESULT_ARM_PUMP_S: float = 0.9
 const MAX_PRESSURE: float = 1.1
 
 var _pressure: float = 0.0
@@ -45,6 +49,10 @@ static func point_score(inside_s: float, outside_s: float) -> int:
 	if total <= 0.0:
 		return 0
 	return clampi(roundi(MinigameScore.MAX_SCORE * inside_s / total * minf(inside_s / DWELL_S, 1.0)), 0, MinigameScore.MAX_SCORE)
+
+
+func _result_arm() -> float:
+	return RESULT_ARM_PUMP_S
 
 
 func game_name() -> String:
