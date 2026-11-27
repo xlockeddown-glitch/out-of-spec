@@ -6,7 +6,7 @@ extends RefCounted
 ## Keyboard-only on purpose: the pad reaches these through the actions menu.
 const MENU_ONLY: Array[StringName] = [
 	&"place_stone", &"check_block", &"block_stack", &"survey", &"sell_lin", &"wheel_service",
-	&"open_robots", &"open_quests", &"open_skills", &"inventory", &"open_coop", &"open_controls",
+	&"open_robots", &"open_quests", &"open_skills", &"inventory", &"open_picker", &"open_coop", &"open_controls",
 	&"buy_1", &"buy_2", &"buy_3", &"buy_4", &"buy_5", &"buy_6", &"buy_7", &"buy_8", &"buy_9"]
 
 
@@ -112,7 +112,7 @@ func test_the_actions_keep_the_old_keys() -> String:
 	var keys: Dictionary = { &"get_out_in": KEY_F, &"place_stone": KEY_B, &"stone_kind": KEY_N, &"check_block": KEY_Q,
 		&"block_stack": KEY_J, &"survey": KEY_V, &"cycle_seed": KEY_C, &"sell_lin": KEY_L, &"wheel_service": KEY_Y,
 		&"open_robots": KEY_T, &"setpoint_down": KEY_BRACKETLEFT, &"setpoint_up": KEY_BRACKETRIGHT,
-		&"open_quests": KEY_O, &"open_skills": KEY_K, &"inventory": KEY_I, &"open_coop": KEY_F7, &"open_pause": KEY_ESCAPE,
+		&"open_quests": KEY_O, &"open_skills": KEY_K, &"inventory": KEY_I, &"open_picker": KEY_P, &"open_coop": KEY_F7, &"open_pause": KEY_ESCAPE,
 		&"interact": KEY_E, &"swap_scene": KEY_TAB, &"rover_forward": KEY_W, &"rover_reverse": KEY_S,
 		&"rover_steer_left": KEY_A, &"rover_steer_right": KEY_D, &"rover_till": KEY_SPACE,
 		&"rover_zero_steering": KEY_R, &"rover_dig": KEY_G, &"rover_lights": KEY_L, &"rover_fill": KEY_H }

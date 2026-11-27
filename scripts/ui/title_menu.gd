@@ -136,7 +136,9 @@ func _on_new_farm() -> void:
 func _start_new() -> void:
 	if _starting:
 		return
-	_open(SaveGame.start_new())
+	var problem: String = SaveGame.start_new()
+	PickerUI.offer_next = problem == ""
+	_open(problem)
 
 
 func _show_join() -> void:

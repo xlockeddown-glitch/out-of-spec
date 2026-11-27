@@ -49,6 +49,7 @@ const SHOWN_BY: Dictionary = {
 	&"shuttle_license_changed": ["shuttle_licensed"],
 	&"shuttle_trips_changed": ["shuttle_trips"],
 	&"wheels_changed": ["wheel_meters"],
+	&"loadouts_changed": ["player_loadouts"],
 }
 ## These also show the day.
 const SHOW_THE_DAY: Array[StringName] = [&"molt_changed", &"enclosures_changed", &"fissures_changed", &"jobs_changed"]

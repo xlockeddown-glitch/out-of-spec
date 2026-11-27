@@ -169,6 +169,13 @@ var _start_transform: Transform3D
 ## Another player drives, or on a guest nobody does: it shows where it is told.
 var _following: bool = false
 var _visual: Node3D
+## The picker's parts this rover is drawn and driven with, and whose they are (Loadout).
+## A new one is drawn when the driver or their parts change. The defaults are all 1.
+var _look_of: String = ""
+var _look_parts: Dictionary = Loadout.default_parts()
+var _look_node: Node3D
+var _factors: Dictionary = Loadout.drive(Loadout.default_parts())
+var _loadouts_dirty: bool = true
 var _tip := Quaternion.IDENTITY
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 
@@ -179,6 +186,7 @@ func _ready() -> void:
 	# rover is freed on a scene swap; the sensor outlives us.
 	steering.error_changed.connect(_on_steering_error_changed)
 	GameState.upgrades_changed.connect(_apply_upgrades)
+	GameState.loadouts_changed.connect(_on_loadouts_changed)
 	SaveGame.saving.connect(_park)
 	add_to_group(GameState.LIVE_ROVER_GROUP)
 	GameState.farm_loaded.connect(_unpark)
@@ -342,6 +350,7 @@ func _physics_process(delta: float) -> void:
 		_sample_local_input(throttle if moves else 0.0)
 	_cancel_drifted_digs()
 	_deliver_uplink()
+	_refresh_loadout()
 	if moves:
 		_drive(delta)
 		CoopRovers.moved(rover_id, global_transform, _speed_mps, has_line_of_sight)
@@ -487,19 +496,19 @@ func _execute(cmd: UplinkCommand) -> void:
 # --- Drive & drift ----------------------------------------------------------
 
 func _drive(delta: float) -> void:
-	var top_speed: float = max_speed_mps if _applied_throttle >= 0.0 else reverse_speed_mps
+	var top_speed: float = (max_speed_mps if _applied_throttle >= 0.0 else reverse_speed_mps) * _factors[&"speed"]
 	# Slower wading [PLACEHOLDER].
 	var here := Vector2(global_position.x, global_position.z)
 	if Terrain.water_depth_m(here) > 0.0 or PitWater.is_wading(here):
-		top_speed *= Terrain.WATER_SPEED
+		top_speed *= minf(1.0, Terrain.WATER_SPEED * _factors[&"wade"])
 	var target_speed: float = _applied_throttle * top_speed
-	var rate: float = acceleration_mps2 if absf(target_speed) > absf(_speed_mps) else braking_mps2
+	var rate: float = acceleration_mps2 * _factors[&"accel"] if absf(target_speed) > absf(_speed_mps) else braking_mps2 * _factors[&"brake"]
 	_speed_mps = move_toward(_speed_mps, target_speed, rate * delta)
 
 	if absf(_speed_mps) > 0.01:
 		# Kinematic bicycle model: yaw rate = v / L * tan(steer angle).
 		# Drift is an offset on the steering zero, so a hands-off rover curves.
-		var steer_rad: float = deg_to_rad(_applied_steer * max_steer_deg + steering_drift_deg)
+		var steer_rad: float = deg_to_rad(_applied_steer * max_steer_deg * _factors[&"turn"] + steering_drift_deg)
 		rotate_y(_speed_mps / wheelbase_m * tan(steer_rad) * delta)
 
 	var forward: Vector3 = -global_transform.basis.z
@@ -723,6 +732,71 @@ func _try_boulder() -> bool:
 				till_rejected.emit("The boulder was not drilled.")
 		return true
 	return false
+
+
+## Whose parts the rover wears and drives with: the driver's; when nobody drives, the
+## last driver's for as long as they are still in the game (so it does not change shape
+## each time a guest stops); else the host's (the one who owns the farm), else this
+## player's when playing alone.
+func loadout_owner() -> String:
+	var driver: String = CoopRovers.driver(rover_id)
+	if driver != "":
+		return driver
+	if _look_of != "" and (CoopSession.players.has(_look_of) or (CoopSession.players.is_empty() and _look_of == GameState.local_player_id)):
+		return _look_of
+	return CoopSession.players[0] if not CoopSession.players.is_empty() else GameState.local_player_id
+
+
+func _on_loadouts_changed() -> void:
+	_loadouts_dirty = true
+
+
+## The drive multipliers now in use (Loadout.DRIVE_KEYS).
+func drive_factors() -> Dictionary:
+	return _factors
+
+
+## The parts the rover is drawn with now.
+func look_parts() -> Dictionary:
+	return _look_parts
+
+
+## Draws the chassis, power unit and wheels of `loadout_owner()` and takes their drive
+## multipliers, when either changed. Nothing is drawn for the default parts.
+func _refresh_loadout() -> void:
+	var who: String = loadout_owner()
+	if who == _look_of and not _loadouts_dirty:
+		return
+	_loadouts_dirty = false
+	var parts: Dictionary = GameState.loadout_of(who)["parts"]
+	if who == _look_of and parts == _look_parts:
+		return
+	_look_of = who
+	_look_parts = parts
+	_factors = Loadout.drive(parts)
+	if _look_node != null:
+		_look_node.get_parent().remove_child(_look_node)
+		_look_node.free()
+		_look_node = null
+	var specs: Array = []
+	for slot: StringName in [Loadout.CHASSIS, Loadout.POWER, Loadout.WHEELS]:
+		specs.append_array(Loadout.part(slot, parts[slot])["look"])
+	if specs.is_empty():
+		return
+	_look_node = Node3D.new()
+	_look_node.name = "LoadoutLook"
+	for spec: Dictionary in specs:
+		var mesh := BoxMesh.new()
+		mesh.size = spec["size"]
+		var material := StandardMaterial3D.new()
+		material.albedo_color = spec["color"]
+		material.roughness = 0.9
+		mesh.material = material
+		var box := MeshInstance3D.new()
+		box.mesh = mesh
+		box.position = spec["at"]
+		_look_node.add_child(box)
+	(_visual if _visual != null else self).add_child(_look_node)
 
 
 func _apply_upgrades() -> void:

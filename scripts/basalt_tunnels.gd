@@ -119,6 +119,7 @@ func _ready() -> void:
 	_on_credibility_changed(0)
 	_hud.get_parent().add_child(SkillsUI.new())
 	_hud.get_parent().add_child(ToolRollUI.new())
+	_hud.get_parent().add_child(PickerUI.new())
 	_hud.get_parent().add_child(ControlsGuideUI.new())
 	_hud.get_parent().add_child(QuestsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())

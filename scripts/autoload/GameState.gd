@@ -75,6 +75,8 @@ signal quests_changed
 signal xp_certificates_changed
 ## A one-use reward was given or spent (one_use_held).
 signal one_use_changed
+## A player's character name or loadout changed (player_loadouts).
+signal loadouts_changed
 
 enum MoltStage { ACTIVE, PRE_MOLT, MOLTED }
 
@@ -516,6 +518,10 @@ var xp_certificates_spent: Dictionary = {}
 ## free refit). give_one_use() writes it; the action it is for spends it, on the
 ## host only (buy_standard, clear_lab_area). It stays on the farm that gave it.
 var one_use_held: Dictionary = {}
+## Player id -> { "name": the character's name, "parts": slot -> part id } (Loadout).
+## A player with no entry has the defaults and no name. set_loadout() is the only
+## writer, for the player who asks; the host keeps it and syncs it to every guest.
+var player_loadouts: Dictionary = {}
 ## Crop id -> how many of that crop Lin has bought in spec, from the whole farm.
 ## sell_harvest_to_lin() is the only writer; a quest counts it.
 var crops_sold_in_spec: Dictionary = {}
@@ -723,7 +729,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -974,6 +980,13 @@ func farm_dict_problem(data: Dictionary) -> String:
 		quest_problem = one_use_problem(data.get("one_use_held", {}))
 	if quest_problem != "":
 		return quest_problem
+	var loadouts: Variant = data.get("player_loadouts", {})
+	if (loadouts as Dictionary).size() > MAX_KNOWN_GUESTS + 1:
+		return "'player_loadouts' has too many players."
+	for who: Variant in loadouts:
+		var loadout_problem: String = Loadout.entry_problem(loadouts[who]) if who is String else "a player that is not text"
+		if loadout_problem != "":
+			return "'player_loadouts' has %s." % loadout_problem
 	if data.get("wheel_meters", 0.0) < 0.0:
 		return "'wheel_meters' is not a distance driven."
 	var kept: Array = data.get("lab_gates_kept", [])
@@ -1086,6 +1099,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	quests_changed.emit()
 	xp_certificates_changed.emit()
 	one_use_changed.emit()
+	loadouts_changed.emit()
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
 	silk_changed.emit(optical_silk_spools)
@@ -1939,6 +1953,7 @@ func _forget_a_guest(players: Array[String]) -> void:
 			xp_certificates.erase(player_id)
 			xp_certificates_spent.erase(player_id)
 			one_use_held.erase(player_id)
+			player_loadouts.erase(player_id)
 			for entry: Variant in quest_state.values():
 				if entry is Dictionary and entry.get("players") is Array:
 					(entry["players"] as Array).erase(player_id)
@@ -2551,6 +2566,35 @@ func _spend_one_use(reward_id: String, player_id: String = "") -> bool:
 		one_use_held.erase(holder)
 	one_use_changed.emit()
 	return true
+
+
+## The character's name and parts of `player_id` (the local player's when empty), as
+## Loadout makes them: every slot filled, an unknown part the default.
+func loadout_of(player_id: String = "") -> Dictionary:
+	var kept: Variant = player_loadouts.get(_player(player_id), {})
+	var name_text: Variant = (kept as Dictionary).get("name", "") if kept is Dictionary else ""
+	return { "name": Loadout.clean_name(name_text), "parts": Loadout.clean((kept as Dictionary).get("parts", {}) if kept is Dictionary else {}) }
+
+
+## Sets the character's name and parts for `player_id` only (a request carries no
+## other player). `choice` is Loadout.encode()'s text: one part index per slot. Returns
+## "" or why not; nothing changes when it refuses. A name over Loadout.MAX_NAME is
+## refused, not cut. Allowed anywhere: it is paperwork, not farm work.
+func set_loadout(character_name: String, choice: String, player_id: String = "") -> String:
+	player_id = _player(player_id)
+	if character_name.strip_edges().length() > Loadout.MAX_NAME:
+		return "A name is %d characters at most." % Loadout.MAX_NAME
+	var parts: Dictionary = Loadout.decode(choice)
+	if parts.is_empty():
+		return "That is not a loadout."
+	if not player_loadouts.has(player_id) and player_loadouts.size() > MAX_KNOWN_GUESTS:
+		return "The farm knows too many players."
+	var entry: Dictionary = { "name": Loadout.clean_name(character_name), "parts": parts }
+	if player_loadouts.get(player_id, {}) == entry:
+		return ""
+	player_loadouts[player_id] = entry
+	loadouts_changed.emit()
+	return ""
 
 
 ## "" or why saved one_use_held can't be loaded: holder -> reward id -> a count
