@@ -103,15 +103,16 @@ Each biome has one marked place on its road: **a sign and a rover-sized pad**. T
 
 ### 3.1 Distances
 
-The land is 160 m square today. I did not trace the rover's top speed, so times are [ASSUMPTION] and the first PR measures them (§6).
+The land is 160 m square today. The times are measured (PR 211, `tools/measure_land.gd`): the rover tops out at 6 m/s after 0.75 s, and the walker goes 4 m/s. They are straight lines on flat ground, so hills and turns add some.
 
 | Trip | Straight line | On foot | By rover |
 |---|---|---|---|
-| Farm centre to the dome airlock | about 16 m | well under a minute | a few seconds |
-| Farm centre to the tunnel mouth | about 28 m | about a minute | about 10 seconds |
-| Farm centre to the relay | about 100 m | several minutes | under a minute |
-| Farm centre to a new biome marker | 50 to 70 m [PLACEHOLDER] | 2 to 3 minutes | 20 to 30 seconds |
+| Farm centre to the dome airlock | about 16 m | 4 seconds | 3 seconds |
+| Farm centre to the tunnel mouth | about 28 m | 7 seconds | 5 seconds |
+| Farm centre to the relay | about 100 m | 25 seconds | 17 seconds |
+| Farm centre to a new biome marker | 50 to 70 m [PLACEHOLDER] | 15 seconds at 60 m | 10 seconds at 60 m |
 
+- Farther out: 100 m is 25 seconds on foot and 17 by rover; 115 m (the 240 m edge) is 29 seconds on foot and 20 by rover.
 - **Walking is for the middle** (farm, Lab Quarter, Landing Field), where the walkers go (`scripts/walker/`).
 - **The rover is for the ring**, as it already is for the dome and the tunnels (`docs/decisions.md`, co-op).
 - **The land grows to about 240 m** (Question 5). The old 160 m middle keeps its heights, and the new outer ring gives the biomes room (§7.1).
@@ -127,8 +128,18 @@ The biggest technical choice.
 | **C. A scene per biome** | Like the dome and the tunnels: a pad switches scene. | Matches `zones.md` (one scene per PC), but "the rover is in one place" (`rover_in_tunnels`) grows into one flag per biome. | **Medium to high [RISK].** Breaks the open land Ryan asked for. |
 
 - **A is the plan.** One `Terrain`, one dig grid, one save.
-- **[RISK] The ground is computed from a point every meter.** 160 m is 161 by 161 points; doubling the width quadruples that. Measure before choosing a larger size.
-- **[RISK] The uplink.** The ground blocks the relay (`docs/decisions.md`). More hills and a wider land mean more dead spots. A second relay for the far edge is a possible fix [ASSUMPTION].
+
+**Measured (PR 211).** The middle 160 m keeps today's heights exactly; past it the ground eases from the old edge's height to the same height function with its rim at the new edge (`Terrain.natural_on`). Build is the ground's height grid plus all its meshes, median of 3, headless on one PC.
+
+| | 160 m | 240 m |
+|---|---|---|
+| Ground build | 268 ms | 690 ms |
+| Points / chunks / vertices | 25,921 / 100 / 153,600 | 58,081 / 225 / 345,600 |
+| Uplink dead spots (every 4 m) | 7.8 % (131 of 1,681) | 6.7 % (250 of 3,721) |
+
+At 240 m the new outer ring alone is 5.8 % dead (119 of 2,040). The ground does not depend on the farm seed, so one result stands for every seed. Hills and rocks both block the uplink and are counted; the four loose boulders are not.
+- **The ground is computed from a point every meter.** 160 m is 161 by 161 points; 240 m is 2.2 times that. Measured: about 0.7 s to build, once, at the start.
+- **[RISK] The uplink.** The ground blocks the relay (`docs/decisions.md`). More hills and a wider land mean more dead spots. A second relay for the far edge is a possible fix [ASSUMPTION]; the measured dead share is about 7 % at both sizes.
 - **Zones stay scenes.** A zone entrance on the surface uses the pad-and-E pattern the tunnel mouth uses.
 
 ### 3.3 Co-op

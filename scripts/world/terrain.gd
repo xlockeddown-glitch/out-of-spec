@@ -120,18 +120,33 @@ static func _from_level(at: Vector2) -> float:
 
 
 ## Only adds, multiplies and roots, which come out alike on every PC.
-static func _work_out(x: int, z: int) -> float:
-	return roundf(_wash(Vector2(x, z), _land(x, z)) * HEIGHT_PARTS) / HEIGHT_PARTS
+static func _work_out(x: int, z: int, half_m: int = HALF_M) -> float:
+	return roundf(_wash(Vector2(x, z), _land(x, z, half_m)) * HEIGHT_PARTS) / HEIGHT_PARTS
+
+
+## The natural ground at a point if the land were `half_m` out from the middle
+## instead of HALF_M. Inside today's land it is today's ground exactly. Outside,
+## it eases from the height at the old edge (the nearest point of today's land)
+## to the same function with its rim at the new edge, over the way between the two
+## edges. Only for measuring a bigger land (LandMeasure); nothing in play calls it,
+## and it keeps no cache. A land grown for real can use the same rule.
+static func natural_on(point: Vector2i, half_m: int) -> float:
+	var out_m: int = maxi(absi(point.x), absi(point.y))
+	if out_m <= HALF_M:
+		return _work_out(point.x, point.y)
+	var edge := Vector2i(clampi(point.x, -HALF_M, HALF_M), clampi(point.y, -HALF_M, HALF_M))
+	var along: float = float(out_m - HALF_M) / float(maxi(half_m - HALF_M, 1))
+	return lerpf(_work_out(edge.x, edge.y), _work_out(point.x, point.y, half_m), _ease(along))
 
 
 ## The land without the wash.
-static func _land(x: int, z: int) -> float:
+static func _land(x: int, z: int, half_m: int = HALF_M) -> float:
 	var at := Vector2(x, z)
 	var level_m: float = _from_level(at)
 	if level_m <= 0.0:
 		return 0.0
 	var land_m: float = ROLL_M * (_roll(x, z) - ROLL_BELOW)
-	var edge_m: float = HALF_M - maxi(absi(x), absi(z))
+	var edge_m: float = half_m - maxi(absi(x), absi(z))
 	land_m = lerpf(land_m, RIM_M, _ease(1.0 - edge_m / RIM_WIDTH_M)) * _ease(level_m / BLEND_M)
 	for hill: Vector4 in HILLS:
 		land_m = lerpf(land_m, hill.z, _side(1.0 - at.distance_to(Vector2(hill.x, hill.y)) / hill.w))

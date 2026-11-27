@@ -12,6 +12,10 @@ const HIGH_M: float = 6.0
 const LOW_M: float = -1.0
 
 @export var material: Material
+## How far the land reaches from its middle. Only LandMeasure sets it, before the
+## ground is added, to build a bigger land than play has: 2 * half_m must be a
+## multiple of CHUNK_M, and show_dug (digging) is for play's size only.
+var half_m: int = Terrain.HALF_M
 
 var _dug: Dictionary[Vector2i, int] = {}
 ## The pads' level points shown (Terrain.level_points).
@@ -26,22 +30,28 @@ var _tints := PackedColorArray()
 
 func _ready() -> void:
 	# The rover looks for the ground under it before the scene shows what was dug.
+	assert((2 * half_m) % CHUNK_M == 0, "half_m must make whole chunks")
 	_dug = GameState.dug.duplicate()
 	_levelled = Terrain.level_points.duplicate()
-	_heights.resize((Terrain.SIZE_M + 1) * (Terrain.SIZE_M + 1))
+	_heights.resize((2 * half_m + 1) * (2 * half_m + 1))
 	_tints.resize(_heights.size())
-	for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
-		for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
-			_heights[_index(x, z)] = Terrain.point_height(Vector2i(x, z), _dug)
-			_tints[_index(x, z)] = _tint(Terrain.natural(Vector2i(x, z)))
-	_shape.map_width = Terrain.SIZE_M + 1
-	_shape.map_depth = Terrain.SIZE_M + 1
+	for z: int in range(-half_m, half_m + 1):
+		for x: int in range(-half_m, half_m + 1):
+			if half_m == Terrain.HALF_M:
+				_heights[_index(x, z)] = Terrain.point_height(Vector2i(x, z), _dug)
+				_tints[_index(x, z)] = _tint(Terrain.natural(Vector2i(x, z)))
+			else:
+				var natural_m: float = Terrain.natural_on(Vector2i(x, z), half_m)
+				_heights[_index(x, z)] = natural_m
+				_tints[_index(x, z)] = _tint(natural_m)
+	_shape.map_width = 2 * half_m + 1
+	_shape.map_depth = 2 * half_m + 1
 	_shape.map_data = _heights
 	var collision := CollisionShape3D.new()
 	collision.shape = _shape
 	add_child(collision)
-	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M, CHUNK_M):
-		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M, CHUNK_M):
+	for x: int in range(-half_m, half_m, CHUNK_M):
+		for z: int in range(-half_m, half_m, CHUNK_M):
 			var chunk := MeshInstance3D.new()
 			chunk.material_override = material
 			add_child(chunk)
@@ -75,7 +85,7 @@ func show_dug(dug: Dictionary[Vector2i, int]) -> void:
 		var corner: Vector2i = cell * Terrain.CELL_M
 		for x: int in range(corner.x, corner.x + Terrain.CELL_M + 1):
 			for z: int in range(corner.y, corner.y + Terrain.CELL_M + 1):
-				if absi(x) > Terrain.HALF_M or absi(z) > Terrain.HALF_M:
+				if absi(x) > half_m or absi(z) > half_m:
 					continue
 				_heights[_index(x, z)] = Terrain.point_height(Vector2i(x, z), _dug)
 				# A point's height also sets its neighbors' normals, and a point on a
@@ -150,7 +160,7 @@ func _add_face(points: PackedVector3Array, normals: PackedVector3Array, corners:
 
 
 func _normal(x: int, z: int) -> Vector3:
-	var limit: int = Terrain.HALF_M
+	var limit: int = half_m
 	var west: float = _heights[_index(maxi(x - 1, -limit), z)]
 	var east: float = _heights[_index(mini(x + 1, limit), z)]
 	var north: float = _heights[_index(x, maxi(z - 1, -limit))]
@@ -171,7 +181,7 @@ func _point(x: int, z: int) -> Vector3:
 
 
 func _index(x: int, z: int) -> int:
-	return (z + Terrain.HALF_M) * (Terrain.SIZE_M + 1) + x + Terrain.HALF_M
+	return (z + half_m) * (2 * half_m + 1) + x + half_m
 
 
 func _chunk_of(point: Vector2i) -> Vector2i:
