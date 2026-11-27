@@ -20,8 +20,6 @@ const MAX_DEPTH: int = 1
 const HATCH_CELL := Vector2i(8, 16)
 const CRATE_CELL := Vector2i(12, 18)
 const SIGN_CELL := Vector2i(8, 18)
-## The lab level below which the entrance warns (it never blocks) [PLACEHOLDER].
-const SOFT_LEVEL: int = 18
 ## Cold gained per game hour, in percent [PLACEHOLDER]; a full day is 24 hours.
 const COLD_PER_HOUR: float = 10.0
 ## Past this much cold the instruments drift [PLACEHOLDER].
@@ -45,7 +43,6 @@ const REWARDS: Dictionary = {
 	"probe": { "credits": 24 },
 }
 const NAMES: Dictionary = { "core": "an ice core", "mineral": "a mineral", "probe": "a frozen probe" }
-const WARNING_TEXT: String = "The Ice Caves are cold. A pack drifts out of spec after a few hours; a heater cartridge from the hub crate resets it."
 
 
 # --- The hub --------------------------------------------------------------------

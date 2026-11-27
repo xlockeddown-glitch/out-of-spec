@@ -53,8 +53,8 @@ func _at_crate(gs: GameStateScript) -> void:
 func test_under_lab_level_eighteen_the_ramp_warns_and_still_lets_you_in() -> String:
 	if ZoneData.warning_text(&"ice_caves", 3) == "" or ZoneData.warning_text(&"ice_caves", 17) == "":
 		return "A lab level under 18 got no warning at the ramp."
-	if ZoneData.warning_text(&"ice_caves", IceDepth.SOFT_LEVEL) != "":
-		return "Lab level 18 is in the band: no warning."
+	if ZoneData.warning_text(&"ice_caves", ZoneData.band(&"ice_caves").x) != "":
+		return "The band's first level is in the band: no warning."
 	var gs: GameStateScript = _state()
 	var let_in: String = _inside(gs)  # the warning is the screen's; the host does not gate on level
 	var zone: String = gs.rover_zone
@@ -315,8 +315,12 @@ func test_the_new_field_round_trips_and_an_old_save_loads() -> String:
 			return "The rover did not go in."
 		var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
 		var back: GameStateScript = _state()
-		if back.farm_from_dict(data) != "" or not back.cold_since.has(HOST) or not is_equal_approx(float(back.cold_since[HOST]), 3.0):
-			problems.append("The cold stamp did not survive a save: %s." % [back.cold_since])
+		var saved: Dictionary = data.get("cold_since", {})
+		if not saved.has(HOST) or not is_equal_approx(float(saved[HOST]), 3.0):
+			problems.append("The cold stamp was not saved: %s." % [saved])
+		# A load clears the places, so it drops the stamps with them; arriving stamps again.
+		if back.farm_from_dict(data) != "" or not back.cold_since.is_empty():
+			problems.append("A load kept a stamp with no place: %s." % [back.cold_since])
 		for bad: Variant in [3, { 7: 1.0 }, { HOST: "now" }, { HOST: -1.0 }, { HOST: INF }]:
 			var junk: Dictionary = gs.farm_to_dict()
 			junk["cold_since"] = bad
@@ -344,6 +348,43 @@ func test_the_new_field_round_trips_and_an_old_save_loads() -> String:
 		back.free()
 		return "")
 	return run if run != "" else "\n".join(problems)
+
+
+## The host joins a rover that is already in the caves (a scene swap with no host command), or
+## loads a save with the rover there and no stamp: arriving still starts the host's cold.
+func test_a_host_who_joins_a_rover_already_in_the_caves_gets_a_cold_stamp() -> String:
+	var problems: Array[String] = []
+	var run: String = _at(4.0, func() -> String:
+		var gs: GameStateScript = _state()
+		gs.rover_zone = ZONE
+		gs.rover_in_tunnels = true
+		if gs.cold_since.has(HOST):
+			return "The host had a stamp before arriving."
+		# The arrival path: the scene reports its place and nothing else.
+		gs._set_place(HOST, ZONE, 0)
+		if not gs.cold_since.has(HOST) or not is_equal_approx(float(gs.cold_since[HOST]), 4.0):
+			problems.append("Joining a rover already in the caves gave no stamp: %s." % [gs.cold_since])
+		# A save with the rover in the caves and no stamp for the host.
+		var data: Dictionary = gs.farm_to_dict()
+		data["rover_zone"] = ZONE
+		data.erase("cold_since")
+		var back: GameStateScript = _state()
+		if back.farm_from_dict(data) != "":
+			problems.append("The save with no stamp did not load.")
+		GameClock.elapsed_days = 4.5
+		back._set_place(HOST, ZONE, 0)
+		if not back.cold_since.has(HOST) or not is_equal_approx(float(back.cold_since[HOST]), 4.5):
+			problems.append("A loaded save with the rover in the caves gave no stamp on arrival: %s." % [back.cold_since])
+		# A second report from the same place keeps the stamp it has.
+		GameClock.elapsed_days = 5.0
+		back._set_place(HOST, ZONE, 1)
+		if not is_equal_approx(float(back.cold_since.get(HOST, -1.0)), 4.5):
+			problems.append("Going down a depth restarted the cold.")
+		gs.free()
+		back.free()
+		return "")
+	return run if run != "" else "
+".join(problems)
 
 
 func test_the_protocol_is_38() -> String:

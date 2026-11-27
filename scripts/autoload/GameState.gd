@@ -1143,6 +1143,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	settle_rover_depth(false)
 	sentinel_sighted = false
 	player_places.clear()
+	_prune_cold()
 	_settle_trips_on_load()
 	_recall_warned_day = 0
 	_recall_rescued_day = 0
@@ -4695,7 +4696,7 @@ func _track_cold(player_id: String, was_in_caves: bool) -> void:
 	if FarmCommands.guest:
 		return
 	var in_caves: bool = player_places.has(player_id) and place_of(player_id) == IceDepth.ZONE
-	if in_caves and not was_in_caves:
+	if in_caves and (not was_in_caves or not cold_since.has(player_id)):
 		cold_since[player_id] = GameClock.elapsed_days
 		ice_changed.emit()
 	elif not in_caves and cold_since.has(player_id):
@@ -5049,7 +5050,7 @@ func move_rover_mine(into: bool, player_id: String = "") -> String:
 	return _move_rover(MineDepth.ZONE, into, player_id)
 
 
-## Host: the same for the Ice Caves' ramp at the north edge. No key: below IceDepth.SOFT_LEVEL
+## Host: the same for the Ice Caves' ramp at the north edge. No key: below the zone band's first level (zones.json)
 ## the entrance only warns (main_farm); the rover goes in all the same.
 func move_rover_ice(into: bool, player_id: String = "") -> String:
 	return _move_rover(IceDepth.ZONE, into, player_id)

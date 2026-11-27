@@ -173,7 +173,7 @@ func note_arrival(path: String) -> void:
 	if FarmCommands.guest:
 		CoopScenes.report_scene(path)
 	else:
-		GameState.player_places[GameState.local_player_id] = at
+		GameState._set_place(GameState.local_player_id, str(at[0]), int(at[1]))
 
 
 func _note_outside(path: String) -> void:
