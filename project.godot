@@ -31,9 +31,9 @@ CoopSync="*res://scripts/autoload/CoopSync.gd"
 SceneSwitcher="*res://scripts/autoload/SceneSwitcher.gd"
 CoopRovers="*res://scripts/autoload/CoopRovers.gd"
 CoopWalkers="*res://scripts/autoload/CoopWalkers.gd"
-CoopBeds="*res://scripts/autoload/CoopBeds.gd"
 CoopProfile="*res://scripts/autoload/CoopProfile.gd"
 CoopScenes="*res://scripts/autoload/CoopScenes.gd"
+CoopBeds="*res://scripts/autoload/CoopBeds.gd"
 
 [display]
 

@@ -12,6 +12,9 @@ func _out(farm: GameStateScript) -> void:
 	farm.sentinel_days_unseen = 4
 	farm.hygrometer.error = 0.0
 	farm.park_rover(farm.TUNNEL_ROVER, Transform3D(Basis.IDENTITY, farm.SENTINEL_AT + NEAR))
+	farm.rover_zone = farm.TUNNELS_ZONE
+	farm.rover_depth = 0
+	farm.player_places["player_2"] = [farm.TUNNELS_ZONE, 0]  # a guest asks from the rover's place
 
 
 func _run(body: Callable) -> String:
@@ -163,6 +166,8 @@ func test_the_cup_is_refused_when_it_should_be() -> String:
 		if farm.catch_sentinel(80.0) == "" or farm.set_rover_lights(true) == "":
 			return "The rover must be in the tunnels."
 		_out(farm)
+		farm.player_places["player_2"] = [farm.TUNNELS_ZONE, 0]
+		farm.player_places["player_3"] = [farm.TUNNELS_ZONE, 0]
 		CoopRovers._drivers[farm.TUNNEL_ROVER] = ["player_2", Time.get_ticks_msec() + 100000]
 		var other: String = farm.catch_sentinel(80.0, "player_3")
 		var lights: String = farm.set_rover_lights(true, "player_3")

@@ -64,8 +64,16 @@ func _ready() -> void:
 	_panel.hide()
 
 
+## The rover this screen is with: in the tunnels, the one below (a console's field rover too).
+func _rover_here() -> String:
+	var scene: Node = get_tree().current_scene
+	if scene != null and scene.scene_file_path == SceneSwitcher.TUNNELS_SCENE:
+		return GameState.TUNNEL_ROVER
+	return GameState.rover_here()
+
+
 func _process(_delta: float) -> void:
-	_strip.text = strip_text(CoopSession.players, GameState.local_player_id, CoopSession.is_hosting(), CoopSync.is_too_big(), CoopBeds.in_bed, CoopRovers.driver(GameState.rover_here()))
+	_strip.text = strip_text(CoopSession.players, GameState.local_player_id, CoopSession.is_hosting(), CoopSync.is_too_big(), CoopBeds.in_bed, CoopRovers.driver(_rover_here()))
 	if _panel.visible:
 		_refresh()
 

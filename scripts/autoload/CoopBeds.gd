@@ -25,6 +25,8 @@ func start(with_session: Node, with_clock: Node) -> void:
 	session = with_session
 	clock = with_clock
 	session.player_joined.connect(_look.unbind(1))
+	# Autoload order matters: CoopBeds loads after CoopScenes, so forget_place (which sends a
+	# lost rover home) has run before a day ends on a drop.
 	session.player_left.connect(_look.unbind(1))
 
 

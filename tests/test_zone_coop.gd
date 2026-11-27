@@ -84,6 +84,8 @@ func test_the_last_one_below_dropping_brings_the_lent_rover_home() -> String:
 	var beds: Node = BedsScript.new()
 	beds.start(host, clock)
 	clock.elapsed_days = 0.5
+	var at_morning: Array[String] = []
+	clock.day_started.connect(func(_day: int) -> void: at_morning.append(gs.rover_zone))
 	# The host is on the farm, in bed; the guest took the farm's rover down to depth 2
 	# and is driving it, and a vent has hurt it.
 	gs.rover_in_tunnels = true
@@ -95,6 +97,7 @@ func test_the_last_one_below_dropping_brings_the_lent_rover_home() -> String:
 	rovers._drivers[gs.TUNNEL_ROVER] = [gid, 1 << 60]
 	beds.go_to_bed(gs.local_player_id)
 	var waited: bool = clock.elapsed_days == 0.5 and gs.rover_zone == ZONE
+	var epoch: int = gs.rover_epoch
 	guest.leave()
 	_until(func() -> bool: return host.players.size() == 1)
 	var problems: Array[String] = []
@@ -112,6 +115,10 @@ func test_the_last_one_below_dropping_brings_the_lent_rover_home() -> String:
 		problems.append("A ghost still holds the drive lease")
 	if clock.elapsed_days == 0.5 or not beds.in_bed.is_empty():
 		problems.append("The day is still waiting for a guest who is gone")
+	if at_morning != [""]:
+		problems.append("The day must start after the rover is home, not before (rover_zone at the new day: %s)" % [at_morning])
+	if gs.rover_epoch == epoch:
+		problems.append("The rover coming home was not counted for the poses in flight")
 	beds.free()
 	clock.free()
 	rovers.free()
@@ -244,7 +251,8 @@ func test_a_late_guest_is_told_the_zone_state() -> String:
 		gs.rover_epoch = 5
 		gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.descent_position(2))
 		gs.player_places["player_1"] = [ZONE, 2]
-	return _join_late(setup, func(host: Node, guest: Node) -> String:
+		gs.zone_heat_trip = true
+	return _join_late(setup, func(_host: Node, guest: Node) -> String:
 		var theirs: GameStateScript = guest.commands.state
 		var problems: Array[String] = []
 		if ZoneDepth.taken_today(theirs.finds_taken, ZoneDepth.ZONE, _today()) != [str(find["id"])]:
@@ -263,8 +271,9 @@ func test_a_late_guest_is_told_the_zone_state() -> String:
 			problems.append("The newcomer was not told where the host is")
 		if theirs.zone_heat_trip:
 			problems.append("The newcomer was handed the host's heat trip")
-		return "
-".join(problems))
+		if not theirs.rover_transforms.has(theirs.TUNNEL_ROVER) or not theirs.rover_transforms[theirs.TUNNEL_ROVER].origin.is_equal_approx(ZoneDepth.descent_position(2)):
+			problems.append("The newcomer was not told where the rover below is")
+		return "\n".join(problems))
 
 
 func test_a_late_guest_joins_a_field_rover_trip() -> String:
@@ -293,10 +302,15 @@ func test_a_late_guest_cannot_take_a_find_already_taken_or_from_the_wrong_depth(
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, _find_at())
 	var guest: Node = _guest(host)
 	var gid: String = _guest_id(host)
+	gs.player_places[gid] = [ZONE, ZoneDepth.DEPTH + 1]
+	var deeper: Array = _request(guest, &"take_find", [str(find["id"]), _today()])
+	_until(func() -> bool: return not deeper.is_empty())
+	var problems: Array[String] = []
+	if deeper.is_empty() or deeper[0] == "":
+		problems.append("A guest at another depth than the rover took a find (%s)" % [deeper])
 	gs.player_places[gid] = [ZONE, ZoneDepth.DEPTH]
 	var asked: Array = _request(guest, &"take_find", [str(find["id"]), _today()])
 	_until(func() -> bool: return not asked.is_empty())
-	var problems: Array[String] = []
 	if asked.is_empty() or asked[0] == "":
 		problems.append("A find the farm already took was taken again by the newcomer (%s)" % [asked])
 	if gs.crystal_ore != 10 or gs.credits != 500:
@@ -343,7 +357,7 @@ func test_each_zone_command_is_checked_against_the_sender_s_own_place() -> Strin
 	for who: String in ["player_2", "player_3", "player_4"]:
 		if commands.execute(who, &"place_beacon", ["spot_west"]) == "":
 			problems.append("%s set a beacon below the hub" % who)
-	for who: String in ["player_2", "player_3", "player_4"]:
+	for who: String in ["player_2", "player_3", "player_4", "player_5"]:
 		if commands.execute(who, &"leave_zone", []) == "":
 			problems.append("%s left the zone from below the hub, or from where they are not" % who)
 	for who: String in ["player_2", "player_4"]:
@@ -354,12 +368,36 @@ func test_each_zone_command_is_checked_against_the_sender_s_own_place() -> Strin
 	# player_4 is where the rover is: the find is theirs.
 	if commands.execute("player_4", &"take_find", [str(find["id"]), day]) != "":
 		problems.append("A guest at the rover's depth could not take a find")
+	problems.append_array(_hub_controls(gs, commands))
 	commands.free()
 	gs.free()
 	return "\n".join(problems)
 
 
-func test_a_guest_at_depth_two_rides_the_lift_only_from_depth_two() -> String:
+## The same commands, from where they are allowed: the rover at the hub with the beacon
+## spot and the way home within its reach (the controls for the refusals above).
+func _hub_controls(gs: GameStateScript, commands: Node) -> Array[String]:
+	var problems: Array[String] = []
+	gs.rover_depth = 0
+	gs.rover_lent = false  # a field rover: leaving the zone is the player's own
+	gs.quest_state["beacon_run"] = { "accepted": 0, "steps_done": [], "base": {}, "shown": {}, "players": [], "done": -1 }
+	gs.player_places["player_6"] = [ZONE, 0]
+	gs.player_places["player_7"] = [ZonePresence.FARM, 0]
+	var spot: Vector3 = LavaHub.spot_position("spot_west")
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, spot)
+	if commands.execute("player_7", &"place_beacon", ["spot_west"]) == "" or not gs.beacons_placed.is_empty():
+		problems.append("A guest on the farm set a beacon in the hub")
+	if commands.execute("player_6", &"place_beacon", ["spot_west"]) != "" or gs.beacons_placed != ["spot_west"]:
+		problems.append("A guest in the hub could not set a beacon beside the rover")
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)
+	if commands.execute("player_7", &"leave_zone", []) == "":
+		problems.append("A guest on the farm left the zone")
+	if commands.execute("player_6", &"leave_zone", []) != "" or gs.place_of("player_6") != ZonePresence.DOME:
+		problems.append("A guest in the hub could not leave by the way home")
+	return problems
+
+
+func test_a_guest_rides_the_lift_only_from_the_depth_the_rover_is_at() -> String:
 	var gs: GameStateScript = GameStateScript.new()
 	gs.build_registry()
 	_fresh(gs)
@@ -374,7 +412,7 @@ func test_a_guest_at_depth_two_rides_the_lift_only_from_depth_two() -> String:
 	gs.player_places["player_3"] = [ZONE, 3]
 	var problems: Array[String] = []
 	if commands.execute("player_2", &"use_lift", [0]) == "" or gs.rover_depth != 3:
-		problems.append("A guest at depth 2 rode the depth 3 lift")
+		problems.append("A guest at depth 2 rode the lift of depth 3")
 	if commands.execute("player_3", &"use_lift", [0]) != "" or gs.rover_depth != 0:
 		problems.append("A guest at depth 3 could not ride up")
 	commands.free()
@@ -399,6 +437,8 @@ func test_a_find_is_reached_from_the_pose_a_guest_drove_to_not_the_parked_one() 
 	# The kept pose is far from the find; the guest, driving, has told the host it is on it.
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, at + Vector3(40.0, 0.0, 0.0))
 	rovers._poses[gs.TUNNEL_ROVER] = [[at.x, at.y, at.z, 0.0, 0.0, true], 0]
+	var saved: Array[int] = [0]
+	SaveGame.saving.connect(func() -> void: saved[0] += 1)
 	var problems: Array[String] = []
 	var took: String = gs.take_find(str(find["id"]), _today(), "player_2")
 	if took != "":
@@ -410,6 +450,8 @@ func test_a_find_is_reached_from_the_pose_a_guest_drove_to_not_the_parked_one() 
 	rovers._poses[gs.TUNNEL_ROVER] = [[there.x + 40.0, there.y, there.z, 0.0, 0.0, true], 0]
 	if gs.take_find(str(other["id"]), _today(), "player_2") == "":
 		problems.append("A find was taken from a rover the guest had driven away from it")
+	if saved[0] != 0:
+		problems.append("A guest's find saved this screen's own rover over the told pose")
 	rovers.free()
 	return _finish("\n".join(problems))
 
@@ -427,6 +469,8 @@ func test_a_beacon_is_set_from_the_pose_a_guest_drove_to_not_the_parked_one() ->
 	gs.player_places["player_2"] = [ZONE, 0]
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, spot + Vector3(40.0, 0.0, 0.0))
 	rovers._poses[gs.TUNNEL_ROVER] = [[spot.x, spot.y, spot.z, 0.0, 0.0, true], 0]
+	var saved: Array[int] = [0]
+	SaveGame.saving.connect(func() -> void: saved[0] += 1)
 	var problems: Array[String] = []
 	var set_down: String = gs.place_beacon("spot_west", "player_2")
 	if set_down != "" or gs.beacons_placed != ["spot_west"]:
@@ -436,5 +480,167 @@ func test_a_beacon_is_set_from_the_pose_a_guest_drove_to_not_the_parked_one() ->
 	rovers._poses[gs.TUNNEL_ROVER] = [[far.x, far.y, far.z, 0.0, 0.0, true], 0]
 	if gs.place_beacon("spot_east", "player_2") == "":
 		problems.append("A beacon was set from a rover the guest had driven away from it")
+	if saved[0] != 0:
+		problems.append("A guest's beacon saved this screen's own rover over the told pose")
+	rovers.free()
+	return _finish("\n".join(problems))
+
+
+# --- Round two: the review's fixes ----------------------------------------------
+
+func test_a_guest_who_went_in_and_stepped_into_the_dome_is_still_on_the_trip() -> String:
+	var all: Array = _farm_host()
+	var host: Node = all[0]
+	var gs: GameStateScript = all[1]
+	var rovers: Node = all[2]
+	var guest: Node = _guest(host)
+	var gid: String = _guest_id(host)
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD)
+	gs.player_places[gs.local_player_id] = [ZonePresence.FARM, 0]
+	gs.player_places[gid] = [ZonePresence.FARM, 0]
+	var epoch: int = gs.rover_epoch
+	var asked: Array = _request(guest, &"move_rover", [true])
+	_until(func() -> bool: return not asked.is_empty())
+	var problems: Array[String] = []
+	if asked != [""]:
+		problems.append("The guest could not take the rover in by the mouth (%s)" % [asked])
+	if gs.place_of(gid) != ZONE or not gs._trip_players.has(gid):
+		problems.append("The host did not note the guest below the moment the rover went in")
+	if gs.rover_epoch == epoch:
+		problems.append("The rover going in was not counted for the poses in flight")
+	gs.player_places[gid] = [ZonePresence.DOME, 0]  # Tab, in the fade or after it
+	guest.leave()
+	_until(func() -> bool: return host.players.size() == 1)
+	if gs.rover_zone != "" or gs.rover_lent or gs.rover_transforms.has(gs.TUNNEL_ROVER):
+		problems.append("The rover was left below by a guest who dropped from the dome")
+	rovers.free()
+	return _finish("\n".join(problems))
+
+
+func test_stopping_hosting_with_the_guest_alone_below_brings_the_rover_home() -> String:
+	var all: Array = _farm_host()
+	var host: Node = all[0]
+	var gs: GameStateScript = all[1]
+	var rovers: Node = all[2]
+	var guest: Node = _guest(host)
+	var gid: String = _guest_id(host)
+	gs.rover_in_tunnels = true
+	gs.rover_transforms[gs.TUNNEL_ROVER] = gs.TUNNEL_START
+	gs.zone_heat_trip = true
+	gs.player_places[gs.local_player_id] = [ZonePresence.FARM, 0]
+	gs.player_places[gid] = [ZONE, 0]
+	host.leave()  # STOP HOSTING
+	var problems: Array[String] = []
+	if gs.rover_zone != "" or gs.rover_lent or gs.rover_transforms.has(gs.TUNNEL_ROVER):
+		problems.append("The rover was left below when the host stopped hosting")
+	if gs.zone_heat_trip:
+		problems.append("The heat trip outlived the session")
+	if not gs.rover_transforms.has(gs.ROVER):
+		problems.append("The farm's rover is not on the farm")
+	if gs.player_places.has(gid):
+		problems.append("The host still holds the guest's place")
+	rovers.free()
+	return _finish("\n".join(problems))
+
+
+func test_the_rover_goes_in_from_the_farm_and_out_from_the_hub() -> String:
+	var gs: GameStateScript = GameStateScript.new()
+	gs.build_registry()
+	_fresh(gs)
+	gs.local_player_id = "player_1"
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_PAD)
+	var problems: Array[String] = []
+	gs.player_places["player_2"] = [ZonePresence.DOME, 0]
+	if gs.move_rover(true, "player_2") == "" or gs.rover_lent:
+		problems.append("A guest in the dome took the farm's rover in")
+	gs.player_places["player_2"] = [ZonePresence.FARM, 0]
+	var epoch: int = gs.rover_epoch
+	if gs.move_rover(true, "player_2") != "" or not gs.rover_lent:
+		problems.append("A guest on the farm could not take the rover in")
+	if gs.place_of("player_2") != ZONE or not gs._trip_players.has("player_2") or gs.rover_epoch != epoch + 1:
+		problems.append("Going in did not note the guest below and a new epoch")
+	gs.player_places["player_2"] = [ZONE, 1]
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.TUNNEL_EXIT)
+	if gs.move_rover(false, "player_2") == "" or not gs.rover_lent:
+		problems.append("A guest below the hub took the rover out")
+	gs.player_places["player_2"] = [ZONE, 0]
+	if gs.move_rover(false, "player_2") != "" or gs.rover_lent:
+		problems.append("A guest in the hub could not take the rover out")
+	if gs.place_of("player_2") != ZonePresence.FARM or not gs._trip_players.is_empty():
+		problems.append("Coming out did not put the guest on the farm and end the trip")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_the_cup_and_the_lights_are_for_a_guest_at_the_rover() -> String:
+	var gs: GameStateScript = GameStateScript.new()
+	gs.build_registry()
+	_fresh(gs)
+	gs.local_player_id = "player_1"
+	gs.rover_in_tunnels = true
+	gs.rover_depth = 0
+	gs.rover_lights = false
+	gs.sentinel_out = true
+	gs.sentinel_days_unseen = 4
+	gs.hygrometer.error = 0.0
+	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, gs.SENTINEL_AT + Vector3(3.0, 0.0, 0.0))
+	var problems: Array[String] = []
+	gs.player_places["player_2"] = [ZonePresence.FARM, 0]
+	if gs.catch_sentinel(80.0, "player_2") == "" or gs.is_caught(gs.SENTINEL):
+		problems.append("A guest on the farm used the cup")
+	if gs.set_rover_lights(true, "player_2") == "" or gs.rover_lights:
+		problems.append("A guest on the farm worked the lights")
+	gs.player_places["player_2"] = [ZONE, 1]
+	if gs.set_rover_lights(true, "player_2") == "" or gs.rover_lights:
+		problems.append("A guest below the hub worked the lights of a rover at another place")
+	gs.player_places["player_2"] = [ZONE, 0]
+	gs.rover_depth = 1
+	if gs.catch_sentinel(80.0, "player_2") == "" or gs.is_caught(gs.SENTINEL):
+		problems.append("The cup worked from below the hub")
+	gs.rover_depth = 0
+	var cup: String = gs.catch_sentinel(80.0, "player_2")
+	if cup != "" or not gs.is_caught(gs.SENTINEL):
+		problems.append("A guest at the rover could not use the cup (%s)" % cup)
+	if gs.set_rover_lights(true, "player_2") != "" or not gs.rover_lights:
+		problems.append("A guest at the rover could not work the lights")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_the_title_menu_is_never_held_by_a_console_trip_that_waits() -> String:
+	var pending: bool = FastTravel.pending
+	FastTravel.pending = true
+	var problems: Array[String] = []
+	if SceneSwitcher.swap_blocked(SceneSwitcher.TITLE_SCENE, SceneSwitcher.DOME_SCENE):
+		problems.append("A wait for the host held the player in the dome and kept them from the title menu")
+	if not SceneSwitcher.swap_blocked(SceneSwitcher.FARM_SCENE, SceneSwitcher.DOME_SCENE):
+		problems.append("The dome no longer holds while the answer is waited for")
+	FastTravel.pending = false
+	if SceneSwitcher.swap_blocked(SceneSwitcher.FARM_SCENE, SceneSwitcher.DOME_SCENE):
+		problems.append("The dome holds with no wait")
+	FastTravel.pending = pending
+	return "\n".join(problems)
+
+
+func test_a_leaver_stops_being_the_told_driver_and_the_walkers_ignore_a_field_rover() -> String:
+	var session: Node = _session()
+	var gs: GameStateScript = session.commands.state
+	var rovers: Node = RoversScript.new()
+	rovers.start(session, gs)
+	rovers._told_driver[gs.TUNNEL_ROVER] = "player_2"
+	rovers._on_left("player_2")
+	var problems: Array[String] = []
+	if rovers._told_driver.get(gs.TUNNEL_ROVER, "x") != "":
+		problems.append("A guest who left is still the told driver (the rover would be held for a ghost)")
+	var walkers: Node = load("res://scripts/autoload/CoopWalkers.gd").new()
+	walkers.start(session, gs, rovers)
+	walkers.out["player_2"] = true
+	gs._emit_field_rover_changed()
+	if not walkers.is_out("player_2"):
+		problems.append("A field rover starting or going put the walkers back in their rovers")
+	gs.rover_place_changed.emit()
+	if walkers.is_out("player_2"):
+		problems.append("The farm's rover moving did not forget the walkers")
+	walkers.free()
 	rovers.free()
 	return _finish("\n".join(problems))
