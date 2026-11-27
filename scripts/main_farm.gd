@@ -1263,6 +1263,7 @@ func _build_notice_board() -> void:
 	var world: Node3D = $WorldView/WorldViewport/World
 	var board: Node3D = LavaHubProps.board_node("FARM NOTICE BOARD")
 	board.position = NoticeBoard.FARM_POSITION
+	board.add_child(QuestBoardMarker.new())
 	world.add_child(board)
 	_notice_pad = ParkingPad.new()
 	_notice_pad.name = "NoticeBoardPad"
