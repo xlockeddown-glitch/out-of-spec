@@ -12,7 +12,7 @@ Short log of calls that shape code and data. Newest first.
 - **The license is the farm's:** `GameState.shuttle_licensed`, saved (SAVED_LATER, so an old save loads unlicensed) and shown to guests (FarmSync SHOWN_BY). Vance's `shuttle_exam` quest grants it through a `shuttle_license` reward; a farm quest only (`QuestEngine.data_problem`).
 - **The exam's check:** the engine's `count` of `cal_log` rows that are traceable, on time and not the Manager's: one clean calibration at the bench, by a player. Offered at lab level 20 by the quest's own `lab_level` gate, which a test holds equal to `Shuttle.license_level()`.
 - **`lab_gates` row left `built:false`:** the exam reads the quest's own gate and the economy number, not the row, so the row stays a table entry for tuning, as the other zone rows do.
-- **`book_shuttle(moon, people = 1)`:** a farm command a guest can send. It runs `trip_problem` on the host's clock and returns the reason. A refused trip takes no fare and posts no booking. It always refuses for now.
+- **`book_shuttle(moon, people)`:** a farm command a guest can send. It runs `trip_problem` on the host's clock and returns the reason. A refused trip takes no fare and posts no booking. It always refuses for now.
 - **`CoopSession.PROTOCOL` 30 to 31:** a new command and a new synced field.
 
 ## 2026-11-26: The land grows to 240 m (biomes step 2)

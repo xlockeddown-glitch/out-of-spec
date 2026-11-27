@@ -91,8 +91,8 @@ static func closes_at(moon: String, elapsed_days: float) -> float:
 	if not is_open(moon, elapsed_days):
 		return -1.0
 	var c: Array[float] = cycle(moon)
-	var into: float = fposmod(elapsed_days * 24.0 - c[2] + EPSILON_H, c[0])
-	return elapsed_days + (c[1] - into) / 24.0
+	var k: int = floori((elapsed_days * 24.0 - c[2] + EPSILON_H) / c[0])
+	return (float(k) * c[0] + c[2] + c[1]) / 24.0
 
 
 ## "14:20": the clock time of an elapsed time (the day runs 06:00 to 06:00).
@@ -104,7 +104,7 @@ static func clock_text(elapsed_days: float) -> String:
 
 ## "3 h 10 min", "40 min", or from a day on "1.5 days" (a span in game hours).
 static func span_text(hours: float) -> String:
-	if hours >= 24.0 - 0.01:
+	if ceili(hours * 60.0 - EPSILON_H * 60.0) >= 24 * 60:
 		var days: float = snappedf(hours / 24.0, 0.5)
 		var shown: String = str(int(days)) if is_equal_approx(days, roundf(days)) else str(days)
 		return "%s day%s" % [shown, "" if is_equal_approx(days, 1.0) else "s"]
@@ -158,9 +158,9 @@ static func trip_problem(moon: String, lab_level: int, licensed: bool, credits: 
 	if license != "":
 		return license
 	if not is_open(moon, elapsed_days):
-		return text("moon_down_text") % [moon_name(moon), window_line(moon, elapsed_days)]
+		return text("moon_down_text") % window_line(moon, elapsed_days)
 	if credits < fare() * people:
-		return text("short_text") % [moon_name(moon), SP811.integer(fare()), SP811.integer(credits)]
+		return text("short_text") % [moon_name(moon), SP811.integer(fare() * people), SP811.integer(fare()), SP811.integer(people), SP811.integer(credits)]
 	var day: int = floori(elapsed_days) + 1
 	var recall: float = TunnelRecall.at_hour(day, number("recall_hour", 2.0))
 	if elapsed_days + trip_hours() / 24.0 > recall + EPSILON_H / 24.0:
@@ -180,7 +180,15 @@ static func data_problem() -> String:
 	if trip_hours() <= 0.0 or trip_hours() >= 24.0:
 		return "a day trip must take under a day."
 	for moon: String in MOONS:
-		var c: Array[float] = cycle(moon)
-		if c[1] <= 0.0 or c[0] <= c[1] or c[2] < 0.0:
+		for key: String in ["open_hours", "offset_hours"]:
+			if typeof(DataManager.get_value(TABLE, PATH + moon + "/" + key)) not in [TYPE_INT, TYPE_FLOAT]:
+				return "%s '%s' is not a number." % [moon, key]
+		var open: float = number(moon + "/open_hours", 0.0)
+		var period: float = number(moon + "/period_hours", 0.0)
+		if period <= 0.0:
+			if typeof(DataManager.get_value(TABLE, PATH + moon + "/shut_hours")) not in [TYPE_INT, TYPE_FLOAT]:
+				return "%s has neither a period nor a shut time." % moon
+			period = open + number(moon + "/shut_hours", 0.0)
+		if open <= 0.0 or period <= open or number(moon + "/offset_hours", 0.0) < 0.0:
 			return "%s has a window that is not sane." % moon
 	return ""

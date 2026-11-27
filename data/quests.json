@@ -249,10 +249,10 @@
       "steps": [
         {
           "id": "clean_calibration",
-          "text": "Calibrate any instrument at the bench in the dome: traceable, by your own hand, and on time.",
+          "text": "Calibrate any instrument at the bench in the dome: traceable, on time and by your own hand, not a robot's.",
           "check": "count",
           "log": "cal_log",
-          "where": { "traceable": true, "on_time": true, "not_performed_by": "Manager" }
+          "where": { "traceable": true, "on_time": true, "not_performed_by": "Manager", "programmed_by": "" }
         }
       ],
       "rewards": { "shuttle_license": true, "phone": "npcs/vance/quests/shuttle_exam_done" }

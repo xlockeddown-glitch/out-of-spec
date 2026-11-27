@@ -493,11 +493,11 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 		for player: String in players:
 			var points: Dictionary = farm.quest_points.get_or_add(player, {})
 			points[str(quest["id"])] = maxi(int(rewards["quest_points"]), int(points.get(str(quest["id"]), 0)))
+	if rewards.get(SHUTTLE_LICENSE, false) is bool and rewards.get(SHUTTLE_LICENSE, false):
+		farm.grant_shuttle_license()
 	# One each, held until its player spends it (GameState.spend_xp_certificate).
 	# A player who holds or has spent this quest's certificate, here or on another
 	# farm, is not given it again.
-	if rewards.get(SHUTTLE_LICENSE, false) == true:
-		farm.grant_shuttle_license()
 	var certificate: int = int(rewards.get(XP_CERTIFICATE, 0))
 	var given: int = 0
 	if certificate > 0:
@@ -573,7 +573,7 @@ static func reward_text(quest: Dictionary) -> String:
 		parts.append("%s quest %s" % [SP811.integer(points), "point" if points == 1 else "points"])
 	if int(rewards.get(XP_CERTIFICATE, 0)) > 0:
 		parts.append("an XP certificate (%s XP)" % SP811.integer(int(rewards[XP_CERTIFICATE])))
-	if rewards.get(SHUTTLE_LICENSE, false) == true:
+	if rewards.get(SHUTTLE_LICENSE, false) is bool and rewards.get(SHUTTLE_LICENSE, false):
 		parts.append("the shuttle license")
 	if keepsake_name(str(rewards.get(KEEPSAKE, ""))) != "":
 		parts.append("a keepsake (%s)" % keepsake_name(str(rewards[KEEPSAKE])))
@@ -758,7 +758,8 @@ static func data_problem(quest: Dictionary) -> String:
 		if quest.has(key) and not quest[key] is Dictionary:
 			return "'%s' is not a dictionary." % key
 	if (quest.get("rewards", {}) as Dictionary).has(SHUTTLE_LICENSE):
-		if (quest["rewards"] as Dictionary)[SHUTTLE_LICENSE] != true:
+		var licence: Variant = (quest["rewards"] as Dictionary)[SHUTTLE_LICENSE]
+		if typeof(licence) != TYPE_BOOL or not licence:
 			return "its shuttle_license reward is not true."
 		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_FARM or is_daily(quest):
 			return "the shuttle license is the farm's: a farm quest that is not a daily ask."

@@ -118,8 +118,11 @@ func test_the_window_line_is_short_and_says_when() -> String:
 	var phobos: String = Shuttle.window_line(Shuttle.PHOBOS, 0.0)
 	if phobos != "Phobos: next window 08:30, in 2 h 30 min.":
 		problems.append("Phobos before its first window: '%s'" % phobos)
-	if not Shuttle.window_line(Shuttle.PHOBOS, _h(3.0)).begins_with("Phobos: window open"):
+	if Shuttle.window_line(Shuttle.PHOBOS, _h(3.0)) != "Phobos: window open, closes 09:30, in 30 min.":
 		problems.append("Phobos in its window: '%s'" % Shuttle.window_line(Shuttle.PHOBOS, _h(3.0)))
+	# The second window of the day closes at its own minute, not the first's.
+	if Shuttle.window_line(Shuttle.PHOBOS, _h(14.0)) != "Phobos: window open, closes 20:30, in 30 min.":
+		problems.append("Phobos in its second window: '%s'" % Shuttle.window_line(Shuttle.PHOBOS, _h(14.0)))
 	var up: String = Shuttle.window_line(Shuttle.DEIMOS, _h(36.0))
 	if up != "Deimos: up, closes in 1 day.":
 		problems.append("Deimos up with a day to run: '%s'" % up)
@@ -128,6 +131,8 @@ func test_the_window_line_is_short_and_says_when() -> String:
 		problems.append("Deimos down: '%s'" % down)
 	if Shuttle.span_text(0.2) != "12 min" or Shuttle.span_text(3.0 + 10.0 / 60.0) != "3 h 10 min":
 		problems.append("A span of hours reads in hours and minutes.")
+	if Shuttle.span_text(23.99) != "1 day" or Shuttle.span_text(24.0) != "1 day" or Shuttle.span_text(23.9833) != "23 h 59 min":
+		problems.append("The gap just under a day: '%s', '%s', '%s'" % [Shuttle.span_text(23.99), Shuttle.span_text(24.0), Shuttle.span_text(23.9833)])
 	return "\n".join(problems)
 
 
@@ -146,11 +151,14 @@ func test_trip_problem_names_each_reason_in_turn() -> String:
 	if Shuttle.license_problem(5, true) != "" or Shuttle.license_problem(1, false) == "":
 		problems.append("The license is what counts, not the level, once it is held.")
 	var down: String = Shuttle.trip_problem(Shuttle.PHOBOS, 20, true, 500, 1, _h(6.0), true)
-	if not down.contains("Phobos is down"):
-		problems.append("Phobos shut: '%s'" % down)
+	if down != Shuttle.window_line(Shuttle.PHOBOS, _h(6.0)) or down.contains("down") or down.count("Phobos") != 1:
+		problems.append("Phobos shut: the window line alone, the moon named once: '%s'" % down)
+	var deimos_down: String = Shuttle.trip_problem(Shuttle.DEIMOS, 20, true, 500, 1, _h(70.0), true)
+	if deimos_down.count("Deimos") != 1 or deimos_down.count("down") != 1:
+		problems.append("Deimos shut says it once: '%s'" % deimos_down)
 	var short: String = Shuttle.trip_problem(Shuttle.PHOBOS, 20, true, fare * 2 - 1, 2, open, true)
-	if not short.contains("%d CR" % fare) or not short.contains("Phobos"):
-		problems.append("The wallet, short for two: '%s'" % short)
+	if not short.contains("%d CR" % fare) or not short.contains("Phobos") or not short.contains("%d CR" % (fare * 2)):
+		problems.append("The wallet, short for two, states the total and the fare: '%s'" % short)
 	if Shuttle.trip_problem(Shuttle.PHOBOS, 20, true, fare * 2, 2, open, false).contains("CR a person"):
 		problems.append("Exactly two fares is enough.")
 	# Hour 46.6 of the game is day 2, past its 02:00 recall at hour 44.
@@ -165,6 +173,14 @@ func test_trip_problem_names_each_reason_in_turn() -> String:
 		problems.append("The last reason is the missing hub: '%s'" % no_hub)
 	if Shuttle.trip_problem(Shuttle.DEIMOS, 20, true, 500, 1, _h(10.0), true) != "":
 		problems.append("A trip with every reason met was refused.")
+	# The 02:00 recall is hour 20 of the game: a 6 h trip may start at 14:00 game
+	# hours (20:00 on the clock) and not a minute after, and not at 01:00 either.
+	if Shuttle.trip_problem(Shuttle.DEIMOS, 20, true, 500, 1, _h(14.0), true) != "":
+		problems.append("A trip that gets back exactly at the recall was refused.")
+	if not Shuttle.trip_problem(Shuttle.DEIMOS, 20, true, 500, 1, _h(14.02), true).contains("recall"):
+		problems.append("A trip that gets back after the recall was allowed.")
+	if not Shuttle.trip_problem(Shuttle.DEIMOS, 20, true, 500, 1, _h(19.0), true).contains("recall"):
+		problems.append("A trip starting at 01:00 was allowed.")
 	for bad: Array in [["luna", 1], [Shuttle.PHOBOS, 0], [Shuttle.PHOBOS, Shuttle.party_most() + 1]]:
 		if Shuttle.trip_problem(str(bad[0]), 20, true, 5000, int(bad[1]), open, true) == "":
 			problems.append("A bad moon or party was allowed: %s" % [bad])
@@ -197,6 +213,8 @@ func test_book_shuttle_from_a_guest_is_refused_with_the_reason() -> String:
 		problems.append("book_shuttle must be a farm command that takes a moon and a party.")
 	if commands.problem(&"book_shuttle", []) == "" or commands.problem(&"book_shuttle", [3, 1]) == "":
 		problems.append("A booking with no moon, or a number for the moon, must be refused.")
+	if commands.problem(&"book_shuttle", [Shuttle.PHOBOS]) == "":
+		problems.append("A booking with the party left out must be refused as the wrong argument count.")
 	GameClock.elapsed_days = _h(3.0)
 	var guest: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.PHOBOS, 1])
 	if not guest is String or guest == "" or gs.credits != 500:
@@ -205,9 +223,9 @@ func test_book_shuttle_from_a_guest_is_refused_with_the_reason() -> String:
 	var licensed: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.PHOBOS, 1])
 	if licensed != Shuttle.text("no_hub_text") % "Phobos" or gs.credits != 500:
 		problems.append("A licensed guest is refused for the hub and pays nothing: '%s', %d CR" % [licensed, gs.credits])
-	var host: Variant = commands.execute(HOST, &"book_shuttle", [Shuttle.DEIMOS])
-	if host == "" or gs.credits != 500:
-		problems.append("The host's booking, with the party left out, is refused too: '%s'" % host)
+	var host: Variant = commands.execute(HOST, &"book_shuttle", [Shuttle.DEIMOS, 1])
+	if host != Shuttle.text("no_hub_text") % "Deimos" or gs.credits != 500:
+		problems.append("The host's booking is refused for the hub too: '%s'" % host)
 	commands.free()
 	_done(gs)
 	return "\n".join(problems)
@@ -293,7 +311,12 @@ func test_the_exam_is_offered_at_level_20_and_a_clean_calibration_grants_the_lic
 	if not gs.quest_state.has("shuttle_exam") or gs.shuttle_licensed:
 		problems.append("The exam is offered at its level and grants nothing yet.")
 	# A calibration that is late, untraceable or the Manager's does not pass it.
-	var row: Dictionary = { "instrument_id": "exam_probe", "traceable": true, "on_time": true, "performed_by": HOST, "day": 1 }
+	var row: Dictionary = { "instrument_id": "exam_probe", "traceable": true, "on_time": true, "performed_by": HOST, "programmed_by": "", "day": 1 }
+	# A robot's calibration (its own hands, the player's program) is not the player's.
+	var robot: Dictionary = row.duplicate()
+	robot["performed_by"] = "TR-1"
+	robot["programmed_by"] = HOST
+	gs.cal_log.append(robot)
 	for flaw: Array in [["traceable", false], ["on_time", false], ["performed_by", "Manager"]]:
 		var bad: Dictionary = row.duplicate()
 		bad[flaw[0]] = flaw[1]
@@ -309,6 +332,38 @@ func test_the_exam_is_offered_at_level_20_and_a_clean_calibration_grants_the_lic
 		problems.append("The phone must name the license among the reward.")
 	_done(gs)
 	return "\n".join(problems)
+
+
+func test_a_clean_calibration_from_before_the_offer_does_not_pass_the_exam() -> String:
+	var gs: GameStateScript = _state()
+	var problems: Array[String] = []
+	gs.cal_log.append({ "instrument_id": "early_probe", "traceable": true, "on_time": true, "performed_by": HOST, "programmed_by": "", "day": 1 })
+	gs.lab_xp = gs.xp_for_level(Shuttle.license_level())
+	gs.update_quests()
+	gs.update_quests()
+	if not gs.quest_state.has("shuttle_exam") or gs.shuttle_licensed or QuestEngine.is_done(gs, "shuttle_exam"):
+		problems.append("A calibration from before the offer passed the exam.")
+	_done(gs)
+	return "
+".join(problems)
+
+
+func test_the_exam_reward_must_be_the_license_on_a_farm_quest() -> String:
+	var problems: Array[String] = []
+	var exam: Dictionary = _exam()
+	if exam.is_empty():
+		return "The exam quest is missing."
+	var not_true: Dictionary = exam.duplicate(true)
+	not_true["rewards"]["shuttle_license"] = "yes"
+	var wrong_scope: Dictionary = exam.duplicate(true)
+	wrong_scope["scope"] = "player"
+	var daily: Dictionary = exam.duplicate(true)
+	daily["kind"] = "daily"
+	for case: Array in [["a reward that is not true", not_true], ["a player-scope quest", wrong_scope], ["a daily quest", daily]]:
+		if QuestEngine.data_problem(case[1] as Dictionary) == "":
+			problems.append("The license was allowed as %s." % case[0])
+	return "
+".join(problems)
 
 
 # --- Data ------------------------------------------------------------------------------

@@ -3509,8 +3509,12 @@ func grant_shuttle_license() -> void:
 ## host's clock and refuses with Shuttle.trip_problem's reason, taking no fare;
 ## no moon has a hub yet, so every booking is refused for now. The pad PR will
 ## carry the party there. Returns "" when booked, else why not.
-func book_shuttle(moon: String, people: int = 1, player_id: String = "") -> String:
-	var hub_ready: bool = Shuttle.is_moon(moon) and ZoneData.hub_scene(StringName(moon)) != ""
+@warning_ignore("unused_parameter")
+func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
+	# The pad PR must also check that the player stands at the pad and that
+	# `people` are all present (players_present()) before a fare is taken; today
+	# every booking is refused, so no fare can be.
+	var hub_ready: bool = Shuttle.is_moon(moon) and ZoneData.is_playable(StringName(moon))
 	var reason: String = Shuttle.trip_problem(moon, lab_level(), shuttle_licensed, credits, people, GameClock.elapsed_days, hub_ready)
 	if reason != "":
 		return reason
