@@ -31,6 +31,8 @@ const PUFF_COUNT: int = 8
 const PUFF_LIFETIME_S: float = 3.0
 const PUFF_RISE_M_S: float = 0.9
 const PUFF_SIZE_M: float = 0.5
+## Steam colour: a neutral grey (Ryan, Nov 27 playtest: "maybe a bit greyer"; was 0.85/0.88/0.92) [PLACEHOLDER].
+const PUFF_GREY := Color(0.66, 0.66, 0.66)
 
 static var _spots: Array[Vector2] = []
 static var _spots_ready: bool = false
@@ -138,7 +140,7 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 	puff_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
 	puff_material.billboard_keep_scale = true
 	puff_material.vertex_color_use_as_albedo = true
-	puff_material.albedo_color = Color(0.85, 0.88, 0.92)
+	puff_material.albedo_color = PUFF_GREY
 	var puff_mesh := QuadMesh.new()
 	puff_mesh.size = Vector2.ONE * PUFF_SIZE_M
 	puff_mesh.material = puff_material
