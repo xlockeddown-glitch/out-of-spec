@@ -66,7 +66,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"ui_cancel"):
 		hide()
 	# No key press reaches the farm or the scene swap behind the view.
-	if event is InputEventKey or event is InputEventJoypadButton:
+	if event is InputEventKey or event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		get_viewport().set_input_as_handled()
 
 

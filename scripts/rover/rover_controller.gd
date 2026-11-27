@@ -34,6 +34,11 @@ static var input_blocked: bool = false
 ## drives nothing. Keyboard play, with no pad, is as it was.
 static func panel_has_stick(tree: SceneTree) -> bool:
 	return tree != null and not Input.get_connected_joypads().is_empty() and QuestsUI.other_panel_open(tree)
+## A panel is open on this screen, so the D-pad and A move its focus, not the rover.
+func _panel_open() -> bool:
+	return is_inside_tree() and QuestsUI.other_panel_open(get_tree())
+
+
 ## Said when there is no ground to dig; the screens add where to dig.
 const ROCK_REFUSAL: String = "This rock can't be dug."
 
@@ -303,7 +308,7 @@ func _park() -> void:
 
 
 func _input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"rover_till", false) and not input_blocked and not CoopWalkers.on_foot():
+	if event.is_action_pressed(&"rover_till", false) and not input_blocked and not _panel_open() and not CoopWalkers.on_foot():
 		_till_presses.append({"seed": GameState.current_seed(), "offset": GameState.planting_offset_steps})
 
 
@@ -431,7 +436,7 @@ func _sample_local_input(throttle: float) -> void:
 	for press: Dictionary in _till_presses:
 		queue_command(Command.TILL, str(press["seed"]), int(press["offset"]))
 	_till_presses.clear()
-	if not input_blocked and Input.is_action_just_pressed(&"rover_zero_steering"):
+	if not input_blocked and not _panel_open() and Input.is_action_just_pressed(&"rover_zero_steering"):
 		queue_command(Command.ZERO_STEERING)
 
 

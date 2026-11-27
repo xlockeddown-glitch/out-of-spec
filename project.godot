@@ -89,7 +89,7 @@ swap_scene={
 }
 open_pause={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"physical_keycode":4194305), Object(InputEventJoypadButton,"device":-1,"button_index":6,"pressed":true)]
+"events": [Object(InputEventKey,"device":-1,"keycode":4194305), Object(InputEventJoypadButton,"device":-1,"button_index":6,"pressed":true)]
 }
 get_out_in={
 "deadzone": 0.2,
@@ -161,39 +161,39 @@ ui_cancel={
 }
 buy_1={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"keycode":49)]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":49)]
 }
 buy_2={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"keycode":50)]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":50)]
 }
 buy_3={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"keycode":51)]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":51)]
 }
 buy_4={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"keycode":52)]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":52)]
 }
 buy_5={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"keycode":53)]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":53)]
 }
 buy_6={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"keycode":54)]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":54)]
 }
 buy_7={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"keycode":55)]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":55)]
 }
 buy_8={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"keycode":56)]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":56)]
 }
 buy_9={
 "deadzone": 0.2,
-"events": [Object(InputEventKey,"device":-1,"keycode":57)]
+"events": [Object(InputEventKey,"device":-1,"physical_keycode":57)]
 }
 
 [layer_names]

@@ -89,7 +89,6 @@ text = "INSTRUMENT"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(380, 44)
 layout_mode = 2
-focus_mode = 0
 theme_override_font_sizes/font_size = 20
 
 [node name="GameSpacer" type="Control" parent="Panel/Content/InstrumentRow"]
@@ -99,7 +98,6 @@ size_flags_horizontal = 3
 [node name="CarefulCheck" type="CheckButton" parent="Panel/Content/InstrumentRow"]
 unique_name_in_owner = true
 layout_mode = 2
-focus_mode = 0
 theme_override_font_sizes/font_size = 16
 text = "CAREFUL"
 
@@ -108,7 +106,6 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 tooltip_text = "Set the Zero comes up at key moments. Rewards are the same on every setting. OFF: always one click."
-focus_mode = 0
 theme_override_font_sizes/font_size = 16
 
 [node name="ReadingsRow" type="HBoxContainer" parent="Panel/Content"]
@@ -215,7 +212,6 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
 size_flags_horizontal = 3
-focus_mode = 0
 theme_override_font_sizes/font_size = 24
 text = "ZERO / CALIBRATE"
 
@@ -223,7 +219,6 @@ text = "ZERO / CALIBRATE"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(240, 64)
 layout_mode = 2
-focus_mode = 0
 theme_override_font_sizes/font_size = 24
 text = "CLOSE  [Esc]"
 

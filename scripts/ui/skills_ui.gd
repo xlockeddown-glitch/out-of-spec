@@ -60,7 +60,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			hide()
 	# No key press reaches the farm or the scene swap behind the view. Driving
 	# polls Input, so the rover still answers.
-	if key != null or event is InputEventJoypadButton:
+	if key != null or event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		get_viewport().set_input_as_handled()
 
 

@@ -206,7 +206,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if away and event.is_action_pressed(&"interact"):
 		get_viewport().set_input_as_handled()
 		SceneSwitcher.swap_to(SceneSwitcher.FARM_SCENE)
-	elif away and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
+	elif away and not event is InputEventJoypadMotion and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
 		get_viewport().set_input_as_handled()
 		_say_if_away()
 	elif event.is_action_pressed(&"interact") and _exit_pad.rover_inside:

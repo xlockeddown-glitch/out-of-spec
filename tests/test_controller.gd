@@ -112,15 +112,130 @@ func test_the_actions_keep_the_old_keys() -> String:
 	var keys: Dictionary = { &"get_out_in": KEY_F, &"place_stone": KEY_B, &"stone_kind": KEY_N, &"check_block": KEY_Q,
 		&"block_stack": KEY_J, &"survey": KEY_V, &"cycle_seed": KEY_C, &"sell_lin": KEY_L, &"wheel_service": KEY_Y,
 		&"open_robots": KEY_T, &"setpoint_down": KEY_BRACKETLEFT, &"setpoint_up": KEY_BRACKETRIGHT,
-		&"open_quests": KEY_O, &"open_skills": KEY_K, &"open_coop": KEY_F7, &"buy_1": KEY_1, &"buy_9": KEY_9}
+		&"open_quests": KEY_O, &"open_skills": KEY_K, &"open_coop": KEY_F7, &"open_pause": KEY_ESCAPE,
+		&"interact": KEY_E, &"swap_scene": KEY_TAB, &"rover_forward": KEY_W, &"rover_reverse": KEY_S,
+		&"rover_steer_left": KEY_A, &"rover_steer_right": KEY_D, &"rover_till": KEY_SPACE,
+		&"rover_zero_steering": KEY_R, &"rover_dig": KEY_G, &"rover_lights": KEY_L, &"rover_fill": KEY_H }
+	for i: int in 9:
+		keys[StringName("buy_%d" % (i + 1))] = KEY_1 + i
 	var bad: PackedStringArray = []
 	for action: StringName in keys:
+		# A key press as the OS sends it: both the typed and the physical key set.
 		var event := InputEventKey.new()
 		event.keycode = keys[action]
+		event.physical_keycode = keys[action]
 		event.pressed = true
 		if not event.is_action(action):
 			bad.append(String(action))
 	return "" if bad.is_empty() else "Key no longer does it: %s" % ", ".join(bad)
+
+
+func test_the_movement_axes_are_the_right_ones() -> String:
+	# action: [axis, sign]
+	var want: Dictionary = { &"rover_steer_left": [JOY_AXIS_LEFT_X, -1.0], &"rover_steer_right": [JOY_AXIS_LEFT_X, 1.0],
+		&"rover_forward": [JOY_AXIS_LEFT_Y, -1.0], &"rover_reverse": [JOY_AXIS_LEFT_Y, 1.0] }
+	var bad: PackedStringArray = []
+	for action: StringName in want:
+		var found: bool = false
+		for event: InputEvent in InputMap.action_get_events(action):
+			var motion := event as InputEventJoypadMotion
+			if motion != null and motion.axis == want[action][0] and signf(motion.axis_value) == want[action][1]:
+				found = true
+		if not found:
+			bad.append("%s stick" % action)
+		if absf(InputMap.action_get_deadzone(action) - 0.2) > 0.001:
+			bad.append("%s deadzone" % action)
+	for pair: Array in [[&"rover_forward", JOY_AXIS_TRIGGER_RIGHT], [&"rover_reverse", JOY_AXIS_TRIGGER_LEFT]]:
+		var trigger: bool = false
+		for event: InputEvent in InputMap.action_get_events(pair[0]):
+			var motion := event as InputEventJoypadMotion
+			if motion != null and motion.axis == pair[1] and motion.axis_value > 0.0:
+				trigger = true
+		if not trigger:
+			bad.append("%s trigger" % pair[0])
+	return "" if bad.is_empty() else "Movement bindings wrong: %s" % ", ".join(bad)
+
+
+func test_the_keys_match_the_pause_and_buy_layout_rules() -> String:
+	# Buys stay on the physical key (AZERTY needs no shift); pause is typed Esc like ui_cancel.
+	var bad: PackedStringArray = []
+	for i: int in 9:
+		var action := StringName("buy_%d" % (i + 1))
+		for event: InputEvent in InputMap.action_get_events(action):
+			if event is InputEventKey and (event as InputEventKey).physical_keycode == 0:
+				bad.append(String(action))
+	for event: InputEvent in InputMap.action_get_events(&"open_pause"):
+		if event is InputEventKey and (event as InputEventKey).keycode == 0:
+			bad.append("open_pause")
+	return "" if bad.is_empty() else "Wrong kind of key: %s" % ", ".join(bad)
+
+
+func test_the_coop_strip_does_not_count_as_a_panel() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var coop := CoopUI.new()
+	tree.root.add_child(coop)
+	var problem: String = ""
+	if QuestsUI.other_panel_open(tree):
+		problem = "The closed co-op panel must not count as a panel."
+	coop.open()
+	if not QuestsUI.other_panel_open(tree):
+		problem = "The open co-op panel must count."
+	coop.free()
+	return problem
+
+
+func test_a_panel_keeps_the_stick_and_the_rover_buttons() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var holder := Control.new()
+	holder.add_to_group(QuestsUI.MODAL_GROUP)
+	tree.root.add_child(holder)
+	var rover := RoverController.new()
+	tree.root.add_child(rover)
+	var problem: String = ""
+	if not rover._panel_open():
+		problem = "An open panel must hold the rover's till and zero-steering buttons."
+	holder.hide()
+	if rover._panel_open():
+		problem = "With no panel open they must work."
+	rover.free()
+	holder.free()
+	return problem
+
+
+func test_the_chord_must_be_quick_and_a_single_shoulder_does_not_open() -> String:
+	var sent: Array[StringName] = []
+	var menu: ActionsMenuUI = _menu(ActionsMenuUI.farm_actions(), sent)
+	var problem: String = ""
+	menu._input(_shoulder(JOY_BUTTON_LEFT_SHOULDER, true))
+	var token: int = ActionsMenuUI.chord_token
+	# A slow second shoulder is two taps, not a chord.
+	menu._lb_msec = Time.get_ticks_msec() - 600
+	menu._input(_shoulder(JOY_BUTTON_RIGHT_SHOULDER, true))
+	if menu.visible:
+		problem = "A slow second shoulder must not open the menu."
+	if ActionsMenuUI.chord_token == token:
+		problem = "Every shoulder press must overtake a waiting set-point nudge."
+	# Let go of both and tap them together again.
+	menu._input(_shoulder(JOY_BUTTON_LEFT_SHOULDER, false))
+	menu._input(_shoulder(JOY_BUTTON_RIGHT_SHOULDER, false))
+	menu._input(_shoulder(JOY_BUTTON_LEFT_SHOULDER, true))
+	menu._input(_shoulder(JOY_BUTTON_RIGHT_SHOULDER, true))
+	if not menu.visible:
+		problem = "A quick chord must open the menu."
+	menu.free()
+	RoverController.input_blocked = false
+	return problem
+
+
+func test_the_bench_takes_focus_on_open() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var bench: CalBenchUI = (load("res://ui/cal_bench_ui.tscn") as PackedScene).instantiate()
+	tree.root.add_child(bench)
+	bench.open()
+	var owner: Control = bench.get_viewport().gui_get_focus_owner()
+	var problem: String = "" if owner != null else "The bench must open with a focused control."
+	bench.free()
+	return problem
 
 
 func test_the_menu_pad_defaults_exist() -> String:
@@ -204,6 +319,32 @@ func test_start_opens_the_pause_panel_and_b_does_not() -> String:
 	pause._unhandled_input(cancel)
 	if pause.visible:
 		problem = "B must close it."
+	pause.free()
+	tree.paused = false
+	RoverController.input_blocked = false
+	return problem
+
+
+func test_start_does_not_open_pause_over_a_panel_and_close_restores_the_block() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var pause := PauseUI.new()
+	tree.root.add_child(pause)
+	var holder := Control.new()
+	holder.add_to_group(QuestsUI.MODAL_GROUP)
+	tree.root.add_child(holder)
+	var start := InputEventAction.new()
+	start.action = &"open_pause"
+	start.pressed = true
+	var problem: String = ""
+	pause._unhandled_input(start)
+	if pause.visible:
+		problem = "Start must not open pause over another panel."
+	holder.free()
+	RoverController.input_blocked = true
+	pause._unhandled_input(start)
+	pause.close()
+	if not RoverController.input_blocked:
+		problem = "Closing pause must put back the block it found."
 	pause.free()
 	tree.paused = false
 	RoverController.input_blocked = false

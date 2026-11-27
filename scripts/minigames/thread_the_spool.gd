@@ -71,6 +71,8 @@ const COLOR_OUT := Color(1.0, 0.75, 0.3)
 const COLOR_SPOOL := Color(1, 1, 1)
 
 var _stage: Stage = Stage.IDLE
+## Which way the left stick leans past half (-1, 0, 1), so a lean counts once.
+var _stick_x: int = 0
 ## Seconds in this stage.
 var _time: float = 0.0
 ## The sway's own clock, and how fast it runs against the real one.
@@ -334,6 +336,7 @@ func _set_steer(direction: int) -> void:
 
 
 func _let_go() -> void:
+	_stick_x = 0
 	_steer = 0
 	_left = false
 	_right = false
@@ -376,6 +379,19 @@ func _finish(with_score: int) -> void:
 
 func _input(event: InputEvent) -> void:
 	if _stage == Stage.IDLE or not is_visible_in_tree() or event.is_echo():
+		return
+	var motion := event as InputEventJoypadMotion
+	if motion != null:
+		# The left stick pushes like the D-pad: a push on crossing half, let go on easing back.
+		if motion.axis == JOY_AXIS_LEFT_X:
+			var dir: int = 0 if absf(motion.axis_value) < 0.5 else (1 if motion.axis_value > 0.0 else -1)
+			if dir != _stick_x:
+				if _stick_x != 0:
+					push(_stick_x < 0, false)
+				_stick_x = dir
+				if dir != 0:
+					push(dir < 0, true)
+		get_viewport().set_input_as_handled()
 		return
 	if event.is_action_pressed(&"ui_left") or event.is_action_released(&"ui_left"):
 		get_viewport().set_input_as_handled()

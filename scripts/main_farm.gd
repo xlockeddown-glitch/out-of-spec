@@ -15,7 +15,8 @@ const FARM_KEYS: Array[StringName] = [
 	&"interact", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill", &"swap_scene"]
 ## On foot, these verbs of the rover only say so.
 const ON_FOOT_REFUSED: Array[StringName] = [
-	&"place_stone", &"block_stack", &"sell_lin", &"stone_kind", &"check_block", &"open_robots", &"survey"]
+	&"place_stone", &"block_stack", &"sell_lin", &"stone_kind", &"check_block", &"open_robots", &"survey", &"wheel_service",
+	&"buy_1", &"buy_2", &"buy_3", &"buy_4", &"buy_5", &"buy_6", &"buy_7", &"buy_8", &"buy_9"]
 ## Bram's standards, in catalog order.
 const BUY_ACTIONS: Array[StringName] = [
 	&"buy_1", &"buy_2", &"buy_3", &"buy_4", &"buy_5", &"buy_6", &"buy_7", &"buy_8", &"buy_9"]
@@ -589,7 +590,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_hud.push_log("TUNNEL MOUTH: " + TunnelRecall.text("closed_text"))
 		else:
 			SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
-	elif away and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
+	elif away and not event is InputEventJoypadMotion and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
 		get_viewport().set_input_as_handled()
 		_say_if_away()
 	elif event.is_action_pressed(&"interact") and _cal_pad.rover_inside:
@@ -669,8 +670,11 @@ func _adjust_setpoint(cell: Vector3i, step: int) -> void:
 ## LB and RB together open the actions menu, so a shoulder press waits a moment
 ## and gives way if the menu opened.
 func _pad_setpoint(step: int) -> void:
+	var token: int = ActionsMenuUI.chord_token
 	await get_tree().create_timer(ActionsMenuUI.CHORD_GRACE_S).timeout
-	if is_inside_tree() and not QuestsUI.other_panel_open(get_tree()):
+	# Overtaken by a second shoulder or the menu, or the situation changed.
+	if (is_inside_tree() and token == ActionsMenuUI.chord_token and not QuestsUI.other_panel_open(get_tree())
+			and not CoopWalkers.on_foot() and _rover.away_text() == ""):
 		_step_setpoint(step)
 
 

@@ -40,8 +40,12 @@ var _rows: VBoxContainer
 var _close_button: Button
 var _focus_before: Control
 var _blocked_before: bool = false
-var _lb_held: bool = false
-var _rb_held: bool = false
+## When each shoulder went down (msec); far in the past when up.
+var _lb_msec: int = -1000000
+var _rb_msec: int = -1000000
+## Counts every shoulder press and every open, so a set-point nudge that is
+## waiting on the chord can tell it was overtaken.
+static var chord_token: int = 0
 
 
 func _init(actions: Array[StringName] = []) -> void:
@@ -109,14 +113,28 @@ func _input(event: InputEvent) -> void:
 	var pad := event as InputEventJoypadButton
 	if pad == null:
 		return
-	var down: bool = pad.pressed
-	if pad.button_index == JOY_BUTTON_LEFT_SHOULDER:
-		_lb_held = down
-	elif pad.button_index == JOY_BUTTON_RIGHT_SHOULDER:
-		_rb_held = down
-	else:
+	var lb: bool = pad.button_index == JOY_BUTTON_LEFT_SHOULDER
+	if not lb and pad.button_index != JOY_BUTTON_RIGHT_SHOULDER:
 		return
-	if down and _lb_held and _rb_held and not visible and not QuestsUI.other_panel_open(get_tree(), self):
+	if not pad.pressed:
+		if lb:
+			_lb_msec = -1000000
+		else:
+			_rb_msec = -1000000
+		return
+	chord_token += 1
+	var now: int = Time.get_ticks_msec()
+	var other_msec: int = _rb_msec if lb else _lb_msec
+	if lb:
+		_lb_msec = now
+	else:
+		_rb_msec = now
+	# The other shoulder must have gone down just before, and still be down.
+	var in_time: bool = now - other_msec <= int(CHORD_GRACE_S * 1000.0)
+	var still_down: bool = true
+	if not Input.get_connected_joypads().is_empty():
+		still_down = Input.is_joy_button_pressed(pad.device, JOY_BUTTON_RIGHT_SHOULDER if lb else JOY_BUTTON_LEFT_SHOULDER)
+	if in_time and still_down and not visible and not QuestsUI.other_panel_open(get_tree(), self):
 		get_viewport().set_input_as_handled()
 		open()
 
@@ -127,11 +145,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"ui_cancel"):
 		close()
 	# No key or pad press reaches the farm behind the menu.
-	if event is InputEventKey or event is InputEventJoypadButton:
+	if event is InputEventKey or event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		get_viewport().set_input_as_handled()
 
 
 func open() -> void:
+	chord_token += 1
 	_focus_before = get_viewport().gui_get_focus_owner()
 	_blocked_before = RoverController.input_blocked
 	# The stick moves the menu's focus, not the rover.

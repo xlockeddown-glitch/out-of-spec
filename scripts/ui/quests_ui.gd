@@ -65,7 +65,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if toggled or event.is_action_pressed(&"ui_cancel"):
 		close()
 	# As in SkillsUI: no key press reaches the farm behind the view.
-	if key != null or event is InputEventJoypadButton:
+	if key != null or event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		get_viewport().set_input_as_handled()
 
 
