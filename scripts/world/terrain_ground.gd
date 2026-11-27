@@ -28,6 +28,13 @@ var _heights := PackedFloat32Array()
 var _tints := PackedColorArray()
 ## One chunk's triangles by index, built on first use and shared.
 static var _faces := PackedInt32Array()
+## Debug overlay (F8, debug builds): the ground coloured by biome instead of by height
+## [PLACEHOLDER: replaces the height tint; multiplying would keep the hills visible
+## but muddy the colours]. Off every launch, never saved or sent.
+var _biome_view: bool = false
+## Each point's biome colour, worked out on the first show and kept.
+var _biome_tints := PackedColorArray()
+var _biome_note: CanvasLayer
 
 
 func _ready() -> void:
@@ -59,6 +66,38 @@ func _ready() -> void:
 			add_child(chunk)
 			_chunks[Vector2i(x, z)] = chunk
 			_build(Vector2i(x, z))
+
+
+## Paints the ground by biome (true) or restores its own tints (false), a debug view.
+## Heights, collision and digging are untouched. Only play's size has biomes.
+func show_biomes(on: bool) -> void:
+	if on == _biome_view or half_m != Terrain.HALF_M:
+		return
+	_biome_view = on
+	if on and _biome_tints.is_empty():
+		_biome_tints.resize(_tints.size())
+		var by_id: Dictionary[StringName, Color] = {}
+		for z: int in range(-half_m, half_m + 1):
+			for x: int in range(-half_m, half_m + 1):
+				var id: StringName = BiomeData.biome_at(Vector2(x, z))
+				if not by_id.has(id):
+					by_id[id] = BiomeData.tint(id)
+				_biome_tints[_index(x, z)] = by_id[id]
+	for chunk: Vector2i in _chunks:
+		_build(chunk)
+	if on and _biome_note == null:
+		_biome_note = CanvasLayer.new()
+		var label := Label.new()
+		label.text = "Biome map (F8)"
+		label.position = Vector2(8, 8)
+		_biome_note.add_child(label)
+		add_child(_biome_note)
+	if _biome_note != null:
+		_biome_note.visible = on
+
+
+func is_showing_biomes() -> bool:
+	return _biome_view
 
 
 ## Shows this digging (cell -> steps deep) and the pads' level ground (Terrain)
@@ -139,11 +178,12 @@ func _build(chunk: Vector2i) -> void:
 	var normals := PackedVector3Array()
 	var tints := PackedColorArray()
 	var side: int = CHUNK_M + 1
+	var shown: PackedColorArray = _biome_tints if _biome_view else _tints
 	for x: int in range(chunk.x, chunk.x + side):
 		for z: int in range(chunk.y, chunk.y + side):
 			points.append(_point(x, z))
 			normals.append(_normal(x, z))
-			tints.append(_tints[_index(x, z)])
+			tints.append(shown[_index(x, z)])
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = points

@@ -584,6 +584,13 @@ func _input(event: InputEvent) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	# Debug builds only: F8 paints the ground by biome (biomes.md section 6, step 4).
+	# Caught here, outside the world viewport, and handed to the ground.
+	var key := event as InputEventKey
+	if OS.is_debug_build() and key and key.pressed and not key.echo and key.physical_keycode == KEY_F8:
+		get_viewport().set_input_as_handled()
+		_rover.ground.show_biomes(not _rover.ground.is_showing_biomes())
+		return
 	var away: bool = _rover.away_text() != ""
 	if event.is_action_pressed(&"get_out_in"):
 		get_viewport().set_input_as_handled()

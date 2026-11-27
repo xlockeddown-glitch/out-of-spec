@@ -40,7 +40,7 @@ The process (asking Ryan multiple-choice questions with a write-in, asking 2 to 
 | Lore, characters, species | [`docs/canon.md`](docs/canon.md) | The art bibles in `docs/design/` are sources, but canon wins |
 | Reviewing another model's PR | [Before a PR leaves draft](#before-a-pr-leaves-draft), the doc for its task type | Check rules against the linked docs; flag invented numbers; report blockers, minors and nits |
 | Questions for Ryan, other models' input | [`docs/workflow.md`](docs/workflow.md) | Log each answer in `docs/decisions.md` with its date |
-| Playtest and export builds | [`docs/playtest.md`](docs/playtest.md), [Windows export](#windows-export) | Debug builds only: F9 skips to the next morning |
+| Playtest and export builds | [`docs/playtest.md`](docs/playtest.md), [Windows export](#windows-export) | Debug builds only: F9 skips to the next morning, F8 colours the ground by biome |
 
 ### Before a PR leaves draft
 
@@ -89,6 +89,7 @@ Open `project.godot` in Godot 4.7 and press F5. The farm saves each morning and 
 | F1 | Controls guide: every verb in plain English, grouped, with its key and its pad button. F1 or Esc closes it. On a pad: LB + RB, then CONTROLS |
 | Esc | Close a panel |
 | F9 (debug builds) | Skip to the next morning |
+| F8 (debug builds) | Colour the ground by biome (press again to turn it off) |
 | Tab, airlock, or ENTER DOME | Swap farm <-> dome |
 | Click (dome) | Bench calibration, terrarium info, collect silk spool |
 | INSTALL SILK SPOOL (phone) | Slot a spool into the relay (cuts uplink lag); a whole one may replace a damaged one |
