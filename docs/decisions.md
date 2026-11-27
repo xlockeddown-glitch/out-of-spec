@@ -2,6 +2,17 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: The Landing Field pad and terminal (biomes step 12)
+
+`LandingDressing` and `ShuttleUI` give the shuttle rules a place. Every number and line is a [PLACEHOLDER].
+
+- **Placement:** the 8 by 8 m slab is at (0, 106), 19 m south of the marker pad, so the marker and its sign did not move. The slab is 0.6 m thick and its top is the highest ground under it: the land there dips about 0.4 m, and the thickness hides that gap. Gantry on the slab's south side, terminal east of it at (7.5, 100).
+- **No collision:** the same as the Frost and Basalt dressing and the biome pads. A rover drives over the slab; posts with collision would need digging refused under them. Only the terminal has an Area3D on layer 8 (a click target that blocks nothing).
+- **Lights:** eight emissive heads, dark until `BiomeData.is_open` (lab level 20), refreshed on the same signals as `RoadLamps`. No OmniLight.
+- **Interact:** the terminal is clicked, or the interact key is pressed within 5 m of it, on foot or in the rover; the key is handled before the on-foot refusal. The panel is a modal like the dome console's and its Esc, focus and controller handling are copied from it.
+- **Co-op:** `book_shuttle` joins `CoopWalkers.ON_FOOT`. The host checks, before the hub reason and before any fare, that the sender is on the farm and at the terminal (walker pose, else the farm rover's pose; 5 m, plus 1.5 m for a late guest pose) and that `people` do not exceed `players_present()`. `PROTOCOL` stays 31: the command's arguments are as they were, only the host's checks changed.
+- **Not saved:** built from constants on every machine.
+
 ## 2026-11-27: The shuttle's rules and the license (zones step 16, rules half)
 
 `Shuttle` (scripts/world/shuttle.gd) holds the rules; every number and word is in `data/economy.json` "shuttle" and a [PLACEHOLDER]. The Landing Field pad and its terminal come next, with biomes step 12.
