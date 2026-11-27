@@ -9,6 +9,8 @@ signal clicked
 
 ## Shown by scenes that display a hover hint.
 @export var hint: String = ""
+## What the interact key does here, for the "[E] verb" prompt over it. Empty reads "Use".
+@export var verb: String = ""
 @export var enabled: bool = true:
 	set(value):
 		enabled = value
