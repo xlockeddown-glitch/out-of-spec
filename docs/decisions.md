@@ -11,6 +11,8 @@ Phobos part 2: a stray in the service tunnel can be caught, Odalys's `strays` qu
 - **Caught today:** `GameState.strays_caught` is `{day, ids}`, pruned to today. Both new fields are in `SAVED_LATER` (old saves load) and in `FarmSync.SHOWN_BY` (`enclosures_changed` and the new `strays_changed`).
 - **Quest:** `strays` (personal, Odalys, one step, done by `catch_stray`); offered after a player has reached Phobos (`reached_<moon>` counts, added in `book_shuttle`, no XP). An old save has no such count and is offered the quest after its next trip.
 - **Protocol:** 38 to 39, once, for the new command.
+- **No dome tank yet:** the Runner's record is kept but sits out the molt and the lab sitter's round (`NO_DOME_TANK`), since nothing could show or collect it. It joins both when its dome tank is built. The station-stock enclosure line waits for that tank too; until then the player sees it in the stray's hover hint, the catch toast and the phone line.
+- **Species unlock:** comes only from the first catch (the farm's one Runner tank). A later player who finishes the quest gets the XP and the line, not a second unlock.
 - **[PLACEHOLDER] choices:** 100 Husbandry XP for the quest; "being on Phobos" standing in for "being in the service tunnel" (no hub-versus-tunnel presence exists); the three strays a day and the seven spots (from part 1); Odalys's two lines; the station-stock wording; the phone line when the Runner is added.
 - **Left out:** smuggler caches, terraform pods, Deimos strays, breeding moon stock, any new look, and a dome tank to look at.
 

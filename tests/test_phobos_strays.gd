@@ -286,3 +286,45 @@ func test_the_strays_quest_is_in_the_data_and_clean() -> String:
 			var problem: String = QuestEngine.data_problem(quest)
 			return "" if problem == "" else "Strays is not clean: %s" % problem
 	return "Strays is not in data/quests.json."
+
+
+func test_a_runner_with_no_dome_tank_neither_molts_nor_gives_silk() -> String:
+	return _on_phobos(func(gs: GameStateScript) -> String:
+		gs.catch_stray(_today()[0], GameClock.get_day_index())
+		gs._tick_enclosures(500.0)
+		if float(gs.enclosures[RUNNER]["molt_progress"]) != 0.0:
+			return "The Runner has no dome tank yet, so it must not molt."
+		gs.enclosures[RUNNER] = { "molt_progress": 1.0, "molt_stage": int(GameStateScript.MoltStage.MOLTED), "exuvia_until_day": 0 }
+		var spools: float = gs.optical_silk_spools
+		gs.lab_sitter = LabSitter.new_booking(GameClock.get_day_index())
+		gs._sitter_tend()
+		if gs.is_enclosure_spool_ready(RUNNER) or gs.collect_enclosure_spool(RUNNER, HOST) or gs.optical_silk_spools != spools:
+			return "Nothing may collect silk from a tank nobody can see."
+		return "")
+
+
+func test_a_guest_cannot_decide_a_catch_and_a_later_catch_is_let_go() -> String:
+	return _on_phobos(func(gs: GameStateScript) -> String:
+		FarmCommands.guest = true
+		var why: String = gs.catch_stray(_today()[0], GameClock.get_day_index())
+		FarmCommands.guest = false
+		if why == "" or not gs.strays_caught.is_empty() or _count(gs, HOST, "catch_stray") != 0:
+			return "A guest's own game must not make a catch: '%s'" % why
+		return "")
+
+
+func test_a_guest_is_told_of_a_catch_by_the_sync() -> String:
+	return _on_phobos(func(host: GameStateScript) -> String:
+		host.catch_stray(_today()[0], GameClock.get_day_index())
+		var guest: GameStateScript = GameStateScript.new()
+		guest.build_registry()
+		var heard: Array[int] = [0]
+		guest.strays_changed.connect(func() -> void: heard[0] += 1)
+		FarmCommands.guest = true
+		var updated: String = FarmSync.update(FarmSync.capture(host), guest)
+		FarmCommands.guest = false
+		var problem: String = ""
+		if updated != "" or heard[0] < 1 or guest.strays_caught_today() != host.strays_caught_today():
+			problem = "FarmSync must re-emit strays_changed on a guest: '%s', told %d" % [updated, heard[0]]
+		guest.free()
+		return problem)

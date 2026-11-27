@@ -13,8 +13,9 @@ const SCENE_PATH: String = "res://scenes/phobos_service_tunnel.tscn"
 const TITLE_TEXT: String = "PHOBOS // SERVICE TUNNEL"
 const AMBIENT_HINT: String = "Warm station conduit. Click the ladder to climb back up, or inspect a stray."
 const LADDER_HINT: String = "Ladder up to Phobos hub"
-const STRAY_HINT: String = "Banded Regolith Runner (stray)"
-const STRAY_CAUGHT_TEXT: String = "Caught. A Banded Regolith Runner, station stock. Odalys will want to hear."
+const STRAY_HINT: String = "Banded Regolith Runner (stray). %s"
+const STRAY_CAUGHT_TEXT: String = "Caught. A Banded Regolith Runner. %s. Odalys will want to hear."
+const STRAY_LET_GO_TEXT: String = "Caught, and let go: the dome already has its Runner."
 const TOO_FAR_TEXT: String = "Move closer."
 const SIGN_TEXT: String = "SECTOR 04 // THERMAL CONDUIT"
 
@@ -324,7 +325,7 @@ func _build_strays(day: int) -> void:
 		click.name = "StrayClick_%d" % i
 		click.collision_layer = 8
 		click.collision_mask = 0
-		click.hint = STRAY_HINT
+		click.hint = STRAY_HINT % GameState.STATION_LINE
 		var shape := CollisionShape3D.new()
 		var box := BoxShape3D.new()
 		box.size = Vector3(0.9, 0.7, 0.9)
@@ -416,11 +417,17 @@ func _on_stray_clicked(at: Vector3, stray_index: int, layout_day: int) -> void:
 		return
 	# The host decides (a guest's click only asks); this screen changes when it says so.
 	_catching = true
+	var had_runner: bool = GameState.is_caught(GameState.RUNNER)
 	var problem: Variant = await FarmCommands.request(&"catch_stray", [stray_index, layout_day])
 	_catching = false
 	if not is_inside_tree():
 		return
-	_toast(str(problem) if str(problem) != "" else STRAY_CAUGHT_TEXT)
+	if str(problem) != "":
+		_toast(str(problem))
+	elif had_runner:
+		_toast(STRAY_LET_GO_TEXT)
+	else:
+		_toast(STRAY_CAUGHT_TEXT % GameState.STATION_LINE)
 
 
 ## A stray caught today is gone from this screen, whoever caught it.
@@ -430,6 +437,7 @@ func _show_strays() -> void:
 		var gone: bool = stray_indices[i] in caught
 		stray_nodes[i].visible = not gone
 		stray_clicks[i].visible = not gone
+		stray_clicks[i].enabled = not gone  # also clears its hover hint
 		stray_clicks[i].collision_layer = 0 if gone else 8
 
 

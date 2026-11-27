@@ -158,6 +158,9 @@ const CATCHABLE: Array[StringName] = [&"cobalt_sentinel", &"banded_regolith_runn
 ## beside it, in enclosure_origins.
 const RUNNER: StringName = &"banded_regolith_runner"
 const STATION_ORIGIN: String = "phobos_station"
+## Species caught with a tank record but no dome tank yet: they sit out the molt and the
+## lab sitter's round until the tank exists (nothing could show or collect them).
+const NO_DOME_TANK: Array[StringName] = [&"banded_regolith_runner"]
 const STATION_LINE: String = "Station stock, caught in a Phobos service tunnel"
 ## What a catch is counted under in action_counts (the Strays quest reads it), and the
 ## prefix of a count of arriving on a moon ("reached_phobos"): both with no XP.
@@ -1142,7 +1145,6 @@ static func _has_nan(value: Variant) -> bool:
 	return false
 
 
-## An entry of `enclosures`: a molt, at the stage its progress gives.
 ## Why a save's strays_caught and enclosure_origins can't load, or "".
 static func _stray_problem(strays: Variant, origins: Variant, tanks: Dictionary) -> String:
 	if not strays is Dictionary or not origins is Dictionary:
@@ -1156,11 +1158,12 @@ static func _stray_problem(strays: Variant, origins: Variant, tanks: Dictionary)
 			if not stray is int or stray < 0 or stray >= PhobosServiceTunnel.STRAY_SPOTS.size() or (ids as Array).count(stray) != 1:
 				return "'strays_caught' holds a stray that is not one."
 	for id: Variant in origins:
-		if not id is String or not tanks.has(id) or origins[id] != STATION_ORIGIN:
+		if not id is String or id != String(RUNNER) or not tanks.has(id) 				or not origins[id] is String or origins[id] != STATION_ORIGIN:
 			return "'enclosure_origins' has an entry that is not a caught tarantula's origin."
 	return ""
 
 
+## An entry of `enclosures`: a molt, at the stage its progress gives.
 static func _is_tank(tank: Variant) -> bool:
 	if not tank is Dictionary or tank.size() != 3 or not tank.has_all(["molt_progress", "molt_stage", "exuvia_until_day"]):
 		return false
@@ -5953,6 +5956,8 @@ func strays_caught_today() -> Array[int]:
 ## find), so they are let go on the spot but still count, so every player's Strays quest can
 ## finish. A catch is counted for who made it (action_counts, STRAY_COUNT, with no XP).
 func catch_stray(stray_index: int, layout_day: int, player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host decides a catch."
 	var who: String = _player(player_id)
 	var day: int = GameClock.get_day_index()
 	if place_of(who) != Shuttle.PHOBOS:
@@ -5968,7 +5973,7 @@ func catch_stray(stray_index: int, layout_day: int, player_id: String = "") -> S
 	strays_caught = { "day": day, "ids": ids }
 	if catch_species(String(RUNNER)):
 		enclosure_origins[String(RUNNER)] = STATION_ORIGIN
-		post_phone("STATION STOCK: a Banded Regolith Runner. It goes to a tank in the dome.")
+		post_phone("A Banded Regolith Runner. %s. It is kept for the dome." % STATION_LINE)
 	if who != MANAGER_ID:
 		var done: Dictionary = (action_counts.get_or_add(who, {}) as Dictionary).get_or_add(STRAY_COUNT, { "count": 0, "xp": 0 })
 		done["count"] = int(done["count"]) + 1
@@ -6335,7 +6340,7 @@ func _species_number(species_id: String, field: String) -> float:
 
 
 func is_enclosure_spool_ready(species_id: String) -> bool:
-	return is_caught(species_id) and enclosures[species_id]["molt_stage"] == MoltStage.MOLTED
+	return is_caught(species_id) and not StringName(species_id) in NO_DOME_TANK and enclosures[species_id]["molt_stage"] == MoltStage.MOLTED
 
 
 func is_enclosure_exuvia_visible(species_id: String) -> bool:
@@ -6358,7 +6363,7 @@ func enclosure_text(species_id: String) -> String:
 func _tick_enclosures(delta_days: float) -> void:
 	for id: String in enclosures:
 		var tank: Dictionary = enclosures[id]
-		if tank["molt_stage"] == MoltStage.MOLTED or enclosure_pause_reason(id) != "":
+		if StringName(id) in NO_DOME_TANK or tank["molt_stage"] == MoltStage.MOLTED or enclosure_pause_reason(id) != "":
 			continue
 		tank["molt_progress"] = minf(1.0, tank["molt_progress"] + delta_days / molt_days())
 		tank["molt_stage"] = int(_molt_stage_at(tank["molt_progress"]))
