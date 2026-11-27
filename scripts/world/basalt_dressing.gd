@@ -31,8 +31,8 @@ const PUFF_COUNT: int = 8
 const PUFF_LIFETIME_S: float = 3.0
 const PUFF_RISE_M_S: float = 0.9
 const PUFF_SIZE_M: float = 0.5
-## Steam colour: a neutral grey (Ryan, Nov 27 playtest: "maybe a bit greyer"; was 0.85/0.88/0.92) [PLACEHOLDER].
-const PUFF_GREY := Color(0.66, 0.66, 0.66)
+## Steam colour, neutral grey (Ryan Nov 27: "a bit greyer"; was 0.85/0.88/0.92) [PLACEHOLDER].
+const PUFF_GREY: Color = Color(0.66, 0.66, 0.66)
 
 static var _spots: Array[Vector2] = []
 static var _spots_ready: bool = false
