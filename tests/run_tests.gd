@@ -19,6 +19,8 @@ func _on_timeout() -> void:
 
 
 func _run_tests() -> void:
+	# Prompts follow the device at once here; the settle has its own tests.
+	Controls.settle_text = false
 	var passed: int = 0
 	var failed: int = 0
 	for file: String in DirAccess.get_files_at("res://tests"):

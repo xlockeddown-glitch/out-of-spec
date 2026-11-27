@@ -216,7 +216,7 @@ func _process(delta: float) -> void:
 	_hud.set_clock(GameClock.format_now())
 	_hud.set_molt(GameState.molt_text() if GameState.has_skill_unlock("molt_on_phone") else "")
 	# Bram's number tags follow the device in use.
-	if _bram_bay.rover_inside and Controls.using_pad() != _bram_pad:
+	if _bram_bay.rover_inside and Controls.shown_pad() != _bram_pad:
 		_refresh_bram()
 	if _inspect_left > 0.0:
 		_inspect_left -= delta
@@ -934,13 +934,13 @@ func _on_rover_entered_bay() -> void:
 ## The number key's tag on one of Bram's buttons: "  [3]" on the keyboard, nothing
 ## on a pad (its buttons would grow, and the actions menu lists the buys).
 func _buy_tag(index: int) -> String:
-	if Controls.using_pad():
+	if Controls.shown_pad():
 		return ""
 	return "  [%s]" % Controls.key_label(ActionsMenuUI.BUY_ACTIONS[index])
 
 
 func _refresh_bram() -> void:
-	_bram_pad = Controls.using_pad()
+	_bram_pad = Controls.shown_pad()
 	_hud.show_bram(_bram_line, GameState.treads_ore_cost(), GameState.crystal_ore, GameState.has_wide_treads)
 	_hud.show_wheel_service(GameState.wheel_service_text(), GameState.wheels_due())
 	var offers: Array[Dictionary] = []

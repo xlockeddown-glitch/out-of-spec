@@ -38,6 +38,16 @@ static var last_device: Device = Device.KEY
 static var pad_present_override: bool = false
 ## The first-launch line is told once for each run of the game.
 static var hint_told: bool = false
+## [PLACEHOLDER] The wording on screen follows the device only after it has held
+## still this long (shown_pad). A pad that also sends key presses (Steam Input, a
+## remapper) flips last_device on every event; without this the text would flip too.
+const DEVICE_DWELL_MSEC: int = 600
+## False makes shown_pad() the raw device at once (the test runner does this).
+static var settle_text: bool = true
+static var _raw_pad: bool = false
+static var _raw_msec: int = 0
+static var _shown_pad: bool = false
+static var _shown_known: bool = false
 
 
 ## Called with every input event (GameState does). A key or mouse click means
@@ -64,6 +74,35 @@ static func pad_connected() -> bool:
 ## Whether prompts show the pad: it is the last device used and one is plugged in.
 static func using_pad() -> bool:
 	return last_device == Device.PAD and pad_connected()
+
+
+## The device the text on screen is written for: using_pad(), but it changes only
+## once using_pad() has stayed the same for DEVICE_DWELL_MSEC. A flip that goes on
+## never changes it. The first call takes the device at once. `now` is the clock in
+## milliseconds (tests pass their own).
+static func shown_pad(now: int = -1) -> bool:
+	var raw: bool = using_pad()
+	if not settle_text:
+		return raw
+	if now < 0:
+		now = Time.get_ticks_msec()
+	if not _shown_known:
+		_shown_known = true
+		_shown_pad = raw
+		_raw_pad = raw
+		_raw_msec = now
+		return raw
+	if raw != _raw_pad:
+		_raw_pad = raw
+		_raw_msec = now
+	if raw != _shown_pad and now - _raw_msec >= DEVICE_DWELL_MSEC:
+		_shown_pad = raw
+	return _shown_pad
+
+
+## Forgets what shown_pad() settled on, so the next call takes the device at once.
+static func reset_shown() -> void:
+	_shown_known = false
 
 
 ## "E", "Space", "Esc", "[": the first key of the action, "" if it has none.
@@ -111,7 +150,7 @@ static func pad_label(action: StringName) -> String:
 ## What to tell the player to press for the action, on the device they use:
 ## the key, or the pad button, or for a verb only the actions menu has, the way there.
 static func prompt(action: StringName) -> String:
-	if using_pad():
+	if shown_pad():
 		var pad: String = pad_label(action)
 		if pad != "":
 			return pad
@@ -123,7 +162,7 @@ static func prompt(action: StringName) -> String:
 ## Like prompt(), but never longer than a phone button can hold: on a pad a verb
 ## with no button is just "menu".
 static func short_prompt(action: StringName) -> String:
-	if using_pad():
+	if shown_pad():
 		var pad: String = pad_label(action)
 		return pad.replace("D-pad ", "D-") if pad != "" else SHORT_MENU
 	var key: String = key_label(action)
@@ -143,7 +182,7 @@ static func menu_name(action: StringName) -> String:
 ## The first-launch line, wording for the device: the pad player sees the pad way.
 static func hint_text() -> String:
 	var menu: String = MENU_WORDS % menu_name(CONTROLS_ACTION)
-	if using_pad():
+	if shown_pad():
 		return "Press %s for the controls." % menu
 	var key: String = key_label(CONTROLS_ACTION)
 	if pad_connected():

@@ -3,19 +3,22 @@ extends Node3D
 ## the bench UI, and the scene switcher, and refreshes the status panel.
 
 ## Built when shown, so it names the key or button in use.
+## On the pad it is shorter, so it stays on one line (the keyboard's is 118 characters).
 static func default_hint() -> String:
+	if Controls.shown_pad():
+		return "D-pad, %s: pick and use  ·  %s  ·  %s  ·  %s: back to farm" % [
+			Controls.prompt(&"interact"), Controls.prompt(&"open_skills"), Controls.prompt(&"open_coop"), Controls.prompt(&"swap_scene")]
 	return "Click the bench to calibrate  ·  Plan board: grow the lab  ·  %s: skills  ·  %s: co-op  ·  Airlock or %s: back to farm" % [
 		Controls.prompt(&"open_skills"), Controls.prompt(&"open_coop"), Controls.prompt(&"swap_scene")]
-## [PLACEHOLDER] The lab's wording follows the device the player used last, but it
-## changes at most this often: a pad that also sends key presses (Steam Input,
-## a remapper) would otherwise flip the bottom line between two texts every frame.
-const DEVICE_DWELL_MSEC: int = 600
 ## [PLACEHOLDER] How far the stick must be pushed to step the pad's selection, and
 ## how far back it must come before it can step again.
 const STICK_STEP: float = 0.6
 const STICK_REST: float = 0.35
 ## [PLACEHOLDER] Off the pad's line, a clickable counts this many times further away.
 const OFF_LINE_COST: float = 2.0
+## [PLACEHOLDER] The mouse must move this many pixels in all before it takes the
+## hint back from the pad's pick (a bumped desk or a drifting sensor must not).
+const MOUSE_TAKEOVER_PX: float = 6.0
 const TOAST_SECONDS: float = 3.0
 ## Long messages (dispatches, audit lines) stay up longer.
 const TOAST_SECONDS_PER_CHAR: float = 0.04
@@ -59,9 +62,12 @@ var _holding_audit: bool = false
 var _pad_pick: Clickable = null
 ## Which stick directions are held (so one push steps once).
 var _stick_held: Dictionary[Vector2i, bool] = {}
-## The default line and the "use" words, built for the device at the last settle.
+## Mouse travel since the pad last picked.
+var _mouse_travel: float = 0.0
+## The toast's own text (the pick is named under it).
+var _toast_text: String = ""
+## The default line and the "use" words, built for the settled device.
 var _hint_pad: bool = false
-var _hint_msec: int = -1000000
 var _default_text: String = ""
 var _use_text: String = ""
 
@@ -125,29 +131,35 @@ func _process(delta: float) -> void:
 		if Clickable.hovered == _kestrel_click:
 			Clickable.hovered = null
 	_show_mug_ring()
+	if _stick_held.size() > 0 and QuestsUI.other_panel_open(get_tree()):
+		# The stick may be let go inside a panel, where this scene sees nothing.
+		_stick_held.clear()
+	if _pad_pick != null and not _pad_pick_valid():
+		_pad_pick = null
+	_refresh_prompts()
+	var picked: bool = _pad_pick != null
+	var pick_line: String = "%s  ·  %s" % [_name_of(_pad_pick), _use_text] if picked else ""
 	if _toast_left > 0.0:
 		_toast_left -= delta
+		# What A would use is always on screen, under the toast.
+		_hint_label.text = _toast_text + ("\n" + pick_line if picked else "")
 	else:
 		_holding_audit = false
-		_settle_prompts()
-		var shown: Clickable = _pad_pick if _pad_pick_valid() else Clickable.hovered
-		if shown == null:
+		var shown: Clickable = Clickable.hovered
+		if picked:
+			_hint_label.text = pick_line
+		elif shown == null:
 			_hint_label.text = _default_text
-		elif _pad_pick_valid():
-			_hint_label.text = "%s  ·  %s" % [_name_of(shown), _use_text]
 		else:
 			_hint_label.text = shown.hint if shown.hint != "" else _default_text
 
 
-## Rebuilds the prompt wording when the device changed and has stayed put for
-## DEVICE_DWELL_MSEC since the last change.
-func _settle_prompts() -> void:
-	var pad: bool = Controls.using_pad()
-	var now: int = Time.get_ticks_msec()
-	if _default_text != "" and (pad == _hint_pad or now - _hint_msec < DEVICE_DWELL_MSEC):
+## Rebuilds the prompt wording when the settled device (Controls.shown_pad, which
+## a flipping device cannot change) differs from the one the words are for.
+func _refresh_prompts() -> void:
+	var pad: bool = Controls.shown_pad()
+	if _default_text != "" and pad == _hint_pad:
 		return
-	if pad != _hint_pad or _default_text == "":
-		_hint_msec = now
 	_hint_pad = pad
 	_default_text = default_hint()
 	_use_text = "%s to use" % Controls.prompt(&"interact")
@@ -164,22 +176,23 @@ func usable_clickables() -> Array[Clickable]:
 	var found: Array[Clickable] = []
 	for node: Node in find_children("*", "Clickable", true, false):
 		var item: Clickable = node as Clickable
-		if item.enabled and item.is_inside_tree() and _shown(item):
+		if _pickable(item):
 			found.append(item)
 	return found
 
 
-func _shown(item: Clickable) -> bool:
-	var up: Node = item.get_parent()
-	while up != null and up != self:
-		if up is Node3D and not (up as Node3D).visible:
-			return false
-		up = up.get_parent()
-	return true
+## Usable now, and on the screen where the player can see it.
+func _pickable(item: Clickable) -> bool:
+	if not (item.enabled and item.is_inside_tree() and item.is_visible_in_tree()):
+		return false
+	var camera: Camera3D = get_viewport().get_camera_3d()
+	if camera == null:
+		return true
+	return not camera.is_position_behind(item.global_position) and get_viewport().get_visible_rect().has_point(_screen_point(item))
 
 
 func _pad_pick_valid() -> bool:
-	return _pad_pick != null and is_instance_valid(_pad_pick) and _pad_pick.enabled and _pad_pick.is_inside_tree() and _shown(_pad_pick)
+	return _pad_pick != null and is_instance_valid(_pad_pick) and _pickable(_pad_pick)
 
 
 func _screen_point(item: Clickable) -> Vector2:
@@ -219,12 +232,15 @@ func pad_step(direction: Vector2) -> void:
 			best = item
 	if best != null:
 		_pad_pick = best
+		_mouse_travel = 0.0
 
 
 func _input(event: InputEvent) -> void:
-	# The mouse moving takes the hint back from the pad's pick.
-	if event is InputEventMouseMotion and (event as InputEventMouseMotion).relative != Vector2.ZERO:
-		_pad_pick = null
+	# The mouse really moving (not a pixel of drift) takes the hint back from the pad's pick.
+	if event is InputEventMouseMotion:
+		_mouse_travel += (event as InputEventMouseMotion).relative.length()
+		if _mouse_travel >= MOUSE_TAKEOVER_PX:
+			_pad_pick = null
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -268,8 +284,15 @@ func _stick_direction(motion: InputEventJoypadMotion) -> Vector2i:
 			_stick_held[key] = false
 		return Vector2i.ZERO
 	if strength >= STICK_STEP and not _stick_held.get(along, false):
+		# A push to a corner crosses both axes: only the first one steps.
+		var other_axis_held: bool = false
+		for key: Vector2i in _stick_held:
+			if _stick_held[key] and (key.x == 0) != (along.x == 0):
+				other_axis_held = true
 		_stick_held[along] = true
-		return along
+		# A flick straight across skips the rest event, so the way back is free again.
+		_stick_held[-along] = false
+		return Vector2i.ZERO if other_axis_held else along
 	return Vector2i.ZERO
 
 
@@ -430,8 +453,9 @@ func _toast(text: String) -> void:
 	# after the same time jump) both stay on screen.
 	var frame: int = Engine.get_process_frames()
 	if frame == _toast_frame and _toast_left > 0.0:
-		_hint_label.text += "\n" + text
+		_toast_text += "\n" + text
 	else:
-		_hint_label.text = text
+		_toast_text = text
+	_hint_label.text = _toast_text
 	_toast_frame = frame
-	_toast_left = maxf(TOAST_SECONDS, _hint_label.text.length() * TOAST_SECONDS_PER_CHAR)
+	_toast_left = maxf(TOAST_SECONDS, _toast_text.length() * TOAST_SECONDS_PER_CHAR)
