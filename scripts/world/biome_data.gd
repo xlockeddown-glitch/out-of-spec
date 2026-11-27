@@ -50,6 +50,7 @@ const FIELDS: Dictionary = {
 	"reach_m": TYPE_FLOAT,
 	"band": TYPE_ARRAY,
 	"tint": TYPE_STRING,
+	"ground_tint": TYPE_STRING,
 	"sign": TYPE_STRING,
 	"marker": TYPE_ARRAY,
 	"entrances": TYPE_ARRAY,
@@ -220,6 +221,13 @@ static func marker(id: StringName) -> Vector2:
 static func tint(id: StringName) -> Color:
 	var text: String = str(biome(id).get("tint", ""))
 	return Color(text) if Color.html_is_valid(text) else Color.MAGENTA
+
+
+## The colour the real ground of `id` leans toward in play, or white for an unknown id
+## (no change). It is a multiplier on the height tint, not the F8 overlay's colour.
+static func ground_tint(id: StringName) -> Color:
+	var text: String = str(biome(id).get("ground_tint", ""))
+	return Color(text) if Color.html_is_valid(text) else Color.WHITE
 
 
 ## The zone-level band of `id` as (min, max), or (0, 0) for an unknown id.
@@ -406,6 +414,8 @@ static func _row_problems(label: String, row: Dictionary) -> Array[String]:
 		out.append("%s: reach_m must be above 0" % label)
 	if not Color.html_is_valid(str(row["tint"])):
 		out.append("%s: tint %s is not a colour" % [label, row["tint"]])
+	if not Color.html_is_valid(str(row["ground_tint"])):
+		out.append("%s: ground_tint %s is not a colour" % [label, row["ground_tint"]])
 	out.append_array(_band_problems(label, row["band"]))
 	for field: String in ["centre", "marker"]:
 		out.append_array(_point_problems(label, field, row[field]))
