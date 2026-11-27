@@ -72,7 +72,18 @@ func _ready() -> void:
 	GameState.farm_loaded.connect(refresh_hints)
 	GameClock.day_started.connect(_on_day_started)
 	# A guest's clock never emits day_started; it emits this when it shows the host's time.
-	GameClock.guest_time_shown.connect(refresh_hints)
+	GameClock.guest_time_shown.connect(_on_guest_time_shown)
+
+
+## The guest clock ticks every frame; the hint only changes with the day.
+var _hint_day: int = -1
+
+
+func _on_guest_time_shown() -> void:
+	var day: int = GameClock.get_day_index()
+	if day != _hint_day:
+		_hint_day = day
+		refresh_hints()
 
 
 func _on_audit_completed(_report: Dictionary) -> void:
