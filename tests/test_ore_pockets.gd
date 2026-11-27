@@ -49,7 +49,7 @@ func test_pockets_are_few_and_the_same_for_a_seed() -> String:
 		if around.size.x < 20 or around.size.y < 20:
 			return "Seed %d: the pockets must lie about the farm, not in a clump: %s" % [seed_value, cells]
 		for cell: Vector2i in cells:
-			if Terrain.dig_problem(cell, dug) != "" or not ReferenceBlock.at(seed_value, cell).is_empty() or cells.count(cell) != 1:
+			if Terrain.dig_problem(cell, dug, true) != "" or not ReferenceBlock.at(seed_value, cell).is_empty() or cells.count(cell) != 1:
 				return "Seed %d: %s can't be dug, holds a block, or is there twice." % [seed_value, cell]
 	return ""
 
