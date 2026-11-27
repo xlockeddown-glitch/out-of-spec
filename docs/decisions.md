@@ -2,6 +2,10 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: Service tunnel walker follows loadout changes (fix/tunnel-walker-loadout)
+
+Connected `GameState.loadouts_changed` in `PhobosServiceTunnel` (`scripts/world/phobos_service_tunnel.gd`) to `_dress_walker()` (matching `PhobosHub`) so the walker's suit and loadout update live when loadouts change in the tunnel, and disconnected it in `_exit_tree()`. Added a regression test in `tests/test_phobos_service_tunnel.gd`.
+
 ## 2026-11-27: UI restyle, part 2 (feat/ui-restyle-2)
 
 Moved `PauseUI` (`scripts/ui/pause_ui.gd`), `TitleMenu` (`scripts/ui/title_menu.gd`), `SkillsUI` (`scripts/ui/skills_ui.gd`), and `XpCertificateUI` (`scripts/ui/xp_certificate_ui.gd`) onto `ScopeTheme` (Meridiani Scope putty shell, terracotta header bar, recessed dark glass, and chunky putty buttons). Looks only — all button order, callbacks, signals, focus handling, node/field names, texts, and open/close rules are unchanged. Every new size and colour choice below is a [PLACEHOLDER]:
