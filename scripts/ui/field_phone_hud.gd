@@ -15,7 +15,7 @@ signal accept_job_pressed(index: int)
 
 ## How big the phone is, as a fraction of its original size. Fonts, fixed
 ## sizes, margins and the width all follow this one number.
-const PHONE_SCALE: float = 0.85 # [PLACEHOLDER] Ryan: "a little too big"
+const PHONE_SCALE: float = 0.8 # [PLACEHOLDER] Ryan: 20 % smaller
 ## The phone's width on the screen before PHONE_SCALE (0.32 of the screen).
 const BASE_WIDTH_FRACTION: float = 0.32
 ## Where the phone starts, as a fraction of the screen width. The world view
