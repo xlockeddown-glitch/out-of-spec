@@ -85,10 +85,12 @@ func test_no_part_is_on_a_road_the_sign_the_pad_or_an_entrance() -> String:
 
 func test_the_clearance_rules_refuse_the_road_the_sign_the_plot_and_the_edge() -> String:
 	var pad: Vector2 = BiomeData.marker(LANDING)
-	if LandingDressing.clear(Vector4(0.0, 60.0, 2.0, 2.0)):
-		return "A slab was allowed on the road"
+	# The road runs up to z 85 at the sign, inside the field (reach 30 round z 100).
+	if BiomeData.biome_at(Vector2(0.0, 78.0)) != LANDING or LandingDressing.clear(Vector4(0.0, 78.0, 2.0, 2.0)):
+		return "A slab was allowed on the road inside the field"
 	if LandingDressing.clear(Vector4(pad.x + 2.7, pad.y, 0.5, 0.5)):
 		return "A part was allowed on the sign"
+	# The plot lies 100 m from the field, so only the field rule can refuse it there.
 	if LandingDressing.clear(Vector4(0.0, 0.0, 1.0, 1.0)):
 		return "A part was allowed on the plot"
 	if LandingDressing.clear(Vector4(0.0, 400.0, 1.0, 1.0)):
@@ -120,28 +122,135 @@ func test_the_slab_sits_level_over_its_footprint() -> String:
 	return result
 
 
-func test_the_slab_follows_digging_and_hides_under_stone() -> String:
-	var slab: Vector4 = LandingDressing.parts()["slab"]
+func _cells_under(part: Vector4, depth: int) -> Dictionary[Vector2i, int]:
+	var dug: Dictionary[Vector2i, int] = {}
+	var first: Vector2i = Terrain.cell_at(Vector2(part.x - part.z, part.y - part.w))
+	var last: Vector2i = Terrain.cell_at(Vector2(part.x + part.z, part.y + part.w))
+	for x: int in range(first.x - 1, last.x + 2):
+		for z: int in range(first.y - 1, last.y + 2):
+			dug[Vector2i(x, z)] = depth
+	return dug
+
+
+func _top_of(post: MeshInstance3D) -> float:
+	return post.position.y + (post.mesh as BoxMesh).size.y * 0.5
+
+
+func _bottom_of(post: MeshInstance3D) -> float:
+	return post.position.y - (post.mesh as BoxMesh).size.y * 0.5
+
+
+func test_the_slab_follows_digging() -> String:
+	var found: Dictionary[String, Vector4] = LandingDressing.parts()
 	var dressing: LandingDressing = _dressed()
 	var before: float = dressing.slab_top_now()
-	var dug: Dictionary[Vector2i, int] = {}
-	var centre: Vector2i = Terrain.cell_at(Vector2(slab.x, slab.y))
-	for x: int in range(-1, 2):
-		for z: int in range(-1, 2):
-			dug[centre + Vector2i(x, z)] = 3
+	var dug: Dictionary[Vector2i, int] = _cells_under(found["slab"], 3)
 	dressing.settle(dug)
 	var after: float = dressing.slab_top_now()
 	var result: String = ""
-	if absf(after - before) > 0.5:
-		result = "The slab jumped %.2f m for a dug middle: it should stay on the highest ground" % (after - before)
-	var pieces: Dictionary[Vector2i, int] = {centre: 1}
+	if not after < before - 0.5:
+		result = "The slab did not follow the digging down (%.2f to %.2f)" % [before, after]
+	elif absf(after - LandingDressing.slab_top(dug)) > 0.001:
+		result = "The slab's top is not over the highest ground left"
+	else:
+		# Dug under only one corner's cell, the slab reaches the new low.
+		var corner: Dictionary[Vector2i, int] = {Terrain.cell_at(Vector2(found["slab"].x - 3.9, found["slab"].y - 3.9)): 3}
+		dressing.settle(corner)
+		var slab: MeshInstance3D = dressing.get_node("Slab") as MeshInstance3D
+		var low: float = LandingDressing.lowest_under(found["slab"], corner)
+		if _bottom_of(slab) > low + 0.001:
+			result = "The slab hangs over the dug corner (bottom %.2f, ground %.2f)" % [_bottom_of(slab), low]
+		elif absf(dressing.slab_top_now() - LandingDressing.slab_top(corner)) > 0.001:
+			result = "A dug corner moved the slab's top"
+	_cleanup()
+	return result
+
+
+func test_posts_keep_their_tops_and_reach_the_dug_ground() -> String:
+	var found: Dictionary[String, Vector4] = LandingDressing.parts()
+	var dressing: LandingDressing = _dressed()
+	var west: MeshInstance3D = dressing.get_node("Gantry/Post_west") as MeshInstance3D
+	var east: MeshInstance3D = dressing.get_node("Gantry/Post_east") as MeshInstance3D
+	var terminal: MeshInstance3D = dressing.get_node("Terminal").get_child(0) as MeshInstance3D
+	var top_before: float = _top_of(west)
+	var terminal_top: float = _top_of(terminal)
+	var dug: Dictionary[Vector2i, int] = _cells_under(found["gantry_west"], 3)
+	for cell: Vector2i in _cells_under(found["terminal"], 3):
+		dug[cell] = 3
+	dressing.settle(dug)
+	var result: String = ""
+	if absf(_top_of(west) - top_before) > 0.001 or absf(_top_of(east) - top_before) > 0.001:
+		result = "A dug post moved the gantry's top (%.2f to %.2f)" % [top_before, _top_of(west)]
+	elif _bottom_of(west) > LandingDressing.lowest_under(found["gantry_west"], dug) + 0.001:
+		result = "The west post hangs over its dug ground"
+	elif _bottom_of(terminal) > LandingDressing.lowest_under(found["terminal"], dug) + 0.001 or _top_of(terminal) < LandingDressing.highest_under(found["terminal"], dug) + 1.0:
+		result = "The terminal post hangs or lost its height (top %.2f, was %.2f)" % [_top_of(terminal), terminal_top]
+	_cleanup()
+	return result
+
+
+func test_stone_hides_the_parts_and_the_terminal_stops_being_clickable() -> String:
+	var found: Dictionary[String, Vector4] = LandingDressing.parts()
+	var dressing: LandingDressing = _dressed()
+	var slab_cell: Vector2i = Terrain.cell_at(Vector2(found["slab"].x, found["slab"].y))
+	var pieces: Dictionary[Vector2i, int] = {slab_cell: 1}
 	dressing.cover(pieces)
-	if result == "" and (dressing.shown()["slab"] or not dressing.shown()["terminal"]):
+	var result: String = ""
+	if dressing.shown()["slab"] or not dressing.shown()["terminal"]:
 		result = "Stone on the slab should hide the slab only"
+	var post_cell: Vector2i = Terrain.cell_at(Vector2(found["gantry_east"].x, found["gantry_east"].y))
+	var post_only: Dictionary[Vector2i, int] = {post_cell: 1}
+	dressing.cover(post_only)
+	if result == "" and (not dressing.shown()["slab"] or dressing.shown()["gantry"]):
+		result = "Stone on a gantry post's cell should hide the gantry and leave the slab"
+	var on_terminal: Dictionary[Vector2i, int] = {Terrain.cell_at(Vector2(found["terminal"].x, found["terminal"].y)): 1}
+	Clickable.hovered = dressing.terminal_click
+	dressing.cover(on_terminal)
+	if result == "" and (dressing.shown()["terminal"] or dressing.terminal_click.enabled or Clickable.hovered == dressing.terminal_click):
+		result = "A terminal under stone is still clickable or hovered"
 	var empty: Dictionary[Vector2i, int] = {}
 	dressing.cover(empty)
-	if result == "" and not dressing.shown()["slab"]:
-		result = "The slab stayed hidden after the stone went"
+	if result == "" and (not dressing.shown()["terminal"] or not dressing.terminal_click.enabled):
+		result = "The terminal did not come back after the stone went"
+	Clickable.hovered = null
+	_cleanup()
+	return result
+
+
+func test_the_live_dressing_follows_its_signals() -> String:
+	var found: Dictionary[String, Vector4] = LandingDressing.parts()
+	var xp: int = GameState.lab_xp
+	var saved_dug: Dictionary[Vector2i, int] = GameState.dug.duplicate()
+	var saved_stone: Dictionary[Vector2i, int] = GameState.stone_pieces.duplicate()
+	GameState.lab_xp = GameState.xp_for_level(19)
+	var dressing := LandingDressing.new()
+	_nodes.append(dressing)
+	(Engine.get_main_loop() as SceneTree).root.add_child(dressing)
+	var result: String = ""
+	var dark: bool = not dressing.is_lit()
+	GameState.lab_xp = GameState.xp_for_level(20)
+	GameState.lab_xp_changed.emit()
+	var lit: bool = dressing.is_lit()
+	var before: float = dressing.slab_top_now()
+	GameState.dug = _cells_under(found["slab"], 3)
+	GameState.terrain_changed.emit()
+	var dropped: float = dressing.slab_top_now()
+	GameState.dug = saved_dug
+	GameState.terrain_changed.emit()
+	var back: float = dressing.slab_top_now()
+	GameState.stone_pieces = {Terrain.cell_at(Vector2(found["slab"].x, found["slab"].y)): 1}
+	GameState.stone_changed.emit()
+	var hidden: bool = not dressing.shown()["slab"]
+	GameState.stone_pieces = saved_stone
+	GameState.stone_changed.emit()
+	var shown_again: bool = dressing.shown()["slab"]
+	GameState.lab_xp = xp
+	if not dark or not lit:
+		result = "The lights did not follow lab_xp_changed (dark %s, lit %s)" % [dark, lit]
+	elif not dropped < before - 0.5 or not is_equal_approx(back, before):
+		result = "The slab did not follow terrain_changed (%.2f, %.2f, %.2f)" % [before, dropped, back]
+	elif not hidden or not shown_again:
+		result = "The slab did not follow stone_changed"
 	_cleanup()
 	return result
 
@@ -166,10 +275,10 @@ func test_the_terminal_is_a_clickable_on_layer_8() -> String:
 	var dressing: LandingDressing = _dressed()
 	var click: Clickable = dressing.terminal_click
 	var result: String = ""
-	var at_it := Vector3(LandingDressing.TERMINAL_AT.x, 1.0, LandingDressing.TERMINAL_AT.y)
+	var at_it := Vector3(Shuttle.TERMINAL_AT.x, 1.0, Shuttle.TERMINAL_AT.y)
 	if click == null or click.collision_layer != 8 or click.hint == "":
 		result = "The terminal needs a Clickable on layer 8 with a hint"
-	elif not LandingDressing.terminal_near(at_it) or LandingDressing.terminal_near(Vector3(0.0, 1.0, 40.0)) or LandingDressing.terminal_near(null):
+	elif not Shuttle.terminal_near(at_it) or Shuttle.terminal_near(Vector3(0.0, 1.0, 40.0)) or Shuttle.terminal_near(null):
 		result = "terminal_near is wrong at the terminal, far away or with no position"
 	_cleanup()
 	return result
@@ -218,6 +327,54 @@ func test_the_panel_has_a_book_button_for_each_moon() -> String:
 	return "\n".join(problems)
 
 
+func test_the_panel_opens_shows_the_refusal_follows_the_license_and_closes() -> String:
+	var ui := ShuttleUI.new()
+	_nodes.append(ui)
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	tree.root.add_child(ui)
+	var problems: Array[String] = []
+	var licensed: bool = GameState.shuttle_licensed
+	GameState.shuttle_licensed = false
+	ui.open()
+	if not ui.visible:
+		problems.append("open() did not show the panel")
+	if not _all_text(ui).contains(Shuttle.text("terminal_unlicensed")):
+		problems.append("The unlicensed line is missing")
+	GameState.shuttle_licensed = true
+	GameState.shuttle_license_changed.emit()
+	if not _all_text(ui).contains(Shuttle.text("terminal_licensed")):
+		problems.append("The open panel kept a stale license line")
+	ui.close()
+	if ui.visible:
+		problems.append("close() did not hide the panel")
+	GameState.shuttle_licensed = licensed
+	_cleanup()
+	return "\n".join(problems)
+
+
+func _all_text(node: Node) -> String:
+	var text: String = ""
+	for label: Node in node.find_children("*", "Label", true, false):
+		text += (label as Label).text + "\n"
+	return text
+
+
+## A booking pressed in the panel shows what the host answered (the host here is
+## this process: far from the terminal the answer is the walk reason).
+func test_a_booking_in_the_panel_shows_the_reason() -> String:
+	var ui := ShuttleUI.new()
+	_nodes.append(ui)
+	(Engine.get_main_loop() as SceneTree).root.add_child(ui)
+	ui.open()
+	var status: Label = ui.find_child("Status", true, false) as Label
+	await ui._on_book(Shuttle.PHOBOS)
+	var shown: String = status.text
+	_cleanup()
+	if shown == "":
+		return "A refused booking showed no reason in the panel"
+	return ""
+
+
 # --- book_shuttle: where and how many ----------------------------------------------
 
 func _state() -> GameStateScript:
@@ -253,7 +410,7 @@ func test_a_guest_far_from_the_terminal_is_told_to_walk_there() -> String:
 
 func test_more_people_than_are_present_is_refused() -> String:
 	var gs: GameStateScript = _state()
-	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(LandingDressing.TERMINAL_AT.x, 0.5, LandingDressing.TERMINAL_AT.y))
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
 	var here: int = gs.players_present().size()
 	var told: String = gs.book_shuttle(Shuttle.PHOBOS, here + 1)
 	var charged: int = 500 - gs.credits
@@ -267,7 +424,7 @@ func test_a_guest_at_the_terminal_gets_the_hub_refusal_and_pays_nothing() -> Str
 	var gs: GameStateScript = _state()
 	var commands: Node = CommandsScript.new()
 	commands.state = gs
-	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(LandingDressing.TERMINAL_AT.x, 0.5, LandingDressing.TERMINAL_AT.y))
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
 	var told: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.PHOBOS, 1])
 	var charged: int = 500 - gs.credits
 	commands.free()
@@ -281,3 +438,66 @@ func test_book_shuttle_is_a_command_a_walker_may_send() -> String:
 	if not &"book_shuttle" in CoopWalkers.ON_FOOT:
 		return "book_shuttle must be allowed on foot"
 	return ""
+
+
+# --- A walker's own position counts, not the rover's ---------------------------------
+
+func _walk_to(player_id: String, at: Vector3) -> void:
+	CoopWalkers.out[player_id] = [at.x, at.y, at.z, 0.0, 0.0]
+
+
+func _rover_at(gs: GameStateScript, at: Vector3) -> void:
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, at)
+
+
+func test_a_walker_at_the_terminal_may_book_with_the_rover_far_away() -> String:
+	var gs: GameStateScript = _state()
+	_rover_at(gs, Vector3(0.0, 0.5, 20.0))
+	_walk_to(GUEST, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
+	var stand: Variant = gs.standing_at(GUEST)
+	var told: String = gs.book_shuttle(Shuttle.PHOBOS, 1, GUEST)
+	var rover_rider: String = gs.book_shuttle(Shuttle.PHOBOS, 1, HOST)
+	CoopWalkers.out.erase(GUEST)
+	var charged: int = 500 - gs.credits
+	_done(gs)
+	if not stand is Vector3 or not Shuttle.terminal_near(stand):
+		return "A walker's position is not where they walk to"
+	if told != Shuttle.text("no_hub_text") % "Phobos" or charged != 0:
+		return "A walker at the terminal got '%s' and paid %d CR" % [told, charged]
+	if rover_rider != Shuttle.text("far_text"):
+		return "The one in the far rover got '%s', not the walk reason" % rover_rider
+	return ""
+
+
+func test_a_walker_far_from_the_terminal_is_refused_with_the_rover_beside_it() -> String:
+	var gs: GameStateScript = _state()
+	_rover_at(gs, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
+	_walk_to(GUEST, Vector3(0.0, 0.5, 20.0))
+	var told: String = gs.book_shuttle(Shuttle.PHOBOS, 1, GUEST)
+	var rider: String = gs.book_shuttle(Shuttle.PHOBOS, 1, HOST)
+	CoopWalkers.out.erase(GUEST)
+	var charged: int = 500 - gs.credits
+	_done(gs)
+	if told != Shuttle.text("far_text") or charged != 0:
+		return "A far walker got '%s' (%d CR) with the rover at the terminal" % [told, charged]
+	if rider != Shuttle.text("no_hub_text") % "Phobos":
+		return "The one in the rover at the terminal got '%s'" % rider
+	return ""
+
+
+func test_the_host_allows_a_little_more_than_the_reach_and_no_more() -> String:
+	var gs: GameStateScript = _state()
+	var problems: Array[String] = []
+	var edge: float = Shuttle.REACH_M + Shuttle.HOST_SLACK_M
+	for case: Array in [[Shuttle.REACH_M, true, false], [Shuttle.REACH_M + 0.01, false, true], [edge, false, true], [edge + 0.01, false, false]]:
+		var apart: float = case[0]
+		_walk_to(GUEST, Vector3(Shuttle.TERMINAL_AT.x - apart, 0.5, Shuttle.TERMINAL_AT.y))
+		var near: bool = Shuttle.terminal_near(gs.standing_at(GUEST))
+		var booked_past: bool = gs.book_shuttle(Shuttle.PHOBOS, 1, GUEST) != Shuttle.text("far_text")
+		if booked_past != (case[1] or case[2]):
+			problems.append("%.2f m: the host's answer is wrong (allowed %s)" % [apart, booked_past])
+		if near != case[1]:
+			problems.append("%.2f m: terminal_near is wrong (%s)" % [apart, near])
+	CoopWalkers.out.erase(GUEST)
+	_done(gs)
+	return "\n".join(problems)

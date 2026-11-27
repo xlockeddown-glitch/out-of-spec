@@ -19,7 +19,7 @@ const SLAB_HALF_M: float = 4.0
 const SLAB_THICKNESS_M: float = 0.6
 const SLAB_LIFT_M: float = 0.03
 ## The terminal: its middle, and the box it fills (x, z half-widths).
-const TERMINAL_AT := Vector2(7.5, 100.0)
+const TERMINAL_AT: Vector2 = Shuttle.TERMINAL_AT
 const TERMINAL_HALF := Vector2(0.45, 0.35)
 const TERMINAL_HEIGHT_M: float = 1.5
 ## The edge lights: one at each corner and one in the middle of each edge, a
@@ -36,10 +36,6 @@ const GANTRY_BEAM_M: float = 0.35
 ## rock or a fissure, and from a lamp.
 const SPOT_CLEAR_M: float = 1.0
 const LAMP_CLEAR_M: float = 1.0
-## How near a player must stand to the terminal to use it, in metres [PLACEHOLDER].
-## A guest's pose lags a little, so the host allows HOST_SLACK_M more.
-const REACH_M: float = 5.0
-const HOST_SLACK_M: float = 1.5
 const HINT: String = "Shuttle terminal: launch windows and day trips"
 
 static var _plants: Array[HillDressing.Placed] = []
@@ -47,7 +43,12 @@ static var _plants_ready: bool = false
 
 var terminal_click: Clickable
 var _lights: Array[MeshInstance3D] = []
-var _heads: Array[Node3D] = []
+var _slab_mesh: BoxMesh
+var _posts: Array[MeshInstance3D] = []
+var _beam: MeshInstance3D
+var _terminal_post: MeshInstance3D
+var _screen: MeshInstance3D
+var _click_shape: CollisionShape3D
 var _slab: MeshInstance3D
 var _gantry: Node3D
 var _terminal: Node3D
@@ -67,11 +68,6 @@ static func plants() -> Array[HillDressing.Placed]:
 		_plants = HillDressing.plants()
 		_plants_ready = true
 	return _plants
-
-
-## The slab's footprint as a Rect2 (x, z).
-static func slab_rect() -> Rect2:
-	return Rect2(SLAB_AT - Vector2.ONE * SLAB_HALF_M, Vector2.ONE * SLAB_HALF_M * 2.0)
 
 
 ## Every part's footprint as { name: Vector4(x, z, half x, half z) }: the slab, each
@@ -146,16 +142,6 @@ static func parts_apart() -> bool:
 	return true
 
 
-## True if a player at `where` (the farm's x, y, z; null when unknown) is near enough
-## to the terminal.
-## `slack` is what the host allows beyond REACH_M for a late pose.
-static func terminal_near(where: Variant, slack: float = 0.0) -> bool:
-	if not where is Vector3:
-		return false
-	var at: Vector3 = where
-	return Vector2(TERMINAL_AT.x - at.x, TERMINAL_AT.y - at.z).length() <= REACH_M + slack
-
-
 func _ready() -> void:
 	name = "LandingDressing"
 	build(GameState.dug)
@@ -182,7 +168,8 @@ func _on_stone_changed() -> void:
 ## Whether stone covers any cell under a part's footprint.
 static func covered_by(part: Vector4, pieces: Dictionary[Vector2i, int]) -> bool:
 	var first: Vector2i = Terrain.cell_at(Vector2(part.x - part.z, part.y - part.w))
-	var last: Vector2i = Terrain.cell_at(Vector2(part.x + part.z, part.y + part.w))
+	# A hair under the far edge, so an edge that lies on a cell line stays out of the next cell.
+	var last: Vector2i = Terrain.cell_at(Vector2(part.x + part.z - 0.001, part.y + part.w - 0.001))
 	for x: int in range(first.x, last.x + 1):
 		for z: int in range(first.y, last.y + 1):
 			if pieces.has(Vector2i(x, z)):
@@ -200,6 +187,11 @@ func cover(pieces: Dictionary[Vector2i, int]) -> void:
 		head.visible = not slab_hidden
 	_gantry.visible = not (covered_by(found["gantry_west"], pieces) or covered_by(found["gantry_east"], pieces))
 	_terminal.visible = not covered_by(found["terminal"], pieces)
+	# A hidden terminal cannot be clicked or hinted either.
+	if terminal_click.enabled != _terminal.visible:
+		terminal_click.enabled = _terminal.visible
+		if Clickable.hovered == terminal_click:
+			Clickable.hovered = null
 
 
 ## Which of the slab, the gantry and the terminal are showing.
@@ -207,19 +199,27 @@ func shown() -> Dictionary[String, bool]:
 	return {"slab": _slab.visible, "gantry": _gantry.visible, "terminal": _terminal.visible}
 
 
-## The highest ground under a footprint (x, z, half x, half z), over its corners,
-## edge middles and middle, so a slab on it has no corner buried.
+## The highest ground under a footprint (x, z, half x, half z): every metre across it
+## and its edges, so no vertex under a slab pokes through its top.
 static func highest_under(part: Vector4, dug: Dictionary[Vector2i, int]) -> float:
-	var high: float = -INF
-	for x: int in range(-1, 2):
-		for z: int in range(-1, 2):
-			high = maxf(high, Terrain.height(Vector2(part.x + float(x) * part.z, part.y + float(z) * part.w), dug))
-	return high
+	return _extreme(part, dug, true)
 
 
-## The lowest ground under a footprint, so a post there has no foot in the air.
+## The lowest ground under a footprint, so a part there has no foot in the air.
 static func lowest_under(part: Vector4, dug: Dictionary[Vector2i, int]) -> float:
-	return HillDressing.lowest_under(Vector2(part.x, part.y), Vector2(part.z, part.w), dug)
+	return _extreme(part, dug, false)
+
+
+static func _extreme(part: Vector4, dug: Dictionary[Vector2i, int], highest: bool) -> float:
+	var found: float = -INF if highest else INF
+	var nx: int = maxi(1, ceili(part.z * 2.0))
+	var nz: int = maxi(1, ceili(part.w * 2.0))
+	for i: int in nx + 1:
+		for j: int in nz + 1:
+			var at := Vector2(part.x - part.z + part.z * 2.0 * float(i) / float(nx), part.y - part.w + part.w * 2.0 * float(j) / float(nz))
+			var ground: float = Terrain.height(at, dug)
+			found = maxf(found, ground) if highest else minf(found, ground)
+	return found
 
 
 ## Where the slab's top is: the highest ground under it, a little lifted.
@@ -233,7 +233,7 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 		remove_child(child)
 		child.queue_free()
 	_lights.clear()
-	_heads.clear()
+	_posts.clear()
 	terminal_click = null
 	if _unlit_material == null:
 		_unlit_material = StandardMaterial3D.new()
@@ -261,6 +261,7 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 	var slab_mesh := BoxMesh.new()
 	slab_mesh.size = Vector3(SLAB_HALF_M * 2.0, SLAB_THICKNESS_M, SLAB_HALF_M * 2.0)
 	slab_mesh.material = concrete
+	_slab_mesh = slab_mesh
 	_slab.mesh = slab_mesh
 	add_child(_slab)
 	# The edge lights: small posts' heads, riding on the slab's top.
@@ -285,16 +286,18 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 		post_mesh.size = Vector3(GANTRY_POST_M, GANTRY_HEIGHT_M, GANTRY_POST_M)
 		post_mesh.material = steel
 		post.mesh = post_mesh
-		post.position = Vector3(found[key].x, GANTRY_HEIGHT_M * 0.5, found[key].y)
+		post.position = Vector3(found[key].x, 0.0, found[key].y)
 		_gantry.add_child(post)
+		_posts.append(post)
 	var beam := MeshInstance3D.new()
 	beam.name = "Beam"
 	var beam_mesh := BoxMesh.new()
 	beam_mesh.size = Vector3(GANTRY_X_M * 2.0 + GANTRY_POST_M, GANTRY_BEAM_M, GANTRY_POST_M)
 	beam_mesh.material = steel
 	beam.mesh = beam_mesh
-	beam.position = Vector3(0.0, GANTRY_HEIGHT_M - GANTRY_BEAM_M * 0.5, GANTRY_Z_M)
+	beam.position = Vector3(0.0, 0.0, GANTRY_Z_M)
 	_gantry.add_child(beam)
+	_beam = beam
 	add_child(_gantry)
 	# The terminal: a post, a screen on its north face and a clickable box.
 	_terminal = Node3D.new()
@@ -304,7 +307,7 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 	post_mesh.size = Vector3(TERMINAL_HALF.x * 2.0, TERMINAL_HEIGHT_M, TERMINAL_HALF.y * 2.0)
 	post_mesh.material = steel
 	post.mesh = post_mesh
-	post.position = Vector3(0.0, TERMINAL_HEIGHT_M * 0.5, 0.0)
+	_terminal_post = post
 	_terminal.add_child(post)
 	var screen := MeshInstance3D.new()
 	screen.name = "Screen"
@@ -312,8 +315,9 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 	screen_mesh.size = Vector3(TERMINAL_HALF.x * 2.0 - 0.1, 0.55, 0.05)
 	screen_mesh.material = screen_material
 	screen.mesh = screen_mesh
-	screen.position = Vector3(0.0, TERMINAL_HEIGHT_M - 0.4, -TERMINAL_HALF.y - 0.02)
-	screen.rotation_degrees = Vector3(-12.0, 0.0, 0.0)
+	screen.position = Vector3(0.0, 0.0, -TERMINAL_HALF.y - 0.02)
+	screen.rotation_degrees = Vector3(12.0, 0.0, 0.0)
+	_screen = screen
 	_terminal.add_child(screen)
 	terminal_click = Clickable.new()
 	terminal_click.name = "TerminalClick"
@@ -324,7 +328,7 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 	var box := BoxShape3D.new()
 	box.size = Vector3(TERMINAL_HALF.x * 2.0 + 0.3, TERMINAL_HEIGHT_M, TERMINAL_HALF.y * 2.0 + 0.3)
 	shape.shape = box
-	shape.position = Vector3(0.0, TERMINAL_HEIGHT_M * 0.5, 0.0)
+	_click_shape = shape
 	terminal_click.add_child(shape)
 	_terminal.add_child(terminal_click)
 	_terminal.position = Vector3(TERMINAL_AT.x, 0.0, TERMINAL_AT.y)
@@ -333,18 +337,39 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 	refresh()
 
 
-## Re-seats everything on the ground as `dug` leaves it.
+## Re-seats everything on the ground as `dug` leaves it, as FrostDressing does: the
+## slab's top is over the highest ground under it and it reaches down to the lowest,
+## and each post stands on the lowest ground under it with its top at the set height
+## over the highest, so digging beside it neither buries nor hangs it.
 func settle(dug: Dictionary[Vector2i, int]) -> void:
 	var found: Dictionary[String, Vector4] = parts()
 	var top: float = slab_top(dug)
-	_slab.position = Vector3(SLAB_AT.x, top - SLAB_THICKNESS_M * 0.5, SLAB_AT.y)
+	var bottom: float = minf(top - SLAB_THICKNESS_M, lowest_under(found["slab"], dug) - 0.05)
+	_slab_mesh.size.y = top - bottom
+	_slab.position = Vector3(SLAB_AT.x, (top + bottom) * 0.5, SLAB_AT.y)
 	for head: MeshInstance3D in _lights:
 		head.position.y = top + LIGHT_SIZE_M * 0.3
-	# A post stands on the lowest ground under it and its top is the set height
-	# above the highest, so a slope cannot bury it or hang it.
-	var foot: float = minf(lowest_under(found["gantry_west"], dug), lowest_under(found["gantry_east"], dug))
-	_gantry.position.y = foot
-	_terminal.position.y = lowest_under(found["terminal"], dug)
+	var gantry_top: float = -INF
+	for key: String in ["gantry_west", "gantry_east"]:
+		gantry_top = maxf(gantry_top, highest_under(found[key], dug) + GANTRY_HEIGHT_M)
+	for i: int in _posts.size():
+		var foot: float = lowest_under(found["gantry_west" if i == 0 else "gantry_east"], dug)
+		_seat(_posts[i], foot, gantry_top, GANTRY_POST_M, GANTRY_POST_M)
+	(_beam.mesh as BoxMesh).size.y = GANTRY_BEAM_M
+	_beam.position.y = gantry_top - GANTRY_BEAM_M * 0.5
+	var terminal: Vector4 = found["terminal"]
+	var terminal_foot: float = lowest_under(terminal, dug)
+	var terminal_top: float = highest_under(terminal, dug) + TERMINAL_HEIGHT_M
+	_seat(_terminal_post, terminal_foot, terminal_top, TERMINAL_HALF.x * 2.0, TERMINAL_HALF.y * 2.0)
+	_screen.position.y = terminal_top - 0.4
+	(_click_shape.shape as BoxShape3D).size.y = terminal_top - terminal_foot
+	_click_shape.position.y = (terminal_top + terminal_foot) * 0.5
+
+
+## Stretches a box post to reach from `foot` to `top`.
+func _seat(post: MeshInstance3D, foot: float, top: float, width: float, depth: float) -> void:
+	(post.mesh as BoxMesh).size = Vector3(width, top - foot, depth)
+	post.position.y = (top + foot) * 0.5
 
 
 ## Lights the pad when the Landing Field is open, dark otherwise.
@@ -366,4 +391,4 @@ func light_count() -> int:
 
 ## The slab's top as it stands now (the node's), for a test.
 func slab_top_now() -> float:
-	return _slab.position.y + SLAB_THICKNESS_M * 0.5
+	return _slab.position.y + _slab_mesh.size.y * 0.5

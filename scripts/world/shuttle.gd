@@ -15,6 +15,12 @@ const MOONS: Array[String] = [PHOBOS, DEIMOS]
 ## A window counts as open from its start to just before its end, whatever a
 ## float did to the clock on the way (in game hours).
 const EPSILON_H: float = 0.000001
+## The terminal at the landing pad: where it stands (x, z) and how near a player must
+## be to use it, in metres [PLACEHOLDER]. A guest's pose lags a little, so the host
+## allows HOST_SLACK_M more. LandingDressing builds it there.
+const TERMINAL_AT := Vector2(7.5, 100.0)
+const REACH_M: float = 5.0
+const HOST_SLACK_M: float = 1.5
 
 
 static func number(key: String, fallback: float) -> float:
@@ -192,3 +198,12 @@ static func data_problem() -> String:
 		if open <= 0.0 or period <= open or number(moon + "/offset_hours", 0.0) < 0.0:
 			return "%s has a window that is not sane." % moon
 	return ""
+
+
+## True if a player at `where` (the farm's x, y, z; null when unknown) is near enough
+## to the terminal. `slack` is what the host allows beyond REACH_M for a late pose.
+static func terminal_near(where: Variant, slack: float = 0.0) -> bool:
+	if not where is Vector3:
+		return false
+	var at: Vector3 = where
+	return Vector2(TERMINAL_AT.x - at.x, TERMINAL_AT.y - at.z).length() <= REACH_M + slack

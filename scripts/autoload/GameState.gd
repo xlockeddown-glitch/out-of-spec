@@ -3514,7 +3514,7 @@ func grant_shuttle_license() -> void:
 func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
 	var id: String = _player(player_id)
 	var at: Variant = standing_at(id)
-	if place_of(id) != ZonePresence.FARM or not LandingDressing.terminal_near(at, LandingDressing.HOST_SLACK_M):
+	if place_of(id) != ZonePresence.FARM or not Shuttle.terminal_near(at, Shuttle.HOST_SLACK_M):
 		return Shuttle.text("far_text")
 	if people > players_present().size():
 		return Shuttle.text("crowd_text") % SP811.integer(players_present().size())
@@ -5585,7 +5585,7 @@ func catch_sentinel(reading_pct: float, player_id: String = "") -> String:
 	var at: Variant = _rover_pose_now(TUNNEL_ROVER)  # honours the told pose: no save of this screen's rover over it
 	if at != null:
 		watch_sentinel(TUNNEL_ROVER, at, 0.0)
-	if is_caught(SENTINEL) or not sentinel_in_reach(at as Vector3):
+	if is_caught(SENTINEL) or at == null or not sentinel_in_reach(at as Vector3):
 		return "Nothing is in the cup's reach."
 	var off: float = reading_pct - hygrometer.error - _species_number(SENTINEL, "ideal_humidity_pct")
 	if absf(off) <= CUP_TOLERANCE_PCT:

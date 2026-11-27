@@ -59,12 +59,14 @@ func _ready() -> void:
 		books.add_child(book)
 	column.add_child(books)
 	_status = PlanBoardUI._label("", TEXT, 18)
+	_status.name = "Status"
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(_status)
 	_close_button = PlanBoardUI._button("%s  (%s)" % [Shuttle.text("terminal_close"), Controls.key_label(&"ui_cancel")])
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_close_button.pressed.connect(close)
 	column.add_child(_close_button)
+	GameState.shuttle_license_changed.connect(_on_license_changed)
 	hide()
 
 
@@ -95,6 +97,12 @@ func close() -> void:
 		before.grab_focus()
 	elif _close_button.has_focus():
 		_close_button.release_focus()
+
+
+## A teammate's exam can give the license while the panel is open.
+func _on_license_changed() -> void:
+	if visible:
+		_refresh()
 
 
 func _refresh() -> void:

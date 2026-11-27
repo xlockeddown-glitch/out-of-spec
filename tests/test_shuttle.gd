@@ -25,7 +25,7 @@ func _state(credits: int = 500) -> GameStateScript:
 
 ## The farm rover parked at the landing pad's terminal, so a player in it is there.
 func _park_at_terminal(gs: GameStateScript) -> void:
-	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(LandingDressing.TERMINAL_AT.x, 0.5, LandingDressing.TERMINAL_AT.y))
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
 
 
 func _done(gs: GameStateScript) -> void:

@@ -120,7 +120,7 @@
     "bad_party_text": "A day trip carries 1 to %s people.",
     "no_moon_text": "That is not a moon the shuttle flies to.",
     "far_text": "Walk to the shuttle terminal at the landing pad.",
-    "crowd_text": "Only %s people are here to go. Book for no more than that.",
+    "crowd_text": "Only %s here to go. Book for no more than that.",
     "terminal_title": "Shuttle terminal",
     "terminal_hint": "Launch windows and day trips. One seat a booking.",
     "terminal_fare": "Fare: %s CR a person.",

@@ -220,7 +220,7 @@ func _process(delta: float) -> void:
 		_inspect_left -= delta
 		return
 	var hovered: Clickable = Clickable.hovered
-	_hover_hint.text = hovered.hint if hovered else _rover.away_text() + _walkers.hint()
+	_hover_hint.text = hovered.hint if hovered else _rover.away_text() + _walkers.hint() + _terminal_prompt()
 
 
 func _show_inspect(text: String) -> void:
@@ -593,9 +593,17 @@ func _input(event: InputEvent) -> void:
 		_dig_pressed_msec = Time.get_ticks_msec()
 
 
+## A line for someone within reach of the shuttle terminal who is not pointing at it
+## (a controller has no pointer): the key that opens it.
+func _terminal_prompt() -> String:
+	if _shuttle_ui == null or not Shuttle.terminal_near(GameState.standing_at(GameState.local_player_id)):
+		return ""
+	return "Shuttle terminal: press %s." % Controls.prompt(&"interact")
+
+
 ## Opens the shuttle terminal's panel, or says to walk up to it.
 func _open_shuttle_terminal() -> void:
-	if LandingDressing.terminal_near(GameState.standing_at(GameState.local_player_id)):
+	if Shuttle.terminal_near(GameState.standing_at(GameState.local_player_id)):
 		_shuttle_ui.open()
 	else:
 		_hud.push_log("SHUTTLE TERMINAL: " + Shuttle.text("far_text"))
@@ -613,7 +621,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"get_out_in"):
 		get_viewport().set_input_as_handled()
 		_get_out_or_in()
-	elif event.is_action_pressed(&"interact") and _shuttle_ui != null and LandingDressing.terminal_near(GameState.standing_at(GameState.local_player_id)):
+	elif event.is_action_pressed(&"interact") and _shuttle_ui != null and Shuttle.terminal_near(GameState.standing_at(GameState.local_player_id)):
 		# At the landing pad's terminal, on foot or in the rover: the same key as the
 		# dome's console, handled before the on-foot refusal below.
 		get_viewport().set_input_as_handled()
