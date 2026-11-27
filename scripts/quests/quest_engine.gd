@@ -123,6 +123,8 @@ const XP_CERTIFICATE: String = "xp_certificate"
 ## A `counter` that is not a source of data/skills.json: what Lin has bought in
 ## spec, of the crop `where.crop_id` names or of every crop.
 const SOLD_IN_SPEC: String = "crops_sold_in_spec"
+## A quest's key for the zone whose camp it opens for the farm (Camp, zones doc 6.2).
+const CAMP: String = "camp"
 ## The mini-games a step may carry in `minigame`. A Set the Zero step is a
 ## `count` of `cal_log` rows whose `where` names one instrument: the one the game
 ## is for. A Wring the Blocks step is a `counter` of built stacks
@@ -365,6 +367,9 @@ static func _update_one(farm: Node, quest: Dictionary, state: Dictionary, presen
 				return true
 			return false
 		state[id] = _accepted(farm, quest, present, owner)
+		# A quest that carries a camp opens that zone's camp for the farm once it is taken.
+		if quest.has(CAMP) and farm.has_method("open_camp"):
+			farm.open_camp(str(quest[CAMP]))
 	var entry: Dictionary = state[id]
 	if int(entry["done"]) >= 0:
 		return false
@@ -752,6 +757,8 @@ static func data_problem(quest: Dictionary) -> String:
 	for step: Variant in steps:
 		if step.has(PROMPT_KEY) and (not step[PROMPT_KEY] is String or not InputMap.has_action(StringName(step[PROMPT_KEY]))):
 			return "step '%s' has a prompt that is not an input action." % str(step.get("id", ""))
+	if quest.has(CAMP) and (not quest[CAMP] is String or not Camp.has_camp(quest[CAMP])):
+		return "its camp is not a zone that has one."
 	if quest.has("zone") and (not quest["zone"] is String or not ZoneData.has_zone(StringName(quest["zone"]))):
 		return "its zone is not one data/zones.json has."
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:

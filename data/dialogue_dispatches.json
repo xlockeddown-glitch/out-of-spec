@@ -278,7 +278,9 @@
         "missing_blocks_done": "That is a length, and it holds. The case is yours. It has been empty long enough.",
         "missing_blocks_reference": "You wrung that like someone who has done it ten thousand times. I have. I know the look of it.",
         "beacon_run_offer": "The tunnels go dark past the first bend. There is a rack by the mouth with my beacons on it. Take one, set it down deeper in, and come back for the next. Three, if you would.",
-        "beacon_run_done": "Three little lights where there were none. You can find your way home now. So can I, if I ever come down."
+        "beacon_run_done": "Three little lights where there were none. You can find your way home now. So can I, if I ever come down.",
+        "two_sunsets_offer": "The shaft looks different at dusk and at dawn, and I never stayed to see both. There is a camp by the hub now: a tent, a heater, a bedroll. Bring supplies, park the rover beside it and sleep the night there. Tell me what the rock does.",
+        "two_sunsets_done": "One night, two sunsets, and you are still in one piece. The rock was kinder than I thought. Mind the supplies next time."
       },
       "hub": {
         "rack_take": "One beacon, off the rack. Now set it down further in.",
