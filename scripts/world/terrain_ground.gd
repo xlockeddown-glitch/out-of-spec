@@ -22,10 +22,10 @@ const BIOME_BLUR: int = 1
 ## A road's paint (BiomeData road lines): the tint leans this far toward ROAD_TINT
 ## inside the strip, 0 to 1, fading over BiomeData.ROAD_EDGE_M [PLACEHOLDER]. A
 ## vertex colour is 8 bits, 0 to 1, and multiplies the ground's dark base, so the
-## road can not be brighter than white: it is a dusty warm trail, paler than the
-## dark grounds (the Basalt Ridge) and warmer than the pale ones.
-const ROAD_TINT := Color(1.0, 0.72, 0.5)
-const ROAD_STRENGTH: float = 0.6
+## road can not be brighter than white: it is a pale dusty sand, paler than the
+## Badlands' orange-brown and the other grounds [PLACEHOLDER].
+const ROAD_TINT := Color(1.0, 0.95, 0.86)
+const ROAD_STRENGTH: float = 1.0
 
 @export var material: Material
 ## How far the land reaches from its middle. Only LandMeasure sets it, before the

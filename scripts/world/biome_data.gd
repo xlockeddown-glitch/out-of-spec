@@ -50,6 +50,8 @@ const ROAD_START_SLACK_M: float = 2.0
 ## The last waypoint lies on or this near the pad's edge, as the Chebyshev
 ## distance from the marker (the pad's half-width plus a little).
 const ROAD_END_SLACK_M: float = 0.5
+## A road's end may sit this far inside its pad's edge, no more.
+const ROAD_END_LOW_M: float = 0.1
 const ROAD_TEXT: String = "Keep the road clear."
 
 const ROLES: Array[String] = ["hub", "spoke", "open"]
@@ -308,7 +310,12 @@ static func segment_gap(at: Vector2, a: Vector2, b: Vector2) -> float:
 
 ## What is wrong with a road: its waypoints, where it starts and ends, and what its
 ## strip touches (the plot, built things, rocks, fissures, and its own pad's sign).
-static func road_problems(label: String, line: Array[Vector2], marker_at: Vector2) -> Array[String]:
+## The box (x, z, half x, half z) of a pad's sign, from BiomeMarkers' own sizes.
+static func _sign_box(marker_at: Vector2) -> Vector4:
+	return Vector4(marker_at.x + BiomeMarkers.SIGN_OFFSET_M, marker_at.y, BiomeMarkers.BOARD_SIZE.x * 0.5, BiomeMarkers.SIGN_DEPTH_M * 0.5)
+
+
+static func road_problems(label: String, line: Array[Vector2], marker_at: Vector2, table: Array = []) -> Array[String]:
 	var out: Array[String] = []
 	if line.is_empty():
 		return out
@@ -319,12 +326,25 @@ static func road_problems(label: String, line: Array[Vector2], marker_at: Vector
 	if start_gap > ROAD_START_SLACK_M:
 		out.append("%s: road starts %.1f m from the farm's level circle, over the %.1f m limit" % [label, start_gap, ROAD_START_SLACK_M])
 	var end: Vector2 = line[line.size() - 1]
-	var end_reach: float = PAD_HALF_M + ROAD_END_SLACK_M
-	if maxf(absf(end.x - marker_at.x), absf(end.y - marker_at.y)) > end_reach:
+	var end_gap: float = maxf(absf(end.x - marker_at.x), absf(end.y - marker_at.y))
+	if end_gap > PAD_HALF_M + ROAD_END_SLACK_M or end_gap < PAD_HALF_M - ROAD_END_LOW_M:
 		out.append("%s: road ends at (%s, %s), not at its pad's edge" % [label, end.x, end.y])
 	var plot := Rect2(Vector2(-PLOT_HALF_M, -PLOT_HALF_M), Vector2(PLOT_HALF_M, PLOT_HALF_M) * 2.0)
 	var boxes: Array[Vector4] = spots()
-	boxes.append(Vector4(marker_at.x + PAD_HALF_M + 0.7, marker_at.y, 0.75, 0.2))  # its pad's sign
+	boxes.append(_sign_box(marker_at))  # its pad's sign
+	for row: Variant in table:
+		if not row is Dictionary or str((row as Dictionary).get("role", "")) == "hub":
+			continue
+		var other: Dictionary = row
+		if other.get("marker") is Array and str(other.get("id")) != label:
+			var m: Vector2 = _point(other["marker"])
+			boxes.append(Vector4(m.x, m.y, PAD_HALF_M, PAD_HALF_M))
+			boxes.append(_sign_box(m))
+		if other.get("entrances") is Array:
+			for entrance: Variant in other["entrances"]:
+				if entrance is Dictionary and (entrance as Dictionary).get("at") is Array:
+					var e: Vector2 = _point((entrance as Dictionary)["at"])
+					boxes.append(Vector4(e.x, e.y, PAD_HALF_M, PAD_HALF_M))
 	for i: int in range(line.size() - 1):
 		var a: Vector2 = line[i]
 		var b: Vector2 = line[i + 1]
@@ -339,6 +359,9 @@ static func road_problems(label: String, line: Array[Vector2], marker_at: Vector
 			if absf(at.x) > Terrain.HALF_M - ROAD_HALF_M or absf(at.y) > Terrain.HALF_M - ROAD_HALF_M:
 				out.append("%s: road leaves the land at (%s, %s)" % [label, at.x, at.y])
 				break
+			if absf(at.x - marker_at.x) < PAD_HALF_M - ROAD_END_LOW_M and absf(at.y - marker_at.y) < PAD_HALF_M - ROAD_END_LOW_M:
+				out.append("%s: road runs over its own pad at (%s, %s)" % [label, at.x, at.y])
+				break
 			if not hit_plot and plot.grow(ROAD_HALF_M).has_point(at):
 				hit_plot = true
 				out.append("%s: road touches the farm plot at (%s, %s)" % [label, at.x, at.y])
@@ -346,7 +369,7 @@ static func road_problems(label: String, line: Array[Vector2], marker_at: Vector
 				var box: Vector4 = boxes[n]
 				var dx: float = maxf(absf(at.x - box.x) - box.z, 0.0)
 				var dz: float = maxf(absf(at.y - box.y) - box.w, 0.0)
-				if not hit.has(n) and dx * dx + dz * dz < ROAD_HALF_M * ROAD_HALF_M:
+				if not hit.has(n) and dx * dx + dz * dz <= ROAD_HALF_M * ROAD_HALF_M:
 					hit[n] = true
 					out.append("%s: road touches the thing at (%s, %s)" % [label, box.x, box.y])
 	return out
@@ -665,7 +688,7 @@ static func _place_problems(label: String, row: Dictionary, table: Array) -> Arr
 	var id := StringName(label)
 	var marker_at: Vector2 = _point(row["marker"])
 	out.append_array(pad_problems(label, "marker", marker_at))
-	out.append_array(road_problems(label, road_in(row), marker_at))
+	out.append_array(road_problems(label, road_in(row), marker_at, table))
 	var centre_at: Vector2 = _point(row["centre"])
 	for spot: Vector4 in spots():
 		if absf(centre_at.x - spot.x) < spot.z and absf(centre_at.y - spot.y) < spot.w:

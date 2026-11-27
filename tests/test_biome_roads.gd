@@ -78,13 +78,18 @@ func test_roads_keep_off_the_plot_the_props_the_rocks_and_the_fissures() -> Stri
 func test_a_bad_road_is_refused_with_a_line_that_names_it() -> String:
 	var cases: Array = [
 		["through a fissure", "badlands", [[31, 11], [46, 8], [67, 21]], "road touches the thing at (46.0, 8.0)"],
-		["through the plot", "frost_flats", [[0, -33], [0, 0], [0, -76]], "road touches the farm plot"],
-		["off the land", "landing_field", [[0, 33], [0, 119]], "road leaves the land"],
+		["through the plot", "frost_flats", [[0, -34], [0, 0], [0, -76]], "road touches the farm plot"],
+		["off the land", "landing_field", [[0, 33], [119, 119]], "road leaves the land"],
 		["far from the farm", "frost_flats", [[0, -50], [0, -76]], "road starts"],
-		["short of the pad", "frost_flats", [[0, -33], [0, -60]], "not at its pad's edge"],
-		["one waypoint", "frost_flats", [[0, -33]], "at least two waypoints"],
-		["waypoint not a point", "frost_flats", [[0, -33], [1]], "road waypoint 1 must be [x, z]"],
-		["through the pad's sign", "frost_flats", [[0, -33], [8, -78], [2, -78]], "road touches the thing at (2.7"],
+		["short of the pad", "frost_flats", [[0, -34], [0, -60]], "not at its pad's edge"],
+		["one waypoint", "frost_flats", [[0, -34]], "at least two waypoints"],
+		["waypoint not a point", "frost_flats", [[0, -34], [1]], "road waypoint 1 must be [x, z]"],
+		["through the pad's sign", "frost_flats", [[0, -34], [8, -78], [2, -78]], "road touches the thing at (2.7"],
+		["through another pad", "badlands", [[31, 11], [28, -17], [67, 21]], "road touches the thing at (28.0, -17.0)"],
+		["through another pad's sign", "badlands", [[31, 11], [30.7, -17], [67, 21]], "road touches the thing at (30.7"],
+		["over a placed entrance", "badlands", [[31, 11], [50, -24], [67, 21]], "road touches the thing at (50.0, -24.0)"],
+		["ending at its pad's middle", "frost_flats", [[0, -34], [0, -78]], "not at its pad's edge"],
+		["across its own pad", "frost_flats", [[0, -34], [0, -76], [0, -80]], "road runs over its own pad"],
 	]
 	for c: Array in cases:
 		var rows: Array = BiomeData.raw_rows()
@@ -140,6 +145,13 @@ func test_a_road_is_painted_and_ground_off_it_is_not() -> String:
 	return fail
 
 
+func _colours_at(ground: TerrainGround, at: Vector2i) -> Color:
+	var chunk: Vector2i = ground._chunk_of(at)
+	var colours: PackedColorArray = (ground._chunks[chunk].mesh as ArrayMesh).surface_get_arrays(0)[Mesh.ARRAY_COLOR]
+	return colours[(at.x - chunk.x) * (TerrainGround.CHUNK_M + 1) + (at.y - chunk.y)]
+
+
+
 func test_the_paint_fades_over_a_metre_and_digging_keeps_it() -> String:
 	if BiomeData.road_weight(BiomeData.ROAD_HALF_M) != 1.0 or BiomeData.road_weight(BiomeData.ROAD_HALF_M + BiomeData.ROAD_EDGE_M) != 0.0:
 		return "The weight is not 1 in the strip and 0 past the soft edge"
@@ -147,13 +159,50 @@ func test_the_paint_fades_over_a_metre_and_digging_keeps_it() -> String:
 	if mid <= 0.0 or mid >= 1.0:
 		return "The weight in the soft edge is %f" % mid
 	var ground := _ground()
+	var lean: PackedColorArray = ground._biome_lean()
+	var fail: String = ""
+	# A point 2 m off the frost road (x = 0) is in the soft edge: part paint.
+	var soft := Vector2i(2, -50)
+	var plain: Color = ground._tint(Terrain.natural(soft)) * lean[ground._index(soft.x, soft.y)]
+	var want: Color = plain.lerp(TerrainGround.ROAD_TINT, TerrainGround.ROAD_STRENGTH * BiomeData.road_weight(2.0))
+	var got: Color = ground._tints[ground._index(soft.x, soft.y)]
+	if _distance(got, want) > 0.005 or _distance(got, plain) < 0.01:
+		fail = "The soft edge at %s is %s, wanted about %s (plain %s)" % [soft, got, want, plain]
+	# The redrawn chunk keeps the paint, in the mesh's own colours.
 	var on: Vector2i = _on_and_off(&"frost_flats")[0]
 	var before: Color = ground._tints[ground._index(on.x, on.y)]
-	var cell: Vector2i = Terrain.cell_at(Vector2(on) + Vector2(0.5, 0.5))
-	ground.show_dug({cell: 1})
+	ground.show_dug({Terrain.cell_at(Vector2(on) + Vector2(0.5, 0.5)): 1})
 	var after: Color = ground._tints[ground._index(on.x, on.y)]
+	var shown: Color = _colours_at(ground, on)
+	var plain_on: Color = ground._tint(Terrain.natural(on)) * lean[ground._index(on.x, on.y)]
+	if fail == "" and before != after:
+		fail = "Digging changed the road's paint"
+	if fail == "" and (_distance(shown, after) > 0.02 or _distance(shown, plain_on) < 0.03):
+		fail = "The redrawn chunk at %s shows %s, not the road paint %s" % [on, shown, after]
 	ground.free()
-	return "" if before == after else "Digging changed the road's paint"
+	return fail
+
+
+## The shader multiplies a vertex colour by this base, so it is what the eye sees.
+const SHADER_BASE := Color(0.42, 0.5, 0.3)
+const MIN_SEPARATION: float = 0.06
+
+
+func test_a_road_shows_against_the_ground_of_its_own_biome_flat_and_on_a_hill() -> String:
+	var ground := _ground()
+	var lean: PackedColorArray = ground._biome_lean()
+	var fail: String = ""
+	for id: StringName in WITH_ROAD:
+		var on: Vector2i = _on_and_off(id)[0]
+		var leaned: Color = lean[ground._index(on.x, on.y)]
+		for height: float in [0.0, 3.0]:
+			var plain: Color = ground._tint(height) * leaned
+			var road: Color = plain.lerp(TerrainGround.ROAD_TINT, TerrainGround.ROAD_STRENGTH)
+			var seen: float = absf((plain.r - road.r) * SHADER_BASE.r) + absf((plain.g - road.g) * SHADER_BASE.g) + absf((plain.b - road.b) * SHADER_BASE.b)
+			if seen < MIN_SEPARATION:
+				fail = "%s: a road on ground %.0f m high differs from its ground by only %.3f after the shader" % [id, height, seen]
+	ground.free()
+	return fail
 
 
 func test_the_road_changes_no_height() -> String:
@@ -205,17 +254,97 @@ func test_points_off_a_road_are_not_road() -> String:
 	return ""
 
 
-func test_digging_a_road_cell_through_the_game_is_refused() -> String:
+## A road cell that is not an ore pocket and can be dug: on the frost road.
+func _plain_road_cell() -> Vector3i:
+	for at: Vector2 in _along(&"frost_flats"):
+		var cell: Vector2i = _cell_at(at)
+		if Terrain.can_dig(cell) and BiomeData.is_road_cell(cell) and not BiomeMarkers.is_blocked_cell(cell) and not HillDressing.is_at_rock(cell):
+			return Vector3i(cell.x, 0, cell.y)
+	return Vector3i.ZERO
+
+
+func _state() -> Node:
 	var gs: Node = load("res://scripts/autoload/GameState.gd").new()
 	gs.build_registry()
 	gs.set_world_seed(424242)
-	var cell: Vector2i = _cell_at(Vector2(_on_and_off(&"frost_flats")[0]))
-	if gs.is_live_pocket(cell):
-		gs.free()
-		return ""
-	var out: String = gs.dig(Vector3i(cell.x, 0, cell.y))
+	return gs
+
+
+
+func test_digging_a_road_cell_through_the_game_is_refused() -> String:
+	var gs: Node = _state()
+	var cell: Vector3i = _plain_road_cell()
+	var bad: String = ""
+	if cell == Vector3i.ZERO or gs.is_live_pocket(Vector2i(cell.x, cell.z)):
+		bad = "No plain road cell to test"
+	else:
+		var out: String = gs.dig(cell)
+		if out != BiomeData.ROAD_TEXT:
+			bad = "Digging a road cell through the game said '%s'" % out
 	gs.free()
-	return "" if out == BiomeData.ROAD_TEXT else "Digging a road cell through the game said '%s'" % out
+	return bad
+
+
+func test_the_host_refuses_a_road_dig_and_a_road_wall() -> String:
+	var gs: Node = _state()
+	var commands: Node = load("res://scripts/autoload/FarmCommands.gd").new()
+	commands.state = gs
+	var cell: Vector3i = _plain_road_cell()
+	var bad: String = ""
+	var dug: Variant = commands.execute("player_1", &"dig", [cell])
+	if dug != BiomeData.ROAD_TEXT:
+		bad = "The host's road dig answered %s" % [dug]
+	var wall: Variant = commands.execute("player_1", &"place_stone", [cell, StonePieces.WALL])
+	if bad == "" and wall != BiomeData.ROAD_TEXT:
+		bad = "The host's road wall answered %s" % [wall]
+	commands.free()
+	gs.free()
+	return bad
+
+
+func test_an_ore_pocket_on_a_road_digs_once_then_fills() -> String:
+	var gs: Node = _state()
+	var cell: Vector3i = _plain_road_cell()
+	var at := Vector2i(cell.x, cell.z)
+	gs.new_pockets.append(at)
+	var bad: String = ""
+	if gs.dig(cell) != "" or gs.dug.get(at, 0) != 1:
+		bad = "The pocket on the road did not dig once"
+	elif gs.dig(cell) != BiomeData.ROAD_TEXT:
+		bad = "A second dig on the road pocket was not refused"
+	elif gs.fill(cell) != "":
+		bad = "The road pocket's cell could not be filled"
+	gs.free()
+	return bad
+
+
+func test_an_old_save_with_digging_and_stone_on_a_road_loads_and_can_be_put_right() -> String:
+	var gs: Node = _state()
+	var cells: Array[Vector2i] = []
+	for at: Vector2 in _along(&"landing_field"):
+		var cell: Vector2i = _cell_at(at)
+		if Terrain.can_dig(cell) and BiomeData.is_road_cell(cell) and not BiomeMarkers.is_blocked_cell(cell) and not HillDressing.is_at_rock(cell) and not cells.has(cell):
+			cells.append(cell)
+		if cells.size() == 8:
+			break
+	if cells.size() < 8:
+		gs.free()
+		return "Only %d road cells found" % cells.size()
+	gs.dug[cells[0]] = 1
+	gs.stone_pieces[cells[7]] = StonePieces.WALL
+	gs.stone = 0
+	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
+	var other: Node = _state()
+	var bad: String = other.farm_from_dict(data)
+	if bad == "" and (not other.dug.has(cells[0]) or not other.stone_pieces.has(cells[7])):
+		bad = "The old digging or stone on the road did not load"
+	if bad == "" and other.fill(Vector3i(cells[0].x, 0, cells[0].y)) != "":
+		bad = "An old dug road cell could not be filled"
+	if bad == "" and other.place_stone(Vector3i(cells[7].x, 0, cells[7].y), StonePieces.TAKE_UP) != "":
+		bad = "An old stone piece on the road could not be taken up"
+	other.free()
+	gs.free()
+	return bad
 
 
 func test_the_protocol_is_30() -> String:
