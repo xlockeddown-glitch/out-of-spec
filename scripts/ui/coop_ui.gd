@@ -21,7 +21,6 @@ var _bed_note: String = ""
 
 
 func _ready() -> void:
-	add_to_group(QuestsUI.MODAL_GROUP)
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_strip = PlanBoardUI._label("", TEAL, 18)
@@ -33,6 +32,8 @@ func _ready() -> void:
 	_panel = Control.new()
 	_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	## Only the panel counts as a modal, not the always-shown strip.
+	_panel.add_to_group(QuestsUI.MODAL_GROUP)
 	add_child(_panel)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -80,7 +81,7 @@ func _process(_delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	var toggled: bool = key != null and key.pressed and not key.echo and key.keycode == KEY_F7
+	var toggled: bool = event.is_action_pressed(&"open_coop")
 	if not _panel.visible:
 		if toggled:
 			get_viewport().set_input_as_handled()
@@ -89,7 +90,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if toggled or event.is_action_pressed(&"ui_cancel"):
 		_panel.hide()
 	# As in SkillsUI: no key press reaches the farm behind the panel.
-	if key != null or event is InputEventJoypadButton:
+	if key != null or event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		get_viewport().set_input_as_handled()
 
 

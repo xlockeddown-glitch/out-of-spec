@@ -13,6 +13,8 @@ var _resume_button: Button
 var _quit_button: Button
 ## True after the first press of QUIT that warned the guests.
 var _armed: bool = false
+## The rover block as it was when the panel opened, put back on close.
+var _blocked_before: bool = false
 ## Writes the farm: returns "" or why not. Replaceable in tests.
 var saver: Callable
 ## Ends the game. Replaceable in tests.
@@ -68,18 +70,23 @@ static func is_alone() -> bool:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"ui_cancel"):
+	# Esc and the pad's Start open it. Esc and the pad's B close it, so B never opens it.
+	if visible and (event.is_action_pressed(&"open_pause") or event.is_action_pressed(&"ui_cancel")):
 		get_viewport().set_input_as_handled()
-		if visible:
-			close()
-		else:
+		close()
+	elif not visible and event.is_action_pressed(&"open_pause"):
+		# Not over a minigame or another panel: they own Esc and Start.
+		if not QuestsUI.other_panel_open(get_tree(), self):
+			get_viewport().set_input_as_handled()
 			open()
-	elif visible and (event is InputEventKey or event is InputEventJoypadButton):
+	elif visible and (event is InputEventKey or event is InputEventJoypadButton or event is InputEventJoypadMotion):
 		# No key reaches the farm behind the panel.
 		get_viewport().set_input_as_handled()
 
 
 func open() -> void:
+	if not visible:
+		_blocked_before = RoverController.input_blocked
 	_armed = false
 	_note.text = ""
 	var alone: bool = is_alone()
@@ -125,7 +132,7 @@ func _body(alone: bool) -> String:
 
 
 func close() -> void:
-	RoverController.input_blocked = false
+	RoverController.input_blocked = _blocked_before
 	if is_inside_tree():
 		get_tree().paused = false
 	hide()

@@ -52,6 +52,7 @@ func _ready() -> void:
 	$UI.add_child(SkillsUI.new())
 	$UI.add_child(QuestsUI.new())
 	$UI.add_child(CoopUI.new())
+	$UI.add_child(ActionsMenuUI.new(ActionsMenuUI.PANEL_ACTIONS))
 	var travel_ui := FastTravelUI.new()
 	$UI.add_child(travel_ui)
 	var console := FastTravelConsole.new()

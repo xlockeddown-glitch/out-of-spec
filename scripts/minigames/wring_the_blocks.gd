@@ -80,6 +80,8 @@ const COLOR_BLOCK_EDGE := Color(0.9, 0.94, 0.98)
 const COLOR_BLOCK_TEXT := Color(0.05, 0.07, 0.06)
 
 var _stage: Stage = Stage.IDLE
+## Which way the left stick leans (-1, 0, 1): in past 0.5, out below 0.3, so a lean counts once.
+var _stick_x: int = 0
 ## Seconds in this stage.
 var _time: float = 0.0
 var _speed: float = 1.0
@@ -196,6 +198,7 @@ func _ready() -> void:
 func play(share: float, mode: int, motion_seed: int, stack: Dictionary, subject: String = "") -> void:
 	if is_playing():
 		skip()
+	_stick_x = 0
 	_target = int(stack.get("target", 0))
 	_tray.assign(GaugeStack.pieces_of(stack.get("tray", [])))
 	_tray.sort_custom(func(a: int, b: int) -> bool:
@@ -459,6 +462,20 @@ func _finish(with_score: int) -> void:
 func _input(event: InputEvent) -> void:
 	if _stage == Stage.IDLE or not is_visible_in_tree() or event.is_echo():
 		return
+	var motion := event as InputEventJoypadMotion
+	if motion != null:
+		# The left stick moves the cursor once per push, not once per sample.
+		if motion.axis == JOY_AXIS_LEFT_X:
+			var lean: float = absf(motion.axis_value)
+			var dir: int = 0
+			if lean >= 0.5 or (_stick_x != 0 and lean >= 0.3 and (motion.axis_value > 0.0) == (_stick_x > 0)):
+				dir = 1 if motion.axis_value > 0.0 else -1
+			if dir != _stick_x:
+				_stick_x = dir
+				if dir != 0:
+					move_cursor(dir)
+		get_viewport().set_input_as_handled()
+		return
 	if event.is_action_pressed(&"ui_accept"):
 		get_viewport().set_input_as_handled()
 		hold(true)
@@ -474,6 +491,13 @@ func _input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"ui_right"):
 		get_viewport().set_input_as_handled()
 		move_cursor(1)
+
+
+## While the game runs, no key or pad press reaches the farm or the scene swap behind it.
+func _unhandled_input(event: InputEvent) -> void:
+	if _stage != Stage.IDLE and is_visible_in_tree() and (event is InputEventKey
+			or event is InputEventJoypadButton or event is InputEventJoypadMotion):
+		get_viewport().set_input_as_handled()
 
 
 ## A click on a block in the tray picks it. Off the tray and the two buttons, the

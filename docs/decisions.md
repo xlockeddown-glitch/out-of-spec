@@ -2111,6 +2111,36 @@ Ryan's idea: stage areas almost level specific. Underground for lab levels about
 - **The rover home on a drop or a stop costs nothing** [PLACEHOLDER], as for a drop in the zone.
 - **No protocol change:** `CoopSession.PROTOCOL` stays 23.
 
+## 2026-11-26: Xbox controller play (every control is a named action)
+
+Every verb is now a named InputMap action with the same keyboard key as before; the pad layout below is a **[PLACEHOLDER]** for Ryan to play with. A later controls guide reads the InputMap.
+
+| Pad input | Action | Key it matches |
+| --- | --- | --- |
+| Left stick | Steer (X) and walk or drive (Y), deadzone 0.2 | WASD / arrows |
+| RT / LT | `rover_forward` / `rover_reverse` | W / S |
+| A | `interact` | E |
+| B | `ui_cancel` (closes a panel; never opens pause) | Esc |
+| X | `rover_dig` | G |
+| Y | `rover_fill` | H |
+| LB / RB | `setpoint_down` / `setpoint_up` | [ / ] |
+| D-pad up | `rover_lights` | L |
+| D-pad down | `rover_zero_steering` | R |
+| D-pad left | `cycle_seed` | C |
+| D-pad right | `stone_kind` | N |
+| Right stick click | `rover_till` | Space |
+| Left stick click | `get_out_in` | F |
+| Start | `open_pause` (B or Start closes it) | Esc |
+| Back / View | `swap_scene` | Tab |
+| LB + RB together | Opens the actions menu **[NEW] [PLACEHOLDER]** | none |
+
+**The actions menu [NEW].** A focusable vertical list in the same style as the other panels. D-pad or stick moves, A picks, B closes. A pick sends the same InputEventAction the key makes, so the refusal messages and checks are the same. It holds the verbs with no pad button: place stone (B), check with block (Q), block stack (J), survey (V), sell to Lin (L), wheel service (Y), robots (T), quests (O), skills (K), co-op (F7) and Bram's buys 1 to 9. In the dome and the tunnels it offers only quests, skills and co-op. Keyboard players never see it.
+
+- **Chord.** LB + RB opens it. The set-point nudge waits 0.12 s so the chord does not move the set point.
+- **Menus.** Panels grab focus on open, so the Godot ui_* pad defaults work. `ui_accept` and `ui_cancel` carry A and B explicitly in project.godot.
+- **Panels hold the stick.** With a pad connected and a panel open, the stick no longer drives the rover or walker.
+- **Left as keys.** F9 (debug morning skip) stays a key.
+
 ## The field phone is a little smaller (Ryan: "a little too big")
 
 The phone is scaled by one number, `FieldPhoneHUD.PHONE_SCALE = 0.8` [PLACEHOLDER], to 80 % of its old size (Ryan asked for 20 % smaller; it was 0.85 in PR 203): its width (the phone now starts at 0.744 of the screen, not 0.68), every font, fixed size, gap and the case margins. Only size changed; colours, order, styles and wording are as they were. The scene file still holds the original sizes and the phone scales them when it loads, so "a bit more or less" is a one-number change. The world view, the hover hint and the robots panel end where the phone begins (`FieldPhoneHUD.LEFT_ANCHOR`); a test pins that the farm and tunnel world views agree with it, and the phone sets its own left anchor from it when it loads (the phone scene file holds the same 0.744).

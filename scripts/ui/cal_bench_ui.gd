@@ -114,6 +114,18 @@ func open(instrument_id: String = "hygrometer") -> void:
 	var index: int = maxi(_ids.find(instrument_id), 0)
 	_instrument_option.select(index)
 	_on_instrument_selected(index)
+	# So the pad's D-pad and A work without a mouse.
+	_bench_focus(true)
+	_instrument_option.grab_focus()
+
+
+## The bench's own controls take focus, except while a game is up.
+func _bench_focus(on: bool) -> void:
+	var mode: Control.FocusMode = Control.FOCUS_ALL if on else Control.FOCUS_NONE
+	for control: Control in [_instrument_option, _careful_check, _game_option, _calibrate_button, _send_button, _close_button]:
+		control.focus_mode = mode
+		if not on and control.has_focus():
+			control.release_focus()
 
 
 ## Instruments in service right now: buying a Tier 1 standard from Bram adds
@@ -415,6 +427,8 @@ func _on_calibrate_pressed() -> void:
 	var arguments: Array = [id]
 	if _zero_game_due(id):
 		_calibrate_button.disabled = true
+		# While a game is up, A and the D-pad are the game's, not the bench's.
+		_bench_focus(false)
 		# The clock is in the seed: opening the bench again is not the same sweep.
 		var motion_seed: int = hash([id, GameState.cal_log.size(), Time.get_ticks_usec()])
 		var score: int = MinigameScore.SKIPPED
@@ -430,6 +444,8 @@ func _on_calibrate_pressed() -> void:
 		if _visit != visit:
 			return
 		_calibrate_button.disabled = false
+		_bench_focus(true)
+		_calibrate_button.grab_focus()
 		# A skip sends no score: the command as it always was.
 		if score != MinigameScore.SKIPPED:
 			arguments.append(score)

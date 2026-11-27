@@ -7,8 +7,6 @@ extends Control
 ## not while another panel is open. It
 ## only shows what QuestLog reads from the farm, so a guest sees the host's word.
 
-## Q was Ryan's pick, but on the farm Q is the check with a block.
-const KEY: Key = KEY_O
 const TEAL: Color = SkillsUI.TEAL
 const TEXT: Color = SkillsUI.TEXT
 const DIM: Color = SkillsUI.DIM
@@ -57,7 +55,7 @@ func _ready() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	var toggled: bool = key != null and key.pressed and not key.echo and key.keycode == KEY
+	var toggled: bool = event.is_action_pressed(&"open_quests")
 	if not visible:
 		# Not over another panel: it has the keys while it is open.
 		if toggled and not other_panel_open(get_tree(), self):
@@ -67,7 +65,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if toggled or event.is_action_pressed(&"ui_cancel"):
 		close()
 	# As in SkillsUI: no key press reaches the farm behind the view.
-	if key != null or event is InputEventJoypadButton:
+	if key != null or event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		get_viewport().set_input_as_handled()
 
 

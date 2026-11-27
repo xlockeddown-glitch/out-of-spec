@@ -171,8 +171,10 @@ func test_the_readme_key_table_lists_every_key() -> String:
 			continue
 		for event: InputEvent in InputMap.action_get_events(action):
 			if event is InputEventKey:
-				wanted[OS.get_keycode_string((event as InputEventKey).physical_keycode)] = String(action)
-	var names: Dictionary = {"Bracketleft": "[", "Bracketright": "]"}
+				var pressed := event as InputEventKey
+				var shown: String = OS.get_keycode_string(pressed.physical_keycode if pressed.physical_keycode != 0 else pressed.keycode)
+				wanted[{"BracketLeft": "[", "BracketRight": "]", "Escape": "Esc"}.get(shown, shown)] = String(action)
+	var names: Dictionary = {"Bracketleft": "[", "Bracketright": "]", "BracketLeft": "[", "BracketRight": "]", "Escape": "Esc"}
 	var key := RegEx.create_from_string("\\bKEY_([A-Z0-9]+)\\b")
 	for path: String in ["res://scripts/main_farm.gd", "res://scripts/basalt_tunnels.gd", "res://scripts/ui/skills_ui.gd",
 			"res://scripts/ui/coop_ui.gd", "res://scripts/autoload/GameState.gd"]:
