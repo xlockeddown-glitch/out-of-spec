@@ -21,6 +21,8 @@ var _told_reach: bool = false
 const HATCH: String = "hatch"
 const LIFT: String = "lift"
 const FIND: String = "find"
+## The camp at the hub, once a quest has opened it (Camp).
+const CAMP: String = "camp"
 
 ## The rack, the board or a beacon spot the rover is by (LavaHub.nearest), or {}.
 var _hub_near: Dictionary = {}
@@ -130,6 +132,8 @@ func _build_zone() -> void:
 		_depth_props.build_hatch()
 		_props = LavaHubProps.new()
 		_rover.get_parent().add_child(_props)
+		if Camp.has_camp(_zone_id()):
+			_rover.get_parent().add_child(CampProps.new(_zone_id()))
 		GameState.beacons_changed.connect(_on_beacons_changed)
 	# The lift station: at the hub, and at the depth that has one. Broken until repaired.
 	if ZoneDepth.is_lift_depth(_built_depth) or _built_depth == 0:
@@ -169,6 +173,8 @@ func _process(_delta: float) -> void:
 		_hub_near = LavaHub.nearest(_rover.global_position, GameState.beacons_placed, spot_wins) if rover_free and not catching else {}
 	if _hub_near.is_empty() and rover_free and not catching:
 		_hub_near = _station_near()
+	if _hub_near.is_empty() and rover_free and not catching and not _below:
+		_hub_near = _camp_near()
 	_tell_hub()
 	if _below:
 		_watch_vents(rover_free)
@@ -269,6 +275,13 @@ func _tell_hub() -> void:
 			_hud.push_log(_lift_prompt())
 		FIND:
 			_hud.push_log("FIND: press " + Controls.prompt(&"interact") + " to take it.")
+		CAMP:
+			if CoopBeds.in_bed.has(GameState.local_player_id):
+				_hud.push_log("CAMP: you are asleep. Press %s to get up." % Controls.prompt(&"interact"))
+			elif GameState.camp_supplies > 0:
+				_hud.push_log("CAMP: press %s to sleep the night here (%d of supplies held)." % [Controls.prompt(&"interact"), GameState.camp_supplies])
+			else:
+				_hud.push_log("CAMP: press %s to buy a night's supplies (%d credits)." % [Controls.prompt(&"interact"), Camp.SUPPLY_COST_CREDITS])
 
 
 func _use_hub(target: Dictionary) -> void:
@@ -287,6 +300,8 @@ func _use_hub(target: Dictionary) -> void:
 			_use_lift()
 		FIND:
 			_use_find(str(target["id"]))
+		CAMP:
+			_use_camp()
 
 
 ## Orin speaks on the phone: he is not here in person [PLACEHOLDER].
@@ -377,6 +392,38 @@ func _station_near() -> Dictionary:
 	if (_built_depth == 0 or ZoneDepth.is_lift_depth(_built_depth)) and ZoneDepth.near_lift(at, _built_depth):
 		return { "kind": LIFT, "id": "repaired" if GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth()) else "broken" }
 	return {}
+
+
+## The open camp the rover is by, or {}. Its id is the supplies held, so the prompt is
+## told again when a night's supplies are bought.
+func _camp_near() -> Dictionary:
+	var zone: String = _zone_id()
+	if Camp.has_camp(zone) and GameState.camps_open.has(zone) and Camp.near(zone, _rover.global_position):
+		return { "kind": CAMP, "id": str(GameState.camp_supplies) }
+	return {}
+
+
+## E at the camp: sleep the night if the farm holds supplies, else buy a night's (host-run).
+func _use_camp() -> void:
+	var asleep: bool = CoopBeds.in_bed.has(GameState.local_player_id)
+	var buying: bool = GameState.camp_supplies < 1 and not asleep
+	var problem: String = ""
+	if asleep:
+		problem = await FarmCommands.request(&"get_up", [])
+	elif buying:
+		problem = await FarmCommands.request(&"buy_camp_supplies", [])
+	else:
+		problem = await FarmCommands.request(&"go_to_bed", [])
+	if not is_inside_tree():
+		return
+	if asleep and problem == "":
+		_hud.push_log("CAMP: you get up.")
+	elif problem != "":
+		_hud.push_log("CAMP: " + problem)
+	elif buying:
+		_hud.push_log("CAMP: the farm bought a night's supplies for %d credits." % Camp.SUPPLY_COST_CREDITS)
+	else:
+		_hud.push_log("CAMP: you turn in for the night.")
 
 
 func _lift_prompt() -> String:

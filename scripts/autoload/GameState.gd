@@ -17,6 +17,7 @@ signal beacons_changed
 ## A find was taken below the Lava Tubes.
 signal finds_changed
 signal pump_changed  # the farm's pump was bought, or a pool was pumped dry
+signal camps_changed  # a camp was opened for the farm, or its supplies were bought or used
 ## A lift was repaired, or the deepest depth reached in a zone grew.
 signal lifts_changed
 signal lab_sitter_changed
@@ -205,6 +206,12 @@ var beacons_placed: Array[String] = []
 var finds_taken: Dictionary = {}
 ## The farm owns the Flooded Aquifer's pump (bought at the hub crate, shared wallet), saved.
 var pump_owned: bool = false
+## The zones whose camp the farm has opened (Camp, zones doc 6.2), saved. A quest opens one.
+var camps_open: Array[String] = []
+## Nights of camp supplies the farm holds, bought at a camp hub and used up by a night there, saved.
+var camp_supplies: int = 0
+## Host only: the players put to bed at a camp tonight (the day clears it). Not saved: a night is not.
+var _campers: Dictionary = {}
 ## The Aquifer's pools drained today: zone id -> { "day": int, "ids": [pool ids] }, like finds_taken.
 var pools_drained: Dictionary = {}
 ## The lift stations repaired, for good: zone id -> Array of the depths (ZoneDepth).
@@ -737,14 +744,14 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "camps_open", "camp_supplies"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
 	"_pad_problems",
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
-	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players",
+	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers",
 	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip",
 ]
 
@@ -798,6 +805,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return AquiferDepth.drained_problem(data["pools_drained"])
 	if data.has("pump_owned") and not data["pump_owned"] is bool:
 		return "'pump_owned' is not a yes or no."
+	if data.has("camps_open") and Camp.open_problem(data["camps_open"]) != "":
+		return Camp.open_problem(data["camps_open"])
+	if data.has("camp_supplies") and Camp.supplies_problem(data["camp_supplies"]) != "":
+		return Camp.supplies_problem(data["camp_supplies"])
 	if data.has("lifts_repaired") and ZoneDepth.lifts_problem(data["lifts_repaired"]) != "":
 		return ZoneDepth.lifts_problem(data["lifts_repaired"])
 	if data.has("lab_sitter") and LabSitter.booking_problem(data["lab_sitter"]) != "":
@@ -1105,6 +1116,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	_guest_rescued_day.clear()
 	_console_arrivals.clear()
 	_trip_players.clear()
+	_campers.clear()
 	_rescue_notes.clear()
 	_ore_at_entry = -1
 	zone_heat_trip = false
@@ -1582,6 +1594,13 @@ const NO_TIME_TONIGHT: String = "This would run past 06:00, and the day waits un
 ## With friends in: "" or why not. See CoopBeds.
 func go_to_bed(player_id: String = "") -> String:
 	var id: String = _player(player_id)
+	# Somewhere in a zone: only an open camp's hub is a bed (zones doc 6.2 and 12.4).
+	var camp_zone: String = _zone_place_of(id)
+	if camp_zone != "":
+		return _go_to_camp_bed(id, camp_zone)
+	# The host's screen is in a zone's hub but their place says otherwise: not a plain bed.
+	if id == local_player_id and _scene_zone_here() != "":
+		return "Your place and this scene disagree. Try again in a moment."
 	# Where the local player stands is theirs to check; a guest's is checked on their screen.
 	if id == local_player_id:
 		var why: String = CoopBeds.here_refusal()
@@ -1591,7 +1610,120 @@ func go_to_bed(player_id: String = "") -> String:
 
 
 func get_up(player_id: String = "") -> String:
-	CoopBeds.get_up(_player(player_id))
+	_beds().get_up(_player(player_id))
+	return ""
+
+
+## The zone the player is in (not the farm, the dome or a moon), or "".
+func _zone_place_of(player_id: String) -> String:
+	if not player_places.has(player_id):
+		return ""
+	var place: String = place_of(player_id)
+	return "" if place in [ZonePresence.FARM, ZonePresence.DOME] or Shuttle.is_moon(place) else place
+
+
+## The zone whose hub scene is on screen, or "" (the farm, the dome, a menu, a moon).
+func _scene_zone_here() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var scene: Node = tree.current_scene if tree != null else null
+	if scene == null:
+		return ""
+	var at: Array = ZonePresence.for_scene(scene.scene_file_path)
+	if at.is_empty() or str(at[0]) in [ZonePresence.FARM, ZonePresence.DOME] or Shuttle.is_moon(str(at[0])):
+		return ""
+	return str(at[0])
+
+
+## The beds the day waits on: CoopBeds, or the test's stand-in.
+func _beds() -> Object:
+	return recall_beds if recall_beds != null else CoopBeds
+
+
+## Host: why `player_id` can't sleep at the camp in `zone` tonight, or "" (Camp.sleep_problem).
+func camp_problem(player_id: String, zone: String, paid: bool = false) -> String:
+	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+	var near: bool = at != null and Camp.near(zone, at, Camp.HOST_REACH_SLACK_M)
+	return Camp.sleep_problem(zone, camps_open.has(zone), depth_of(player_id), rover_zone == zone and rover_depth == 0, near, maxi(camp_supplies, 1 if paid else 0))
+
+
+## Host: the player goes to bed at the open camp of `zone`. Uses one night's supplies and
+## counts the night for the quests. Alone the day ends where they stand (no rescue, no fee,
+## not moved); with friends in they count as in bed, and the recall leaves them be.
+func _go_to_camp_bed(player_id: String, zone: String) -> String:
+	if FarmCommands.guest:
+		return "Only the host's farm can end the day."
+	if GameClock.paused:
+		return "The clock is paused."
+	# Paid for tonight already (kept until the day starts): waking and lying down again
+	# at the camp costs no second supply and counts no second night.
+	var paid: bool = _campers.has(player_id)
+	if paid and player_id in _beds().in_bed:
+		return ""
+	var why: String = camp_problem(player_id, zone, paid)
+	if why != "":
+		return why
+	if player_id in _beds().in_bed:
+		return "You are in bed already."
+	var counted: bool = player_id != MANAGER_ID and not paid
+	if not paid:
+		camp_supplies -= 1
+		_campers[player_id] = true
+	if counted:
+		var done: Dictionary = (action_counts.get_or_add(player_id, {}) as Dictionary).get_or_add(Camp.NIGHT_COUNT, { "count": 0, "xp": 0 })
+		done["count"] = int(done["count"]) + 1
+	camps_changed.emit()
+	var refused: String = _beds().go_to_bed(player_id)
+	if refused != "":
+		if not paid:
+			camp_supplies += 1  # the night did not happen
+			_campers.erase(player_id)
+		if counted:
+			var undone: Dictionary = (action_counts[player_id] as Dictionary)[Camp.NIGHT_COUNT]
+			undone["count"] = int(undone["count"]) - 1
+		camps_changed.emit()
+	return refused
+
+
+## `scene_path` is the hub, at its first depth, of a zone whose camp the farm has opened:
+## the one scene where a bed is not on the farm (CoopBeds.scene_refusal).
+func camp_scene_open(scene_path: String) -> bool:
+	var at: Array = ZonePresence.for_scene(scene_path)
+	return not at.is_empty() and int(at[1]) == 0 and camps_open.has(str(at[0]))
+
+
+## The player is asleep at a camp tonight: the recall does not warn or carry them out.
+func is_camping(player_id: String) -> bool:
+	return _campers.has(player_id) and player_id in _beds().in_bed
+
+
+## Host: the farm opens the camp of `zone` (a quest does, Camp). Returns "" or why not.
+func open_camp(zone: String) -> String:
+	if FarmCommands.guest:
+		return "Only the host's farm opens a camp."
+	if not Camp.has_camp(zone):
+		return "That zone has no camp."
+	if not camps_open.has(zone):
+		camps_open.append(zone)
+		camps_open.sort()
+		camps_changed.emit()
+	return ""
+
+
+## Host: the farm buys a night's supplies at the camp, for the player there (`player_id`
+## is filled in by FarmCommands). Returns "" or why not (Camp.buy_problem). Paid once from
+## the shared wallet.
+func buy_camp_supplies(player_id: String = "") -> String:
+	var zone: String = _zone_place_of(player_id)
+	if zone == "":
+		return Camp.buy_problem("", false, "", 0, camp_supplies, credits, false)
+	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+	var near: bool = rover_zone == zone and rover_depth == 0 and at != null and Camp.near(zone, at, Camp.HOST_REACH_SLACK_M)
+	var reason: String = Camp.buy_problem(zone, camps_open.has(zone), zone, depth_of(player_id), camp_supplies, credits, near)
+	if reason != "":
+		return reason
+	add_credits(-Camp.SUPPLY_COST_CREDITS)
+	camp_supplies += 1
+	camps_changed.emit()
 	return ""
 
 
@@ -3759,6 +3891,7 @@ func _sitter_tend() -> void:
 
 
 func _on_day_started(day: int) -> void:
+	_campers.clear()  # the night at a camp is over: they wake there, and the recall is theirs again
 	# A rover below stands on the new day's floor.
 	settle_rover_depth()
 	zone_heat_trip = false  # a heat trip is one day's trip
@@ -4535,6 +4668,7 @@ func forget_place(player_id: String) -> void:
 	var was: String = place_of(player_id) if player_places.has(player_id) else ""
 	var on_trip: bool = _trip_players.has(player_id)
 	player_places.erase(player_id)
+	_campers.erase(player_id)  # a camper who drops is out of bed (CoopBeds drops them too)
 	_console_arrivals.erase(player_id)
 	_trip_players.erase(player_id)
 	# Gone mid-trip: the day trip is over with them, and nothing is charged. The shuttle
@@ -5054,7 +5188,7 @@ func _tick_recall() -> void:
 	var day: int = GameClock.get_day_index()
 	var host_warned: bool = false
 	var out: Array[String] = []
-	if _host_below():
+	if _host_below() and not is_camping(local_player_id):
 		match TunnelRecall.phase(GameClock.elapsed_days, _recall_warned_day, _recall_rescued_day):
 			TunnelRecall.WARN:
 				_recall_warned_day = day
@@ -5063,6 +5197,8 @@ func _tick_recall() -> void:
 			TunnelRecall.RESCUE:
 				out.append(local_player_id)
 	for guest_id: String in _guests_below():
+		if is_camping(guest_id):
+			continue  # asleep at a camp: no warning, no rescue (zones doc 6.2)
 		match TunnelRecall.phase(GameClock.elapsed_days, int(_guest_warned_day.get(guest_id, 0)), int(_guest_rescued_day.get(guest_id, 0))):
 			TunnelRecall.WARN:
 				_guest_warned_day[guest_id] = day
@@ -5101,7 +5237,7 @@ func _tell_guest(player_id: String, step: String) -> void:
 ## Still below, at the moment of the carrying: the rover is in the tunnels and the
 ## player is there (a guest in a zone, the host in the tunnels scene).
 func _carry_out_due(player_id: String) -> bool:
-	if not rover_in_tunnels:
+	if not rover_in_tunnels or is_camping(player_id):
 		return false
 	if player_id == local_player_id:
 		return _host_below()
