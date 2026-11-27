@@ -420,7 +420,7 @@ static func is_open(id: StringName, lab_level: int, audits_done: int) -> bool:
 	if not has_biome(id):
 		return false
 	var need: Dictionary = opens(id)
-	return lab_level >= int(need.get("lab_level", 0)) and audits_done >= int(need.get("audits", 0))
+	return (not need.has("lab_level") or lab_level >= int(need["lab_level"])) and (not need.has("audits") or audits_done >= int(need["audits"]))
 
 
 ## The one line a closed biome's sign adds, naming the next step, or "" when it is
@@ -429,7 +429,7 @@ static func next_step_text(id: StringName, lab_level: int, audits_done: int, aud
 	if not has_biome(id) or is_open(id, lab_level, audits_done):
 		return ""
 	var need: Dictionary = opens(id)
-	if lab_level < int(need.get("lab_level", 0)):
+	if need.has("lab_level") and lab_level < int(need["lab_level"]):
 		return "Lights up at lab level %d." % int(need["lab_level"])
 	return "Next: the auditor comes on morning %d." % audit_day
 

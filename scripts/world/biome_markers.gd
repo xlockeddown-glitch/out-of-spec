@@ -71,6 +71,8 @@ func _ready() -> void:
 	GameState.audit_completed.connect(_on_audit_completed)
 	GameState.farm_loaded.connect(refresh_hints)
 	GameClock.day_started.connect(_on_day_started)
+	# A guest's clock never emits day_started; it emits this when it shows the host's time.
+	GameClock.guest_time_shown.connect(refresh_hints)
 
 
 func _on_audit_completed(_report: Dictionary) -> void:

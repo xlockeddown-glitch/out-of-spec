@@ -39,6 +39,8 @@ static func lamp_ids() -> Array[StringName]:
 ## sides, or at its pad's corners when it has no road. Spots that would sit on a road
 ## cell, a pad or sign cell, or a built thing are dropped. Worked out once.
 static func spots(id: StringName) -> Array[Vector2]:
+	if not lamp_ids().has(id):
+		return []
 	if not _spots.has(id):
 		var found: Array[Vector2] = []
 		var line: Array[Vector2] = BiomeData.road(id)
@@ -91,8 +93,10 @@ static func _along(line: Array[Vector2]) -> Array[Vector2]:
 static func _clear(at: Vector2) -> bool:
 	if absf(at.x) > Terrain.HALF_M - 1.0 or absf(at.y) > Terrain.HALF_M - 1.0:
 		return false
+	if absf(at.x) < BiomeData.PLOT_HALF_M and absf(at.y) < BiomeData.PLOT_HALF_M:
+		return false
 	var cell := Vector2i(floori(at.x / Terrain.CELL_M), floori(at.y / Terrain.CELL_M))
-	if BiomeData.is_road_cell(cell) or BiomeMarkers.is_blocked_cell(cell):
+	if BiomeData.on_road(at) or BiomeData.is_road_cell(cell) or BiomeMarkers.is_blocked_cell(cell):
 		return false
 	for box: Vector4 in BiomeData.spots():
 		if absf(at.x - box.x) < box.z + SPOT_CLEAR_M and absf(at.y - box.y) < box.w + SPOT_CLEAR_M:

@@ -34,7 +34,23 @@ func _with_state(level: int, audits: int, body: Callable) -> String:
 	var result: String = body.call()
 	GameState.lab_xp = xp
 	GameState.audit_log.assign(kept)
+	_cleanup()
 	return result
+
+
+## Frees every node the test made, in the tree or not.
+func _cleanup() -> void:
+	for node: Node in _nodes:
+		if node.get_parent() != null:
+			node.get_parent().remove_child(node)
+		node.free()
+	_nodes.clear()
+
+
+## Puts `node` in the tree's root so its _ready runs and its signals connect.
+func _live(node: Node) -> void:
+	(Engine.get_main_loop() as SceneTree).root.add_child(node)
+	_nodes.append(node)
 
 
 func test_is_open_at_each_boundary() -> String:
@@ -139,6 +155,12 @@ func test_no_lamp_stands_where_it_must_not() -> String:
 
 func test_lamps_sit_on_the_ground_as_dug_leaves_it() -> String:
 	var lamps: RoadLamps = _built()
+	var problem: String = _settle_problem(lamps)
+	_cleanup()
+	return problem
+
+
+func _settle_problem(lamps: RoadLamps) -> String:
 	var post: Node3D = lamps.get_node("Lamp_badlands_0") as Node3D
 	var at := Vector2(post.position.x, post.position.z)
 	var none: Dictionary[Vector2i, int] = {}
@@ -180,4 +202,98 @@ func test_the_next_step_text_by_hand() -> String:
 		return BiomeData.next_step_text(&"lab_quarter", 1, 0, 10)
 	if BiomeData.next_step_text(&"farm", 1, 0, 10) != "" or BiomeData.next_step_text(&"nowhere", 1, 0, 10) != "":
 		return "The farm and an unknown id need no line"
+	return ""
+
+
+func test_live_lamps_follow_the_signals_with_no_manual_refresh() -> String:
+	return _with_state(1, 0, func() -> String:
+		var lamps := RoadLamps.new()
+		_live(lamps)
+		if lamps.is_lit(&"basalt_ridge") or lamps.is_lit(&"lab_quarter"):
+			return "Closed lamps are lit after _ready"
+		GameState.lab_xp = GameState.xp_for_level(5)
+		GameState.lab_xp_changed.emit()
+		if not lamps.is_lit(&"basalt_ridge"):
+			return "lab_xp_changed did not light the Basalt Ridge"
+		GameState.audit_log.append({})
+		GameState.audit_completed.emit({})
+		if not lamps.is_lit(&"lab_quarter"):
+			return "audit_completed did not light the Lab Quarter"
+		GameState.lab_xp = GameState.xp_for_level(1)
+		GameState.audit_log.clear()
+		GameState.farm_loaded.emit()
+		if lamps.is_lit(&"basalt_ridge") or lamps.is_lit(&"lab_quarter"):
+			return "farm_loaded did not relight from the loaded state"
+		var post: Node3D = lamps.get_node("Lamp_badlands_0") as Node3D
+		var at := Vector2(post.position.x, post.position.z)
+		var before: float = post.position.y
+		var saved: Dictionary[Vector2i, int] = GameState.dug.duplicate()
+		var dug: Dictionary[Vector2i, int] = {}
+		var middle := Vector2i(floori(at.x / Terrain.CELL_M), floori(at.y / Terrain.CELL_M))
+		for dx: int in range(-1, 2):
+			for dz: int in range(-1, 2):
+				var cell: Vector2i = middle + Vector2i(dx, dz)
+				if Terrain.can_dig(cell) and not Terrain.is_near_water(cell):
+					dug[cell] = 1
+		GameState.dug = dug
+		GameState.terrain_changed.emit()
+		var dropped: float = post.position.y
+		GameState.dug = saved
+		GameState.terrain_changed.emit()
+		if not dropped < before:
+			return "terrain_changed did not lower the lamp (%s, %s)" % [before, dropped]
+		if not is_equal_approx(post.position.y, before):
+			return "terrain_changed did not raise the lamp back"
+		return "")
+
+
+func test_live_signs_follow_the_signals_with_no_manual_refresh() -> String:
+	var days: float = GameClock.elapsed_days
+	var result: String = _with_state(1, 0, func() -> String:
+		GameClock.elapsed_days = 0.0
+		var markers := BiomeMarkers.new()
+		_live(markers)
+		var basalt := markers.get_node("Sign_basalt_ridge") as Clickable
+		var lab := markers.get_node("Sign_lab_quarter") as Clickable
+		if not basalt.hint.ends_with("Lights up at lab level 5."):
+			return "Basalt sign after _ready: %s" % basalt.hint
+		GameState.lab_xp = GameState.xp_for_level(5)
+		GameState.lab_xp_changed.emit()
+		if basalt.hint != BiomeData.sign_text(&"basalt_ridge"):
+			return "lab_xp_changed did not clear the Basalt sign line"
+		if not lab.hint.ends_with("morning 5."):
+			return "Lab Quarter sign: %s" % lab.hint
+		# Emitting day_started would also run the game's own audit, so check the hookup.
+		if not GameClock.day_started.is_connected(markers._on_day_started):
+			return "The signs do not listen to day_started"
+		GameClock.elapsed_days = 4.0
+		GameClock.guest_time_shown.emit()
+		if not lab.hint.ends_with("morning 10."):
+			return "guest_time_shown did not move the audit morning: %s" % lab.hint
+		GameClock.elapsed_days = 0.0
+		GameClock.guest_time_shown.emit()
+		if not lab.hint.ends_with("morning 5."):
+			return "guest_time_shown did not refresh the sign: %s" % lab.hint
+		GameState.audit_log.append({})
+		GameState.audit_completed.emit({})
+		if lab.hint != BiomeData.sign_text(&"lab_quarter"):
+			return "audit_completed did not clear the Lab Quarter line"
+		GameState.audit_log.clear()
+		GameState.farm_loaded.emit()
+		if not lab.hint.ends_with("morning 5."):
+			return "farm_loaded did not refresh the sign"
+		return "")
+	GameClock.elapsed_days = days
+	return result
+
+
+func test_the_helpers_survive_odd_inputs() -> String:
+	if not BiomeData.is_open(&"farm", 1, -1) or not BiomeData.is_open(&"farm", -1, -1):
+		return "The farm must always be open"
+	if BiomeData.next_step_text(&"farm", -1, 0, 5) != "":
+		return "The farm needs no line"
+	if BiomeData.next_step_text(&"lab_quarter", -1, 0, 5) != "Next: the auditor comes on morning 5.":
+		return BiomeData.next_step_text(&"lab_quarter", -1, 0, 5)
+	if not RoadLamps.spots(&"nowhere").is_empty() or not RoadLamps.spots(&"farm").is_empty():
+		return "Lamps for an id that is not a spoke"
 	return ""
