@@ -8,6 +8,7 @@ const FARM_SCENE: String = "res://scenes/main_farm.tscn"
 const TITLE_SCENE: String = "res://scenes/title_menu.tscn"
 const DOME_SCENE: String = "res://scenes/dome_interior.tscn"
 const TUNNELS_SCENE: String = "res://scenes/basalt_tunnels.tscn"
+const AQUIFER_SCENE: String = "res://scenes/flooded_aquifer.tscn"
 const PHOBOS_SCENE: String = "res://scenes/phobos_hub.tscn"
 const DEIMOS_SCENE: String = "res://scenes/deimos_hub.tscn"
 const FADE_SECONDS: float = 0.1  # each way; ~0.2 s total per the Week 2 board
@@ -51,9 +52,22 @@ func toggle_farm_dome() -> void:
 ## Where the dome's airlock leads. The tunnels only while a rover is there for
 ## the player: one that was sent home, or let go, leaves the farm out the door.
 func exit_path() -> String:
-	if outside == TUNNELS_SCENE and (GameState.rover_zone == "" or TunnelRecall.closed(GameClock.elapsed_days)):
+	if is_zone_scene(outside) and (GameState.rover_zone == "" or TunnelRecall.closed(GameClock.elapsed_days)):
 		outside = FARM_SCENE
+	elif is_zone_scene(outside):
+		outside = scene_for_zone(GameState.rover_zone)
 	return outside
+
+
+## True if `path` is the hub scene of a zone the farm's rover goes into (the Lava
+## Tubes' tunnels, the Flooded Aquifer): one that shows a depth below it.
+static func is_zone_scene(path: String) -> bool:
+	return path == TUNNELS_SCENE or path == AQUIFER_SCENE
+
+
+## The hub scene of the zone the rover is in: the Aquifer's, else the tunnels'.
+static func scene_for_zone(zone: String) -> String:
+	return AQUIFER_SCENE if zone == AquiferDepth.ZONE else TUNNELS_SCENE
 
 
 ## True if `scene_path` is the dome and a console request is out: nothing leaves the
@@ -107,12 +121,12 @@ func swap_to(path: String) -> void:
 	_busy = true
 	if path == TITLE_SCENE:
 		FastTravel.pending = false  # leaving the farm: no answer is waited for
-	if path != TUNNELS_SCENE:
-		# Anywhere but the tunnels, no screen is below them.
+	if not is_zone_scene(path):
+		# Anywhere but a zone, no screen is below it.
 		ZoneDepth.set_local(0, {})
 	else:
-		# The tunnels show the depth the one rover is at.
-		ZoneDepth.follow(GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
+		# A zone shows the depth the one rover is at.
+		ZoneDepth.follow(GameState.rover_depth, GameState.world_seed, GameClock.get_day_index(), AquiferDepth.ZONE if path == AQUIFER_SCENE else ZoneDepth.ZONE)
 	_note_outside(path)
 	note_arrival(path)
 	var tween: Tween = create_tween()
@@ -148,7 +162,7 @@ func note_arrival(path: String) -> void:
 
 
 func _note_outside(path: String) -> void:
-	if path == TUNNELS_SCENE:
-		outside = TUNNELS_SCENE
+	if is_zone_scene(path):
+		outside = path
 	elif path != DOME_SCENE:
 		outside = FARM_SCENE

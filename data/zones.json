@@ -26,7 +26,7 @@
       "band": [8, 24],
       "hazards": ["water_depth", "pressure_drop", "slow_wading"],
       "finds": ["water_samples", "drowned_gear", "gauge_blocks"],
-      "hub_scene": "",
+      "hub_scene": "res://scenes/flooded_aquifer.tscn",
       "entrance": "A sinkhole south of the plateau, reached by rover.",
       "tarantula_hook": "",
       "notes": "The second area (Ryan, section 14.1 answer 6)."

@@ -25,7 +25,7 @@ static func is_place(place: String) -> bool:
 static func place_problem(place: String, depth: int) -> String:
 	if not is_place(place):
 		return "'%s' is not a place." % place
-	if depth < 0 or depth > MAX_DEPTH:
+	if depth < 0 or depth > (AquiferDepth.MAX_DEPTH if place == AquiferDepth.ZONE else MAX_DEPTH):
 		return "Depth %d is out of range." % depth
 	if depth > 0 and (place == FARM or place == DOME):
 		return "The %s has no depth." % place
@@ -52,7 +52,7 @@ static func for_scene(path: String) -> Array:
 		return [DOME, 0]
 	for id: StringName in ZoneData.ids():
 		if path != "" and ZoneData.hub_scene(id) == path:
-			return [String(id), ZoneDepth.local_depth if String(id) == ZoneDepth.ZONE else 0]
+			return [String(id), ZoneDepth.local_depth if String(id) in [ZoneDepth.ZONE, AquiferDepth.ZONE] else 0]
 	return []
 
 

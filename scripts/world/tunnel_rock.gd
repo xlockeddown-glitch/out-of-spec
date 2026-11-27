@@ -96,6 +96,8 @@ var _lintels: Dictionary[Vector3, StandardMaterial3D] = {}
 static func grid() -> PackedStringArray:
 	if ZoneDepth.local_depth > 0 and not ZoneDepth.local_layout.is_empty():
 		return ZoneDepth.local_layout["grid"]
+	if ZoneDepth.local_zone == AquiferDepth.ZONE:
+		return AquiferDepth.hub_grid()
 	return MAP
 
 
@@ -210,16 +212,19 @@ static func drawn_ground_m(place: Vector2) -> float:
 
 func _enter_tree() -> void:
 	# Before any child's _ready: the map is the one the rover is at.
-	ZoneDepth.follow(GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
+	var zone: String = AquiferDepth.ZONE if GameState.rover_zone == AquiferDepth.ZONE else ZoneDepth.ZONE
+	ZoneDepth.follow(GameState.rover_depth, GameState.world_seed, GameClock.get_day_index(), zone)
 
 
 func _ready() -> void:
 	_build_colliders()
 	_build_blocks()
-	var water := VoxelWater.new()
-	water.name = "Water"
-	water.fill(POOL, WATER_M, drawn_ground_m)
-	add_child(water)
+	# The Lava hub's sump is in the map's corner; the Aquifer's corner is rock.
+	if ZoneDepth.local_zone == ZoneDepth.ZONE:
+		var water := VoxelWater.new()
+		water.name = "Water"
+		water.fill(POOL, WATER_M, drawn_ground_m)
+		add_child(water)
 	for y: int in grid().size():
 		for x: int in grid()[y].length():
 			var cell := Vector2i(x, y)
@@ -363,6 +368,9 @@ func _build_blocks() -> void:
 	stone.vertex_color_use_as_albedo = true
 	stone.vertex_color_is_srgb = true
 	stone.roughness = 1.0
+	if ZoneDepth.local_zone == AquiferDepth.ZONE:
+		stone.albedo_color = Color.WHITE.lerp(ScopeTheme.TEAL, 0.25)  # wet, ice-cemented rock [PLACEHOLDER]
+		stone.roughness = 0.5
 	_add_blocks("Blocks", rock, rock_colors, stone)
 	var molten := ShaderMaterial.new()
 	molten.shader = load("res://assets/shaders/magma.gdshader")

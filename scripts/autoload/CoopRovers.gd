@@ -232,7 +232,7 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 		_refuse(player_id, rover_id, "a rover %.1f m away, %.1f m allowed" % [distance, left], now)
 		return
 	# In the rock nobody could get it out again.
-	if not _in_bounds(rover_id, to.origin) or (rover_id == farm.TUNNEL_ROVER and not TunnelRock.holds_in(ZoneDepth.grid_for(farm.rover_depth, farm.world_seed, GameClock.get_day_index()), to.origin)):
+	if not _in_bounds(rover_id, to.origin) or (rover_id == farm.TUNNEL_ROVER and not TunnelRock.holds_in(ZoneDepth.grid_for(farm.rover_depth, farm.world_seed, GameClock.get_day_index(), farm.rover_zone), to.origin)):
 		_refuse(player_id, rover_id, "a rover out of bounds at %s" % [to.origin], now)
 		return
 	_reach[rover_id] = [left - distance, now]
