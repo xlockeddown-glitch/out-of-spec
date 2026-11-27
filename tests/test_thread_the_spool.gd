@@ -552,7 +552,7 @@ func test_a_guest_s_seat_is_graded_like_the_host_s() -> String:
 
 
 func test_no_save_or_message_changed() -> String:
-	if SessionScript.PROTOCOL != 25:
+	if SessionScript.PROTOCOL != 26:
 		return "The score rides as a scored action's last argument: the protocol is still 18."
 	if SaveGame.VERSION != 1:
 		return "Nothing new is saved: the save version is still 1."

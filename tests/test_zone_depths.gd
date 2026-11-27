@@ -328,8 +328,8 @@ func test_a_repaired_lift_and_the_deepest_depth_are_saved_and_checked() -> Strin
 		junk["deepest_depth"] = bad
 		if gs.farm_dict_problem(junk) == "":
 			problems.append("A bad deepest_depth was accepted: %s" % [bad])
-	if CoopSession.PROTOCOL != 25:
-		problems.append("The protocol is %d, not 25." % CoopSession.PROTOCOL)
+	if CoopSession.PROTOCOL != 26:
+		problems.append("The protocol is %d, not 26." % CoopSession.PROTOCOL)
 	gs.free()
 	back.free()
 	old.free()
