@@ -1,0 +1,89 @@
+{
+  "_note": "Biomes (docs/design/biomes.md section 6 step 3). The farm hub and the five biomes of section 7.1 on the 240 m land (|x| and |z| up to 120 m; x east, z south, the farm at 0, 0). Every number, tint and sign line is a [PLACEHOLDER]. centre and marker are [x, z] in metres. reach_m is how far the biome runs from its centre. bearing_deg is the way out of the farm, 0 north (-z), 90 east, clockwise; the farm has none. role is hub (the farm), spoke (a road out of the farm) or open (the Badlands: the open land between the roads, which takes every point no other biome claims). band is the lab level the content is tuned for (zones.md section 2), never a gate; the Badlands band is the Earthworks 1 to 30 of biomes.md section 2. tint is a ground colour (nothing paints it yet). sign is the soft-gate warning on the biome's marker (a sign and a rover pad on its road; information, never a wall) and names no key. zone_entrance is a zones.json id or null; entrance_at is where that way in already is, or null. Existing places stay where they are: the tunnel mouth (20.5, -19) belongs to the Basalt Ridge, the relay (-70, -70) to the Lab Quarter, and the Aquifer sinkhole is new, in the Badlands (Question 12). Read by scripts/world/biome_data.gd; nothing in play reads it yet.",
+  "biomes": [
+    {
+      "id": "farm",
+      "name": "Farm",
+      "role": "hub",
+      "centre": [0, 0],
+      "reach_m": 24,
+      "bearing_deg": null,
+      "band": [1, 99],
+      "tint": "#b8693f",
+      "sign": "Farm: grow, water, harvest and sleep. Everything starts here.",
+      "marker": [-12, -18],
+      "zone_entrance": null,
+      "entrance_at": null
+    },
+    {
+      "id": "lab_quarter",
+      "name": "Lab Quarter",
+      "role": "spoke",
+      "centre": [-55, -40],
+      "reach_m": 35,
+      "bearing_deg": 306,
+      "band": [1, 20],
+      "tint": "#c9c3b8",
+      "sign": "Lab Quarter: lab level 1 to 20. Instruments, standards and the relay road.",
+      "marker": [-42, -28],
+      "zone_entrance": null,
+      "entrance_at": null
+    },
+    {
+      "id": "badlands",
+      "name": "Badlands",
+      "role": "open",
+      "centre": [75, 18],
+      "reach_m": 45,
+      "bearing_deg": 104,
+      "band": [1, 30],
+      "tint": "#a2643c",
+      "sign": "Badlands: Earthworks level 1 to 30. Hills and pits. Deep holes seep water.",
+      "marker": [58, 24],
+      "zone_entrance": "flooded_aquifer",
+      "entrance_at": [80, 35]
+    },
+    {
+      "id": "basalt_ridge",
+      "name": "Basalt Ridge",
+      "role": "spoke",
+      "centre": [45, -34],
+      "reach_m": 35,
+      "bearing_deg": 53,
+      "band": [5, 20],
+      "tint": "#3d3c43",
+      "sign": "Basalt Ridge: lab level 5 and up. Dark ground, cold nights. The tunnels start here.",
+      "marker": [27, -24],
+      "zone_entrance": "lava_tubes",
+      "entrance_at": [20.5, -19]
+    },
+    {
+      "id": "frost_flats",
+      "name": "Frost Flats",
+      "role": "spoke",
+      "centre": [0, -95],
+      "reach_m": 40,
+      "bearing_deg": 0,
+      "band": [18, 35],
+      "tint": "#cdd9df",
+      "sign": "Frost Flats: lab level 18 and up. Ice, long drives, a heater for the rover.",
+      "marker": [-12, -60],
+      "zone_entrance": "ice_caves",
+      "entrance_at": null
+    },
+    {
+      "id": "landing_field",
+      "name": "Landing Field",
+      "role": "spoke",
+      "centre": [0, 100],
+      "reach_m": 30,
+      "bearing_deg": 180,
+      "band": [20, 99],
+      "tint": "#8f8f8b",
+      "sign": "Landing Field: lab level 20 and up. The shuttle leaves from here, with a license.",
+      "marker": [0, 90],
+      "zone_entrance": "phobos",
+      "entrance_at": null
+    }
+  ]
+}

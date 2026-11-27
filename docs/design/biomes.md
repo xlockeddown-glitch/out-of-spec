@@ -203,6 +203,7 @@ Small PRs, one job each, smallest first.
 1. **Measure.** A test or dev scene that prints rover top speed, ground build time and uplink dead spots at 160 m and 240 m, to put real numbers in §3.1. No change to play.
 2. **Land size.** Grow the land to about 240 m. Every point inside the old 160 m keeps its height for an existing seed (§7.1); a test checks it.
 3. **Biome table.** `data/biomes.json` and a pure `BiomeData` class (ids, centres, reach, band, tint, zone entrance). Tests only.
+   *Built 2026-11-26 (feat/biome-table):* `data/biomes.json` (the farm hub and the five biomes, every number a [PLACEHOLDER]), `scripts/world/biome_data.gd` (`BiomeData`: the check, `biome_at`, `marker`, `tint`, `band`, `sign_text`) and `tests/test_biome_data.gd`. Nothing in play reads it yet.
 4. **Paint the map.** A debug overlay (a key) that colours the ground by biome, so Ryan can see layout A against B before art is spent.
 5. **Tint the ground by biome.** `TerrainGround` takes the tint. Heights do not change, so the land hash and old saves are safe.
 6. **Signs and parking pads.** One sign and one rover pad per biome, on the existing land. Hover text only.
