@@ -2,9 +2,14 @@ class_name BiomeData
 extends RefCounted
 ## Reads data/biomes.json (docs/design/biomes.md section 6, build step 3): the
 ## farm hub and the five biomes on the 240 m land, with each one's centre,
-## reach, level band, ground tint, sign line, marker and zone entrance. Pure
+## reach, level band, ground tint, sign line, marker and zone entrances. Pure
 ## static readers and a data check; no node, no scene, and nothing in play
-## reads it yet. It loads its own file so no other script has to change.
+## reads it yet.
+##
+## It loads its own file, not through DataManager, because DataManager's table
+## list is another script's to change, and nothing in play needs the table yet.
+## The load reports every fault with push_error, checks the table before it is
+## kept, and keeps nothing usable if the check fails.
 
 const PATH: String = "res://data/biomes.json"
 const FARM: StringName = &"farm"
@@ -16,10 +21,20 @@ const LAND_HALF_M: float = 120.0
 const EDGE_MARGIN_M: float = 4.0
 ## The farm plot is 12 by 12 cells of 2 m (GameState.PLOT), half-width in metres.
 const PLOT_HALF_M: float = 12.0
-## A marker keeps this far outside the plot.
-const PLOT_CLEAR_M: float = 2.0
+## A marker's middle keeps this far outside the plot's edge.
+const PLOT_CLEAR_M: float = 3.0
 
-## The bands are lab levels, as in zones.json.
+## A marker's rover pad is 4 by 4 m, like the tunnel pad and the calibration pad.
+const PAD_HALF_M: float = 2.0
+## A pad keeps this much clear of anything solid or built [PLACEHOLDER].
+const PAD_CLEAR_M: float = 1.0
+## The ground under a pad may differ this much between its corners, edges and
+## middle [PLACEHOLDER]. The old land's heights cannot change, so a pad goes where
+## the land is already near flat.
+const PAD_SPREAD_MAX_M: float = 0.25
+
+## The bands are zone levels, as in zones.json (the Badlands' is the Earthworks
+## level of biomes.md section 2).
 const LEVEL_MIN: int = 1
 const LEVEL_MAX: int = 99
 ## How far a biome's centre may lie from its bearing, in degrees [PLACEHOLDER].
@@ -37,53 +52,115 @@ const FIELDS: Dictionary = {
 	"tint": TYPE_STRING,
 	"sign": TYPE_STRING,
 	"marker": TYPE_ARRAY,
+	"entrances": TYPE_ARRAY,
 }
 
-## Places the scene already holds that a marker must stay clear of: x, z and
-## the clear radius in metres (read from scenes/main_farm.tscn). The plot,
-## the farm board and the tunnel mouth are the ones a sign could land on.
-const KNOWN_SPOTS: Array[Vector3] = [
-	Vector3(0, 2, 3),         # rover start
-	Vector3(8, 14, 4),        # dome airlock
-	Vector3(13.5, 15, 4),     # field calibration pad
-	Vector3(-3, 14, 4),       # drop pod
-	Vector3(1.5, 17.5, 3),    # farm notice board
-	Vector3(16, -2, 5),       # Bram's bay and the rover pad beside it
-	Vector3(20.5, -19, 6),    # tunnel mouth
-	Vector3(20.5, -15.5, 4),  # tunnel pad
-	Vector3(-70, -70, 8),     # satellite relay
-	Vector3(63, 8, 8),        # the wash
-	Vector3(-16, 3, 3), Vector3(-19, -3, 3), Vector3(-15, 12, 3), Vector3(4, -19, 3),
-	Vector3(-3, -21, 3), Vector3(19, 4, 3), Vector3(21, -9, 3), Vector3(11, 18, 3),  # ore fissures
-	Vector3(-14, -14, 3),     # the gulch bend
+## Built things in scenes/main_farm.tscn a marker's pad must stay clear of: x, z,
+## and the half-width in x and in z, in metres (from the scene's collision shapes
+## and models; the pads, the board and the bay are their real sizes). The land's
+## own rocks are read from HillDressing.ROCKS, not listed here.
+const SCENE_SPOTS: Array[Vector4] = [
+	Vector4(0, 2, 1.2, 1.6),        # rover start
+	Vector4(8, 14, 2.5, 2.0),       # dome airlock
+	Vector4(13.5, 15, 2.5, 2.5),    # field calibration pad
+	Vector4(-3, 14, 2.0, 2.0),      # drop pod
+	Vector4(1.5, 17.5, 3.5, 3.5),   # farm notice board (its pad is 7 by 7)
+	Vector4(16, -2, 3.5, 3.5),      # Bram's bay and the rover pad beside it
+	Vector4(20.5, -19, 4.0, 3.0),   # tunnel mouth
+	Vector4(20.5, -15.5, 2.0, 2.0), # tunnel pad
+	Vector4(-70, -70, 4.0, 4.0),    # satellite relay
+	Vector4(63, 8, 8.0, 6.0),       # the wash
+	Vector4(-17, -10, 2.5, 2.0),    # RockA, solid
+	Vector4(-9, -17, 2.0, 2.5),     # RockB, solid
+	Vector4(16, 9, 2.0, 2.0),       # RockC, solid
+	Vector4(5, -16, 1.5, 1.5),      # RockD, solid
+	Vector4(5.5, 16.5, 0.5, 0.5),   # weather mast
+	Vector4(-9.5, 17, 0.8, 0.6),    # solar skid
+	Vector4(-17.5, 5.4, 0.6, 0.6),  # core drill
+	Vector4(-14, 1, 0.7, 0.6),      # sorting skip
+	Vector4(-17, -4.6, 0.4, 0.4),   # seismic thumper
+	Vector4(-14, -14, 1.0, 1.0),    # cobbles A
+	Vector4(20, 13, 1.0, 1.0),      # cobbles B
+	Vector4(-1, -25, 7.0, 1.5),     # the gulch, x -8 to 6
+	Vector4(0, -30, 10.0, 1.5),     # the plateau rim
+	Vector4(-16, 3, 1.5, 1.5), Vector4(-19, -3, 1.5, 1.5), Vector4(-15, 12, 1.5, 1.5),
+	Vector4(4, -19, 1.5, 1.5), Vector4(-3, -21, 1.5, 1.5), Vector4(19, 4, 1.5, 1.5),
+	Vector4(21, -9, 1.5, 1.5), Vector4(11, 18, 1.5, 1.5),  # ore fissures
 ]
 
 static var _cache: Array[Dictionary] = []
 static var _loaded: bool = false
 
 
-# --- Readers --------------------------------------------------------------------
+# --- Loading --------------------------------------------------------------------
 
-## The table, read once. An unreadable file gives an empty list.
+## The table, read and checked once. If the file is missing, unreadable or fails
+## the check, each fault is reported and the list is empty. reload() tries again.
 static func rows() -> Array[Dictionary]:
 	if not _loaded:
+		var found: Dictionary = read_file(PATH)
+		for line: String in found["errors"] as Array:
+			push_error(line)
 		_cache = []
-		for row: Variant in raw_rows():
-			if row is Dictionary:
-				_cache.append(row)
+		if (found["errors"] as Array).is_empty():
+			_cache.assign(found["rows"])
+			for row: Dictionary in _cache:
+				_freeze(row)
+			_cache.make_read_only()
 		_loaded = true
 	return _cache
 
 
-## The rows exactly as the file holds them (for the check). Empty if unreadable.
-static func raw_rows() -> Array:
-	if not FileAccess.file_exists(PATH):
-		return []
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(PATH))
-	if parsed is Dictionary and (parsed as Dictionary).get("biomes") is Array:
-		return (parsed as Dictionary)["biomes"]
-	return []
+## Forget what was read, so the next reader reads the file again (for tests).
+static func reload() -> void:
+	_cache = []
+	_loaded = false
 
+
+## The rows exactly as the file holds them (for the check), unchecked and not
+## read-only. Empty if the file is unreadable.
+static func raw_rows() -> Array:
+	return read_file(PATH)["rows"] as Array
+
+
+## Reads and checks one file: {"rows": the rows, "errors": one line each}. A
+## missing file, a JSON fault (with its line), a missing "biomes" list or any
+## problem of the check gives errors, and then rows is empty.
+static func read_file(path: String) -> Dictionary:
+	var out: Dictionary = {"rows": [], "errors": []}
+	var errors: Array = out["errors"]
+	if not FileAccess.file_exists(path):
+		errors.append("%s: file not found" % path)
+		return out
+	var json := JSON.new()
+	if json.parse(FileAccess.get_file_as_string(path)) != OK:
+		errors.append("%s: line %d: %s" % [path, json.get_error_line(), json.get_error_message()])
+		return out
+	var data: Variant = json.data
+	if not data is Dictionary or not (data as Dictionary).get("biomes") is Array:
+		errors.append("%s: no \"biomes\" list" % path)
+		return out
+	var table: Array = (data as Dictionary)["biomes"]
+	for line: String in problems(table):
+		errors.append("%s: %s" % [path, line])
+	if errors.is_empty():
+		out["rows"] = table
+	return out
+
+
+## Makes a row and everything inside it read-only (DataManager does the same).
+static func _freeze(value: Variant) -> void:
+	if value is Dictionary:
+		for key: Variant in (value as Dictionary).keys():
+			_freeze((value as Dictionary)[key])
+		(value as Dictionary).make_read_only()
+	elif value is Array:
+		for item: Variant in value as Array:
+			_freeze(item)
+		(value as Array).make_read_only()
+
+
+# --- Readers --------------------------------------------------------------------
 
 static func ids() -> Array[StringName]:
 	var out: Array[StringName] = []
@@ -127,7 +204,7 @@ static func tint(id: StringName) -> Color:
 	return Color(text) if Color.html_is_valid(text) else Color.MAGENTA
 
 
-## The lab-level band of `id` as (min, max), or (0, 0) for an unknown id.
+## The zone-level band of `id` as (min, max), or (0, 0) for an unknown id.
 static func band(id: StringName) -> Vector2i:
 	var raw: Variant = biome(id).get("band")
 	if raw is Array and (raw as Array).size() == 2:
@@ -140,16 +217,25 @@ static func sign_text(id: StringName) -> String:
 	return str(biome(id).get("sign", ""))
 
 
-## The zone id behind the biome's entrance, or &"" when it has none.
-static func zone_entrance(id: StringName) -> StringName:
-	var zone: Variant = biome(id).get("zone_entrance")
-	return StringName(zone as String) if zone is String else &""
+## The zone ids with a way in inside the biome, in table order.
+static func zones(id: StringName) -> Array[StringName]:
+	var out: Array[StringName] = []
+	var raw: Variant = biome(id).get("entrances")
+	if raw is Array:
+		for entrance: Variant in raw as Array:
+			out.append(StringName(str((entrance as Dictionary).get("zone", ""))))
+	return out
 
 
-## Where that entrance is today, or null when it is not built or placed.
-static func entrance_at(id: StringName) -> Variant:
-	var raw: Variant = biome(id).get("entrance_at")
-	return _point(raw) if raw is Array else null
+## Where `zone`'s way in is inside biome `id`, or null when it is not placed.
+static func entrance_at(id: StringName, zone: StringName) -> Variant:
+	var raw: Variant = biome(id).get("entrances")
+	if raw is Array:
+		for entrance: Variant in raw as Array:
+			var spot: Dictionary = entrance
+			if str(spot.get("zone", "")) == String(zone):
+				return _point(spot["at"]) if spot.get("at") is Array else null
+	return null
 
 
 ## Which biome holds the ground at `at` (x, z in metres).
@@ -178,7 +264,7 @@ static func at_in(table: Array, at: Vector2) -> StringName:
 		var id := StringName(str(row.get("id", "")))
 		var role: String = str(row.get("role", ""))
 		var distance: float = at.distance_to(_point(row.get("centre")))
-		var covers: bool = distance <= float(row.get("reach_m", 0.0))
+		var covers: bool = distance <= _number(row.get("reach_m"))
 		if role == "hub" and covers:
 			return id
 		if role == "open":
@@ -187,6 +273,56 @@ static func at_in(table: Array, at: Vector2) -> StringName:
 			best = id
 			best_distance = distance
 	return best if best != &"" else open_id
+
+
+# --- Ground the markers sit on --------------------------------------------------
+
+## Every built thing and solid rock a pad must keep off, as x, z, half-width x,
+## half-width z. The rocks come from HillDressing.ROCKS, each as the square its
+## longest side makes (a rock may stand any way).
+static func spots() -> Array[Vector4]:
+	var out: Array[Vector4] = SCENE_SPOTS.duplicate()
+	for at: Vector2i in HillDressing.ROCKS:
+		var size: Vector3 = HillDressing.ROCK_SIZE_M[HillDressing.ROCKS[at]]
+		var half: float = maxf(size.x, size.z) * 0.5
+		out.append(Vector4(at.x, at.y, half, half))
+	return out
+
+
+## The height spread (highest less lowest) of the ground under a 4 by 4 m pad
+## whose middle is `at`, over its corners, edge middles and middle, on the 240 m
+## land as Terrain models it.
+static func pad_spread_m(at: Vector2) -> float:
+	var low: float = INF
+	var high: float = -INF
+	for dx: int in [-1, 0, 1]:
+		for dz: int in [-1, 0, 1]:
+			var point := Vector2(at.x + dx * PAD_HALF_M, at.y + dz * PAD_HALF_M)
+			var h: float = Terrain.natural_on(Vector2i(roundi(point.x), roundi(point.y)), int(LAND_HALF_M))
+			low = minf(low, h)
+			high = maxf(high, h)
+	return high - low
+
+
+## What is wrong with putting a rover pad (4 by 4 m) at `at`: the plot, built
+## things and rocks, the relay road, and ground that is not near flat.
+static func pad_problems(label: String, field: String, at: Vector2) -> Array[String]:
+	var out: Array[String] = []
+	var plot: float = PLOT_HALF_M + PLOT_CLEAR_M
+	if absf(at.x) < plot and absf(at.y) < plot:
+		out.append("%s: %s is on the farm plot" % [label, field])
+	var reach_m: float = PAD_HALF_M + PAD_CLEAR_M
+	for spot: Vector4 in spots():
+		if absf(at.x - spot.x) < spot.z + reach_m and absf(at.y - spot.y) < spot.w + reach_m:
+			out.append("%s: %s pad is on or too near the thing at (%s, %s)" % [label, field, spot.x, spot.y])
+	var along: float = clampf(at.dot(Terrain.RELAY_WAY), 0.0, Terrain.RELAY.length())
+	var road_gap: float = at.distance_to(Terrain.RELAY_WAY * along)
+	if road_gap < Terrain.ROAD_LEVEL_M + PAD_HALF_M * sqrt(2.0):
+		out.append("%s: %s pad is %.1f m from the relay road, inside its %d m level strip" % [label, field, road_gap, int(Terrain.ROAD_LEVEL_M)])
+	var spread: float = pad_spread_m(at)
+	if spread > PAD_SPREAD_MAX_M:
+		out.append("%s: %s pad ground varies by %.2f m, over the %.2f m limit" % [label, field, spread, PAD_SPREAD_MAX_M])
+	return out
 
 
 # --- The check ------------------------------------------------------------------
@@ -203,7 +339,9 @@ static func problems(table: Array) -> Array[String]:
 			out.append("row %d is not an object" % i)
 			continue
 		var row: Dictionary = table[i]
-		var label: String = str(row.get("id", "row %d" % i))
+		var label: String = _label(row, i)
+		if typeof(row.get("role")) == TYPE_STRING:
+			roles[row["role"]] = int(roles.get(row["role"], 0)) + 1
 		var before: int = out.size()
 		for field: String in FIELDS:
 			if not row.has(field):
@@ -211,7 +349,7 @@ static func problems(table: Array) -> Array[String]:
 			elif not _type_ok(row[field], int(FIELDS[field])):
 				out.append("%s: %s has the wrong type" % [label, field])
 		if typeof(row.get("id")) == TYPE_STRING:
-			if str(row["id"]).is_empty():
+			if str(row["id"]).strip_edges().is_empty():
 				out.append("row %d: empty id" % i)
 			elif seen.has(row["id"]):
 				out.append("%s: duplicate id" % label)
@@ -219,23 +357,29 @@ static func problems(table: Array) -> Array[String]:
 		if out.size() > before:
 			continue
 		out.append_array(_row_problems(label, row))
-		roles[row["role"]] = int(roles.get(row["role"], 0)) + 1
 		sound.append(row)
 	for role: String in ["hub", "open"]:
 		if int(roles.get(role, 0)) != 1:
 			out.append("the table needs exactly one %s row, not %d" % [role, int(roles.get(role, 0))])
 	# Only when every row is sound can the points be asked where they fall.
 	if out.is_empty():
-		for row: Dictionary in sound:
-			out.append_array(_place_problems(str(row["id"]), row, sound))
+		out.append_array(_table_problems(sound))
 	return out
+
+
+## The name a row goes by in a message.
+static func _label(row: Dictionary, index: int) -> String:
+	var id: Variant = row.get("id")
+	if id is String and not (id as String).strip_edges().is_empty():
+		return id
+	return "row %d" % index
 
 
 static func _row_problems(label: String, row: Dictionary) -> Array[String]:
 	var out: Array[String] = []
 	if not ROLES.has(str(row["role"])):
 		out.append("%s: unknown role %s" % [label, row["role"]])
-	if str(row["name"]).is_empty():
+	if str(row["name"]).strip_edges().is_empty():
 		out.append("%s: empty name" % label)
 	if str(row["sign"]).strip_edges().is_empty():
 		out.append("%s: empty sign" % label)
@@ -246,14 +390,29 @@ static func _row_problems(label: String, row: Dictionary) -> Array[String]:
 	out.append_array(_band_problems(label, row["band"]))
 	for field: String in ["centre", "marker"]:
 		out.append_array(_point_problems(label, field, row[field]))
-	var zone: Variant = row.get("zone_entrance")
-	if zone != null and (not zone is String or not ZoneData.has_zone(StringName(zone as String))):
-		out.append("%s: zone_entrance %s is not a zones.json id" % [label, zone])
-	var at: Variant = row.get("entrance_at")
-	if at != null:
-		out.append_array(_point_problems(label, "entrance_at", at))
-		if zone == null:
-			out.append("%s: entrance_at without a zone_entrance" % label)
+	var bearing: Variant = row.get("bearing_deg")
+	if str(row["role"]) == "hub":
+		if bearing != null:
+			out.append("%s: the hub has no bearing_deg" % label)
+	elif bearing == null or (typeof(bearing) != TYPE_FLOAT and typeof(bearing) != TYPE_INT):
+		out.append("%s: a spoke or open biome needs a bearing_deg" % label)
+	elif float(bearing) < 0.0 or float(bearing) >= 360.0:
+		out.append("%s: bearing_deg %s must be from 0 up to 360" % [label, bearing])
+	for i: int in (row["entrances"] as Array).size():
+		out.append_array(_entrance_problems(label, i, (row["entrances"] as Array)[i]))
+	return out
+
+
+static func _entrance_problems(label: String, index: int, entrance: Variant) -> Array[String]:
+	var out: Array[String] = []
+	if not entrance is Dictionary or not (entrance as Dictionary).has("zone") or not (entrance as Dictionary).has("at"):
+		out.append("%s: entrance %d must be {zone, at}" % [label, index])
+		return out
+	var spot: Dictionary = entrance
+	if not spot["zone"] is String or not ZoneData.has_zone(StringName(spot["zone"] as String)):
+		out.append("%s: entrance %d zone %s is not a zones.json id" % [label, index, spot["zone"]])
+	if spot["at"] != null:
+		out.append_array(_point_problems(label, "entrance %d at" % index, spot["at"]))
 	return out
 
 
@@ -263,7 +422,8 @@ static func _type_ok(value: Variant, want: int) -> bool:
 	return typeof(value) == want
 
 
-## A point is [x, z]: two numbers, inside the land.
+## A point is [x, z]: two numbers, inside the land (a marker, inside the edge
+## margin too).
 static func _point_problems(label: String, field: String, raw: Variant) -> Array[String]:
 	var out: Array[String] = []
 	if not raw is Array or (raw as Array).size() != 2:
@@ -273,10 +433,12 @@ static func _point_problems(label: String, field: String, raw: Variant) -> Array
 		if typeof(part) != TYPE_FLOAT and typeof(part) != TYPE_INT:
 			out.append("%s: %s must be two numbers" % [label, field])
 			return out
-	var limit: float = LAND_HALF_M - (EDGE_MARGIN_M if field == "marker" else 0.0)
+	var is_marker: bool = field == "marker"
+	var limit: float = LAND_HALF_M - (EDGE_MARGIN_M if is_marker else 0.0)
 	var p: Vector2 = _point(raw)
 	if absf(p.x) > limit or absf(p.y) > limit:
-		out.append("%s: %s (%s, %s) is outside the %d m land" % [label, field, p.x, p.y, int(limit * 2.0)])
+		var rule: String = "%d m land's %d m edge margin" % [int(LAND_HALF_M * 2.0), int(EDGE_MARGIN_M)] if is_marker else "%d m land" % int(LAND_HALF_M * 2.0)
+		out.append("%s: %s (%s, %s) is outside the %s" % [label, field, p.x, p.y, rule])
 	return out
 
 
@@ -296,37 +458,67 @@ static func _band_problems(label: String, raw: Variant) -> Array[String]:
 	return out
 
 
-## The rules that need the whole table: where the marker and the entrance fall,
-## what they sit on, and whether a biome's centre lies on its bearing.
+## The rules that need the whole table: zones claimed once, where every centre,
+## marker and entrance falls and what they sit on, and whether a biome's centre
+## lies on its bearing.
+static func _table_problems(table: Array[Dictionary]) -> Array[String]:
+	var out: Array[String] = []
+	var claimed: Dictionary = {}
+	var pads: Array[Dictionary] = []
+	for row: Dictionary in table:
+		var id: String = str(row["id"])
+		out.append_array(_place_problems(id, row, table))
+		for entrance: Dictionary in row["entrances"]:
+			var zone: String = str(entrance["zone"])
+			if claimed.has(zone):
+				out.append("%s: zone %s is also an entrance of %s" % [id, zone, claimed[zone]])
+			claimed[zone] = id
+		pads.append({"id": id, "at": _point(row["marker"])})
+	for i: int in pads.size():
+		for j: int in range(i + 1, pads.size()):
+			var a: Vector2 = pads[i]["at"]
+			var b: Vector2 = pads[j]["at"]
+			if absf(a.x - b.x) < PAD_HALF_M * 2.0 + PAD_CLEAR_M and absf(a.y - b.y) < PAD_HALF_M * 2.0 + PAD_CLEAR_M:
+				out.append("%s: marker is on the marker of %s" % [pads[i]["id"], pads[j]["id"]])
+	return out
+
+
 static func _place_problems(label: String, row: Dictionary, table: Array) -> Array[String]:
 	var out: Array[String] = []
 	var id := StringName(label)
 	var marker_at: Vector2 = _point(row["marker"])
-	if absf(marker_at.x) < PLOT_HALF_M + PLOT_CLEAR_M and absf(marker_at.y) < PLOT_HALF_M + PLOT_CLEAR_M:
-		out.append("%s: marker is on the farm plot" % label)
-	for spot: Vector3 in KNOWN_SPOTS:
-		if marker_at.distance_to(Vector2(spot.x, spot.y)) < spot.z:
-			out.append("%s: marker is within %s m of the known spot at (%s, %s)" % [label, spot.z, spot.x, spot.y])
-	if at_in(table, _point(row["centre"])) != id:
-		out.append("%s: its own centre falls in %s" % [label, at_in(table, _point(row["centre"]))])
+	out.append_array(pad_problems(label, "marker", marker_at))
+	var centre_at: Vector2 = _point(row["centre"])
+	for spot: Vector4 in spots():
+		if absf(centre_at.x - spot.x) < spot.z and absf(centre_at.y - spot.y) < spot.w:
+			out.append("%s: centre is on the thing at (%s, %s)" % [label, spot.x, spot.y])
+	if at_in(table, centre_at) != id:
+		out.append("%s: its own centre falls in %s" % [label, at_in(table, centre_at)])
 	if at_in(table, marker_at) != id:
 		out.append("%s: its marker falls in %s" % [label, at_in(table, marker_at)])
-	if row.get("entrance_at") != null and at_in(table, _point(row["entrance_at"])) != id:
-		out.append("%s: its entrance falls in %s" % [label, at_in(table, _point(row["entrance_at"]))])
+	for entrance: Dictionary in row["entrances"]:
+		if entrance["at"] == null:
+			continue
+		var at: Vector2 = _point(entrance["at"])
+		if at_in(table, at) != id:
+			out.append("%s: its %s entrance falls in %s" % [label, entrance["zone"], at_in(table, at)])
+		if absf(at.x - marker_at.x) < PAD_HALF_M + PAD_CLEAR_M and absf(at.y - marker_at.y) < PAD_HALF_M + PAD_CLEAR_M:
+			out.append("%s: marker is on its %s entrance" % [label, entrance["zone"]])
 	if str(row["role"]) != "hub":
-		var bearing: Variant = row.get("bearing_deg")
-		if bearing == null or (typeof(bearing) != TYPE_FLOAT and typeof(bearing) != TYPE_INT):
-			out.append("%s: a spoke or open biome needs a bearing_deg" % label)
-		else:
-			var from: Vector2 = _point(row["centre"])
-			var actual: float = fposmod(rad_to_deg(atan2(from.x, -from.y)), 360.0)
-			var gap: float = absf(fposmod(float(bearing) - actual + 180.0, 360.0) - 180.0)
-			if gap > BEARING_SLACK_DEG:
-				out.append("%s: bearing_deg %s is %d degrees off its centre's bearing %d" % [label, bearing, int(gap), int(actual)])
+		var actual: float = fposmod(rad_to_deg(atan2(centre_at.x, -centre_at.y)), 360.0)
+		var gap: float = absf(fposmod(float(row["bearing_deg"]) - actual + 180.0, 360.0) - 180.0)
+		if gap > BEARING_SLACK_DEG:
+			out.append("%s: bearing_deg %s is %d degrees off its centre's bearing %d" % [label, row["bearing_deg"], int(gap), int(actual)])
 	return out
 
 
 static func _point(raw: Variant) -> Vector2:
 	if raw is Array and (raw as Array).size() == 2:
-		return Vector2(float((raw as Array)[0]), float((raw as Array)[1]))
+		return Vector2(_number((raw as Array)[0]), _number((raw as Array)[1]))
 	return Vector2.ZERO
+
+
+## A number out of JSON, or 0 for anything else (null, text), so a reader never
+## trips on a bad value.
+static func _number(raw: Variant) -> float:
+	return float(raw) if typeof(raw) == TYPE_FLOAT or typeof(raw) == TYPE_INT else 0.0
