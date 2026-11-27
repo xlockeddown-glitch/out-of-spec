@@ -12,6 +12,7 @@ const TITLE: String = "CHARACTER AND TRACTOR"
 const ACTION: StringName = &"open_picker"
 const NAME_PROMPT: String = "NAME"
 const NAME_HINT: String = "Name your character"
+const RENAME_TEXT: String = "PAD"
 const APPLY_TEXT: String = "APPLY"
 const BACK_TEXT: String = "CLOSE"
 const NO_TRADE_OFF: String = "A look only. It does not change driving."
@@ -25,6 +26,8 @@ static var offer_next: bool = false
 
 var _parts: Dictionary = {}
 var _name_field: LineEdit
+var _rename_button: Button
+var _keyboard: PadKeyboard
 var _part_labels: Dictionary[StringName, Label] = {}
 var _trade_labels: Dictionary[StringName, Label] = {}
 var _prev_buttons: Dictionary[StringName, Button] = {}
@@ -89,7 +92,14 @@ func _ready() -> void:
 	_name_field.placeholder_text = NAME_HINT
 	_name_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_name_field.add_theme_font_size_override(&"font_size", 22)
+	_name_field.gui_input.connect(_on_name_field_input)
 	name_row.add_child(_name_field)
+	_rename_button = Button.new()
+	_rename_button.name = &"RenamePad"
+	_rename_button.text = RENAME_TEXT
+	_rename_button.add_theme_font_size_override(&"font_size", 20)
+	_rename_button.pressed.connect(open_keyboard)
+	name_row.add_child(_rename_button)
 	for slot: StringName in Loadout.SLOTS:
 		_add_row(rows, slot)
 	_note = PlanBoardUI._label("", ScopeTheme.CARD_INK_MUTED, 18)
@@ -113,6 +123,11 @@ func _ready() -> void:
 	_glyph = ScopeTheme.badge(&"ui_cancel")
 	_close_button.add_child(_glyph)
 	buttons.add_child(_close_button)
+	_keyboard = PadKeyboard.new()
+	_keyboard.text_changed.connect(_on_keyboard_text)
+	_keyboard.finished.connect(_on_keyboard_finished)
+	_keyboard.cancelled.connect(_on_keyboard_cancelled)
+	add_child(_keyboard)
 	hide()
 	if offer_next:
 		offer_next = false
@@ -162,6 +177,8 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _keyboard != null and _keyboard.visible:
+		return
 	var key := event as InputEventKey
 	var toggled: bool = event.is_action_pressed(ACTION)
 	if not visible:
@@ -196,6 +213,8 @@ func open() -> void:
 
 ## Hides the picker and gives the focus back to what had it before open().
 func close() -> void:
+	if _keyboard != null and _keyboard.visible:
+		_keyboard.close()
 	if visible:
 		RoverController.input_blocked = _blocked_before
 	hide()
@@ -217,10 +236,43 @@ func _exit_tree() -> void:
 
 ## Moves a slot to the next part (step 1) or the one before (step -1), wrapping round.
 func cycle(slot: StringName, step: int) -> void:
+	if _keyboard != null and _keyboard.visible:
+		return
 	var count: int = Loadout.parts_of(slot).size()
 	var at: int = Loadout.index_of(slot, _parts.get(slot, ""))
 	_parts[slot] = Loadout.parts_of(slot)[posmod(at + step, count)]["id"]
 	_show_parts()
+
+
+## Opens the on-screen pad keyboard for the character name field.
+func open_keyboard() -> void:
+	if _keyboard == null or not visible:
+		return
+	_keyboard.open(_name_field.text, Loadout.MAX_NAME)
+
+
+func _on_name_field_input(event: InputEvent) -> void:
+	if not visible or (_keyboard != null and _keyboard.visible):
+		return
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed and (event as InputEventJoypadButton).button_index == JOY_BUTTON_A:
+		get_viewport().set_input_as_handled()
+		open_keyboard()
+
+
+func _on_keyboard_text(value: String) -> void:
+	_name_field.text = value
+
+
+func _on_keyboard_finished(value: String) -> void:
+	_name_field.text = value
+	if is_inside_tree() and visible:
+		_next_buttons[Loadout.SLOTS[0]].grab_focus()
+
+
+func _on_keyboard_cancelled() -> void:
+	_name_field.text = _keyboard.text()
+	if is_inside_tree() and visible:
+		_next_buttons[Loadout.SLOTS[0]].grab_focus()
 
 
 ## The part ids as picked now.
