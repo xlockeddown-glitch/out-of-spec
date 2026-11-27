@@ -186,3 +186,30 @@ func test_tunnel_builds_deterministically_respects_lights_and_follows_trip_end()
 	GameState.shuttle_trips = held_trips
 	GameClock.elapsed_days = held_clock
 	return problem
+
+
+func test_walker_follows_loadout_changes() -> String:
+	var held_loadouts: Dictionary = GameState.player_loadouts.duplicate(true)
+	GameState.player_loadouts = {}
+	var tunnel: PhobosServiceTunnel = _open(PhobosServiceTunnel.SCENE_PATH) as PhobosServiceTunnel
+	var bare: int = _count_type(tunnel.walker.model, "MeshInstance3D")
+	var problem: String = ""
+	var err: String = GameState.set_loadout("", Loadout.encode({
+		Loadout.HEAD: &"sun_brim_hat",
+		Loadout.UPPER: &"botanist_field_vest",
+		Loadout.LOWER: &"thermal_basalt_greaves",
+	}))
+	var worn: int = _count_type(tunnel.walker.model, "MeshInstance3D")
+	GameState.player_loadouts = {}
+	GameState.loadouts_changed.emit()
+	var back: int = _count_type(tunnel.walker.model, "MeshInstance3D")
+	_drop(tunnel)
+	GameState.loadouts_changed.emit()
+	GameState.player_loadouts = held_loadouts
+	if err != "":
+		problem = "set_loadout failed unexpectedly: '%s'" % err
+	elif worn <= bare:
+		problem = "Walker model did not show new loadout parts (%d -> %d meshes)." % [bare, worn]
+	elif back != bare:
+		problem = "Walker model did not clear loadout parts back to default (%d vs %d meshes)." % [back, bare]
+	return problem

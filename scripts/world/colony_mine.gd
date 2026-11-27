@@ -17,6 +17,7 @@ const ARCH_HEIGHT_M: float = 2.2
 ## The rooms shored when this scene was built; shoring one builds it again.
 var _built_shored: Array = []
 var _rockfalls: Node3D
+var _decor: Node3D
 
 
 func _zone_id() -> String:
@@ -34,64 +35,72 @@ func _build_zone() -> void:
 	_rockfalls = Node3D.new()
 	_rockfalls.name = "Rockfalls"
 	_rover.get_parent().add_child(_rockfalls)
+	_decor = Node3D.new()
+	_decor.name = "MineDecor"
+	_rover.get_parent().add_child(_decor)
 	if _below:
 		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
 		for fall: Dictionary in ZoneDepth.local_layout.get("rockfalls", []):
 			_draw_rockfall(fall)
+		_build_depth_decor()
 		GameState.finds_changed.connect(_on_finds_changed)
 	else:
 		_depth_props.build_hatch()
 		_draw_crate()
 		_draw_sign()
+		_build_hub_decor()
 
 
-## A rockfall: a rubble pile in the side room's mouth; once shored, a timber support arch
-## stands there instead and the room is open [PLACEHOLDER].
+## Hub dressing: old timber sets along the passages, a short abandoned rail
+## track, dead hanging lamps, and a faded colony stencil sign (visual only,
+## zero collision, rover path clear) [PLACEHOLDER].
+func _build_hub_decor() -> void:
+	MineLook.add_timber_set(_decor, Vector3(-1.5, 0.0, 24.8), 7.8, 3.0, 0.0, true)
+	MineLook.add_timber_set(_decor, Vector3(-1.5, 0.0, 13.5), 7.8, 3.0, 0.0, true)
+	MineLook.add_timber_set(_decor, Vector3(-1.5, 0.0, 7.5), 7.8, 3.0, 0.0, false)
+	MineLook.add_timber_set(_decor, Vector3(-4.5, 0.0, 3.0), 5.4, 2.9, 90.0, true)
+	MineLook.add_rail_track(_decor, Vector3(-1.5, 0.0, 16.5), 10.5, 0.0, true)
+	MineLook.add_stencil_sign(_decor, Vector3(2.4, 0.0, 23.4), "COLONY MINE 01", "ORE DRIFT // KEEP CLEAR", -90.0)
+
+
+## Depth 1 dressing: timber sets along the main north-south trunk, a short
+## abandoned rail track, dead hanging lamps, and a faded stencil sign tucked
+## against the landing wall (visual only, zero collision) [PLACEHOLDER].
+func _build_depth_decor() -> void:
+	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, 7.5), 5.4, 2.9, 0.0, true)
+	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, -1.5), 5.4, 2.9, 0.0, false)
+	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, -10.5), 5.4, 2.9, 0.0, true)
+	MineLook.add_rail_track(_decor, Vector3(0.0, 0.0, -1.5), 15.0, 0.0, true)
+	MineLook.add_stencil_sign(_decor, Vector3(9.6, 0.0, 13.5), "LEVEL 01 DRIFT", "SHORE BEFORE ENTRY", -90.0)
+
+
+## A rockfall: an ore-stained rubble pile in the side room's mouth; once shored,
+## a wedged mine timber arch stands there instead and the room is open [PLACEHOLDER].
 func _draw_rockfall(fall: Dictionary) -> void:
 	var at: Vector3 = MineDepth.rockfall_position(fall)
 	var id: String = str(fall["id"])
 	if bool(fall["shored"]):
-		TunnelLook.add_support_arch(_rockfalls, at, ARCH_SPAN_M, ARCH_HEIGHT_M)
+		MineLook.add_shored_arch(_rockfalls, at, ARCH_SPAN_M, ARCH_HEIGHT_M)
 		_rockfalls.add_child(TunnelLook.label("%s SHORED" % id.to_upper(), at + Vector3(0.0, 2.7, 0.0), TunnelLook.CRYSTAL))
 	else:
-		TunnelLook.add_rubble_pile(_rockfalls, at, RUBBLE_SCALE)
+		MineLook.add_mine_rubble(_rockfalls, at, RUBBLE_SCALE)
 		_rockfalls.add_child(TunnelLook.label("%s ROCKFALL" % id.to_upper(), at + Vector3(0.0, 1.9, 0.0), TunnelLook.BROKEN_RED))
 
 
-## The crate that sells shoring props: a timber pallet, a steel-framed crate of props, a
-## stack of spare posts and a label [PLACEHOLDER].
+## The crate that sells shoring props: a weathered timber pallet, rust-strapped
+## mine crate, spare shoring posts and wedges, and a label [PLACEHOLDER].
 func _draw_crate() -> void:
-	var crate := Node3D.new()
-	crate.name = "PropCrate"
-	crate.position = MineDepth.crate_position()
-	_depth_props.add_child(crate)
-	var dark_mat: Material = TunnelLook.flat_mat(TunnelLook.BASALT_DARK)
-	var steel_mat: Material = TunnelLook.flat_mat(TunnelLook.STEEL)
-	var body_mat: Material = TunnelLook.flat_mat(TunnelLook.REGOLITH_DARK)
-	var wood_mat: Material = TunnelLook.flat_mat(TunnelLook.TIMBER)
-	var light_wood_mat: Material = TunnelLook.flat_mat(TunnelLook.TIMBER_LIGHT)
-
-	for z_off: float in [-0.36, 0.36]:
-		crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.38, 0.08, 0.16)), Vector3(0.0, 0.04, z_off), dark_mat))
-	crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.42, 0.06, 1.04)), Vector3(0.0, 0.11, 0.0), wood_mat))
-	crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.16, 0.62, 0.84)), Vector3(0.0, 0.45, 0.0), body_mat))
-	for sx: float in [-0.57, 0.57]:
-		for sz: float in [-0.41, 0.41]:
-			crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.10, 0.70, 0.10)), Vector3(sx, 0.46, sz), steel_mat))
-	# Spare posts laid across the top, one of them cross-braced.
-	for i: int in 3:
-		crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.14, 0.14, 1.1)), Vector3(-0.36 + 0.36 * float(i), 0.87, 0.0),
-				light_wood_mat if i == 1 else wood_mat))
-	crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.1, 0.06, 0.12)), Vector3(0.0, 0.97, 0.0), steel_mat))
-	crate.add_child(TunnelLook.label("PROP CRATE", Vector3(0.0, 1.55, 0.0), TunnelLook.CRYSTAL))
+	_depth_props.add_child(MineLook.build_prop_crate(MineDepth.crate_position()))
 
 
-## The notice board: the Lava hub's, with Bram's notice for later [PLACEHOLDER].
+## The notice board: the Lava hub's with mine-weathered trim and Bram's notice
+## for later [PLACEHOLDER].
 func _draw_sign() -> void:
 	var board: Node3D = LavaHubProps.board_node("Bram: [later]")
 	board.name = "NoticeSign"
 	board.position = MineDepth.sign_position()
 	_depth_props.add_child(board)
+	MineLook.add_sign_trim(board)
 
 
 func _process(_delta: float) -> void:

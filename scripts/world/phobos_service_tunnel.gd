@@ -85,6 +85,11 @@ func _ready() -> void:
 	_seen_trip = _has_trip()
 
 
+func _exit_tree() -> void:
+	if GameState.loadouts_changed.is_connected(_dress_walker):
+		GameState.loadouts_changed.disconnect(_dress_walker)
+
+
 func _input(event: InputEvent) -> void:
 	# Block Tab farm/dome swap while inside the Phobos service tunnel.
 	if event.is_action_pressed(&"swap_scene"):
@@ -347,10 +352,17 @@ func _build_walker() -> void:
 	walker.camera = camera
 	add_child(walker)
 	walker.position = ARRIVE_AT
-	walker.model.set_suit(WalkerModel.suit_for(GameState.local_player_id, CoopSession.players))
-	walker.model.set_loadout(GameState.loadout_of()["parts"])
+	_dress_walker()
+	GameState.loadouts_changed.connect(_dress_walker)
 	camera.target = walker
 	camera.current = true
+
+
+func _dress_walker() -> void:
+	if walker == null or walker.model == null:
+		return
+	walker.model.set_suit(WalkerModel.suit_for(GameState.local_player_id, CoopSession.players))
+	walker.model.set_loadout(GameState.loadout_of()["parts"])
 
 
 func _build_hud() -> void:
