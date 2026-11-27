@@ -16,7 +16,8 @@ func _scene_fissures() -> Dictionary:
 	return out
 
 
-## Every cell a point touches, dug one step (a point sits as low as its lowest cell).
+## Every cell a point touches, dug one step. A point's height uses the shallowest
+## cell touching it, so all of them have to be dug for the point to drop.
 func _dug_around(at: Vector2) -> Dictionary[Vector2i, int]:
 	var dug: Dictionary[Vector2i, int] = {}
 	var middle := Vector2i(floori(at.x / Terrain.CELL_M), floori(at.y / Terrain.CELL_M))
@@ -76,6 +77,10 @@ func test_the_scene_spots_hold_the_fissures_so_the_copy_cannot_drift() -> String
 				has = true
 		if not has:
 			return "%s at %s is not in BiomeData.SCENE_SPOTS" % [id, at]
+	# And the other way: every 1.5 m square spot in the Badlands is a fissure that is in the scene.
+	for spot: Vector4 in spots:
+		if spot.z == 1.5 and spot.w == 1.5 and BiomeData.biome_at(Vector2(spot.x, spot.y)) == &"badlands" and not found.values().has(Vector2(spot.x, spot.y)):
+			return "SCENE_SPOTS has a fissure row at (%s, %s) that is not in the scene" % [spot.x, spot.y]
 	return ""
 
 
@@ -104,7 +109,7 @@ func test_a_fissure_sits_on_the_ground_even_over_old_digging() -> String:
 		var dug: Dictionary[Vector2i, int] = _dug_around(found[id])
 		var flat: float = OreFissure.ground_y(at, none)
 		var lower: float = OreFissure.ground_y(at, dug)
-		if not is_equal_approx(flat, Terrain.height(found[id], none)):
+		if not is_equal_approx(flat, HillDressing.lowest_under(found[id], Vector2.ONE * OreFissure.FOOTPRINT_HALF_M, none)):
 			return "%s is not on the natural ground" % id
 		if dug.is_empty() or not lower < flat:
 			return "%s did not drop onto its dug ground (%s, %s)" % [id, flat, lower]
@@ -145,3 +150,91 @@ func test_an_old_save_with_mined_fissures_and_digging_at_a_fissure_loads_the_sam
 	source.free()
 	target.free()
 	return problem
+
+
+## The real fissure nodes, from the farm scene, put in the tree. Returns [holder, fissures].
+func _live_fissures() -> Array:
+	var scene: Node = (load("res://scenes/main_farm.tscn") as PackedScene).instantiate()
+	var parent: Node = scene.find_child("Fissures")
+	var fissures: Array = []
+	var holder: Node3D = null
+	if parent != null:
+		# Move just the fissures into the tree, so the rest of the farm does not run.
+		holder = Node3D.new()
+		holder.name = "FissureTestHolder"
+		(Engine.get_main_loop() as SceneTree).root.add_child(holder)
+		for child: Node in parent.get_children():
+			parent.remove_child(child)
+			holder.add_child(child)
+			fissures.append(child)
+	scene.free()
+	return [holder, fissures]
+
+
+func test_every_child_of_fissures_is_an_ore_fissure_that_settles_in_ready() -> String:
+	var live: Array = _live_fissures()
+	var holder: Node = live[0]
+	if holder == null:
+		return "The scene has no Fissures node"
+	var problem: String = ""
+	var fissures: Array = live[1]
+	if fissures.size() != GameState.FISSURES.size():
+		problem = "Found %d nodes under Fissures, expected %d" % [fissures.size(), GameState.FISSURES.size()]
+	for node: Node in fissures:
+		if problem != "":
+			break
+		if not node is OreFissure:
+			problem = "%s under Fissures is not an OreFissure" % node.name
+			break
+		var fissure := node as OreFissure
+		var at: Vector3 = fissure.global_position
+		var want: float = OreFissure.ground_y(at, GameState.dug)
+		if not is_equal_approx(at.y, want):
+			problem = "%s did not settle in _ready (y %s, ground %s)" % [fissure.name, at.y, want]
+	holder.get_parent().remove_child(holder)
+	holder.free()
+	return problem
+
+
+func test_a_fissure_follows_the_ground_when_the_terrain_changes() -> String:
+	var live: Array = _live_fissures()
+	var holder: Node = live[0]
+	if holder == null:
+		return "The scene has no Fissures node"
+	var fissure: OreFissure = null
+	for node: Node in live[1]:
+		if node.name == &"FissureC":
+			fissure = node as OreFissure
+	var problem: String = ""
+	if fissure == null:
+		problem = "No FissureC"
+	else:
+		var saved: Dictionary[Vector2i, int] = GameState.dug.duplicate()
+		var before: float = fissure.global_position.y
+		var spot := Vector2(fissure.global_position.x, fissure.global_position.z)
+		GameState.dug = _dug_around(spot)
+		GameState.terrain_changed.emit()
+		var dropped: float = fissure.global_position.y
+		GameState.dug = saved
+		GameState.terrain_changed.emit()
+		var back: float = fissure.global_position.y
+		if not dropped < before:
+			problem = "FissureC did not drop after the cells under it were dug (%s, %s)" % [before, dropped]
+		elif not is_equal_approx(back, before):
+			problem = "FissureC did not come back up after the digging was undone (%s, %s)" % [before, back]
+	holder.get_parent().remove_child(holder)
+	holder.free()
+	return problem
+
+
+func test_a_fissure_sits_on_the_lowest_ground_under_its_footprint() -> String:
+	var none: Dictionary[Vector2i, int] = {}
+	for id: StringName in _scene_fissures():
+		var at: Vector2 = _scene_fissures()[id]
+		var y: float = OreFissure.ground_y(Vector3(at.x, 0.0, at.y), none)
+		for x: int in range(-1, 2):
+			for z: int in range(-1, 2):
+				var corner: Vector2 = at + Vector2(x, z) * OreFissure.FOOTPRINT_HALF_M
+				if y > Terrain.height(corner, none) + 0.0001:
+					return "%s hangs above the ground at its corner %s" % [id, corner]
+	return ""

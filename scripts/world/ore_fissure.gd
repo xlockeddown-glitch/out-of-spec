@@ -9,6 +9,8 @@ const MODEL_PATH: String = "res://assets/voxels/ore_fissure.glb"
 const MINE_RADIUS_M: float = 2.0
 ## One voxel = 0.2 m (docs/art/voxel_models.md): 8 voxels across = 1.6 m.
 const MODEL_SCALE: float = 0.2
+## Half of that 1.6 m.
+const FOOTPRINT_HALF_M: float = 0.8
 
 @export var fissure_id: StringName = &""
 
@@ -39,12 +41,14 @@ func is_in_reach(world_pos: Vector3) -> bool:
 ## Sits on the ground as it is, with any digging (a fissure's spot is on the
 ## hills now, and an old save may have dug cells there). The scene's y is 0.
 func _settle() -> void:
-	position.y = ground_y(position, GameState.dug)
+	var at: Vector3 = global_position
+	global_position = Vector3(at.x, ground_y(at, GameState.dug), at.z)
 
 
-## The ground height under a fissure at `at` (its x and z), given the digging.
+## The lowest ground under a fissure's 1.6 m footprint at `at` (its x and z),
+## given the digging, so no corner hangs in the air over a slope or a dug cell.
 static func ground_y(at: Vector3, dug: Dictionary[Vector2i, int]) -> float:
-	return Terrain.height(Vector2(at.x, at.z), dug)
+	return HillDressing.lowest_under(Vector2(at.x, at.z), Vector2.ONE * FOOTPRINT_HALF_M, dug)
 
 
 func _refresh() -> void:
@@ -62,7 +66,6 @@ func _build_visual() -> Node3D:
 				loaded.free()
 		if model != null:
 			model.scale = Vector3.ONE * MODEL_SCALE
-			model.position.y = 0.02  # lift off the ground plane (no z-fighting)
 			ModelSlot.apply_emission(model)
 			return model
 		push_warning("OreFissure: %s is not a scene; using greybox." % MODEL_PATH)
