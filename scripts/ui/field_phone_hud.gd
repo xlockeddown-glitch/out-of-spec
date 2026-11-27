@@ -13,10 +13,18 @@ signal buy_standard_pressed(standard_id: String)
 ## An ACCEPT button on the job board (paid calibration jobs).
 signal accept_job_pressed(index: int)
 
+## How big the phone is, as a fraction of its original size. Fonts, fixed
+## sizes, margins and the width all follow this one number.
+const PHONE_SCALE: float = 0.8 # [PLACEHOLDER] Ryan: 20 % smaller
+## The phone's width on the screen before PHONE_SCALE (0.32 of the screen).
+const BASE_WIDTH_FRACTION: float = 0.32
+## Where the phone starts, as a fraction of the screen width. The world view
+## and the panels beside the phone end here.
+const LEFT_ANCHOR: float = 1.0 - BASE_WIDTH_FRACTION * PHONE_SCALE
 const MAX_LOG_LINES: int = 8
 ## Tallest the job list grows before it scrolls, px.
-const JOBS_MAX_HEIGHT: float = 130.0 # [PLACEHOLDER] room for three offers
-## The dispatch log always keeps room for this many lines, px.
+const JOBS_MAX_HEIGHT: float = 130.0 # before PHONE_SCALE; [PLACEHOLDER] room for three offers
+## The dispatch log always keeps room for this many lines, px (before PHONE_SCALE).
 const LOG_MIN_HEIGHT: float = 80.0
 const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
 const COLOR_BAR_OFF := Color(0.14, 0.22, 0.2)
@@ -62,7 +70,19 @@ var _jobs_scroll: ScrollContainer
 @onready var _trade_button: Button = %TradeButton
 
 
+## A size in px at the phone's scale.
+static func scaled(base: float) -> float:
+	return roundf(base * PHONE_SCALE)
+
+
+## A font size at the phone's scale.
+static func scaled_font(base: int) -> int:
+	return roundi(base * PHONE_SCALE)
+
+
 func _ready() -> void:
+	anchor_left = LEFT_ANCHOR
+	_scale_scene_nodes(self)
 	_zero_button.pressed.connect(func() -> void: zero_steering_pressed.emit())
 	_slot_spool_button.pressed.connect(func() -> void: slot_spool_pressed.emit())
 	_dome_button.pressed.connect(func() -> void: enter_dome_pressed.emit())
@@ -70,18 +90,18 @@ func _ready() -> void:
 	_wheels_button = Button.new()
 	_wheels_button.name = "WheelServiceButton"
 	_wheels_button.focus_mode = Control.FOCUS_NONE
-	_wheels_button.custom_minimum_size = Vector2(0, 40)
-	_wheels_button.add_theme_font_size_override("font_size", 15)
+	_wheels_button.custom_minimum_size = Vector2(0, scaled(40.0))
+	_wheels_button.add_theme_font_size_override("font_size", scaled_font(15))
 	_wheels_button.pressed.connect(func() -> void: wheel_service_pressed.emit())
 	_bram_panel.add_child(_wheels_button)
 	_standards_box = VBoxContainer.new()
 	_standards_box.name = "StandardsBox"
 	_bram_panel.add_child(_standards_box)
 	_log_label.text = ""
-	_log_label.custom_minimum_size.y = LOG_MIN_HEIGHT
+	_log_label.custom_minimum_size.y = scaled(LOG_MIN_HEIGHT)
 	_credibility_label = Label.new()
 	_credibility_label.name = "CredibilityLabel"
-	_credibility_label.add_theme_font_size_override("font_size", 16)
+	_credibility_label.add_theme_font_size_override("font_size", scaled_font(16))
 	_credibility_label.add_theme_color_override("font_color", COLOR_OK)
 	# A long contract line wraps rather than widening the phone off the screen.
 	_credibility_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -110,6 +130,31 @@ func _ready() -> void:
 	clock_row.get_parent().add_child(_jobs_scroll)
 	clock_row.get_parent().move_child(_jobs_scroll, _gauge_label.get_index() + 1)
 	_jobs_box.minimum_size_changed.connect(_fit_jobs_scroll)
+
+
+## Scales what the scene file sets by hand (written at the original size):
+## fonts, fixed sizes, gaps, the bezel inset and the case margins.
+func _scale_scene_nodes(node: Node) -> void:
+	if node is Control:
+		var control: Control = node
+		if control.has_theme_font_size_override("font_size"):
+			control.add_theme_font_size_override("font_size", scaled_font(control.get_theme_font_size("font_size")))
+		control.custom_minimum_size = Vector2(scaled(control.custom_minimum_size.x), scaled(control.custom_minimum_size.y))
+		if control.name == &"Bezel":
+			control.offset_left = scaled(control.offset_left)
+			control.offset_top = scaled(control.offset_top)
+			control.offset_right = -scaled(-control.offset_right)
+			control.offset_bottom = -scaled(-control.offset_bottom)
+		if control.has_theme_constant_override("separation"):
+			control.add_theme_constant_override("separation", roundi(scaled(control.get_theme_constant("separation"))))
+		if control.has_theme_stylebox_override("panel"):
+			# Copied first: the scene's style is shared by every phone.
+			var box: StyleBox = control.get_theme_stylebox("panel").duplicate()
+			for side: Side in [SIDE_LEFT, SIDE_TOP, SIDE_RIGHT, SIDE_BOTTOM]:
+				box.set_content_margin(side, scaled(box.get_content_margin(side)))
+			control.add_theme_stylebox_override("panel", box)
+	for child: Node in node.get_children():
+		_scale_scene_nodes(child)
 
 
 func configure(relay_name: String, mpe_deg: float, acceptance_ratio: float) -> void:
@@ -228,7 +273,7 @@ func show_standards(offers: Array[Dictionary], note: String) -> void:
 			var label := Label.new()
 			label.text = note
 			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-			label.add_theme_font_size_override("font_size", 14)
+			label.add_theme_font_size_override("font_size", scaled_font(14))
 			label.add_theme_color_override("font_color", Color(0.4, 0.7, 0.45))
 			_standards_box.add_child(label)
 		return
@@ -237,8 +282,8 @@ func show_standards(offers: Array[Dictionary], note: String) -> void:
 		button.text = str(offer["text"])
 		button.disabled = bool(offer["disabled"])
 		button.focus_mode = Control.FOCUS_NONE
-		button.custom_minimum_size = Vector2(0, 40)
-		button.add_theme_font_size_override("font_size", 15)
+		button.custom_minimum_size = Vector2(0, scaled(40.0))
+		button.add_theme_font_size_override("font_size", scaled_font(15))
 		var id: String = str(offer["id"])
 		button.pressed.connect(func() -> void: buy_standard_pressed.emit(id))
 		_standards_box.add_child(button)
@@ -257,7 +302,7 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 		var label := Label.new()
 		label.text = "\n".join(lines)
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.add_theme_font_size_override("font_size", 14)
+		label.add_theme_font_size_override("font_size", scaled_font(14))
 		label.add_theme_color_override("font_color", COLOR_OK)
 		_jobs_box.add_child(label)
 	# Offers you can accept come first; `index` stays the board's own.
@@ -275,7 +320,7 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 		button.tooltip_text = str(offers[i].get("tooltip", ""))
 		button.focus_mode = Control.FOCUS_NONE
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		button.add_theme_font_size_override("font_size", 13)
+		button.add_theme_font_size_override("font_size", scaled_font(13))
 		var index: int = i
 		button.pressed.connect(func() -> void: accept_job_pressed.emit(index))
 		_jobs_box.add_child(button)
@@ -283,13 +328,13 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 
 ## As tall as the job list, up to JOBS_MAX_HEIGHT; it scrolls beyond that.
 func _fit_jobs_scroll() -> void:
-	_jobs_scroll.custom_minimum_size.y = minf(_jobs_box.get_combined_minimum_size().y, JOBS_MAX_HEIGHT)
+	_jobs_scroll.custom_minimum_size.y = minf(_jobs_box.get_combined_minimum_size().y, scaled(JOBS_MAX_HEIGHT))
 
 
 func hide_bram() -> void:
 	_bram_panel.visible = false
 	_jobs_scroll.visible = true
-	_log_label.custom_minimum_size.y = LOG_MIN_HEIGHT
+	_log_label.custom_minimum_size.y = scaled(LOG_MIN_HEIGHT)
 
 
 func push_log(line: String) -> void:

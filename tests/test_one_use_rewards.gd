@@ -251,10 +251,36 @@ func test_data_rejects_a_bad_one_use_reward() -> String:
 	return ""
 
 
+func test_data_knows_the_lab_sitter_reward_and_checks_a_reward_row() -> String:
+	var farm_quest: Dictionary = _quest(FARM_Q, "farm", { "one_use": "lab_sitter" })
+	if QuestEngine.data_problem(farm_quest) != "":
+		return "A farm quest may pay the lab sitter's day: %s" % QuestEngine.data_problem(farm_quest)
+	if QuestEngine.data_problem(_quest(OWN_Q, "player", { "one_use": "lab_sitter" })) == "":
+		return "A player's own quest must not pay the farm's lab sitter day."
+	if QuestEngine.one_use_problem("lab_sitter") != "" or QuestEngine.one_use_problem("bram_discount_10") != "":
+		return "The shipped rows are right: %s, %s" % [QuestEngine.one_use_problem("lab_sitter"), QuestEngine.one_use_problem("bram_discount_10")]
+	if QuestEngine.one_use_problem("nope") == "":
+		return "A reward the data does not have is a problem."
+	var table: Dictionary = DataManager._records[&"quests"]
+	var shipped: Dictionary = table["one_use_rewards"]
+	var base: Dictionary = (shipped[&"lab_sitter"] as Dictionary).duplicate()
+	var problems: Array[String] = []
+	for change: Dictionary in [{ "pct": 10 }, { "holder": "player" }, { "holder": "crew" }, { "pct": 150 }]:
+		var bad: Dictionary = base.duplicate()
+		bad.merge(change, true)
+		table["one_use_rewards"] = { &"lab_sitter": bad }
+		if QuestEngine.one_use_problem("lab_sitter") == "":
+			problems.append("A bad lab_sitter row was accepted: %s" % [change])
+	table["one_use_rewards"] = shipped
+	return "; ".join(problems)
+
+
 func test_shipped_data_has_both_rewards_and_the_pocket_watch() -> String:
-	for id: String in ["bram_discount_10", "free_lab_refit"]:
+	for id: String in ["bram_discount_10", "free_lab_refit", "lab_sitter"]:
 		if not QuestEngine.has_one_use(id) or QuestEngine.one_use_name(id) == "" or QuestEngine.one_use_held_line(id) == "" or QuestEngine.one_use_used_line(id) == "":
 			return "The data has %s with its name and two lines." % id
+	if not QuestEngine.one_use_of_farm("lab_sitter") or QuestEngine.one_use_pct("lab_sitter") != 0:
+		return "The lab sitter's day is the farm's and takes no percent."
 	if not QuestEngine.one_use_of_farm("free_lab_refit") or QuestEngine.one_use_of_farm("bram_discount_10") or QuestEngine.one_use_pct("bram_discount_10") != 10:
 		return "The refit is the farm's; the discount is a player's, 10 percent."
 	if QuestEngine.keepsake_name("pocket_watch") == "" or QuestEngine.keepsake_text("pocket_watch") == "" or QuestEngine.keepsake_name("felt_lined_case") == "":
