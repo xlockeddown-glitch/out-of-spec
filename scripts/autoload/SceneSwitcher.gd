@@ -81,10 +81,14 @@ func reconcile_trip() -> String:
 	return to
 
 
-## Like swap_to, but after a swap in progress instead of not at all.
+## Like swap_to, but after a swap in progress instead of not at all; nothing if that swap
+## (or an earlier go_to) already brought this screen to `path`, so two asks load it once.
 func go_to(path: String) -> void:
 	while _busy:
 		await scene_swapped
+	var current: Node = get_tree().current_scene
+	if current != null and current.scene_file_path == path:
+		return
 	swap_to(path)
 
 

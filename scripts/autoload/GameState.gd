@@ -3637,7 +3637,8 @@ func _settle_trips_on_load() -> void:
 		elif TunnelRecall.closed(GameClock.elapsed_days) or GameClock.elapsed_days >= float(shuttle_trips[id]["ends_at"]):
 			var moon: String = str(shuttle_trips[id]["moon"])
 			shuttle_trips.erase(id)
-			_stand_at_pad(id)
+			# No walker is stood: farm_loaded (below, in farm_from_dict) has CoopWalkers
+			# forget everyone, so the host opens at the farm in the rover, as on any load.
 			post_phone(Shuttle.text("trip_over_text") % Shuttle.moon_name(moon))
 		else:
 			player_places[id] = [str(shuttle_trips[id]["moon"]), 0]

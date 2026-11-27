@@ -139,7 +139,7 @@ func _on_book(moon: String) -> void:
 func _enter_hub(moon: String) -> void:
 	var hub: String = ZoneData.hub_scene(StringName(moon))
 	var current: Node = get_tree().current_scene if is_inside_tree() else null
-	if hub == "" or SceneSwitcher.is_busy() or (current != null and current.scene_file_path == hub):
+	if hub == "" or (current != null and current.scene_file_path == hub):
 		return
 	if change_scene.is_valid():
 		change_scene.call(hub)
