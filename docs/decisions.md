@@ -2,6 +2,16 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: The "Meridiani Scope" look, part 1 (feat/scope-ui)
+
+Ryan's pick from three mockups, applied to the calibration bench and the quest board only. The field phone and every other screen are untouched. Every colour and number is a [PLACEHOLDER].
+
+- **One theme, built in code:** `ScopeTheme.theme()` (`scripts/ui/scope_theme.gd`), no `.tres`, so each colour is one const. Shell, header, glass and card as theme type variations; buttons in normal, hover, pressed, focus and disabled; one big teal focus ring (5 px, glow). Godot's default font, no font files. The optional glass shader is skipped.
+- **Verdict colours:** teal in tolerance, amber guard band or indeterminate or a broken chain, red only out of tolerance (`DriftingSensor.band_color`).
+- **Bench:** `BandMeter` is a vernier scale (ticks, amber shoulders, needle with diamond ends) with the same API and numbers; the needle settles over 0.3 s. The chain is chips, so `StandardLabel` no longer holds the "Chain" text (one traceability test reads the chips now). The panel opens in 0.12 s.
+- **Pad glyphs** are a separate badge Label on each button, shown only when the pad is the shown device, so button texts are unchanged.
+- **Quest board:** open quests are focusable cards in a scroll list. A NEW tag marks a quest not seen before, from a local-only set (`QuestSeen`, `user://quests_seen.cfg`, keyed by farm seed, quest id and, for a daily ask, the day). It is not in the farm save, not sent, and no protocol change. Closing the board marks what it showed as seen.
+
 ## 2026-11-27: The Phobos hub and the trip (zones step 17, first half)
 
 Phobos is playable; Deimos is the next PR. Every number, shape and line is a [PLACEHOLDER]. No low-gravity physics yet, and no new species, finds or quest: the escapee hook is a station log line and one sign to inspect.

@@ -64,12 +64,19 @@ const STEADY_HOLD_MARGINAL: String = "%s; without it TUR %s:1, marginal, under %
 @onready var _close_button: Button = %CloseButton
 @onready var _careful_check: CheckButton = %CarefulCheck
 @onready var _game_option: OptionButton = %GameOption
+@onready var _found_col: PanelContainer = %FoundCol
+@onready var _left_col: PanelContainer = %LeftCol
+@onready var _result_plate: PanelContainer = %ResultPlate
+@onready var _chain_row: HFlowContainer = %ChainRow
+@onready var _seal: Control = %Seal
 @onready var _zero_game: SetTheZero = %ZeroGame
 @onready var _hold_game: HoldTheReading = %HoldGame
 
 
 func _ready() -> void:
 	add_to_group(QuestsUI.MODAL_GROUP)
+	theme = ScopeTheme.theme()
+	_dress()
 	hide()
 	_rebuild_list()
 	_instrument_option.item_selected.connect(_on_row_picked)
@@ -111,12 +118,79 @@ func open(instrument_id: String = "hygrometer") -> void:
 	_rebuild_list()
 	_show_game_choices()
 	show()
+	_open_animation()
 	var index: int = maxi(_ids.find(instrument_id), 0)
 	_instrument_option.select(index)
 	_on_instrument_selected(index)
 	# So the pad's D-pad and A work without a mouse.
 	_bench_focus(true)
 	_instrument_option.grab_focus()
+
+
+## What the scope look adds that the scene does not hold: the seal on the bezel
+## and the pad glyphs on the three buttons (shown only on a pad).
+func _dress() -> void:
+	var stamp: PanelContainer = ScopeTheme.chip("OIRM", ScopeTheme.TERRA_DARK, ScopeTheme.TERRA_DARK, 18)
+	stamp.add_theme_stylebox_override(&"panel", ScopeTheme.box(ScopeTheme.ENAMEL_TOP, ScopeTheme.TERRA_DARK, 3, 4, 6))
+	stamp.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_seal.add_child(stamp)
+	_seal.pivot_offset = _seal.custom_minimum_size * 0.5
+	_calibrate_button.add_child(ScopeTheme.badge(&"ui_accept"))
+	_close_button.add_child(ScopeTheme.badge(&"ui_cancel"))
+	_send_button.add_child(ScopeTheme.badge(&"ui_accept"))
+
+
+func _process(_delta: float) -> void:
+	if not visible:
+		return
+	for button: Button in [_calibrate_button, _send_button, _close_button]:
+		ScopeTheme.refresh_badge(button.get_node("PadGlyph") as Label)
+
+
+## A quick fade and settle as the bench opens (ScopeTheme.OPEN_SECONDS, at most 150 ms).
+func _open_animation() -> void:
+	var panel: Control = $Panel
+	panel.pivot_offset = panel.size * 0.5
+	panel.modulate.a = 0.0
+	panel.scale = Vector2(0.97, 0.97)
+	var tween: Tween = create_tween().set_parallel(true)
+	tween.tween_property(panel, "modulate:a", 1.0, ScopeTheme.OPEN_SECONDS)
+	tween.tween_property(panel, "scale", Vector2.ONE, ScopeTheme.OPEN_SECONDS).set_ease(Tween.EASE_OUT)
+
+
+## The result line and its plate take the verdict's colour: teal a pass, amber a
+## guard band or an indeterminate, red a fail. Plain ink with no verdict.
+func _paint_result(color: Color) -> void:
+	_result_label.add_theme_color_override("font_color", color)
+	_tint_card(_result_plate, color if color != ScopeTheme.INK else ScopeTheme.GLASS_LINE)
+
+
+## A card's edge in the verdict's colour.
+func _tint_card(card: PanelContainer, edge: Color) -> void:
+	card.add_theme_stylebox_override(&"panel", ScopeTheme.card_box(edge))
+
+
+## The traceability chain as linked chips: each link on its own, the last (OIRM) a teal one when
+## the chain holds. A broken chain is amber. "" clears it.
+func _show_chain(instrument_id: String) -> void:
+	for child: Node in _chain_row.get_children():
+		_chain_row.remove_child(child)
+		child.queue_free()
+	if instrument_id == "":
+		return
+	var chain: Dictionary = GameState.traceability_chain(instrument_id)
+	var good: bool = chain["traceable"]
+	var edge: Color = ScopeTheme.TEAL if good else ScopeTheme.AMBER
+	_chain_row.add_child(ScopeTheme.chip("Chain" if good else "Chain BROKEN", edge, edge, 16))
+	var links: PackedStringArray = str(chain["text"]).split(" ← ")
+	for i: int in links.size():
+		if i > 0:
+			var arrow := Label.new()
+			arrow.text = "←"
+			arrow.add_theme_color_override(&"font_color", ScopeTheme.INK_MUTED)
+			_chain_row.add_child(arrow)
+		var last: bool = i == links.size() - 1 and links.size() > 1
+		_chain_row.add_child(ScopeTheme.chip(links[i], edge if last else ScopeTheme.GLASS_LINE, ScopeTheme.INK, 16))
 
 
 ## The bench's own controls take focus, except while a game is up.
@@ -277,12 +351,14 @@ func _on_instrument_selected(index: int) -> void:
 		meter.acceptance_ratio = _limit / sensor.mpe if sensor.mpe > 0.0 else 1.0
 	_mpe_label.text = "%s   MPE ±%s" % [sensor.quantity_title(), _unsigned(sensor, sensor.mpe)]
 	_standard_label.text = _reference_text(_current_id, _budget)
+	_show_chain(_current_id)
 	# What the bench would read: the unit's error seen through the standard's.
 	var standard: DriftingSensor = GameState.get_sensor(_budget.get("standard_id", ""))
 	_show_as_found(sensor, sensor.error - (standard.error if standard else 0.0))
 	_left_value.text = "--"
 	_fit(_left_value)
 	_left_band.text = ""
+	_tint_card(_left_col, ScopeTheme.GLASS_LINE)
 	_left_meter.show_needle = false
 	_calibrate_button.disabled = false
 	_result_label.text = _last_record_text(_current_id)
@@ -291,7 +367,7 @@ func _on_instrument_selected(index: int) -> void:
 		_found_value.text = "--"
 		_fit(_found_value)
 		_found_band.text = "STANDARD AT OIRM"
-		_found_band.remove_theme_color_override("font_color")
+		_found_band.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
 		_found_meter.show_needle = false
 		_calibrate_button.disabled = true
 		_result_label.text = "%s is at OIRM until day %d. %s" % [
@@ -318,15 +394,15 @@ func _show_standard(sensor: DriftingSensor) -> void:
 		meter.show_needle = false
 	_mpe_label.text = "%s   MPE ±%s   (reference standard)" % [
 		sensor.quantity_title(), _unsigned_precise(sensor, sensor.mpe)]
-	_standard_label.text = _certificate_text(_current_id) + "\n" + _chain_text(_current_id)
+	_standard_label.text = _certificate_text(_current_id)
 	for label: Label in [_found_value, _left_value]:
 		label.text = "--"
 		_fit(label)
 	_found_band.text = "AT OIRM" if GameState.at_oirm.has(_current_id) else "NO REFERENCE ON SITE"
-	_found_band.remove_theme_color_override("font_color")
+	_found_band.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
 	_left_band.text = ""
 	_calibrate_button.hide()
-	_result_label.remove_theme_color_override("font_color")
+	_paint_result(ScopeTheme.INK)
 	var today: int = GameClock.get_day_index()
 	if sensor.relay_disciplined:
 		var locked: bool = GameState.is_relay_locked(_current_id)
@@ -352,12 +428,13 @@ func _show_job(job: Dictionary) -> void:
 		label.text = "--"
 		_fit(label)
 	_found_band.text = "CUSTOMER JOB"
-	_found_band.remove_theme_color_override("font_color")
+	_found_band.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
 	_left_band.text = ""
-	_result_label.remove_theme_color_override("font_color")
+	_paint_result(ScopeTheme.INK)
 	if job.is_empty():
 		_mpe_label.text = "This job is no longer active."
 		_standard_label.text = ""
+		_show_chain("")
 		_result_label.text = ""
 		_calibrate_button.disabled = true
 		return
@@ -365,6 +442,7 @@ func _show_job(job: Dictionary) -> void:
 	var standard_id: String = GameState.job_bench_standard(job)
 	_standard_label.text = ("Standard: %s" % GameState.instrument_name(standard_id, true) if standard_id != ""
 		else "No standard on the bench for this job.")
+	_show_chain("")
 	_calibrate_button.text = "CALIBRATE FOR CUSTOMER (%s min)" % SP811.integer(roundi(GameState.job_minutes(job)))
 	var problem: String = GameState.job_bench_problem(job)
 	_calibrate_button.disabled = problem != ""
@@ -398,11 +476,6 @@ func _certificate_text(instrument_id: String) -> String:
 		SP811.number(cert["k"], 0)]
 
 
-func _chain_text(instrument_id: String) -> String:
-	var chain: Dictionary = GameState.traceability_chain(instrument_id)
-	return ("Chain: " if chain["traceable"] else "Chain BROKEN: ") + str(chain["text"])
-
-
 func _on_calibrate_pressed() -> void:
 	var id: String = _current_id
 	var visit: int = _visit
@@ -419,7 +492,7 @@ func _on_calibrate_pressed() -> void:
 			return
 		_calibrate_button.disabled = true
 		_result_label.text = GameState.job_result_text(result)
-		_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(
+		_paint_result(DriftingSensor.band_color(
 			DriftingSensor.Band.IN_BAND if result["on_time"] and result["traceable"] else DriftingSensor.Band.GUARDBAND))
 		# Done: keep the pay and credibility shown, not "no longer active".
 		_current_id = ""
@@ -474,6 +547,7 @@ func _on_calibrate_pressed() -> void:
 	_fit(_left_value)
 	_left_band.text = DriftingSensor.band_label(left_band)
 	_left_band.add_theme_color_override("font_color", DriftingSensor.band_color(left_band))
+	_tint_card(_left_col, DriftingSensor.band_color(left_band))
 	_left_meter.value = as_left
 	_left_meter.show_needle = true
 	var result: String = record["result"]
@@ -507,7 +581,7 @@ func _on_calibrate_pressed() -> void:
 		_result_label.text = "AS-FOUND WITHIN ACCEPTANCE LIMIT: PASS. Too soon after the last calibration to change the interval. " + interval_note
 	else:
 		_result_label.text = "AS-FOUND WITHIN ACCEPTANCE LIMIT, LATE: PASS. Interval unchanged. " + interval_note
-	_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(band))
+	_paint_result(DriftingSensor.band_color(band))
 	# The score the host counted. If one was sent and the host counted none (the
 	# kind was no longer new by the time it arrived), that is said too.
 	var zero_text: String = MinigameScore.result_text(int(record.get(MinigameScore.RECORD_KEY, MinigameScore.SKIPPED)),
@@ -559,10 +633,11 @@ func _recorded_budget(record: Dictionary) -> Dictionary:
 ## A finished result, with a trip to OIRM and the certificate as they are now.
 func _show_finished() -> void:
 	_result_label.text = _finished_text
-	_result_label.add_theme_color_override("font_color", _finished_color)
+	_paint_result(_finished_color)
 	if GameState.at_oirm.has(_current_id):
 		_result_label.text += " Sent to OIRM, back on day %d." % GameState.at_oirm[_current_id]
 	_standard_label.text = _reference_text(_current_id, _finished_budget)
+	_show_chain(_current_id)
 
 
 func _on_send_pressed() -> void:
@@ -584,7 +659,7 @@ func _on_send_pressed() -> void:
 ## A refusal is no finding: amber, and the button stays for another try.
 func _show_refusal(prefix: String, answer: Dictionary) -> void:
 	_result_label.text = prefix + str(answer["reason"])
-	_result_label.add_theme_color_override("font_color", DriftingSensor.band_color(DriftingSensor.Band.GUARDBAND))
+	_paint_result(DriftingSensor.band_color(DriftingSensor.Band.GUARDBAND))
 
 
 func _show_as_found(sensor: DriftingSensor, value: float) -> void:
@@ -593,6 +668,7 @@ func _show_as_found(sensor: DriftingSensor, value: float) -> void:
 	_fit(_found_value)
 	_found_band.text = DriftingSensor.band_label(band)
 	_found_band.add_theme_color_override("font_color", DriftingSensor.band_color(band))
+	_tint_card(_found_col, DriftingSensor.band_color(band))
 	_found_meter.value = value
 	_found_meter.show_needle = true
 
@@ -608,7 +684,7 @@ func _bench_band(sensor: DriftingSensor, value: float) -> int:
 
 
 func _last_record_text(instrument_id: String) -> String:
-	_result_label.remove_theme_color_override("font_color")
+	_paint_result(ScopeTheme.INK)
 	var sensor: DriftingSensor = GameState.get_sensor(instrument_id)
 	var today: int = GameClock.get_day_index()
 	var due: String = (DriftingSensor.overdue_text(sensor.cal_due_day) if sensor.is_overdue(today)
@@ -632,7 +708,7 @@ func _last_record_text(instrument_id: String) -> String:
 
 ## The standard used and the chain; for a standard its own certificate first.
 func _reference_text(instrument_id: String, budget: Dictionary) -> String:
-	var text: String = _standard_text(instrument_id, budget) + "\n" + _chain_text(instrument_id)
+	var text: String = _standard_text(instrument_id, budget)
 	if GameState.has_skill_unlock("budget_view"):
 		text += _budget_text(instrument_id, budget)
 	return _certificate_text(instrument_id) + "\n" + text if _is_standard(instrument_id) else text

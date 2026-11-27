@@ -1,36 +1,9 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/cal_bench_ui.gd" id="1_bench"]
 [ext_resource type="Script" path="res://scripts/ui/band_meter.gd" id="2_meter"]
 [ext_resource type="PackedScene" path="res://ui/minigames/set_the_zero.tscn" id="3_zero"]
 [ext_resource type="PackedScene" path="res://ui/minigames/hold_the_reading.tscn" id="4_hold"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_panel"]
-content_margin_left = 36.0
-content_margin_top = 30.0
-content_margin_right = 36.0
-content_margin_bottom = 30.0
-bg_color = Color(0.06, 0.07, 0.065, 0.98)
-border_width_left = 3
-border_width_top = 3
-border_width_right = 3
-border_width_bottom = 3
-border_color = Color(0.3, 0.45, 0.33, 1)
-corner_radius_top_left = 14
-corner_radius_top_right = 14
-corner_radius_bottom_right = 14
-corner_radius_bottom_left = 14
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_col"]
-content_margin_left = 18.0
-content_margin_top = 14.0
-content_margin_right = 18.0
-content_margin_bottom = 14.0
-bg_color = Color(0.03, 0.06, 0.04, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
 
 [node name="CalBenchUI" type="Control"]
 layout_mode = 3
@@ -63,139 +36,179 @@ offset_right = 500.0
 offset_bottom = 345.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_panel")
+theme_type_variation = &"ScopeShell"
 
 [node name="Content" type="VBoxContainer" parent="Panel"]
 layout_mode = 2
-theme_override_constants/separation = 18
+theme_override_constants/separation = 14
 
-[node name="Title" type="Label" parent="Panel/Content"]
+[node name="HeaderPlate" type="PanelContainer" parent="Panel/Content"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_type_variation = &"ScopeHeader"
+
+[node name="HeaderRow" type="HBoxContainer" parent="Panel/Content/HeaderPlate"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Panel/Content/HeaderPlate/HeaderRow"]
+layout_mode = 2
+theme_type_variation = &"ScopeTitle"
 theme_override_font_sizes/font_size = 28
 text = "BENCH CALIBRATION // OMNISPEC FORM 88-C"
 
-[node name="InstrumentRow" type="HBoxContainer" parent="Panel/Content"]
+[node name="HeaderSpacer" type="Control" parent="Panel/Content/HeaderPlate/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Seal" type="Control" parent="Panel/Content/HeaderPlate/HeaderRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(84, 40)
+layout_mode = 2
+rotation = 0.06
+mouse_filter = 2
+
+[node name="Glass" type="PanelContainer" parent="Panel/Content"]
+layout_mode = 2
+theme_type_variation = &"ScopeGlass"
+
+[node name="GlassBox" type="VBoxContainer" parent="Panel/Content/Glass"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="InstrumentRow" type="HBoxContainer" parent="Panel/Content/Glass/GlassBox"]
 layout_mode = 2
 theme_override_constants/separation = 16
 
-[node name="InstrumentCaption" type="Label" parent="Panel/Content/InstrumentRow"]
+[node name="InstrumentCaption" type="Label" parent="Panel/Content/Glass/GlassBox/InstrumentRow"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_type_variation = &"ScopeCaption"
 theme_override_font_sizes/font_size = 20
 text = "INSTRUMENT"
 
-[node name="InstrumentOption" type="OptionButton" parent="Panel/Content/InstrumentRow"]
+[node name="InstrumentOption" type="OptionButton" parent="Panel/Content/Glass/GlassBox/InstrumentRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(380, 44)
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 
-[node name="GameSpacer" type="Control" parent="Panel/Content/InstrumentRow"]
+[node name="GameSpacer" type="Control" parent="Panel/Content/Glass/GlassBox/InstrumentRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="CarefulCheck" type="CheckButton" parent="Panel/Content/InstrumentRow"]
+[node name="CarefulCheck" type="CheckButton" parent="Panel/Content/Glass/GlassBox/InstrumentRow"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
 text = "CAREFUL"
 
-[node name="GameOption" type="OptionButton" parent="Panel/Content/InstrumentRow"]
+[node name="GameOption" type="OptionButton" parent="Panel/Content/Glass/GlassBox/InstrumentRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
 tooltip_text = "Set the Zero comes up at key moments. Rewards are the same on every setting. OFF: always one click."
 theme_override_font_sizes/font_size = 16
 
-[node name="ReadingsRow" type="HBoxContainer" parent="Panel/Content"]
+[node name="ReadingsRow" type="HBoxContainer" parent="Panel/Content/Glass/GlassBox"]
 layout_mode = 2
-theme_override_constants/separation = 24
+theme_override_constants/separation = 20
 
-[node name="FoundCol" type="PanelContainer" parent="Panel/Content/ReadingsRow"]
+[node name="FoundCol" type="PanelContainer" parent="Panel/Content/Glass/GlassBox/ReadingsRow"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_styles/panel = SubResource("StyleBoxFlat_col")
+theme_type_variation = &"ScopeCard"
 
-[node name="VBox" type="VBoxContainer" parent="Panel/Content/ReadingsRow/FoundCol"]
+[node name="VBox" type="VBoxContainer" parent="Panel/Content/Glass/GlassBox/ReadingsRow/FoundCol"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
-[node name="FoundCaption" type="Label" parent="Panel/Content/ReadingsRow/FoundCol/VBox"]
+[node name="FoundCaption" type="Label" parent="Panel/Content/Glass/GlassBox/ReadingsRow/FoundCol/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_type_variation = &"ScopeCaption"
 theme_override_font_sizes/font_size = 18
 text = "AS-FOUND ERROR"
 
-[node name="FoundValue" type="Label" parent="Panel/Content/ReadingsRow/FoundCol/VBox"]
+[node name="FoundValue" type="Label" parent="Panel/Content/Glass/GlassBox/ReadingsRow/FoundCol/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 52
 text = "--"
 horizontal_alignment = 1
 
-[node name="FoundBand" type="Label" parent="Panel/Content/ReadingsRow/FoundCol/VBox"]
+[node name="FoundBand" type="Label" parent="Panel/Content/Glass/GlassBox/ReadingsRow/FoundCol/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 
-[node name="FoundMeter" type="Control" parent="Panel/Content/ReadingsRow/FoundCol/VBox"]
+[node name="FoundMeter" type="Control" parent="Panel/Content/Glass/GlassBox/ReadingsRow/FoundCol/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 44)
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 script = ExtResource("2_meter")
 
-[node name="LeftCol" type="PanelContainer" parent="Panel/Content/ReadingsRow"]
+[node name="LeftCol" type="PanelContainer" parent="Panel/Content/Glass/GlassBox/ReadingsRow"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_styles/panel = SubResource("StyleBoxFlat_col")
+theme_type_variation = &"ScopeCard"
 
-[node name="VBox" type="VBoxContainer" parent="Panel/Content/ReadingsRow/LeftCol"]
+[node name="VBox" type="VBoxContainer" parent="Panel/Content/Glass/GlassBox/ReadingsRow/LeftCol"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 6
 
-[node name="LeftCaption" type="Label" parent="Panel/Content/ReadingsRow/LeftCol/VBox"]
+[node name="LeftCaption" type="Label" parent="Panel/Content/Glass/GlassBox/ReadingsRow/LeftCol/VBox"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_type_variation = &"ScopeCaption"
 theme_override_font_sizes/font_size = 18
 text = "AS-LEFT ERROR"
 
-[node name="LeftValue" type="Label" parent="Panel/Content/ReadingsRow/LeftCol/VBox"]
+[node name="LeftValue" type="Label" parent="Panel/Content/Glass/GlassBox/ReadingsRow/LeftCol/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 52
 text = "--"
 horizontal_alignment = 1
 
-[node name="LeftBand" type="Label" parent="Panel/Content/ReadingsRow/LeftCol/VBox"]
+[node name="LeftBand" type="Label" parent="Panel/Content/Glass/GlassBox/ReadingsRow/LeftCol/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 
-[node name="LeftMeter" type="Control" parent="Panel/Content/ReadingsRow/LeftCol/VBox"]
+[node name="LeftMeter" type="Control" parent="Panel/Content/Glass/GlassBox/ReadingsRow/LeftCol/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 44)
+custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
 script = ExtResource("2_meter")
 
-[node name="MpeLabel" type="Label" parent="Panel/Content"]
+[node name="MpeLabel" type="Label" parent="Panel/Content/Glass/GlassBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_override_colors/font_color = Color(0.2196, 0.8824, 0.7765, 1)
 theme_override_font_sizes/font_size = 20
 horizontal_alignment = 1
 
-[node name="StandardLabel" type="Label" parent="Panel/Content"]
+[node name="StandardLabel" type="Label" parent="Panel/Content/Glass/GlassBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.75, 0.85, 1, 1)
+theme_type_variation = &"ScopeCaption"
 theme_override_font_sizes/font_size = 18
 horizontal_alignment = 1
 autowrap_mode = 3
 
-[node name="ResultLabel" type="Label" parent="Panel/Content"]
+[node name="ChainRow" type="HFlowContainer" parent="Panel/Content/Glass/GlassBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 6
+alignment = 1
+
+[node name="ResultPlate" type="PanelContainer" parent="Panel/Content/Glass/GlassBox"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"ScopeCard"
+
+[node name="ResultLabel" type="Label" parent="Panel/Content/Glass/GlassBox/ResultPlate"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 56)
 layout_mode = 2
