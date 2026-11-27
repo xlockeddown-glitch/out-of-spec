@@ -89,3 +89,15 @@ func test_zone_depth_props_keeps_hatch_lift_finds_and_vents() -> String:
 			props.show_heat(0.0)
 	_free(props)
 	return problem
+
+
+func test_lava_hub_material_helpers_hand_out_fresh_materials() -> String:
+	# Other scenes (FloodedAquifer's pools) change the material they get back, so
+	# LavaHubProps._flat/_glow must never return TunnelLook's shared cache.
+	var a: StandardMaterial3D = LavaHubProps._flat(TunnelLook.REGOLITH)
+	var b: StandardMaterial3D = LavaHubProps._flat(TunnelLook.REGOLITH)
+	if a == b or a == TunnelLook.flat_mat(TunnelLook.REGOLITH):
+		return "_flat handed out a shared material."
+	if LavaHubProps._glow(TunnelLook.BRASS, 0.6) == LavaHubProps._glow(TunnelLook.BRASS, 0.6):
+		return "_glow handed out a shared material."
+	return ""

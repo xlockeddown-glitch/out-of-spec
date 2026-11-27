@@ -153,12 +153,14 @@ static func _sphere(radius: float) -> Mesh:
 	return TunnelLook.sphere(radius)
 
 
+## A fresh material each call: other scenes (e.g. FloodedAquifer's pools) change
+## what they get back, so these two never hand out TunnelLook's shared cache.
 static func _flat(color: Color) -> StandardMaterial3D:
-	return TunnelLook.flat_mat(color)
+	return TunnelLook.flat_mat(color).duplicate() as StandardMaterial3D
 
 
 static func _glow(color: Color, energy: float) -> StandardMaterial3D:
-	return TunnelLook.glow_mat(color, energy)
+	return TunnelLook.glow_mat(color, energy, false)
 
 
 static func _part(mesh: Mesh, at: Vector3, material: Material) -> MeshInstance3D:
