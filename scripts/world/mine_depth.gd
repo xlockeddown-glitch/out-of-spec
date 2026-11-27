@@ -26,6 +26,8 @@ const PROP_COST_ORE: int = 2
 const PROPS_PER_BUY: int = 1
 ## One room shored takes this many props [PLACEHOLDER].
 const PROPS_PER_ROOM: int = 1
+## The most props a farm holds; a save with more is refused, so a purchase stops here [PLACEHOLDER].
+const MAX_PROPS: int = 9999
 ## The rover shores a room from this far from its rockfall, in metres [PLACEHOLDER].
 const SHORE_REACH_M: float = 4.0
 ## The rooms (top left), as the Aquifer's and the Lava Tubes' ROOM_SLOTS: west, east, north.
@@ -203,11 +205,13 @@ static func rockfall_position(fall: Dictionary) -> Vector3:
 
 
 ## Why the farm can't buy shoring props, or "". Pure: GameState passes what it has.
-static func buy_problem(place: String, depth: int, ore: int, near_crate_now: bool) -> String:
+static func buy_problem(place: String, depth: int, ore: int, near_crate_now: bool, held: int = 0) -> String:
 	if place != ZONE or depth != 0:
 		return "Shoring props are sold at the crate in the Colony Mine's hub."
 	if not near_crate_now:
 		return "The rover is too far from the crate."
+	if held + PROPS_PER_BUY > MAX_PROPS:
+		return "The farm holds as many shoring props as it can."
 	if ore < PROP_COST_ORE:
 		return "A shoring prop costs %d crystal ore." % PROP_COST_ORE
 	return ""
@@ -256,8 +260,14 @@ static func shored_problem(shored: Variant) -> String:
 
 
 ## Why a saved `mine_props` can't be, or "".
+## True if the rockfall in reach should be offered instead of `find_id`: the find's room is
+## still buried, so the find cannot be taken yet.
+static func prefer_rockfall(layout_data: Dictionary, find_id: String, fall_in_reach: bool) -> bool:
+	return fall_in_reach and blocked_problem(layout_data, find_id) != ""
+
+
 static func props_problem(props: Variant) -> String:
-	if not props is int or props < 0 or props > 9999:
+	if not props is int or props < 0 or props > MAX_PROPS:
 		return "'mine_props' is not a number of props."
 	return ""
 

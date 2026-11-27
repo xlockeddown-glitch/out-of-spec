@@ -384,6 +384,10 @@ const AQUIFER_PAD: Vector3 = Vector3(-24.0, 0.0, -22.0)
 ## Where the farm's rover goes into the Colony Mine: a sealed gate on the plateau road
 ## [PLACEHOLDER]. Within TUNNEL_PAD_REACH_M of it the rover is on the pad.
 const MINE_PAD: Vector3 = Vector3(12.0, 0.0, -34.0)
+## The gate's trigger box sits in front of the gate, wholly within TUNNEL_PAD_REACH_M of MINE_PAD, so
+## a rover that is told to go in is never refused for distance [PLACEHOLDER].
+const MINE_TRIGGER_OFFSET: Vector3 = Vector3(0.0, 0.0, 1.5)
+const MINE_TRIGGER_SIZE: Vector3 = Vector3(5.0, 3.0, 3.0)
 ## Host: where each player is, as player id -> [place, depth] (ZonePresence). A
 ## player not in it is on the farm. Not saved: a loaded farm has everyone on the
 ## farm. A guest holds the host's copy, from the clock (FarmSync).
@@ -5944,7 +5948,7 @@ func buy_mine_props(player_id: String = "") -> String:
 	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
 	var near: bool = rover_zone == MineDepth.ZONE and rover_depth == 0 and at != null and MineDepth.near_crate(at)
 	var here: String = place_of(player_id) if rover_zone == MineDepth.ZONE else ""
-	var reason: String = MineDepth.buy_problem(here, depth_of(player_id), crystal_ore, near)
+	var reason: String = MineDepth.buy_problem(here, depth_of(player_id), crystal_ore, near, mine_props)
 	if reason != "":
 		return reason
 	crystal_ore -= MineDepth.PROP_COST_ORE

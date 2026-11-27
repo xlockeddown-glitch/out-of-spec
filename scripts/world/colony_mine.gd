@@ -116,8 +116,15 @@ func _mine_near() -> Dictionary:
 			return { "kind": SIGN, "id": "" }
 		return {}
 	var found: Dictionary = _nearest_find()
-	if not found.is_empty():
+	var fall_near: Dictionary = _rockfall_near(at)
+	# A find in a buried room cannot be taken yet: the rockfall in reach is the better prompt.
+	if not found.is_empty() and not MineDepth.prefer_rockfall(ZoneDepth.local_layout, str(found.get("id", "")), not fall_near.is_empty()):
 		return found
+	return fall_near
+
+
+## The nearest rockfall still standing within shoring reach of `at`, or {}.
+func _rockfall_near(at: Vector3) -> Dictionary:
 	for fall: Dictionary in ZoneDepth.local_layout.get("rockfalls", []):
 		if not bool(fall["shored"]):
 			var there: Vector3 = MineDepth.rockfall_position(fall)

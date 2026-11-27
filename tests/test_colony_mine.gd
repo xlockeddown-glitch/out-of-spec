@@ -556,3 +556,59 @@ func test_the_midnight_warning_covers_the_mine_once() -> String:
 	var rescued: int = gs._recall_rescued_day
 	gs.free()
 	return "" if warned == 1 and rescued == 0 else "One warning, no rescue yet: %d warnings, rescued day %d." % [warned, rescued]
+
+
+# --- Review fixes --------------------------------------------------------------------
+
+func test_the_gate_trigger_lies_wholly_inside_the_hosts_pad_reach() -> String:
+	var centre: Vector3 = GameState.MINE_PAD + GameState.MINE_TRIGGER_OFFSET
+	var half: Vector3 = GameState.MINE_TRIGGER_SIZE * 0.5
+	for sx: float in [-1.0, 0.0, 1.0]:
+		for sz: float in [-1.0, 0.0, 1.0]:
+			var at: Vector3 = centre + Vector3(sx * half.x, 0.0, sz * half.z)
+			if at.distance_to(GameState.MINE_PAD) > GameState.TUNNEL_PAD_REACH_M:
+				return "A rover at %s is in the trigger but %.1f m from the pad." % [at, at.distance_to(GameState.MINE_PAD)]
+			var gs: GameStateScript = _state()
+			gs.open_mine_gate()
+			gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, at)
+			var why: String = gs.move_rover_mine(true, HOST)
+			gs.free()
+			if why != "":
+				return "A rover at %s in the trigger was refused: '%s'" % [at, why]
+	return ""
+
+
+func test_a_blocked_rooms_find_gives_way_to_the_rockfall_prompt() -> String:
+	var day: int = 4
+	var spot: Array = _blocked_find(day)
+	if spot.is_empty():
+		return "Day %d has no blocked find." % day
+	var data: Dictionary = MineDepth.layout(SEED, 1, day)
+	if not MineDepth.prefer_rockfall(data, spot[0], true):
+		return "A find in a buried room hid the shore prompt."
+	if MineDepth.prefer_rockfall(data, spot[0], false):
+		return "With no rockfall in reach the find should still show."
+	var shored: Dictionary = MineDepth.layout(SEED, 1, day, [spot[2]])
+	if MineDepth.prefer_rockfall(shored, spot[0], true):
+		return "A find in a shored room should show, not the rockfall."
+	return ""
+
+
+func test_buying_props_stops_at_the_cap_the_save_check_enforces() -> String:
+	var problems: Array[String] = []
+	var run: String = _at(10.5, func() -> String:
+		var gs: GameStateScript = _state()
+		_rover_at(gs, 0, MineDepth.crate_position())
+		gs.crystal_ore = 100
+		gs.mine_props = MineDepth.MAX_PROPS
+		if gs.buy_mine_props(HOST) == "" or gs.mine_props != MineDepth.MAX_PROPS or gs.crystal_ore != 100:
+			problems.append("A prop was sold past the cap (%d props, %d ore)." % [gs.mine_props, gs.crystal_ore])
+		gs.mine_props = MineDepth.MAX_PROPS - 1
+		if gs.buy_mine_props(HOST) != "" or gs.mine_props != MineDepth.MAX_PROPS:
+			problems.append("The last prop under the cap was refused.")
+		if gs.farm_dict_problem(gs.farm_to_dict()) != "":
+			problems.append("A farm at the cap cannot be saved.")
+		gs.free()
+		return "")
+	return run if run != "" else "
+".join(problems)

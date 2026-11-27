@@ -1378,10 +1378,10 @@ func _build_mine_gate() -> void:
 	_mine_pad.name = "MineGatePad"
 	_mine_pad.collision_layer = 0
 	_mine_pad.collision_mask = 2
-	_mine_pad.position = GameState.MINE_PAD + Vector3(0.0, 0.0, 3.0)
+	_mine_pad.position = GameState.MINE_PAD + GameState.MINE_TRIGGER_OFFSET
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
-	box.size = Vector3(5.0, 3.0, 4.0)
+	box.size = GameState.MINE_TRIGGER_SIZE
 	shape.shape = box
 	shape.position = Vector3(0.0, 1.5, 0.0)
 	_mine_pad.add_child(shape)

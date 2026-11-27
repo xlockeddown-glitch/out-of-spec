@@ -56,7 +56,7 @@ Gate, Bram's gate-key quest, hub, depth 1 and the collapse hazard, all from prim
 - Gate: `MINE_PAD` (12, 0, -34) on the plateau road; soft warning under lab level 12. One saved, synced field, `mine_gate_open`, sealed until the quest (or `open_mine_gate()`) opens it.
 - Quest: The Gate Key, Bram, kind lab, farm scope, lab level 10, one step (mine two fissures: counter `mine_fissure`, farm, at least 2), reward 80 CR, 150 lab XP and the `mine_gate` key, plus a phone line.
 - Shoring: `PROP_COST_ORE` 2 crystal ore per prop, `PROPS_PER_BUY` 1, `PROPS_PER_ROOM` 1, `SHORE_REACH_M` 4.0. Props are one shared farm stock, bought at the hub crate.
-- Collapse: `MIN_BLOCKED` 1 and `MAX_BLOCKED` 2 of the 3 rooms blocked each day (never all three), from the hash; `ROCKFALL_IDS` r0 to r2. Shoring lasts the day and resets at 06:00.
+- Collapse: `MIN_BLOCKED` 1 and `MAX_BLOCKED` 2 of the 3 rooms blocked each day (never all three), from the hash; `ROCKFALL_IDS` r0 to r2. Shoring lasts the day and resets at 06:00 (`rooms_shored` is pruned on save, load, take and shore; readers filter by day). `MAX_PROPS` 9999 caps a purchase, matching the save check.
 - Depth 1 layout: `ROOMS`, `CARVES` and `LANDING` rects, `PER_ROOM` 2, `ON_LANDING` 1, `KINDS`, `REWARDS` and `NAMES`.
 - Places: hub cells `HATCH_CELL` (8, 16), `CRATE_CELL` (12, 18) and `SIGN_CELL` (8, 18).
 - Looks: the sealed gate, the rubble pile and support arch (`RUBBLE_SCALE`, `ARCH_SPAN_M`, `ARCH_HEIGHT_M`), the prop crate, the sign text and every on-screen word. The hub temporarily uses the Lava hub grid.
