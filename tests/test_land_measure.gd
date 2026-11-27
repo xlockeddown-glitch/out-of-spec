@@ -50,22 +50,65 @@ func test_small_ground_builds() -> String:
 	return ""
 
 
-func test_bigger_land_keeps_the_middle() -> String:
-	# The 240 m measuring land is the same ground inside the farm's level circle.
-	for at: Vector2i in [Vector2i(0, 0), Vector2i(20, -10), Vector2i(-30, 30)]:
-		if LandMeasure.ground_m(at, 120) != Terrain.natural(at):
-			return "ground at %s differs on a bigger land" % str(at)
+func test_bigger_land_keeps_todays_land_exactly() -> String:
+	# The 240 m land is today's ground on every point of today's 160 m, rim band included.
+	var wrong: int = 0
+	var first := Vector2i.ZERO
+	for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
+		for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
+			var at := Vector2i(x, z)
+			if Terrain.natural_on(at, 120) != Terrain.natural(at):
+				wrong += 1
+				first = at
+	if wrong > 0:
+		return "%d points of today's land differ on a bigger land, e.g. %s" % [wrong, str(first)]
+	return ""
+
+
+func test_bigger_land_joins_the_edge_smoothly() -> String:
+	# Past the old edge the ground eases from the edge's height, with no step.
+	for at: Vector2i in [Vector2i(81, 0), Vector2i(0, -81), Vector2i(81, 81), Vector2i(-81, 40)]:
+		var edge := Vector2i(clampi(at.x, -80, 80), clampi(at.y, -80, 80))
+		if absf(Terrain.natural_on(at, 120) - Terrain.natural(edge)) > 0.3:
+			return "a step at the old edge, at %s" % str(at)
+	return ""
+
+
+func test_measured_ground_is_on_the_scenes_layer() -> String:
+	var layer: int = LandMeasure.ground_layer()
+	if layer & LandMeasure.LOS_MASK == 0:
+		return "the ground's layer %d is not one the uplink ray meets" % layer
+	return ""
+
+
+func test_uplink_is_stopped_by_a_hill_and_clear_in_the_open() -> String:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var land: Dictionary = LandMeasure.physics_land(tree, Terrain.HALF_M)
+	# The physics server takes the new bodies in on a frame.
+	await tree.physics_frame
+	await tree.physics_frame
+	var space: PhysicsDirectSpaceState3D = (land["holder"] as Node3D).get_world_3d().direct_space_state
+	# (72, 72) is behind the hill at (48, 47) from the relay at (-70, -70).
+	var behind_hill: bool = LandMeasure.sees_relay(space, Vector2i(72, 72), Terrain.HALF_M)
+	var in_open: bool = LandMeasure.sees_relay(space, Vector2i(0, 0), Terrain.HALF_M)
+	(land["holder"] as Node).free()
+	if behind_hill:
+		return "a point behind the hill sees the relay"
+	if not in_open:
+		return "the farm's middle cannot see the relay"
 	return ""
 
 
 func test_dead_spot_share_is_a_share() -> String:
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	var land: Dictionary = LandMeasure.physics_land(tree, SMALL_HALF_M)
-	var spots: Dictionary = LandMeasure.dead_spots(land["holder"], SMALL_HALF_M, 8)
+	var land: Dictionary = LandMeasure.physics_land(tree, Terrain.HALF_M)
+	await tree.physics_frame
+	await tree.physics_frame
+	var spots: Dictionary = LandMeasure.dead_spots(land["holder"], Terrain.HALF_M, 16)
 	(land["holder"] as Node).free()
 	if spots["tried"] <= 0:
 		return "no points were tried"
 	var share: float = spots["share"]
-	if share < 0.0 or share > 1.0:
-		return "share %f is not in 0 to 1" % share
+	if share <= 0.0 or share > 1.0:
+		return "share %f should be above 0 (the hills shade some) and at most 1" % share
 	return ""

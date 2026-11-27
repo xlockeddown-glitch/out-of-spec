@@ -13,7 +13,8 @@ const LOW_M: float = -1.0
 
 @export var material: Material
 ## How far the land reaches from its middle. Only LandMeasure sets it, before the
-## ground is added, to build a bigger land than play has.
+## ground is added, to build a bigger land than play has: 2 * half_m must be a
+## multiple of CHUNK_M, and show_dug (digging) is for play's size only.
 var half_m: int = Terrain.HALF_M
 
 var _dug: Dictionary[Vector2i, int] = {}
@@ -29,6 +30,7 @@ var _tints := PackedColorArray()
 
 func _ready() -> void:
 	# The rover looks for the ground under it before the scene shows what was dug.
+	assert((2 * half_m) % CHUNK_M == 0, "half_m must make whole chunks")
 	_dug = GameState.dug.duplicate()
 	_levelled = Terrain.level_points.duplicate()
 	_heights.resize((2 * half_m + 1) * (2 * half_m + 1))

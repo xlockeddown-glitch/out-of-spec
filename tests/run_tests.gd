@@ -49,7 +49,8 @@ func _run_tests() -> void:
 			continue
 		for method_name: String in methods:
 			var label: String = "%s::%s" % [file, method_name]
-			var result: Variant = suite.call(method_name)
+			# A test that must wait for a physics frame may await; the rest return at once.
+			var result: Variant = await suite.call(method_name)
 			if result is String and result.is_empty():
 				print("PASS %s" % label)
 				passed += 1

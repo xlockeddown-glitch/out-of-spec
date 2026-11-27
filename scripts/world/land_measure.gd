@@ -20,6 +20,9 @@ const ANTENNA_M: float = 1.88
 ## The uplink's ray meets the ground and the rocks on this layer
 ## (RoverController.los_collision_mask).
 const LOS_MASK: int = 4
+## The scene node whose collision layer the measured ground copies.
+const SCENE_PATH := "res://scenes/main_farm.tscn"
+const GROUND_NODE := "Ground"
 ## How many times a build is timed; the middle one is kept.
 const BUILD_RUNS: int = 3
 
@@ -75,6 +78,20 @@ static func trips() -> Array[Dictionary]:
 	return list
 
 
+## The collision layer scenes/main_farm.tscn gives its Ground (world and
+## signal_occluder), read from the scene so the uplink ray meets the ground as in play.
+static func ground_layer() -> int:
+	var state: SceneState = (load(SCENE_PATH) as PackedScene).get_state()
+	for i: int in state.get_node_count():
+		if state.get_node_name(i) != GROUND_NODE:
+			continue
+		for j: int in state.get_node_property_count(i):
+			if state.get_node_property_name(i, j) == &"collision_layer":
+				return int(state.get_node_property_value(i, j))
+	push_error("LandMeasure: no collision_layer on %s in %s" % [GROUND_NODE, SCENE_PATH])
+	return 0
+
+
 ## Builds the real ground (TerrainGround) for a land reaching `half_m` from its
 ## middle, under `parent`, and says how long the height grid and the meshes took.
 ## The caller frees the ground. A land bigger than Terrain.HALF_M uses the same
@@ -84,6 +101,7 @@ static func build(parent: Node, half_m: int) -> Dictionary:
 	Terrain._natural = PackedFloat32Array()
 	var ground := TerrainGround.new()
 	ground.half_m = half_m
+	ground.collision_layer = ground_layer()
 	var started_us: int = Time.get_ticks_usec()
 	parent.add_child(ground)
 	var built_ms: float = float(Time.get_ticks_usec() - started_us) / 1000.0

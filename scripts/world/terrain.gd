@@ -125,11 +125,18 @@ static func _work_out(x: int, z: int, half_m: int = HALF_M) -> float:
 
 
 ## The natural ground at a point if the land were `half_m` out from the middle
-## instead of HALF_M: the same function with its rim at that edge. Only for
-## measuring a bigger land (LandMeasure); nothing in play calls it, and it keeps
-## no cache.
+## instead of HALF_M. Inside today's land it is today's ground exactly. Outside,
+## it eases from the height at the old edge (the nearest point of today's land)
+## to the same function with its rim at the new edge, over the way between the two
+## edges. Only for measuring a bigger land (LandMeasure); nothing in play calls it,
+## and it keeps no cache. A land grown for real can use the same rule.
 static func natural_on(point: Vector2i, half_m: int) -> float:
-	return _work_out(point.x, point.y, half_m)
+	var out_m: int = maxi(absi(point.x), absi(point.y))
+	if out_m <= HALF_M:
+		return _work_out(point.x, point.y)
+	var edge := Vector2i(clampi(point.x, -HALF_M, HALF_M), clampi(point.y, -HALF_M, HALF_M))
+	var along: float = float(out_m - HALF_M) / float(maxi(half_m - HALF_M, 1))
+	return lerpf(_work_out(edge.x, edge.y), _work_out(point.x, point.y, half_m), _ease(along))
 
 
 ## The land without the wash.

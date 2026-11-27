@@ -103,7 +103,7 @@ Each biome has one marked place on its road: **a sign and a rover-sized pad**. T
 
 ### 3.1 Distances
 
-The land is 160 m square today. The times are measured (PR measure, `tools/measure_land.gd`): the rover tops out at 6 m/s after 0.75 s, and the walker goes 4 m/s. They are straight lines on flat ground, so hills and turns add some.
+The land is 160 m square today. The times are measured (PR 211, `tools/measure_land.gd`): the rover tops out at 6 m/s after 0.75 s, and the walker goes 4 m/s. They are straight lines on flat ground, so hills and turns add some.
 
 | Trip | Straight line | On foot | By rover |
 |---|---|---|---|
@@ -129,17 +129,17 @@ The biggest technical choice.
 
 - **A is the plan.** One `Terrain`, one dig grid, one save.
 
-**Measured (PR measure).** Same height function, with the rim moved to the new edge for 240 m (the middle 160 m keeps its heights). Build is the ground's height grid plus all its meshes, median of 3, headless on one PC.
+**Measured (PR 211).** The middle 160 m keeps today's heights exactly; past it the ground eases from the old edge's height to the same height function with its rim at the new edge (`Terrain.natural_on`). Build is the ground's height grid plus all its meshes, median of 3, headless on one PC.
 
 | | 160 m | 240 m |
 |---|---|---|
-| Ground build | 273 ms | 603 ms |
+| Ground build | 268 ms | 690 ms |
 | Points / chunks / vertices | 25,921 / 100 / 153,600 | 58,081 / 225 / 345,600 |
-| Uplink dead spots (every 4 m) | 6.3 % (106 of 1,681) | 6.3 % (233 of 3,721) |
+| Uplink dead spots (every 4 m) | 7.8 % (131 of 1,681) | 6.7 % (250 of 3,721) |
 
-At 240 m the new outer ring alone is 6.6 % dead (135 of 2,040). The ground does not depend on the farm seed, so one result stands for every seed. Rocks block the uplink too and are counted; the four loose boulders are not.
-- **The ground is computed from a point every meter.** 160 m is 161 by 161 points; 240 m is 2.2 times that. Measured: about 0.6 s to build, once, at the start.
-- **[RISK] The uplink.** The ground blocks the relay (`docs/decisions.md`). More hills and a wider land mean more dead spots. A second relay for the far edge is a possible fix [ASSUMPTION]; the measured dead share is about 6 % at both sizes.
+At 240 m the new outer ring alone is 5.8 % dead (119 of 2,040). The ground does not depend on the farm seed, so one result stands for every seed. Hills and rocks both block the uplink and are counted; the four loose boulders are not.
+- **The ground is computed from a point every meter.** 160 m is 161 by 161 points; 240 m is 2.2 times that. Measured: about 0.7 s to build, once, at the start.
+- **[RISK] The uplink.** The ground blocks the relay (`docs/decisions.md`). More hills and a wider land mean more dead spots. A second relay for the far edge is a possible fix [ASSUMPTION]; the measured dead share is about 7 % at both sizes.
 - **Zones stay scenes.** A zone entrance on the surface uses the pad-and-E pattern the tunnel mouth uses.
 
 ### 3.3 Co-op
