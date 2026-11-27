@@ -25,8 +25,9 @@ const UNNAMED: String = "Operator"
 ## A part names only those it changes; the others are 1.
 const DRIVE_KEYS: Array[StringName] = [&"speed", &"accel", &"brake", &"turn", &"wade"]
 ## The top speed all multipliers together may reach, as a share of the base: the host
-## accepts a rover pose only up to CoopRovers.REACH_MPS, and the base is 6 m/s.
-const MAX_SPEED_FACTOR: float = 1.25
+## accepts a rover pose only up to CoopRovers.REACH_MPS, and the base is 6 m/s. The best
+## pair of parts gives 1.21; drive() clamps to this, so no table edit can pass it.
+const MAX_SPEED_FACTOR: float = 1.21
 
 ## Slot -> its four parts, the default first. A part: id, name, trade-off text (wheels
 ## and power only), the drive multipliers it changes, and its look: boxes of centre,
@@ -156,14 +157,20 @@ static func clean(parts: Variant) -> Dictionary:
 	return out
 
 
-## The name as it may be kept: no control characters, trimmed, cut to MAX_NAME.
+## The name as it may be kept: no control characters (C0, DEL, C1), no direction
+## overrides or zero-width marks, no "[" (it would open markup), trimmed, cut to MAX_NAME.
+## GameState.set_loadout refuses a longer name before it gets here.
 static func clean_name(text: Variant) -> String:
 	if not text is String:
 		return ""
 	var kept: String = ""
 	for i: int in (text as String).length():
-		if (text as String).unicode_at(i) >= 32 and (text as String).unicode_at(i) != 127:
-			kept += (text as String)[i]
+		var code: int = (text as String).unicode_at(i)
+		if code < 32 or (code >= 127 and code <= 159) or code == 91:
+			continue
+		if (code >= 0x200B and code <= 0x200F) or (code >= 0x202A and code <= 0x202E) 				or (code >= 0x2060 and code <= 0x2069) or code == 0xFEFF:
+			continue
+		kept += (text as String)[i]
 	return kept.strip_edges().left(MAX_NAME).strip_edges()
 
 
@@ -218,6 +225,7 @@ static func drive(parts: Variant) -> Dictionary:
 		var changes: Dictionary = part(slot, cleaned[slot])["drive"]
 		for key: StringName in changes:
 			out[key] = float(out[key]) * float(changes[key])
+	out[&"speed"] = minf(float(out[&"speed"]), MAX_SPEED_FACTOR)
 	return out
 
 
@@ -231,6 +239,8 @@ static func entry_problem(entry: Variant) -> String:
 	var parts: Variant = (entry as Dictionary).get("parts", {})
 	if not parts is Dictionary:
 		return "a loadout with no parts dictionary"
+	if (parts as Dictionary).size() > SLOTS.size():
+		return "a loadout with too many parts"
 	for key: Variant in parts:
 		if not (key is String or key is StringName) or not (parts[key] is String or parts[key] is StringName):
 			return "a loadout part that is not text"

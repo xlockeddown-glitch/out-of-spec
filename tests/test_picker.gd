@@ -156,6 +156,14 @@ func test_a_name_is_trimmed_and_kept_short() -> String:
 		return "A name is at most %d letters" % Loadout.MAX_NAME
 	if Loadout.clean_name("  Quill  ") != "Quill" or Loadout.clean_name(5) != "":
 		return "Spaces off, and only text is a name"
+	var rude: String = "Q" + char(0x202E) + "u" + char(0x200B) + "i" + char(0x85) + "l" + char(0xFEFF) + "[b]l" + char(7) + char(0x2066)
+	if Loadout.clean_name(rude) != "Quilbl":
+		return "Direction marks, zero-width, C1 and C0 controls and [ must go: got '%s'" % Loadout.clean_name(rude)
+	var crowded: Dictionary = {}
+	for i: int in Loadout.SLOTS.size() + 1:
+		crowded["slot_%d" % i] = "x"
+	if Loadout.entry_problem({ "name": "", "parts": crowded }) == "":
+		return "A stored loadout with more parts than slots must be refused"
 	return "" if Loadout.shown_name("") == Loadout.UNNAMED and Loadout.shown_name("Quill") == "Quill" else "The unnamed show %s" % Loadout.UNNAMED
 
 
@@ -281,6 +289,7 @@ func test_the_rover_takes_the_owner_s_parts_and_the_defaults_change_nothing() ->
 		look = rover.find_child("LoadoutLook", true, false)
 	var boxes: int = look.get_child_count() if look != null else 0
 	GameState.player_loadouts = {}
+	GameState.loadouts_changed.emit()
 	rover._refresh_loadout()
 	var gone: Node = rover.find_child("LoadoutLook", true, false)
 	_free(rover)
@@ -427,12 +436,76 @@ func test_a_new_farm_offers_the_picker_once() -> String:
 	PickerUI.offer_next = true
 	var first: PickerUI = _picker()
 	var consumed: bool = not PickerUI.offer_next
+	await _root().get_tree().process_frame
+	var opened: bool = first.visible
 	_free(first)
 	var second: PickerUI = _picker()
+	await _root().get_tree().process_frame
 	var quiet: bool = not second.visible
 	_free(second)
 	_restore(snap)
+	if not opened:
+		return "The offered picker must open on its own"
 	return "" if consumed and quiet else "The offer is made once"
+
+
+func test_a_name_over_the_limit_is_refused_not_cut() -> String:
+	var snap: Dictionary = _snapshot()
+	GameState.player_loadouts = {}
+	var refused: String = GameState.set_loadout("N".repeat(Loadout.MAX_NAME + 1), Loadout.encode(Loadout.default_parts()))
+	var kept_nothing: bool = GameState.player_loadouts.is_empty()
+	var exact: String = GameState.set_loadout("N".repeat(Loadout.MAX_NAME), Loadout.encode(Loadout.default_parts()))
+	_restore(snap)
+	if refused == "" or not kept_nothing:
+		return "A name of %d letters must be refused and change nothing" % (Loadout.MAX_NAME + 1)
+	return "" if exact == "" else "A name of exactly %d letters is fine: %s" % [Loadout.MAX_NAME, exact]
+
+
+func test_a_p_typed_into_the_name_field_does_not_close_the_picker() -> String:
+	var snap: Dictionary = _snapshot()
+	var picker: PickerUI = _picker()
+	picker.open()
+	picker._name_field.grab_focus()
+	var focused: bool = picker._name_field.has_focus()
+	picker._unhandled_input(_key(KEY_P))
+	var still_open: bool = picker.visible
+	picker._name_field.release_focus()
+	picker._unhandled_input(_key(KEY_P))
+	var toggled_off: bool = not picker.visible
+	_free(picker)
+	_restore(snap)
+	if not focused:
+		return "The name field must take the focus for this test to mean anything"
+	if not still_open:
+		return "A p typed into the name field must not close the picker"
+	return "" if toggled_off else "P must still close the picker when the field has no focus"
+
+
+func test_the_rover_keeps_the_last_driver_s_parts_until_someone_else_drives() -> String:
+	var snap: Dictionary = _snapshot()
+	var players: Array[String] = CoopSession.players.duplicate()
+	CoopSession.players = ["player_1", "player_2"] as Array[String]
+	GameState.local_player_id = "player_1"
+	GameState.player_loadouts = {}
+	GameState.set_loadout("", Loadout.encode({ Loadout.WHEELS: &"wide_crawler_tracks" }), "player_2")
+	var rover := RoverController.new()
+	_root().add_child(rover)
+	rover._look_of = "player_2"
+	rover._refresh_loadout()
+	var worn: StringName = rover.look_parts()[Loadout.WHEELS]
+	# Nobody drives now (the lease ran out): still the guest's.
+	var owner_idle: String = rover.loadout_owner()
+	rover._refresh_loadout()
+	var still: StringName = rover.look_parts()[Loadout.WHEELS]
+	# The guest leaves: the host's again.
+	CoopSession.players = ["player_1"] as Array[String]
+	var owner_gone: String = rover.loadout_owner()
+	_free(rover)
+	CoopSession.players = players
+	_restore(snap)
+	if worn != &"wide_crawler_tracks" or owner_idle != "player_2" or still != worn:
+		return "With no driver the rover must keep the last driver's parts (owner %s)" % owner_idle
+	return "" if owner_gone == "player_1" else "A driver who left is not kept: the host's, not %s" % owner_gone
 
 
 func test_the_actions_menu_and_the_controls_guide_list_the_picker() -> String:

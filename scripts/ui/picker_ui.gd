@@ -75,6 +75,8 @@ func _ready() -> void:
 	_name_field = LineEdit.new()
 	_name_field.name = &"NameField"
 	_name_field.max_length = Loadout.MAX_NAME
+	# Enter must not leave a focused field that no longer types (a "p" would close us).
+	_name_field.keep_editing_on_text_submit = true
 	_name_field.placeholder_text = NAME_HINT
 	_name_field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_name_field.add_theme_font_size_override(&"font_size", 22)
@@ -158,7 +160,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			open()
 		return
-	if toggled or event.is_action_pressed(&"ui_cancel"):
+	if toggled and _name_field.has_focus():
+		# A letter typed into the name is not the toggle; Esc still closes.
+		get_viewport().set_input_as_handled()
+	elif toggled or event.is_action_pressed(&"ui_cancel"):
 		close()
 		get_viewport().set_input_as_handled()
 	elif key != null or event is InputEventJoypadButton or event is InputEventJoypadMotion:

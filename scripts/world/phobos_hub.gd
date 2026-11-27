@@ -203,8 +203,15 @@ func _build_walker() -> void:
 	add_child(walker)
 	walker.position = ARRIVE_AT
 	walker.model.set_suit(WalkerModel.suit_for(GameState.local_player_id, CoopSession.players))
+	_dress_walker()
+	GameState.loadouts_changed.connect(_dress_walker)
 	camera.target = walker
 	camera.current = true
+
+
+## The walker wears the parts this player picked (the picker opens here too).
+func _dress_walker() -> void:
+	walker.model.set_loadout(GameState.loadout_of()["parts"])
 
 
 func _build_hud() -> void:

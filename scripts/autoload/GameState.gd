@@ -2578,10 +2578,12 @@ func loadout_of(player_id: String = "") -> Dictionary:
 
 ## Sets the character's name and parts for `player_id` only (a request carries no
 ## other player). `choice` is Loadout.encode()'s text: one part index per slot. Returns
-## "" or why not; nothing changes when it refuses. The name is cut to what Loadout
-## allows. Allowed anywhere: it is paperwork, not farm work.
+## "" or why not; nothing changes when it refuses. A name over Loadout.MAX_NAME is
+## refused, not cut. Allowed anywhere: it is paperwork, not farm work.
 func set_loadout(character_name: String, choice: String, player_id: String = "") -> String:
 	player_id = _player(player_id)
+	if character_name.strip_edges().length() > Loadout.MAX_NAME:
+		return "A name is %d characters at most." % Loadout.MAX_NAME
 	var parts: Dictionary = Loadout.decode(choice)
 	if parts.is_empty():
 		return "That is not a loadout."

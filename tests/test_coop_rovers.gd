@@ -260,3 +260,33 @@ func test_walking_speed_is_accepted_and_a_rover_jump_after_a_dig_or_the_tunnel_t
 	state.rover_place_changed.emit()
 	mine._on_driven("player_2", ID, _pose(-39.0), 2100)
 	return _end_with("" if state.rover_transforms[ID] == _at(-39.0) else "The rover must go on from its new place")
+
+
+## The steepest ground a rover drives is about 45 degrees (the dug pit's corner is 44,
+## the pad's edge 42, the rover's own floor limit 45): one metre up per metre along.
+func test_the_fastest_loadout_climbs_the_steepest_real_grade_without_being_refused() -> String:
+	var all: Array = _pair()
+	var state: Node = all[0].commands.state
+	var mine: Node = all[2]
+	var speed: float = 6.0 * Loadout.MAX_SPEED_FACTOR
+	var step_m: float = speed * 0.05
+	if not mine.is_sane([0.0, 0.0, 0.0, 0.0, speed, true]):
+		return _end_with("The fastest loadout's speed must pass is_sane")
+	if Vector2(step_m, step_m).length() / 0.05 <= mine.REACH_MPS:
+		return _end_with("The 3D speed on this grade is meant to be past the budget, or this test proves nothing")
+	# 30 s straight up a 45 degree grade, a pose every 50 ms.
+	for i: int in 600:
+		var x: float = step_m * (i + 1)
+		mine._on_driven("player_2", ID, [x, x, 0.0, 0.0, speed, true], 1000 + 50 * i)
+		if state.rover_transforms[ID].origin != Vector3(x, x, 0.0):
+			return _end_with("The climb was refused at pose %d" % i)
+	# And back down it.
+	for i: int in 600:
+		var x: float = step_m * 600 - step_m * (i + 1)
+		mine._on_driven("player_2", ID, [x, x, 0.0, 0.0, speed, true], 31000 + 50 * i)
+		if state.rover_transforms[ID].origin != Vector3(x, x, 0.0):
+			return _end_with("The descent was refused at pose %d" % i)
+	# A rise with no run to explain it is still a jump.
+	mine._on_driven("player_2", ID, [0.0, 17.0, 0.0, 0.0, 0.0, true], 62000)
+	mine._on_driven("player_2", ID, [0.0, 34.0, 0.0, 0.0, 0.0, true], 62050)
+	return _end_with("" if state.rover_transforms[ID].origin.y < 30.0 else "A rise without a run must still be charged")

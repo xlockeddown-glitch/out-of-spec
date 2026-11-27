@@ -71,18 +71,36 @@ func test_a_guest_changes_its_own_loadout_and_everyone_sees_it() -> String:
 		return "")
 
 
+## What a guest's session sends when it skips FarmCommands.request (which refuses a wrong
+## argument count itself): the raw command, as a forger would send it.
+func _forged(session: Node, arguments: Array) -> Array:
+	var got: Array = []
+	var ask: Callable = func() -> void: got.append(await session._ask(&"set_loadout", arguments))
+	ask.call()
+	return got
+
+
 func test_a_guest_cannot_change_another_player_s_loadout() -> String:
 	return _play(func(host: Node, first: Node, _second: Node) -> String:
 		var choice: String = "1,1,1,1,1,1"
-		# Named as the host: the host takes the sender from the connection, not the text.
-		var answer: Array = _request(first, &"set_loadout", ["Fake", choice, "player_1"])
-		_until(func() -> bool: return not answer.is_empty())
 		var state: Node = host.commands.state
+		# Named as the host, in a third argument: the host's own check refuses the count.
+		var named: Array = _forged(first, ["Fake", choice, "player_1"])
+		_until(func() -> bool: return not named.is_empty())
+		if named.is_empty() or named[0] == "" or not named[0] is String:
+			return "The host must refuse a command that names a player, got %s" % [named]
+		if not state.player_loadouts.is_empty():
+			return "A refused command must change nothing, got %s" % [state.player_loadouts]
+		# The right shape: stored under the connection's player, never the host's.
+		var plain: Array = _forged(first, ["Mine", choice])
+		_until(func() -> bool: return not plain.is_empty())
+		var sender: String = first.commands.state.local_player_id
+		if plain != [""] or sender == "player_1":
+			return "The host must take the plain command from %s, got %s" % [sender, plain]
 		if state.loadout_of("player_1")["name"] != "" or state.loadout_of("player_1")["parts"] != Loadout.default_parts():
-			return "Another player's loadout must not change, got %s" % [state.player_loadouts]
-		for id: String in state.player_loadouts:
-			if id == "player_1":
-				return "The host must have no entry made for it"
+			return "The host's own loadout must not change, got %s" % [state.player_loadouts]
+		if not state.player_loadouts.has(sender) or state.player_loadouts.size() != 1 or state.loadout_of(sender)["name"] != "Mine":
+			return "It must be stored under the sender (%s), got %s" % [sender, state.player_loadouts]
 		return "")
 
 
@@ -94,8 +112,14 @@ func test_the_host_refuses_what_is_not_a_loadout() -> String:
 			_until(func() -> bool: return not answer.is_empty())
 			if answer.is_empty() or answer[0] == "":
 				return "'%s' must be refused, got %s" % [choice, answer]
-		var long_name: Array = _request(first, &"set_loadout", ["N".repeat(200), "0,0,0,0,0,0"])
+		# A name over the limit but within a message: the name rule refuses it.
+		var long_name: Array = _request(first, &"set_loadout", ["N".repeat(40), "0,0,0,0,0,0"])
 		_until(func() -> bool: return not long_name.is_empty())
-		if long_name.is_empty() or long_name[0] == "":
-			return "A name over the limit must be refused, got %s" % [long_name]
+		if long_name.is_empty() or long_name[0] == "" or not str(long_name[0]).contains("characters"):
+			return "A name over the limit must be refused by the name rule, got %s" % [long_name]
+		# One over a message's text limit: the transport drops the guest, who is told nothing.
+		var huge_name: Array = _request(first, &"set_loadout", ["N".repeat(200), "0,0,0,0,0,0"])
+		_until(func() -> bool: return not huge_name.is_empty())
+		if huge_name.is_empty() or huge_name[0] == "":
+			return "A message over the text limit must not be taken, got %s" % [huge_name]
 		return "" if host.commands.state.player_loadouts.is_empty() else "Nothing must be stored, got %s" % [host.commands.state.player_loadouts])

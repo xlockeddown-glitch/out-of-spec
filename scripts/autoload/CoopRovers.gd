@@ -21,6 +21,12 @@ const STILL_MS: int = 1000
 ## that floods the spot sends a rover (PIT_SEARCH_M).
 const REACH_M: float = 18.0
 const REACH_MPS: float = 7.5
+## A rover reports its speed along the ground, so a climb costs the budget only its
+## horizontal distance, up to this rise per metre run. The steepest drivable ground is
+## the dug pit's corner at about 44 degrees (rise 0.97) and the rover's 45 degree floor
+## limit (1.0); this leaves room above both. Rise beyond it is charged in full, so a
+## pose cannot be teleported up.
+const CLIMB_PER_M: float = 1.2
 ## No rover is farther out than this [PLACEHOLDER].
 const FARTHEST_M: float = 500.0
 ## A rover on the farm may be this far past the land's edge [PLACEHOLDER].
@@ -90,6 +96,16 @@ func is_pose(pose: Array) -> bool:
 		if not is_finite(pose[i]) or absf(pose[i]) > FARTHEST_M:
 			return false
 	return true
+
+
+## What a move costs the driver's budget: the ground covered, plus any rise beyond what
+## a climb of CLIMB_PER_M explains. At the loadout speed cap (7.26 m/s along the ground)
+## a rover on the steepest drivable slope stays inside REACH_MPS; measured in 3D it
+## would not.
+func _charged_distance(from: Vector3, to: Vector3) -> float:
+	var run: float = Vector2(to.x - from.x, to.z - from.z).length()
+	var extra: float = maxf(0.0, absf(to.y - from.y) - run * CLIMB_PER_M)
+	return sqrt(run * run + extra * extra)
 
 
 ## Host: a guest's pose that it may say: not faster than a rover goes. A pose that
@@ -211,7 +227,7 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 	var from: Transform3D = place(rover_id)
 	var reach: Array = _reach.get(rover_id, [REACH_M, now])
 	var left: float = minf(REACH_M, reach[0] + (now - reach[1]) * REACH_MPS / 1000.0)
-	var distance: float = from.origin.distance_to(to.origin)
+	var distance: float = _charged_distance(from.origin, to.origin)
 	if distance > left:
 		_refuse(player_id, rover_id, "a rover %.1f m away, %.1f m allowed" % [distance, left], now)
 		return

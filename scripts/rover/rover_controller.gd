@@ -175,6 +175,7 @@ var _look_of: String = ""
 var _look_parts: Dictionary = Loadout.default_parts()
 var _look_node: Node3D
 var _factors: Dictionary = Loadout.drive(Loadout.default_parts())
+var _loadouts_dirty: bool = true
 var _tip := Quaternion.IDENTITY
 var _gravity: float = ProjectSettings.get_setting("physics/3d/default_gravity", 9.8)
 
@@ -185,6 +186,7 @@ func _ready() -> void:
 	# rover is freed on a scene swap; the sensor outlives us.
 	steering.error_changed.connect(_on_steering_error_changed)
 	GameState.upgrades_changed.connect(_apply_upgrades)
+	GameState.loadouts_changed.connect(_on_loadouts_changed)
 	SaveGame.saving.connect(_park)
 	add_to_group(GameState.LIVE_ROVER_GROUP)
 	GameState.farm_loaded.connect(_unpark)
@@ -732,13 +734,21 @@ func _try_boulder() -> bool:
 	return false
 
 
-## Whose parts the rover wears and drives with: the driver's, else the host's (the one
-## who owns the farm), else this player's when playing alone.
+## Whose parts the rover wears and drives with: the driver's; when nobody drives, the
+## last driver's for as long as they are still in the game (so it does not change shape
+## each time a guest stops); else the host's (the one who owns the farm), else this
+## player's when playing alone.
 func loadout_owner() -> String:
 	var driver: String = CoopRovers.driver(rover_id)
 	if driver != "":
 		return driver
+	if _look_of != "" and (CoopSession.players.has(_look_of) or (CoopSession.players.is_empty() and _look_of == GameState.local_player_id)):
+		return _look_of
 	return CoopSession.players[0] if not CoopSession.players.is_empty() else GameState.local_player_id
+
+
+func _on_loadouts_changed() -> void:
+	_loadouts_dirty = true
 
 
 ## The drive multipliers now in use (Loadout.DRIVE_KEYS).
@@ -755,6 +765,9 @@ func look_parts() -> Dictionary:
 ## multipliers, when either changed. Nothing is drawn for the default parts.
 func _refresh_loadout() -> void:
 	var who: String = loadout_owner()
+	if who == _look_of and not _loadouts_dirty:
+		return
+	_loadouts_dirty = false
 	var parts: Dictionary = GameState.loadout_of(who)["parts"]
 	if who == _look_of and parts == _look_parts:
 		return
