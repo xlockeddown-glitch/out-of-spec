@@ -9,6 +9,7 @@ const TITLE_SCENE: String = "res://scenes/title_menu.tscn"
 const DOME_SCENE: String = "res://scenes/dome_interior.tscn"
 const TUNNELS_SCENE: String = "res://scenes/basalt_tunnels.tscn"
 const PHOBOS_SCENE: String = "res://scenes/phobos_hub.tscn"
+const DEIMOS_SCENE: String = "res://scenes/deimos_hub.tscn"
 const FADE_SECONDS: float = 0.1  # each way; ~0.2 s total per the Week 2 board
 
 ## Where the dome's airlock leads: the farm or the tunnels, whichever was left.
@@ -41,7 +42,7 @@ func toggle_farm_dome() -> void:
 		return  # no farm is open yet
 	if CoopWalkers.on_foot():
 		return  # only the rover goes anywhere
-	if current != null and current.scene_file_path == PHOBOS_SCENE:
+	if current != null and current.scene_file_path in [PHOBOS_SCENE, DEIMOS_SCENE]:
 		return  # the way home from a moon is the hub's return shuttle
 	var on_dome: bool = current != null and current.scene_file_path == DOME_SCENE
 	swap_to(exit_path() if on_dome else DOME_SCENE)

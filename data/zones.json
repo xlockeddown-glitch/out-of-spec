@@ -74,7 +74,7 @@
       "band": [26, 50],
       "hazards": ["low_gravity", "dust", "launch_window", "locked_crates"],
       "finds": ["smuggled_crates", "lost_standards", "tarantulas", "gauge_blocks"],
-      "hub_scene": "",
+      "hub_scene": "res://scenes/deimos_hub.tscn",
       "entrance": "Shuttle from the pad; needs the shuttle license.",
       "tarantula_hook": "Smuggler caches in warm crates, and the terraform test pod [ASSUMPTION]: a new moon-adapted form with a wider climate band.",
       "notes": "Caches and test pods [ASSUMPTION: the test pod is also on the Ice Caves row, as section 2 puts it there and sections 10.3 and 13 put it on Deimos; both kept]; exotic low-expansion gauge blocks (Ryan, 14.1 answer 11)."

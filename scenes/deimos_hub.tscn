@@ -1,0 +1,16 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/world/deimos_hub.gd" id="1_hub"]
+
+[ext_resource type="Script" path="res://scripts/world/inspectable.gd" id="2_inspect"]
+
+[node name="DeimosHub" type="Node3D"]
+script = ExtResource("1_hub")
+
+[node name="CacheSign" type="Area3D" parent="."]
+script = ExtResource("2_inspect")
+prop_id = "deimos_cache"
+
+[node name="PodSign" type="Area3D" parent="."]
+script = ExtResource("2_inspect")
+prop_id = "deimos_test_pod"

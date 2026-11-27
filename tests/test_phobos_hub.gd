@@ -131,15 +131,11 @@ func test_every_refusal_charges_nothing_and_leaves_no_trip() -> String:
 	return "\n".join(problems)
 
 
-func test_deimos_still_has_no_hub_and_fast_travel_never_offers_phobos() -> String:
+func test_fast_travel_never_offers_a_moon() -> String:
 	var gs: GameStateScript = _state(500)
 	var problems: Array[String] = []
-	GameClock.elapsed_days = 3.0 * HOUR  # inside Phobos' window, so only the missing hub refuses
-	var deimos: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
-	if deimos != Shuttle.text("no_hub_text") % "Deimos" or gs.credits != 500:
-		problems.append("Deimos is refused for the missing hub: '%s', %d CR" % [deimos, gs.credits])
-	if not ZoneData.is_playable(&"phobos") or ZoneData.is_playable(&"deimos"):
-		problems.append("Only Phobos is playable among the moons.")
+	if not ZoneData.is_playable(&"phobos") or not ZoneData.is_playable(&"deimos"):
+		problems.append("Both moons are playable.")
 	gs.zones_unlocked.append("lava_tubes")
 	for row: Dictionary in FastTravel.destinations(99, ["lava_tubes", "phobos", "deimos"]):
 		if Shuttle.is_moon(str(row["id"])):
@@ -308,9 +304,12 @@ func test_the_trip_is_saved_an_old_save_has_none_and_a_past_end_comes_home() -> 
 	if old.farm_from_dict(data) != "" or not old.shuttle_trips.is_empty():
 		problems.append("An old save loads with no trip.")
 	var junk: Dictionary = gs.farm_to_dict()
-	junk["shuttle_trips"] = { HOST: { "moon": Shuttle.DEIMOS, "ends_at": 9.0 } }
+	junk["shuttle_trips"] = { HOST: { "moon": "mercury", "ends_at": 9.0 } }
 	if gs.farm_dict_problem(junk) == "":
 		problems.append("A trip to a moon with no hub was accepted.")
+	junk["shuttle_trips"] = { HOST: { "moon": Shuttle.DEIMOS, "ends_at": 9.0 } }
+	if gs.farm_dict_problem(junk) != "":
+		problems.append("A trip to Deimos is a trip now: %s" % gs.farm_dict_problem(junk))
 	junk["shuttle_trips"] = { HOST: "phobos" }
 	if gs.farm_dict_problem(junk) == "":
 		problems.append("A trip that is no dictionary was accepted.")
@@ -391,8 +390,8 @@ func test_shuttle_home_is_a_host_command_allowed_on_foot_in_phobos_only() -> Str
 	var till: Variant = commands.execute(HOST, &"till", [Vector3i(1, 0, 1)])
 	if till != false:
 		problems.append("A traveller on Phobos cannot till the farm.")
-	if CoopSession.PROTOCOL != 33:
-		problems.append("The protocol is %d, not 33." % CoopSession.PROTOCOL)
+	if CoopSession.PROTOCOL != 34:
+		problems.append("The protocol is %d, not 34." % CoopSession.PROTOCOL)
 	if not FarmSync.SHOWN_BY.has(&"shuttle_trips_changed"):
 		problems.append("The trips are shown to a guest.")
 	commands.free()
@@ -594,7 +593,7 @@ func test_a_guest_still_on_the_farm_with_a_trip_goes_to_the_moons_hub() -> Strin
 		if Shuttle.hub_to_join(trip, path) != SceneSwitcher.PHOBOS_SCENE:
 			problems.append("A trip and the screen at %s: the hub." % path)
 	for case: Array in [[trip, SceneSwitcher.PHOBOS_SCENE], [null, SceneSwitcher.FARM_SCENE], [trip, SceneSwitcher.TITLE_SCENE],
-			[trip, SceneSwitcher.TUNNELS_SCENE], ["junk", SceneSwitcher.FARM_SCENE], [{ "moon": Shuttle.DEIMOS }, SceneSwitcher.FARM_SCENE]]:
+			[trip, SceneSwitcher.TUNNELS_SCENE], ["junk", SceneSwitcher.FARM_SCENE], [{ "moon": "mercury" }, SceneSwitcher.FARM_SCENE]]:
 		if Shuttle.hub_to_join(case[0], str(case[1])) != "":
 			problems.append("%s must stay where it is." % [case])
 	if not GameState.shuttle_trips_changed.is_connected(SceneSwitcher.reconcile_trip) or SceneSwitcher.scene_swapped.get_connections().is_empty():

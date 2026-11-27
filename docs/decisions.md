@@ -12,6 +12,16 @@ Ryan's pick from three mockups, applied to the calibration bench and the quest b
 - **Pad glyphs** are a separate badge Label on each button, shown only when the pad is the shown device, so button texts are unchanged.
 - **Quest board:** open quests are focusable cards in a scroll list. A NEW tag marks a quest not seen before, from a local-only set (`QuestSeen`, `user://quests_seen.cfg`, keyed by farm seed, quest id and, for a daily ask, the current day from `GameClock`: an open row has no accepted day of its own, and the save is not touched for it). It is not in the farm save, not sent, and no protocol change. Closing the board marks what it showed as seen. Placeholder limits: no player id in the key (two players on one PC share the set), an old farm shows NEW on first run, the file never shrinks, and a failed save is dropped. The DONE list and the KEEPSAKES shelf are focus stops (with the ring), so a pad or the keys can scroll to them in the 520 px list, and a rebuild of the list keeps the focus on the same place or on CLOSE.
 
+## 2026-11-27: The Deimos hub (zones step 17, second half)
+
+Deimos is playable on the same terms as Phobos. Every number, shape and line is a [PLACEHOLDER]. No crates open, no new species, finds or quest, no low gravity: the cache and the test pod are signs to inspect.
+
+- **Shared code:** `DeimosHub` extends `PhobosHub`, so booking, the console, the trip's end and the guest following the host are one code path. `PhobosHub` gained four hooks (`_moon`, `_title`, `_spots`, `_board_text`); no other refactor. `SceneSwitcher.DEIMOS_SCENE` and the Tab-swap guard know the new scene, and a save restored mid-trip opens the traveller's own moon hub.
+- **Booking:** unchanged rule. `Shuttle.is_open` decides; Deimos is up 60 h and shut 60 h, so a booking in a shut spell is refused with the window line and charges nothing. The way home stays free at any time, and the 00:00 and 02:00 recall never touches a Deimos traveller (the shuttle ends the trip).
+- **Look:** a pale blue-grey deck with tan dust drifts, a hex pad, a cream drum hab with a terracotta skirt, an ochre crate stack with a teal padlock and a pale pod with a fogged window and a warm foot. ScopeTheme constants for every colour, some darkened or lightened (no raw hex).
+- **Save and wire:** `shuttle_trips` accepts "deimos"; old saves load. The message shapes are unchanged, but `CoopSession.PROTOCOL` goes 33 to 34 because an older guest would reject a Deimos trip and stay on the farm while the host thinks it is away.
+- **Tests:** `tests/test_deimos_hub.gd` is new. The tests that said Deimos has no hub were changed to the new behaviour: `test_zones`, `test_zone_presence`, `test_shuttle`, `test_landing_dressing` and `test_phobos_hub` (the unknown-moon cases now use "mercury"), and every exact-protocol assertion now says 34.
+
 ## 2026-11-27: The Phobos hub and the trip (zones step 17, first half)
 
 Phobos is playable; Deimos is the next PR. Every number, shape and line is a [PLACEHOLDER]. No low-gravity physics yet, and no new species, finds or quest: the escapee hook is a station log line and one sign to inspect.

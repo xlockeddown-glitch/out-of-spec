@@ -192,7 +192,7 @@ func test_trip_problem_names_each_reason_in_turn() -> String:
 	return "\n".join(problems)
 
 
-func test_book_shuttle_refuses_with_the_reason_and_charges_nothing() -> String:
+func test_book_shuttle_refuses_the_unlicensed_and_lets_an_open_deimos_booking_through() -> String:
 	var gs: GameStateScript = _state(500)
 	_park_at_terminal(gs)
 	var problems: Array[String] = []
@@ -201,16 +201,16 @@ func test_book_shuttle_refuses_with_the_reason_and_charges_nothing() -> String:
 	if unlicensed == "" or gs.credits != 500:
 		problems.append("An unlicensed booking: '%s', %d CR" % [unlicensed, gs.credits])
 	gs.shuttle_licensed = true
-	var no_hub: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
-	if no_hub != Shuttle.text("no_hub_text") % "Deimos" or gs.credits != 500:
-		problems.append("Deimos ends at the missing hub with no fare taken: '%s', %d CR" % [no_hub, gs.credits])
 	if _lines(gs, "booked") != 0:
 		problems.append("A refused booking must not be told as a booking.")
+	var deimos: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
+	if deimos != "" or gs.credits != 500 - Shuttle.fare():
+		problems.append("Deimos has a hub now, so an open, paid booking goes through: '%s', %d CR" % [deimos, gs.credits])
 	_done(gs)
 	return "\n".join(problems)
 
 
-func test_book_shuttle_from_a_guest_is_refused_with_the_reason() -> String:
+func test_book_shuttle_from_a_guest_books_and_pays_each_their_own_fare() -> String:
 	var gs: GameStateScript = _state(500)
 	_park_at_terminal(gs)
 	var commands: Node = CommandsScript.new()
@@ -228,17 +228,17 @@ func test_book_shuttle_from_a_guest_is_refused_with_the_reason() -> String:
 		problems.append("A guest's unlicensed booking: '%s', %d CR" % [guest, gs.credits])
 	gs.shuttle_licensed = true
 	var licensed: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.DEIMOS, 1])
-	if licensed != Shuttle.text("no_hub_text") % "Deimos" or gs.credits != 500:
-		problems.append("A licensed guest is refused for the hub and pays nothing: '%s', %d CR" % [licensed, gs.credits])
+	if licensed != "" or gs.credits != 500 - Shuttle.fare():
+		problems.append("A licensed guest books Deimos and pays the fare once: '%s', %d CR" % [licensed, gs.credits])
 	var host: Variant = commands.execute(HOST, &"book_shuttle", [Shuttle.DEIMOS, 1])
-	if host != Shuttle.text("no_hub_text") % "Deimos" or gs.credits != 500:
-		problems.append("The host's booking is refused for the hub too: '%s'" % host)
+	if host != "" or gs.credits != 500 - 2 * Shuttle.fare():
+		problems.append("The host books Deimos too, each paying their own fare: '%s', %d CR" % [host, gs.credits])
 	commands.free()
 	_done(gs)
 	return "\n".join(problems)
 
 
-func test_book_shuttle_checks_where_and_how_many_before_the_hub() -> String:
+func test_book_shuttle_checks_where_and_how_many_before_the_fare() -> String:
 	var gs: GameStateScript = _state(500)
 	var problems: Array[String] = []
 	gs.shuttle_licensed = true
@@ -258,8 +258,10 @@ func test_book_shuttle_checks_where_and_how_many_before_the_hub() -> String:
 	if crowd != Shuttle.text("crowd_text") % SP811.integer(gs.players_present().size()) or gs.credits != 500:
 		problems.append("More people than are present is refused: '%s', %d CR" % [crowd, gs.credits])
 	var at_terminal: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
-	if at_terminal != Shuttle.text("no_hub_text") % "Deimos" or gs.credits != 500:
-		problems.append("A guest at the terminal is refused for the hub, no fare: '%s', %d CR" % [at_terminal, gs.credits])
+	if at_terminal != "" or gs.credits != 500 - Shuttle.fare():
+		problems.append("A guest at the terminal books Deimos, one fare: '%s', %d CR" % [at_terminal, gs.credits])
+	gs.shuttle_trips.erase(GUEST)
+	gs.credits = 500
 	# Away from the farm's own place the terminal is out of reach too.
 	gs.player_places[GUEST] = [ZonePresence.DOME, 0]
 	var elsewhere: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
@@ -308,8 +310,8 @@ func test_the_license_is_saved_and_an_old_save_loads_unlicensed() -> String:
 	junk["shuttle_licensed"] = 1
 	if gs.farm_dict_problem(junk) == "":
 		problems.append("A license that is no bool was accepted.")
-	if CoopSession.PROTOCOL != 33:
-		problems.append("The protocol is %d, not 33." % CoopSession.PROTOCOL)
+	if CoopSession.PROTOCOL != 34:
+		problems.append("The protocol is %d, not 34." % CoopSession.PROTOCOL)
 	back.free()
 	old.free()
 	_done(gs)
@@ -420,10 +422,10 @@ func test_the_shuttle_numbers_exist_and_are_sane() -> String:
 		problems.append("Ryan's numbers: a day trip is 40 CR, the license is lab 20 (%d, %d)." % [Shuttle.fare(), Shuttle.license_level()])
 	if Shuttle.party_most() < 1 or Shuttle.trip_hours() <= 0.0 or Shuttle.trip_hours() >= 24.0:
 		problems.append("The party and the trip's length are out of range.")
-	for key: String in ["not_yet_text", "exam_first_text", "granted_text", "booked_text", "moon_down_text", "short_text", "recall_text", "no_hub_text", "bad_party_text", "no_moon_text", "phobos_open_text", "phobos_next_text", "deimos_open_text", "deimos_next_text", "one_seat_text", "not_away_text", "home_text", "trip_over_text", "by_shuttle_text", "home_by_console_text", "hub_hint_console", "hub_hint_board", "hub_hint_hatch", "hub_board_log", "hub_hatch_text", "hub_console_line", "hub_low_gravity", "hub_too_far", "hub_title"]:
+	for key: String in ["not_yet_text", "exam_first_text", "granted_text", "booked_text", "moon_down_text", "short_text", "recall_text", "no_hub_text", "bad_party_text", "no_moon_text", "phobos_open_text", "phobos_next_text", "deimos_open_text", "deimos_next_text", "one_seat_text", "not_away_text", "home_text", "trip_over_text", "by_shuttle_text", "home_by_console_text", "deimos_hub_title", "deimos_hint_board", "deimos_board_notice", "deimos_board_window", "hub_hint_console", "hub_hint_board", "hub_hint_hatch", "hub_board_log", "hub_hatch_text", "hub_console_line", "hub_low_gravity", "hub_too_far", "hub_title"]:
 		if Shuttle.text(key) == "":
 			problems.append("'%s' has no words." % key)
 	for moon: String in Shuttle.MOONS:
-		if moon == Shuttle.DEIMOS and ZoneData.hub_scene(StringName(moon)) != "":
-			problems.append("Deimos has a hub now: the 'no hub yet' reason should be revisited.")
+		if not ZoneData.is_playable(StringName(moon)):
+			problems.append("%s has a hub now, so a booking is not refused for the landing." % moon)
 	return "\n".join(problems)

@@ -170,7 +170,8 @@ func restore(data: Dictionary) -> String:
 	var in_tunnels: bool = GameState.rover_in_tunnels and str(data.get("scene")) == SceneSwitcher.TUNNELS_SCENE
 	# A day trip still on when the save was made carries on at its moon's hub.
 	var on_a_moon: bool = GameState.shuttle_trips.has(GameState.local_player_id) 			and Shuttle.is_moon(GameState.place_of(GameState.local_player_id))
-	open_scene = SceneSwitcher.PHOBOS_SCENE if on_a_moon else (SceneSwitcher.TUNNELS_SCENE if in_tunnels else SceneSwitcher.FARM_SCENE)
+	var moon_scene: String = ZoneData.hub_scene(StringName(GameState.place_of(GameState.local_player_id))) if on_a_moon else ""
+	open_scene = moon_scene if moon_scene != "" else (SceneSwitcher.TUNNELS_SCENE if in_tunnels else SceneSwitcher.FARM_SCENE)
 	return problem
 
 

@@ -435,7 +435,7 @@ func test_more_people_than_are_present_is_refused() -> String:
 	return ""
 
 
-func test_a_guest_at_the_terminal_gets_the_hub_refusal_and_pays_nothing() -> String:
+func test_a_guest_at_the_terminal_books_deimos_and_pays_one_fare() -> String:
 	var gs: GameStateScript = _state()
 	var commands: Node = CommandsScript.new()
 	commands.state = gs
@@ -444,8 +444,8 @@ func test_a_guest_at_the_terminal_gets_the_hub_refusal_and_pays_nothing() -> Str
 	var charged: int = 500 - gs.credits
 	commands.free()
 	_done(gs)
-	if told != Shuttle.text("no_hub_text") % "Deimos" or charged != 0:
-		return "A guest at the terminal got '%s' and paid %d CR" % [told, charged]
+	if told != "" or charged != Shuttle.fare():
+		return "A guest at the terminal books Deimos and pays one fare: got '%s' and paid %d CR" % [told, charged]
 	return ""
 
 
@@ -477,8 +477,8 @@ func test_a_walker_at_the_terminal_may_book_with_the_rover_far_away() -> String:
 	_done(gs)
 	if not stand is Vector3 or not Shuttle.terminal_near(stand):
 		return "A walker's position is not where they walk to"
-	if told != Shuttle.text("no_hub_text") % "Deimos" or charged != 0:
-		return "A walker at the terminal got '%s' and paid %d CR" % [told, charged]
+	if told != "" or charged != Shuttle.fare():
+		return "A walker at the terminal books Deimos, one fare: got '%s' and paid %d CR" % [told, charged]
 	if rover_rider != Shuttle.text("far_text"):
 		return "The one in the far rover got '%s', not the walk reason" % rover_rider
 	return ""
@@ -489,14 +489,14 @@ func test_a_walker_far_from_the_terminal_is_refused_with_the_rover_beside_it() -
 	_rover_at(gs, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
 	_walk_to(GUEST, Vector3(0.0, 0.5, 20.0))
 	var told: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
+	var charged: int = 500 - gs.credits
 	var rider: String = gs.book_shuttle(Shuttle.DEIMOS, 1, HOST)
 	CoopWalkers.out.erase(GUEST)
-	var charged: int = 500 - gs.credits
 	_done(gs)
 	if told != Shuttle.text("far_text") or charged != 0:
 		return "A far walker got '%s' (%d CR) with the rover at the terminal" % [told, charged]
-	if rider != Shuttle.text("no_hub_text") % "Deimos":
-		return "The one in the rover at the terminal got '%s'" % rider
+	if rider != "":
+		return "The one in the rover at the terminal books Deimos: got '%s'" % rider
 	return ""
 
 
