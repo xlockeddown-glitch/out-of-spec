@@ -2,6 +2,15 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: UI restyle, part 2 (feat/ui-restyle-2)
+
+Moved `PauseUI` (`scripts/ui/pause_ui.gd`), `TitleMenu` (`scripts/ui/title_menu.gd`), `SkillsUI` (`scripts/ui/skills_ui.gd`), and `XpCertificateUI` (`scripts/ui/xp_certificate_ui.gd`) onto `ScopeTheme` (Meridiani Scope putty shell, terracotta header bar, recessed dark glass, and chunky putty buttons). Looks only — all button order, callbacks, signals, focus handling, node/field names, texts, and open/close rules are unchanged. Every new size and colour choice below is a [PLACEHOLDER]:
+
+- **`ScopeTheme` additions:** added `LineEdit` theme styling (`GLASS_DEEP` normal fill, `GLASS_CARD` read-only fill, `GLASS_LINE` 2 px border, `focus_box(8)` teal focus ring, `INK`/`INK_DIM`/`INK_MUTED` text, `TEAL` caret, `Color(TEAL, 0.3)` selection [PLACEHOLDER]) plus `ScopeTheme.label()` and `ScopeTheme.button()` static helpers. No existing helper return values were changed.
+- **`PauseUI`, `SkillsUI`, `XpCertificateUI`:** replaced `PlanBoardUI._panel_style()`, `PlanBoardUI._label()`, `PlanBoardUI._button()`, and `RobotsUI` colours with `ScopeTheme.SHELL`, `ScopeTheme.HEADER`, `ScopeTheme.TITLE`, `ScopeTheme.GLASS`, `ScopeTheme.label()`, `ScopeTheme.button()`, and `ScopeTheme.badge(&"ui_cancel")` on their close/back/resume buttons. `SkillsUI` wraps the lab row (with a `ScopeTheme.TEAL` card edge) and each skill row in `ScopeTheme.CARD` panels while keeping the XP certificate button as a direct child of `_rows`. `SkillsUI` and `XpCertificateUI` keep their `TEAL`/`TEXT`/`DIM` constants mapped to `ScopeTheme` colours so sibling screens keep compiling.
+- **`TitleMenu`:** wrapped the title screen in a `ScopeTheme.SHELL` (`SHELL_WIDTH = 780.0` px [PLACEHOLDER]) over a `ScopeTheme.GLASS_DEEP` backdrop, with `OUT OF SPEC` in a `ScopeTheme.HEADER` bar and the note, buttons, and IP `LineEdit` inside `ScopeTheme.GLASS`.
+- **Tests:** `tests/test_ui_restyle_2.gd` builds all four screens, verifies `ScopeTheme` panel/button/LineEdit styles, checks all preserved buttons and named nodes, and frees every node while restoring state.
+
 ## 2026-11-27: Phobos content, part 1 — warm service tunnel (feat/phobos-service-tunnel)
 
 Opened the Phobos hub's service-tunnel hatch into a new warm station conduit scene (`scenes/phobos_service_tunnel.tscn`, `scripts/world/phobos_service_tunnel.gd`) where players can walk and inspect daily-placed `banded_regolith_runner` strays. Deimos stays sealed, and no autoload, save, co-op, or data files were edited (`PROTOCOL` unchanged). Part 2 (catching a stray and Odalys's "Strays" quest) is intentionally left out until Colony Mine merges. Every number, colour, and hash choice is a [PLACEHOLDER]:

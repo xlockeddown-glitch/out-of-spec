@@ -11,6 +11,7 @@ var _text: Label
 var _note: Label
 var _resume_button: Button
 var _quit_button: Button
+var _glyph: Label
 ## True after the first press of QUIT that warned the guests.
 var _armed: bool = false
 ## The rover block as it was when the panel opened, put back on close.
@@ -23,6 +24,7 @@ var quitter: Callable
 
 func _ready() -> void:
 	add_to_group(QuestsUI.MODAL_GROUP)
+	theme = ScopeTheme.theme()
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	if not saver.is_valid():
 		saver = SaveGame.write
@@ -34,28 +36,47 @@ func _ready() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var panel := PanelContainer.new()
+	panel.theme_type_variation = ScopeTheme.SHELL
 	panel.custom_minimum_size = Vector2(560, 0)
-	panel.add_theme_stylebox_override(&"panel", PlanBoardUI._panel_style())
 	center.add_child(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override(&"separation", 12)
 	panel.add_child(column)
-	_title = PlanBoardUI._label("PAUSED", RobotsUI.TEAL, 30)
-	column.add_child(_title)
-	_text = PlanBoardUI._label("", RobotsUI.DIM, 18)
-	column.add_child(_text)
-	_note = PlanBoardUI._label("", RobotsUI.AMBER, 20)
-	column.add_child(_note)
-	_resume_button = PlanBoardUI._button("RESUME  (%s)" % Controls.key_label(&"ui_cancel"))
+	var header := PanelContainer.new()
+	header.theme_type_variation = ScopeTheme.HEADER
+	_title = Label.new()
+	_title.text = "PAUSED"
+	_title.theme_type_variation = ScopeTheme.TITLE
+	_title.add_theme_font_size_override(&"font_size", 30)
+	header.add_child(_title)
+	column.add_child(header)
+	var glass := PanelContainer.new()
+	glass.theme_type_variation = ScopeTheme.GLASS
+	column.add_child(glass)
+	var body := VBoxContainer.new()
+	body.add_theme_constant_override(&"separation", 10)
+	glass.add_child(body)
+	_text = ScopeTheme.label("", ScopeTheme.INK_MUTED, 18)
+	body.add_child(_text)
+	_note = ScopeTheme.label("", ScopeTheme.AMBER, 20)
+	body.add_child(_note)
+	_resume_button = ScopeTheme.button("RESUME  (%s)" % Controls.key_label(&"ui_cancel"), 20)
 	_resume_button.pressed.connect(close)
+	_glyph = ScopeTheme.badge(&"ui_cancel")
+	_resume_button.add_child(_glyph)
 	column.add_child(_resume_button)
-	_quit_button = PlanBoardUI._button("SAVE AND QUIT")
+	_quit_button = ScopeTheme.button("SAVE AND QUIT", 20)
 	_quit_button.pressed.connect(_on_quit)
 	column.add_child(_quit_button)
 	CoopSession.player_joined.connect(_on_players_changed.unbind(1))
 	CoopSession.player_left.connect(_on_players_changed.unbind(1))
 	CoopSession.lost.connect(_on_lost)
 	hide()
+
+
+func _process(_delta: float) -> void:
+	if visible:
+		ScopeTheme.refresh_badge(_glyph)
 
 
 func _exit_tree() -> void:

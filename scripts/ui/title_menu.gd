@@ -2,12 +2,12 @@ extends Control
 ## Title screen: continue the saved farm, start a new one or join a friend's. The clock is
 ## stopped here; it runs once a farm opens.
 
-const COLOR_TEXT := Color(0.8, 0.86, 0.82)
-const COLOR_BACKGROUND := Color(0.06, 0.07, 0.065)
 const FONT_TITLE: int = 72
 const FONT_TEXT: int = 22
 const BUTTON_SIZE := Vector2(420.0, 56.0)
 const NOTE_WIDTH: float = 720.0
+## Putty shell width around the title card [PLACEHOLDER].
+const SHELL_WIDTH: float = 780.0
 
 ## The save checked when the menu opened (SaveGame.check()).
 var _save: Dictionary = {}
@@ -37,44 +37,55 @@ func _ready() -> void:
 
 
 func _build() -> void:
+	theme = ScopeTheme.theme()
 	var background := ColorRect.new()
-	background.color = COLOR_BACKGROUND
+	background.color = ScopeTheme.GLASS_DEEP
 	background.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(background)
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
+	var panel := PanelContainer.new()
+	panel.theme_type_variation = ScopeTheme.SHELL
+	panel.custom_minimum_size = Vector2(SHELL_WIDTH, 0.0)
+	center.add_child(panel)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 24)
-	center.add_child(column)
+	column.add_theme_constant_override(&"separation", 18)
+	panel.add_child(column)
+	var header := PanelContainer.new()
+	header.theme_type_variation = ScopeTheme.HEADER
 	var title := Label.new()
 	title.text = "OUT OF SPEC"
-	title.add_theme_font_size_override("font_size", FONT_TITLE)
-	title.add_theme_color_override("font_color", DriftingSensor.COLOR_IN_BAND)
+	title.theme_type_variation = ScopeTheme.TITLE
+	title.add_theme_font_size_override(&"font_size", FONT_TITLE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	column.add_child(title)
-	_note = Label.new()
+	header.add_child(title)
+	column.add_child(header)
+	var glass := PanelContainer.new()
+	glass.theme_type_variation = ScopeTheme.GLASS
+	column.add_child(glass)
+	var inner := VBoxContainer.new()
+	inner.add_theme_constant_override(&"separation", 18)
+	glass.add_child(inner)
+	_note = ScopeTheme.label("", ScopeTheme.INK, FONT_TEXT)
 	_note.custom_minimum_size.x = NOTE_WIDTH
-	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_note.add_theme_font_size_override("font_size", FONT_TEXT)
-	_note.add_theme_color_override("font_color", COLOR_TEXT)
-	column.add_child(_note)
-	_main_buttons = _button_box(column)
+	inner.add_child(_note)
+	_main_buttons = _button_box(inner)
 	if _save.has("data"):
 		_button(_main_buttons, "CONTINUE (DAY %d)" % SaveGame.day_of(_save["data"]), _on_continue)
 	_button(_main_buttons, "NEW FARM", _on_new_farm)
 	_button(_main_buttons, "JOIN A FRIEND", _show_join)
 	_button(_main_buttons, "QUIT", get_tree().quit)
-	_confirm_buttons = _button_box(column)
+	_confirm_buttons = _button_box(inner)
 	_button(_confirm_buttons, "START A NEW FARM", _start_new)
 	_button(_confirm_buttons, "BACK", _show_main)
-	_join_buttons = _button_box(column)
+	_join_buttons = _button_box(inner)
 	_address = LineEdit.new()
 	_address.placeholder_text = "Your friend's IP address"
 	_address.custom_minimum_size = BUTTON_SIZE
 	_address.alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_address.add_theme_font_size_override("font_size", FONT_TEXT)
+	_address.add_theme_font_size_override(&"font_size", FONT_TEXT)
 	_address.text_submitted.connect(_on_join.unbind(1))
 	_join_buttons.add_child(_address)
 	_button(_join_buttons, "JOIN", _on_join)
