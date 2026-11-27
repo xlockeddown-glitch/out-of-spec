@@ -1,38 +1,6 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/field_phone_hud.gd" id="1_hud"]
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bezel"]
-content_margin_left = 22.0
-content_margin_top = 40.0
-content_margin_right = 22.0
-content_margin_bottom = 40.0
-bg_color = Color(0.11, 0.12, 0.11, 1)
-border_width_left = 4
-border_width_top = 4
-border_width_right = 4
-border_width_bottom = 4
-border_color = Color(0.25, 0.27, 0.25, 1)
-corner_radius_top_left = 28
-corner_radius_top_right = 28
-corner_radius_bottom_right = 28
-corner_radius_bottom_left = 28
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_screen"]
-content_margin_left = 22.0
-content_margin_top = 22.0
-content_margin_right = 22.0
-content_margin_bottom = 22.0
-bg_color = Color(0.03, 0.07, 0.045, 1)
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.2, 0.35, 0.24, 1)
-corner_radius_top_left = 8
-corner_radius_top_right = 8
-corner_radius_bottom_right = 8
-corner_radius_bottom_left = 8
 
 [node name="FieldPhoneHUD" type="Control"]
 layout_mode = 3
@@ -54,11 +22,9 @@ offset_right = -20.0
 offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_bezel")
 
 [node name="Screen" type="PanelContainer" parent="Bezel"]
 layout_mode = 2
-theme_override_styles/panel = SubResource("StyleBoxFlat_screen")
 
 [node name="Content" type="VBoxContainer" parent="Bezel/Screen"]
 layout_mode = 2
@@ -66,7 +32,8 @@ theme_override_constants/separation = 14
 
 [node name="Title" type="Label" parent="Bezel/Screen/Content"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
+theme_type_variation = &"ScopeTitle"
+theme_override_constants/outline_size = 0
 theme_override_font_sizes/font_size = 26
 text = "FIELD PHONE // UPLINK"
 
@@ -76,7 +43,6 @@ layout_mode = 2
 [node name="ClockLabel" type="Label" parent="Bezel/Screen/Content/ClockRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.85, 0.95, 0.88, 1)
 theme_override_font_sizes/font_size = 22
 text = "DAY 1  06:00"
 
@@ -87,14 +53,13 @@ size_flags_horizontal = 3
 [node name="CreditsLabel" type="Label" parent="Bezel/Screen/Content/ClockRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.65, 0.14, 1)
 theme_override_font_sizes/font_size = 22
 text = "0 CR"
 
 [node name="RelayLabel" type="Label" parent="Bezel/Screen/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_type_variation = &"ScopeCaption"
 theme_override_font_sizes/font_size = 18
 text = "SAT-RELAY"
 
@@ -106,7 +71,6 @@ theme_override_constants/separation = 6
 [node name="SigCaption" type="Label" parent="Bezel/Screen/Content/SignalRow"]
 layout_mode = 2
 size_flags_vertical = 8
-theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
 theme_override_font_sizes/font_size = 20
 text = "SIG "
 
@@ -115,28 +79,28 @@ unique_name_in_owner = true
 custom_minimum_size = Vector2(18, 14)
 layout_mode = 2
 size_flags_vertical = 8
-color = Color(0.14, 0.22, 0.16, 1)
+color = Color(0.18, 0.22, 0.275, 1)
 
 [node name="Bar2" type="ColorRect" parent="Bezel/Screen/Content/SignalRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(18, 26)
 layout_mode = 2
 size_flags_vertical = 8
-color = Color(0.14, 0.22, 0.16, 1)
+color = Color(0.18, 0.22, 0.275, 1)
 
 [node name="Bar3" type="ColorRect" parent="Bezel/Screen/Content/SignalRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(18, 38)
 layout_mode = 2
 size_flags_vertical = 8
-color = Color(0.14, 0.22, 0.16, 1)
+color = Color(0.18, 0.22, 0.275, 1)
 
 [node name="Bar4" type="ColorRect" parent="Bezel/Screen/Content/SignalRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(18, 50)
 layout_mode = 2
 size_flags_vertical = 8
-color = Color(0.14, 0.22, 0.16, 1)
+color = Color(0.18, 0.22, 0.275, 1)
 
 [node name="Spacer" type="Control" parent="Bezel/Screen/Content/SignalRow"]
 layout_mode = 2
@@ -152,7 +116,6 @@ text = "LOS --"
 [node name="LagLabel" type="Label" parent="Bezel/Screen/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
 theme_override_font_sizes/font_size = 20
 text = "UPLINK LAG  -- ms"
 
@@ -161,14 +124,12 @@ layout_mode = 2
 
 [node name="DriftCaption" type="Label" parent="Bezel/Screen/Content"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
 theme_override_font_sizes/font_size = 18
 text = "STEERING DRIFT (AS-FOUND)"
 
 [node name="DriftValue" type="Label" parent="Bezel/Screen/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
 theme_override_font_sizes/font_size = 64
 text = "+0.00°"
 horizontal_alignment = 1
@@ -183,7 +144,6 @@ horizontal_alignment = 1
 [node name="ToleranceLabel" type="Label" parent="Bezel/Screen/Content"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
 theme_override_font_sizes/font_size = 16
 text = "TOL --"
 horizontal_alignment = 1
@@ -202,7 +162,7 @@ layout_mode = 2
 [node name="RelayStatusLabel" type="Label" parent="Bezel/Screen/Content/RelayRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
+theme_type_variation = &"ScopeCaption"
 theme_override_font_sizes/font_size = 18
 text = "RELAY: STOCK TRANSCEIVER"
 
@@ -213,14 +173,12 @@ size_flags_horizontal = 3
 [node name="OreLabel" type="Label" parent="Bezel/Screen/Content/RelayRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.22, 0.88, 0.78, 1)
 theme_override_font_sizes/font_size = 18
 text = "ORE 0   "
 
 [node name="SpoolLabel" type="Label" parent="Bezel/Screen/Content/RelayRow"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.45, 0.9, 1, 1)
 theme_override_font_sizes/font_size = 18
 text = "SILK SPOOLS 0"
 
@@ -232,6 +190,7 @@ theme_override_constants/separation = 10
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
+theme_type_variation = &"ScopePhoneKey"
 size_flags_horizontal = 3
 focus_mode = 0
 disabled = true
@@ -242,6 +201,7 @@ text = "INSTALL SILK SPOOL"
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 52)
 layout_mode = 2
+theme_type_variation = &"ScopePhoneKey"
 size_flags_horizontal = 3
 focus_mode = 0
 theme_override_font_sizes/font_size = 18
@@ -256,7 +216,6 @@ layout_mode = 2
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 44)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.96, 0.65, 0.14, 1)
 theme_override_font_sizes/font_size = 16
 autowrap_mode = 3
 
@@ -264,6 +223,7 @@ autowrap_mode = 3
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
+theme_type_variation = &"ScopePhoneKey"
 focus_mode = 0
 theme_override_font_sizes/font_size = 18
 text = "TRADE 6 ORE: WIDE TREADS  [E]"
@@ -273,7 +233,6 @@ layout_mode = 2
 
 [node name="LogCaption" type="Label" parent="Bezel/Screen/Content"]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.4, 0.7, 0.45, 1)
 theme_override_font_sizes/font_size = 18
 text = "DISPATCH LOG"
 
@@ -281,7 +240,6 @@ text = "DISPATCH LOG"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_colors/font_color = Color(0.55, 1, 0.6, 1)
 theme_override_font_sizes/font_size = 16
 autowrap_mode = 3
 clip_text = true

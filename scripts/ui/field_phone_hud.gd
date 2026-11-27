@@ -2,6 +2,8 @@ class_name FieldPhoneHUD
 extends Control
 ## Right-side handheld field phone. Presentation only: renders state handed to
 ## it and emits intent signals. No gameplay rules live here.
+## Its own device in the Meridiani Scope family (ScopeTheme): a putty case with a
+## terracotta band around dark glass, the same rows and keys as before.
 
 signal zero_steering_pressed
 signal slot_spool_pressed
@@ -27,7 +29,7 @@ const JOBS_MAX_HEIGHT: float = 130.0 # before PHONE_SCALE; [PLACEHOLDER] room fo
 ## The dispatch log always keeps room for this many lines, px (before PHONE_SCALE).
 const LOG_MIN_HEIGHT: float = 80.0
 const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
-const COLOR_BAR_OFF := Color(0.14, 0.22, 0.2)
+const COLOR_BAR_OFF := ScopeTheme.GLASS_LINE
 const COLOR_OK := DriftingSensor.COLOR_IN_BAND
 const COLOR_WARN := DriftingSensor.COLOR_GUARDBAND
 const COLOR_FAIL := DriftingSensor.COLOR_OUT_OF_TOLERANCE
@@ -50,6 +52,10 @@ var _gauge_label: Label
 var _jobs_box: VBoxContainer
 ## Holds _jobs_box; scrolls when the jobs are taller than JOBS_MAX_HEIGHT.
 var _jobs_scroll: ScrollContainer
+## The state chip on the drift card, and its three styles (one per band colour), built once.
+var _status_chip: PanelContainer
+var _status_color: Color = COLOR_OK
+var _chip_styles: Dictionary[Color, StyleBoxFlat] = {}
 
 @onready var _bars: Array[ColorRect] = [%Bar1, %Bar2, %Bar3, %Bar4]
 @onready var _relay_label: Label = %RelayLabel
@@ -113,6 +119,8 @@ static func scaled_font(base: int) -> int:
 
 func _ready() -> void:
 	anchor_left = LEFT_ANCHOR
+	theme = ScopeTheme.theme()
+	_style_case()
 	_refresh_keys()
 	_scale_scene_nodes(self)
 	_zero_button.pressed.connect(func() -> void: zero_steering_pressed.emit())
@@ -122,6 +130,7 @@ func _ready() -> void:
 	_wheels_button = Button.new()
 	_wheels_button.name = "WheelServiceButton"
 	_wheels_button.focus_mode = Control.FOCUS_NONE
+	_wheels_button.theme_type_variation = ScopeTheme.PHONE_KEY
 	_wheels_button.custom_minimum_size = Vector2(0, scaled(40.0))
 	_wheels_button.add_theme_font_size_override("font_size", scaled_font(15))
 	_wheels_button.pressed.connect(func() -> void: wheel_service_pressed.emit())
@@ -134,7 +143,6 @@ func _ready() -> void:
 	_credibility_label = Label.new()
 	_credibility_label.name = "CredibilityLabel"
 	_credibility_label.add_theme_font_size_override("font_size", scaled_font(16))
-	_credibility_label.add_theme_color_override("font_color", COLOR_OK)
 	# A long contract line wraps rather than widening the phone off the screen.
 	_credibility_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var clock_row: Node = _credits_label.get_parent()
@@ -162,6 +170,116 @@ func _ready() -> void:
 	clock_row.get_parent().add_child(_jobs_scroll)
 	clock_row.get_parent().move_child(_jobs_scroll, _gauge_label.get_index() + 1)
 	_jobs_box.minimum_size_changed.connect(_fit_jobs_scroll)
+	_link_label.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
+	_card_the_drift()
+	_card_the_header()
+	_card_the_log()
+
+
+## The case and the glass carry the Scope styles. They are set as overrides (copies
+## of the theme's, at the scene's original margins) so _scale_scene_nodes scales
+## their margins with the rest; then the terracotta band goes across the top.
+func _style_case() -> void:
+	var bezel := get_node("Bezel") as PanelContainer
+	var screen := get_node("Bezel/Screen") as PanelContainer
+	var case_box := theme.get_stylebox(&"panel", ScopeTheme.PHONE_CASE).duplicate() as StyleBoxFlat
+	case_box.set_content_margin(SIDE_TOP, 40.0)
+	case_box.set_content_margin(SIDE_BOTTOM, 40.0)
+	bezel.add_theme_stylebox_override(&"panel", case_box)
+	screen.add_theme_stylebox_override(&"panel", theme.get_stylebox(&"panel", ScopeTheme.PHONE_GLASS).duplicate() as StyleBoxFlat)
+	var band := PanelContainer.new()
+	band.name = "Band"
+	band.theme_type_variation = ScopeTheme.PHONE_BAND
+	band.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	band.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	band.offset_left = scaled(20.0 + 70.0)
+	band.offset_right = -scaled(20.0 + 70.0)
+	band.offset_top = scaled(20.0 + 14.0)
+	band.offset_bottom = scaled(20.0 + 28.0)
+	add_child(band)
+
+
+## A cream card (ScopePhoneCard) with a VBox inside; margins are scaled by hand.
+func _make_card(card_name: String) -> VBoxContainer:
+	var card := PanelContainer.new()
+	card.name = card_name
+	card.theme_type_variation = ScopeTheme.PHONE_CARD
+	var cream := theme.get_stylebox(&"panel", ScopeTheme.PHONE_CARD).duplicate() as StyleBoxFlat
+	cream.set_content_margin_all(scaled(8.0))
+	card.add_theme_stylebox_override(&"panel", cream)
+	var rows := VBoxContainer.new()
+	card.add_child(rows)
+	return rows
+
+
+func _ink(label: Label, color: Color = ScopeTheme.CARD_INK) -> void:
+	label.add_theme_color_override(&"font_color", color)
+
+
+## The drift reading sits on a cream card: the number big in dark ink, the state a
+## coloured chip, the zero key outlined.
+func _card_the_drift() -> void:
+	var content: Node = _drift_value.get_parent()
+	var first: Node = content.get_node("DriftCaption")
+	var rows := _make_card("DriftCard")
+	var card: Node = rows.get_parent()
+	content.add_child(card)
+	content.move_child(card, first.get_index())
+	var chip := PanelContainer.new()
+	chip.name = "StatusChip"
+	chip.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	for state_color: Color in [COLOR_OK, COLOR_WARN, COLOR_FAIL]:
+		_chip_styles[state_color] = _chip_style(state_color)
+	chip.add_theme_stylebox_override(&"panel", _chip_styles[COLOR_OK])
+	for node: Node in [first, _drift_value, _status_label, _tolerance_label, _zero_button]:
+		node.reparent(rows, false)
+	# The chip goes where the status label was.
+	rows.add_child(chip)
+	rows.move_child(chip, _status_label.get_index())
+	_status_label.reparent(chip, false)
+	_ink(first as Label, ScopeTheme.CARD_INK_MUTED)
+	_ink(_drift_value)
+	_ink(_tolerance_label, ScopeTheme.CARD_INK_MUTED)
+	_status_label.add_theme_color_override(&"font_color", COLOR_OK)
+	_status_chip = chip
+	_zero_button.theme_type_variation = ScopeTheme.PHONE_KEY_OUTLINE
+
+
+func _chip_style(state: Color) -> StyleBoxFlat:
+	var style := ScopeTheme.state_chip_box(state)
+	style.content_margin_left = scaled(12.0)
+	style.content_margin_right = scaled(12.0)
+	style.content_margin_top = scaled(2.0)
+	style.content_margin_bottom = scaled(2.0)
+	return style
+
+
+## Day, time and credits on one cream card.
+func _card_the_header() -> void:
+	var row: Node = _credits_label.get_parent()
+	var content: Node = row.get_parent()
+	var rows := _make_card("HeaderCard")
+	var card: Node = rows.get_parent()
+	content.add_child(card)
+	content.move_child(card, row.get_index())
+	row.reparent(rows, false)
+	_ink(_clock_label)
+	_ink(_credits_label)
+
+
+## The dispatch log on a cream card.
+func _card_the_log() -> void:
+	var caption: Node = _log_label.get_parent().get_node("LogCaption")
+	var content: Node = _log_label.get_parent()
+	var rows := _make_card("LogCard")
+	var card := rows.get_parent() as Control
+	card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	content.add_child(card)
+	content.move_child(card, caption.get_index())
+	caption.reparent(rows, false)
+	_log_label.reparent(rows, false)
+	_ink(caption as Label, ScopeTheme.CARD_INK_MUTED)
+	_ink(_log_label)
 
 
 ## Scales what the scene file sets by hand (written at the original size):
@@ -228,7 +346,7 @@ func set_relay(slotted: bool, damaged: bool, spools: String, can_slot: bool) -> 
 	_relay_status_label.text = "RELAY: STOCK TRANSCEIVER" if not slotted \
 			else "RELAY: DAMAGED SILK" if damaged else "RELAY: OPTICAL SILK"
 	_relay_status_label.add_theme_color_override(
-		"font_color", Color(0.4, 0.7, 0.45) if not slotted else COLOR_WARN if damaged else Color(0.45, 0.9, 1))
+		"font_color", ScopeTheme.INK_MUTED if not slotted else COLOR_WARN if damaged else ScopeTheme.TEAL)
 	_spool_label.text = "SILK SPOOLS %s" % spools
 	_slot_spool_button.disabled = not can_slot
 
@@ -239,7 +357,8 @@ func set_clock(text: String) -> void:
 
 func set_credits(credits: int) -> void:
 	_credits_label.text = "%s CR" % SP811.integer(credits)
-	_credits_label.add_theme_color_override("font_color", COLOR_FAIL if credits < 0 else COLOR_WARN)
+	# On cream: dark ink, a deep red only when the lab is in debt.
+	_credits_label.add_theme_color_override("font_color", ScopeTheme.CARD_ALERT if credits < 0 else ScopeTheme.CARD_INK)
 
 
 ## e.g. "TRUSTED, 40 % to ACCREDITED" from GameState.credibility_text(), and
@@ -329,7 +448,7 @@ func show_standards(offers: Array[Dictionary], note: String) -> void:
 			label.text = note
 			label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			label.add_theme_font_size_override("font_size", scaled_font(14))
-			label.add_theme_color_override("font_color", Color(0.4, 0.7, 0.45))
+			label.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
 			_standards_box.add_child(label)
 		return
 	for offer: Dictionary in offers:
@@ -337,6 +456,7 @@ func show_standards(offers: Array[Dictionary], note: String) -> void:
 		button.text = str(offer["text"])
 		button.disabled = bool(offer["disabled"])
 		button.focus_mode = Control.FOCUS_NONE
+		button.theme_type_variation = ScopeTheme.PHONE_KEY
 		button.custom_minimum_size = Vector2(0, scaled(40.0))
 		button.add_theme_font_size_override("font_size", scaled_font(15))
 		var id: String = str(offer["id"])
@@ -350,16 +470,12 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 	for child: Node in _jobs_box.get_children():
 		_jobs_box.remove_child(child)
 		child.queue_free()
-	var lines: PackedStringArray = active.duplicate()
+	# Accepted jobs are a plain readout (ink); the note is a muted caption.
+	if not active.is_empty():
+		_add_jobs_label("
+".join(active), false)
 	if offers.is_empty() and note != "":
-		lines.append(note)
-	if not lines.is_empty():
-		var label := Label.new()
-		label.text = "\n".join(lines)
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		label.add_theme_font_size_override("font_size", scaled_font(14))
-		label.add_theme_color_override("font_color", COLOR_OK)
-		_jobs_box.add_child(label)
+		_add_jobs_label(note, true)
 	# Offers you can accept come first; `index` stays the board's own.
 	var order: Array[int] = []
 	for i: int in offers.size():
@@ -374,11 +490,22 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 		button.disabled = bool(offers[i]["disabled"])
 		button.tooltip_text = str(offers[i].get("tooltip", ""))
 		button.focus_mode = Control.FOCUS_NONE
+		button.theme_type_variation = ScopeTheme.PHONE_KEY
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.add_theme_font_size_override("font_size", scaled_font(13))
 		var index: int = i
 		button.pressed.connect(func() -> void: accept_job_pressed.emit(index))
 		_jobs_box.add_child(button)
+
+
+func _add_jobs_label(text: String, muted: bool) -> void:
+	var label := Label.new()
+	label.text = text
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", scaled_font(14))
+	if muted:
+		label.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
+	_jobs_box.add_child(label)
 
 
 ## As tall as the job list, up to JOBS_MAX_HEIGHT; it scrolls beyond that.
@@ -405,5 +532,9 @@ func push_log(line: String) -> void:
 
 func _set_status(text: String, color: Color) -> void:
 	_status_label.text = text
-	_status_label.add_theme_color_override("font_color", color)
-	_drift_value.add_theme_color_override("font_color", color)
+	# The state is the chip (dark pill, state colour); the reading stays dark ink.
+	# Restyled only when the band changes: set_drift runs every frame while driving.
+	if _status_color != color:
+		_status_color = color
+		_status_label.add_theme_color_override(&"font_color", color)
+		_status_chip.add_theme_stylebox_override(&"panel", _chip_styles[color])

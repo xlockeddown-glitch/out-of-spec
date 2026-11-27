@@ -26,6 +26,11 @@ const TERRA_DARK: Color = Color("#9C4728")
 const INK: Color = Color("#EEF6F4")
 const INK_MUTED: Color = Color("#98AAB9")
 const INK_DIM: Color = Color("#6A7C8C")
+## Dark ink for text on the cream phone cards (the light INK would vanish there),
+## and a deep red for a negative figure on cream.
+const CARD_INK: Color = Color("#1D222B")
+const CARD_INK_MUTED: Color = Color("#4A4336")
+const CARD_ALERT: Color = Color("#9B1C23")
 
 ## Theme type variations a panel names with `theme_type_variation`.
 const SHELL: StringName = &"ScopeShell"
@@ -34,6 +39,14 @@ const GLASS: StringName = &"ScopeGlass"
 const CARD: StringName = &"ScopeCard"
 const CAPTION: StringName = &"ScopeCaption"
 const TITLE: StringName = &"ScopeTitle"
+## The field phone's own variations (its case, its glass, its small keys, its top band).
+const PHONE_CASE: StringName = &"ScopePhoneCase"
+const PHONE_GLASS: StringName = &"ScopePhoneGlass"
+const PHONE_KEY: StringName = &"ScopePhoneKey"
+const PHONE_BAND: StringName = &"ScopePhoneBand"
+## A cream card on the phone's dark glass, and its outlined key.
+const PHONE_CARD: StringName = &"ScopePhoneCard"
+const PHONE_KEY_OUTLINE: StringName = &"ScopePhoneKeyOutline"
 
 ## The focus ring: thick, teal, with a soft glow [PLACEHOLDER].
 const FOCUS_BORDER: int = 5
@@ -85,6 +98,14 @@ static func chip_box(border: Color, fill: Color = GLASS_DEEP) -> StyleBoxFlat:
 	return style
 
 
+## The state chip on a cream card: a dark pill with the state colour as text and edge.
+static func state_chip_box(state: Color) -> StyleBoxFlat:
+	var style := box(GLASS_DEEP, state, 2, 8, 8)
+	style.content_margin_top = 2
+	style.content_margin_bottom = 2
+	return style
+
+
 ## A card on the glass: the quest board's rows and the bench's result plate. `edge`
 ## colours the border (a verdict, or the line colour).
 static func card_box(edge: Color = GLASS_LINE) -> StyleBoxFlat:
@@ -108,6 +129,19 @@ static func _build() -> Theme:
 	_variation(t, HEADER, &"PanelContainer", &"panel", header)
 	_variation(t, GLASS, &"PanelContainer", &"panel", box(SHADOW, GLASS_DEEP, 5, 10, 16))
 	_variation(t, CARD, &"PanelContainer", &"panel", card_box())
+	# The field phone: a rounded putty handheld around dark glass, a terracotta band
+	# across its top, smaller keys so two fit side by side [PLACEHOLDER].
+	var body := box(ENAMEL, TERRA_DARK, 4, 28, 22)
+	body.border_width_bottom = 9
+	body.shadow_color = Color(0, 0, 0, 0.5)
+	body.shadow_size = 10
+	_variation(t, PHONE_CASE, &"PanelContainer", &"panel", body)
+	_variation(t, PHONE_GLASS, &"PanelContainer", &"panel", box(SHADOW, GLASS_DEEP, 3, 10, 22))
+	var band := box(TERRA, TERRA_DARK, 2, 7, 0)
+	band.border_width_bottom = 4
+	_variation(t, PHONE_BAND, &"PanelContainer", &"panel", band)
+	# A cream card: putty top colour, small radius, thin dark edge [PLACEHOLDER].
+	_variation(t, PHONE_CARD, &"PanelContainer", &"panel", box(ENAMEL_TOP, CARD_INK, 2, 6, 8))
 	# Labels: ink on the glass; a caption and a title.
 	t.set_color(&"font_color", &"Label", INK)
 	t.set_type_variation(CAPTION, &"Label")
@@ -122,6 +156,32 @@ static func _build() -> Theme:
 	for kind: StringName in [&"OptionButton", &"CheckButton"]:
 		_button_styles(t, kind, GLASS_CARD, GLASS_LINE, INK, INK_DIM)
 	t.set_color(&"font_color", &"CheckButton", INK)
+	t.set_type_variation(PHONE_KEY, &"Button")
+	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
+		var key: StyleBoxFlat = (t.get_stylebox(state, &"Button") as StyleBoxFlat).duplicate() as StyleBoxFlat
+		key.content_margin_left = 8
+		key.content_margin_right = 8
+		key.content_margin_top = 6
+		key.content_margin_bottom = 6
+		# Thin edges to match the small margins [PLACEHOLDER].
+		key.border_width_top = 2
+		key.border_width_left = 2
+		key.border_width_right = 2
+		key.border_width_bottom = 2 if state == &"pressed" else 3 if state == &"disabled" else 4
+		t.set_stylebox(state, PHONE_KEY, key)
+	# The outlined key for a cream card: clear face, putty edge, dark ink.
+	t.set_type_variation(PHONE_KEY_OUTLINE, &"Button")
+	for state: StringName in [&"normal", &"hover", &"pressed", &"disabled"]:
+		var key: StyleBoxFlat = (t.get_stylebox(state, PHONE_KEY) as StyleBoxFlat).duplicate() as StyleBoxFlat
+		var live: bool = state == &"hover" or state == &"pressed"
+		key.bg_color = Color(ENAMEL_INSET, (0.45 if state == &"hover" else 0.8) if live else 0.0)
+		key.border_color = CARD_INK_MUTED
+		key.set_border_width_all(2)
+		key.border_width_bottom = 4 if state == &"hover" or state == &"normal" else 2
+		t.set_stylebox(state, PHONE_KEY_OUTLINE, key)
+	for color_name: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_focus_color"]:
+		t.set_color(color_name, PHONE_KEY_OUTLINE, CARD_INK)
+	t.set_color(&"font_disabled_color", PHONE_KEY_OUTLINE, Color(CARD_INK, 0.45))
 	# The drop-down list.
 	t.set_stylebox(&"panel", &"PopupMenu", box(GLASS_DEEP, TEAL, 2, 6, 6))
 	t.set_stylebox(&"hover", &"PopupMenu", box(Color(TEAL, 0.25), TEAL, 0, 4, 4))

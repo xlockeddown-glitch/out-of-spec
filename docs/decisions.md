@@ -2259,3 +2259,24 @@ Ryan: the start of the game needs a few tips and an idea of what you are doing (
 - **Outside a test.** Suite construction is checked like a test. After the last test the runner awaits two frames and fails the run ("N script error(s) outside any test") if the logger count is above what was pinned on tests, constructions and the probe.
 - **Guard probe, every run.** Before the suite the runner runs `crash_on_null` and `plain_pass` from `tests/helpers/crashing_suite.gd` and counts a fault into `failed` if the crash is not caught or the pass fails. It prints one expected SCRIPT ERROR block, announced by a line before it. `RUNNER_SELFTEST=1` adds a null return, a failure message and await-then-crash and await-then-pass cases. The helper sits in `tests/helpers/`, so the runner never picks it up as a suite.
 - **Result.** The full suite (1570 tests) still passes, with the probe on every run: no hidden script errors on main and none outside a test.
+
+## The field phone in the Scope family [PLACEHOLDER] (2026-11-27, feat/phone-scope)
+Ryan: redo the phone UI to be similar to the Meridian style, not an exact replica.
+- Its own device, not a copy of the bench: a rounded putty case with a terracotta edge and a terracotta band across the top, dark #1D222B glass inside, small putty keys. New ScopeTheme variations ScopePhoneCase, ScopePhoneGlass, ScopePhoneBand, ScopePhoneKey; the bench and the quest board look as before.
+- Same layout, rows, wording, keys and signals as before (Ryan liked the old phone). The earlier PR 127 look (metal case, needle gauge, message cards) stays out. The drift reading now sits on one Scope card.
+- The key hints still follow Controls.shown_pad (the brackets show the pad button on a pad); no separate pad badge was added, since the phone's keys are not focus targets.
+- Size is unchanged: PHONE_SCALE 0.8, the phone still starts at LEFT_ANCHOR (0.744, 1428 px of 1920) and the case is the same 460 x 1048 px at 1080p.
+- Colours: green terminal text became Scope ink (white), muted captions (INK_MUTED) and teal for good states; amber and red keep their meaning. Nothing is saved or sent.
+
+### Phone round 2: "Mix", cream cards on the dark glass [PLACEHOLDER] (2026-11-27)
+Ryan picked "Mix": keep the putty case and terracotta band, and put cream cards on the dark glass (idea from his phone_cards concept, not its exact colours).
+- New ScopeTheme variations ScopePhoneCard (cream ENAMEL_TOP, 6 px radius, thin dark edge) and ScopePhoneKeyOutline (clear face, putty edge, dark ink). New named colours CARD_INK, CARD_INK_MUTED and CARD_ALERT: text on cream is never the light INK.
+- Three cards: header (day, time, credits), drift (caption, big reading in dark ink, state chip, tolerance, ZERO key) and the dispatch log. The state chip is a dark pill with the band colour as text and edge: teal in band, amber guard band, red only out of tolerance. Credits are dark ink, deep red only when negative.
+- Stay on the glass: title, credibility/lab/contract, lights, gauge set, the jobs list and ACCEPT keys, signal, relay, ore, spools, the two putty keys, Bram's shop and standards, the wheel key. Reason: they are keys or status lines that read well on dark, and fewer cards keeps the phone from growing.
+- Every row, text, key, signal and order is unchanged; same size (460 x 1048 px at 1080p).
+
+## Field phone round 3: review fixes (PR 227)
+- Stale per-node font colours on the Ore, Bram, Credits and Status labels are gone from the scene; the theme and code own the colours. The link label starts muted until the uplink is set.
+- Outline key: clear face, muted border, 2 px bottom when disabled or pressed. The state chip restyles only when its band changes, from prebuilt styles.
+- Left alone on purpose: amber lights and the amber NO ROVER label stay amber (state colours, not card ink).
+- project.godot sets no GDScript warning levels, so unsafe_cast and unsafe_call_argument stay Godot defaults (not errors); the casts are typed anyway.
