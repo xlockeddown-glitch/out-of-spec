@@ -2359,3 +2359,13 @@ Added the four rare moon/pod tarantula rows to `data/tarantula_species.json` (`t
 - **Dome look:** `RareSpiderLook` builds a primitive-mesh spider using `ScopeTheme` colours only (no raw hex literals) and attaches inside `Terrarium` when `species_id` is a rare species, inheriting existing empty/pre-molt/exuvia visibility and dim overlay rules.
 - **Numbers [PLACEHOLDER]:** Wider moon-adapted climate bands (`zones.md` §10): Banded Regolith Runner 23 °C (±5.5 °C), 58 % (±18 %), 10 d, grade 3, yield 3, 15 % lag cut; Rime Carapace Spinner 20 °C (±5.0 °C), 74 % (±16 %), 11 d, grade 3, yield 3, 18 % lag cut; Brass Glint Reticle 24 °C (±6.0 °C), 52 % (±20 %), 12 d, grade 4, yield 3, 20 % lag cut; Low-G Titan Carapace 22 °C (±6.5 °C), 60 % (±20 %), 14 d, grade 4, yield 4, 22 % lag cut; Titan scale 1.38×.
 
+## On-screen pad keyboard for the picker (2026-11-27, feat/pad-keyboard)
+
+Added a reusable Meridiani Scope on-screen keyboard (`scripts/ui/pad_keyboard.gd`, `PadKeyboard`) wired into `PickerUI` so controller players can type a character name without leaving the Xbox pad:
+
+- **Keys & navigation:** 5-row layout (`0`–`9`, `A`–`Z`, `-`, `'`, `SHIFT`, `SPACE`, `BACKSPACE`, `DONE`). D-pad or left stick moves the highlighted key with wrap-around at edges; `A` presses the key, `B` deletes (and closes when the buffer is empty), `Start` or `DONE` finishes; mouse clicks on keys also work. Button prompts are built live with `Controls.prompt(...)`.
+- **Picker integration:** Pressing `A` on the focused name field or pressing the `PAD` button beside it opens `PadKeyboard`. Typed text updates `_name_field` respecting `Loadout.MAX_NAME`. While the keyboard is open (in `QuestsUI.MODAL_GROUP`), `PickerUI`'s `P`/`Esc` handling and row arrow cycling are blocked; closing returns focus to the picker rows. Keyboard-and-mouse typing directly into `_name_field` is unchanged.
+- **Local-only UI:** Uses `ScopeTheme` colours only (no raw hex literals); no save or network protocol change.
+- **[PLACEHOLDER]:** Key layout, panel width (820 px), key sizes (64×48 px, action keys 180×48 px), font sizes, stick thresholds (0.6 / 0.35), and button wording (`ENTER NAME`, `PAD`, `SHIFT`, `SPACE`, `BACKSPACE`, `DONE`).
+
+
