@@ -503,7 +503,7 @@ func test_bench_lists_standards_with_send_button() -> String:
 	elif send.disabled != GameState.at_oirm.has(standard_id):
 		problem = "SEND must be enabled unless the standard is already away."
 	bench.open(GameState.STEERING_ID)
-	if problem == "" and (send.visible or not button.visible or button.text != CalBenchUI.CALIBRATE_TEXT or not standard_label.text.contains("Chain")):
+	if problem == "" and (send.visible or not button.visible or button.text != CalBenchUI.CALIBRATE_TEXT or not ScopeTheme.chip_text(bench.get_node("%ChainRow").get_child(0)).begins_with("Chain")):
 		problem = "A unit must show the calibrate button and its chain: %s / %s" % [button.text, standard_label.text]
 	var table_id: String = GameState.steering.calibrated_by
 	var was_away: bool = GameState.at_oirm.has(table_id)
