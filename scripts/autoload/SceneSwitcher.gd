@@ -56,6 +56,12 @@ func trip_holds_dome(scene_path: String) -> bool:
 	return FastTravel.pending and scene_path == DOME_SCENE
 
 
+## The dome stays while a console trip waits on the host; the title menu is always reachable
+## (STOP HOSTING, quitting), so a stuck wait cannot hold the player in the dome.
+func swap_blocked(path: String, scene_path: String) -> bool:
+	return path != TITLE_SCENE and trip_holds_dome(scene_path)
+
+
 ## Like swap_to, but after a swap in progress instead of not at all.
 func go_to(path: String) -> void:
 	while _busy:
@@ -72,9 +78,11 @@ func swap_to(path: String) -> void:
 	if _busy:
 		return
 	var current: Node = get_tree().current_scene
-	if trip_holds_dome(current.scene_file_path if current != null else ""):
+	if swap_blocked(path, current.scene_file_path if current != null else ""):
 		return  # a console trip the host may have agreed to has not got its answer: the dome stays
 	_busy = true
+	if path == TITLE_SCENE:
+		FastTravel.pending = false  # leaving the farm: no answer is waited for
 	if path != TUNNELS_SCENE:
 		# Anywhere but the tunnels, no screen is below them.
 		ZoneDepth.set_local(0, {})

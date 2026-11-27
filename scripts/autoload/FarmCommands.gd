@@ -161,8 +161,8 @@ func execute(player_id: String, action: StringName, arguments: Array) -> Variant
 
 
 ## True unless `action` acts at a cell farther from the farm's rover than a player
-## in it reaches. Where the rover is not known or is in the tunnels, the ground is
-## not here to reach.
+## in it reaches. Where the rover is not known or is in the tunnels, there is no reach
+## to hold to: a player on foot acts where they stand (CoopWalkers), so it is allowed.
 func is_within_reach(action: StringName, arguments: Array) -> bool:
 	if not action in AT_CELL or arguments.is_empty() or not arguments[0] is Vector3i:
 		return true

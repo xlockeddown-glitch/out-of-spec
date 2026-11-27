@@ -88,3 +88,29 @@ Allow about 18 min. Use a fresh editor run or a **Windows debug export** so F9 c
 7. **Meet the auditors · 2 min** — On the farm, park beside the soil plot (the pod lands just south of it) and note your credits. Tap **F9** once per morning until the phone first reads **DAY 5**. Stop there to watch the drop-pod land with AUD-1T. The day-1 hygrometer calibration is overdue. Expect the phone log to show the manager’s intervention and Vance’s one-time warning, with the same credit balance afterward. After a lot of driving the manager may also name the steering encoder; that is expected. ☐ Pass ☐ Fail
 
 8. **Trade at Bram’s bay · 5 min** — Drive with **W/A/S/D** and tap **Space** on fresh cyan fissures until the phone shows **ORE 6**. The fissure from step 3 regrew the following morning. Drive under the scrapyard bay roof until Bram’s offer appears, then press **E** once. Expect **ORE 0**, **WIDE TREADS FITTED**, and Bram’s message that steering drift per meter is down 50 %. ☐ Pass ☐ Fail
+
+## Two-PC zones checklist
+
+Needs two PCs on one network, a farm with the Lava Tubes unlocked, and the rover at the farm's tunnel mouth. The host is **PC A** and the guest is **PC B**. Use a debug export so F9 can move the clock. Allow about 30 min. Mark one box per step.
+
+Good to know first. The console in the dome puts a player in the rover that is already below, at the depth it is at. Finds are only at depths 1 to 3. Joining a farm always opens the farm scene, so PC B must travel back in after each join.
+
+1. **Join the farm · 2 min** — On PC A press **Host** and read out the address. On PC B press **Join** and type it. Expect both players on the farm, and PC B to see PC A's farm. ☐ Pass ☐ Fail
+
+2. **Two places at once · 5 min** — On PC A drive the rover into the tunnel mouth and stay in the hub. On PC B stay on the farm. Expect PC B to see the farm's rover gone from the pad. Now press **Tab** on PC B to go to the dome and use the console to travel to the Lava Tubes. Expect PC B to land in the hub, in the same rover as PC A. ☐ Pass ☐ Fail
+
+3. **Different depths · 6 min** — On PC A take the rover down the hatch to depth 1. Expect the rover on PC B to follow it down. Take a find on PC A. Expect it to pay once on both screens. Now take the rover down to depth 2. On PC B try to take a find at depth 1 and to press the hatch for depth 3. Expect a plain refusal each time. ☐ Pass ☐ Fail
+
+4. **Join late · 6 min** — Bring the rover up to depth 1 and take a find on PC A. On PC B quit to the title screen and join again. Expect PC B on the farm, and the same find already taken. Use the dome console to travel back in. Expect PC B at the depth the rover is at now. Expect no second pay for the find. ☐ Pass ☐ Fail
+
+5. **A guest drops in the hub · 5 min** — Bring the rover to the hub on PC A and walk PC A back to the farm, then to the dome. Expect PC B alone below. Pull PC B's network cable. Expect PC A to see PC B go, and the rover to be gone from the tunnels. Expect no heat trip left on the phone. ☐ Pass ☐ Fail
+
+6. **A guest drops from the dome · 3 min** — Rejoin on PC B. On PC B drive the farm's rover into the tunnel mouth, then press **Tab** to the dome. Quit PC B to the title screen. Expect the farm's rover back on the pad on PC A, not left below. ☐ Pass ☐ Fail
+
+7. **The day does not wait · 3 min** — Rejoin on PC B and drive the rover into the tunnel mouth again. Go to bed on PC A. Quit PC B while it is below. Expect PC A's day to end at once, with the rover home when the new day starts. ☐ Pass ☐ Fail
+
+8. **The host stops hosting · 3 min** — On PC B drive the rover in once more and stay in the hub. On PC A press **Stop hosting** at the title screen or in the menu. Expect the rover home on PC A's farm, and PC B to go to the title screen with a note that the host left. ☐ Pass ☐ Fail
+
+9. **The wait for the host · 2 min** — On PC B use the dome console and, while it waits for an answer, press **Esc** and quit to the title screen. Expect the title screen, not a stuck dome. ☐ Pass ☐ Fail
+
+Not covered: the 02:00 rescue of a guest who is still in a zone when the day ends, and a real two-PC run (these steps have not been run on two PCs yet).

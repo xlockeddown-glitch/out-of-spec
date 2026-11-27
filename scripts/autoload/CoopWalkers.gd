@@ -68,7 +68,7 @@ func start(with_session: Node, with_farm: Node, with_rovers: Node) -> void:
 	session.joined.connect(forget.unbind(1))
 	farm.farm_loaded.connect(forget)
 	# The rover is in another scene, and everyone with it [ASSUMPTION].
-	farm.rover_place_changed.connect(forget)
+	farm.rover_place_changed.connect(_on_rover_place)
 
 
 func _process(_delta: float) -> void:
@@ -182,6 +182,13 @@ func tick(now: int) -> void:
 			_go_in(player_id)
 	if session.is_hosting() and session.players.size() > 1 and _is_due(out, now):
 		session.tell_walkers(out)
+
+
+## A field rover starting or going leaves those on foot at the farm where they are.
+func _on_rover_place() -> void:
+	var only: Variant = farm.get("rover_place_scope")
+	if not (only is String and only != ""):
+		forget()
 
 
 func forget() -> void:

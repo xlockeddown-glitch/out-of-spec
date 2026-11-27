@@ -325,9 +325,11 @@ func test_a_guest_drives_the_rover_only_where_it_is() -> String:
 		farm.park_rover(id, GameState.TUNNEL_START)
 	theirs._told_driver[id] = ""
 	var early: bool = theirs.moves_here(id, true)
+	host.commands.state.player_places["player_2"] = [ZonePresence.FARM, 0]  # it asks from the farm's mouth
 	var asked: Array = _request(guest, &"move_rover", [true])
 	_until(func() -> bool: return not asked.is_empty())
 	var went: bool = asked == [""] and host.commands.state.rover_in_tunnels
+	guest.commands.state.rover_epoch = host.commands.state.rover_epoch  # the farm's sync brings it
 	# In the game the farm's own sync brings the guest the host's farm.
 	guest.commands.state.rover_in_tunnels = true
 	guest.commands.state.rover_place_changed.emit()
@@ -341,7 +343,7 @@ func test_a_guest_drives_the_rover_only_where_it_is() -> String:
 	mine._on_driven("player_2", GameState.ROVER, [GameState.TUNNEL_PAD.x - 2.0, 0.0, GameState.TUNNEL_PAD.z, 0.0, 1.0, true])
 	var forged: bool = mine.driver(GameState.ROVER) != "" or mine.place(GameState.ROVER).origin != GameState.TUNNEL_PAD
 	var rock: Vector3 = to.origin + Vector3(0.0, 0.0, 13.0)
-	mine._on_driven("player_2", id, [rock.x, rock.y, rock.z, 0.0, 1.0, true])
+	mine._on_driven("player_2", id, [rock.x, rock.y, rock.z, 0.0, 1.0, true, host.commands.state.rover_epoch])
 	forged = forged or TunnelRock.holds(rock) or not mine.place(id).is_equal_approx(to)
 	mine.free()
 	theirs.free()
@@ -587,7 +589,7 @@ func test_a_guest_below_is_held_to_the_floor_of_the_rovers_depth() -> String:
 	state.rover_transforms[id] = Transform3D(Basis.IDENTITY, from)
 	var now: int = 1000
 	if found[0]:
-		mine._on_driven("player_2", id, [rock_here_floor_hub.x, 0.0, rock_here_floor_hub.z, 0.0, 0.0, true], now)
+		mine._on_driven("player_2", id, [rock_here_floor_hub.x, 0.0, rock_here_floor_hub.z, 0.0, 0.0, true, state.rover_epoch], now)
 	var forged: bool = found[0] and not mine.place(id).origin.is_equal_approx(from)
 	# A floor cell below that is rock in the hub is accepted (from a cell next to it).
 	var took: bool = true
@@ -599,7 +601,7 @@ func test_a_guest_below_is_held_to_the_floor_of_the_rovers_depth() -> String:
 				next_to = back
 		state.rover_transforms[id] = Transform3D(Basis.IDENTITY, next_to)
 		mine._forget()
-		mine._on_driven("player_2", id, [floor_here_rock_hub.x, 0.0, floor_here_rock_hub.z, 0.0, 0.0, true], now + 100000)
+		mine._on_driven("player_2", id, [floor_here_rock_hub.x, 0.0, floor_here_rock_hub.z, 0.0, 0.0, true, state.rover_epoch], now + 100000)
 		took = mine.place(id).origin.is_equal_approx(floor_here_rock_hub)
 	mine.free()
 	var problem: String = ""

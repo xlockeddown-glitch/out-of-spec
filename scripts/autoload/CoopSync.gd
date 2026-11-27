@@ -40,6 +40,7 @@ func start(with_session: Node, with_farm: Node) -> void:
 	farm = with_farm
 	session.player_joined.connect(_on_player_joined)
 	session.command_done.connect(send_farm)
+	session.player_left.connect(send_farm.unbind(1), CONNECT_DEFERRED)  # a drop may have moved the rover
 	session.joined.connect(_on_joined.unbind(1))
 	session.state_received.connect(_on_state_received)
 

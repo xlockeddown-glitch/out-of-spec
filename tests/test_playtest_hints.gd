@@ -15,6 +15,9 @@ func _out(farm: GameStateScript) -> void:
 	farm.hygrometer.error = 0.0
 	farm.phone_log.clear()
 	farm.park_rover(farm.TUNNEL_ROVER, Transform3D(Basis.IDENTITY, farm.SENTINEL_AT + NEAR))
+	farm.rover_zone = farm.TUNNELS_ZONE
+	farm.rover_depth = 0
+	farm.player_places["player_2"] = [farm.TUNNELS_ZONE, 0]  # a guest asks from the rover's place
 
 
 func _run(body: Callable) -> String:
