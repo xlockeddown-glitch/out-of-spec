@@ -46,7 +46,7 @@ func test_every_listed_rock_passes_and_lies_in_the_flats() -> String:
 		return "The set has %d rocks, want 5 to 8" % FrostDressing.spots().size()
 	for rock: Vector4 in FrostDressing.spots():
 		var at := Vector2(rock.x, rock.y)
-		if BiomeData.biome_at(at) != &"frost_flats" or at.distance_to(BiomeData.marker(&"frost_flats")) > BiomeData.reach(&"frost_flats"):
+		if BiomeData.biome_at(at) != &"frost_flats" or at.distance_to(BiomeData.centre(&"frost_flats")) > BiomeData.reach(&"frost_flats"):
 			return "The rock at %s is not inside the Frost Flats" % at
 	return ""
 
@@ -58,12 +58,14 @@ func test_no_rock_stands_where_it_must_not() -> String:
 		var rock: Vector4 = rocks[i]
 		var at := Vector2(rock.x, rock.y)
 		var half: float = rock.z
-		for corner: Vector2 in [Vector2(-1, -1), Vector2(-1, 1), Vector2(1, -1), Vector2(1, 1), Vector2.ZERO]:
-			var cell: Vector2i = Terrain.cell_at(at + corner * half)
-			if BiomeData.is_road_cell(cell):
-				return "The rock at %s is on a road cell" % at
-			if BiomeMarkers.is_blocked_cell(cell):
-				return "The rock at %s is on the pad or sign" % at
+		var first: Vector2i = Terrain.cell_at(at - Vector2.ONE * half)
+		var last: Vector2i = Terrain.cell_at(at + Vector2.ONE * half)
+		for x: int in range(first.x, last.x + 1):
+			for z: int in range(first.y, last.y + 1):
+				if BiomeData.is_road_cell(Vector2i(x, z)):
+					return "The rock at %s is on a road cell" % at
+				if BiomeMarkers.is_blocked_cell(Vector2i(x, z)):
+					return "The rock at %s is on the pad or sign" % at
 		if BiomeData.road_gap(at) <= BiomeData.ROAD_HALF_M + half:
 			return "The rock at %s is on the road" % at
 		if absf(at.x) < BiomeData.PLOT_HALF_M and absf(at.y) < BiomeData.PLOT_HALF_M:
@@ -88,30 +90,60 @@ func test_no_rock_stands_where_it_must_not() -> String:
 func test_the_pads_approach_is_open() -> String:
 	var pad: Vector2 = BiomeData.marker(&"frost_flats")
 	for rock: Vector4 in FrostDressing.spots():
-		if absf(rock.x - pad.x) < FrostDressing.APPROACH_HALF_M and rock.y > pad.y - BiomeData.PAD_HALF_M:
+		if absf(rock.x - pad.x) < FrostDressing.APPROACH_HALF_M + rock.z and rock.y + rock.z > pad.y - BiomeData.PAD_HALF_M and rock.y - rock.z < pad.y + FrostDressing.APPROACH_LENGTH_M:
 			return "The rock at (%s, %s) is in front of the pad" % [rock.x, rock.y]
 	return ""
 
 
 func test_the_rules_refuse_a_bad_rock() -> String:
 	var pad: Vector2 = BiomeData.marker(&"frost_flats")
-	var bad: Array[Vector4] = [
-		Vector4(0.0, 0.0, 0.8, 0.5),                  # the plot
-		Vector4(0.0, -50.0, 0.8, 0.5),                # the road
-		Vector4(1.4, -60.0, 0.8, 0.5),                # beside the road
-		Vector4(pad.x, pad.y, 0.8, 0.5),              # the pad
-		Vector4(pad.x + 2.7, pad.y, 0.6, 0.4),        # the pad's sign
-		Vector4(0.0, -70.0, 0.8, 0.5),                # the approach, on the road
-		Vector4(-3.0, -72.0, 0.6, 0.4),               # the approach, off the road
-		Vector4(60.0, 0.0, 0.8, 0.5),                 # not in the flats
-		Vector4(0.0, -300.0, 0.8, 0.5),               # off the land
-	]
+	# Each case clears every rule before the one it tests (the list is in clear()).
+	var bad: Dictionary[Vector4, String] = {
+		Vector4(0.0, -65.0, 0.8, 0.5): "the road, inside the flats",
+		Vector4(1.8, -62.0, 0.8, 0.5): "beside the road",
+		Vector4(pad.x, pad.y - 1.0, 0.6, 0.4): "the pad",
+		Vector4(pad.x + 2.7, pad.y - 1.0, 0.6, 0.4): "the pad's sign",
+		Vector4(pad.x - 4.0, pad.y - 1.0, 1.4, 0.5): "the pad's edge cells (a wide rock)",
+		Vector4(-3.0, -72.0, 0.6, 0.4): "the approach, off the road",
+		Vector4(-3.0, pad.y + 1.0, 0.9, 0.5): "the approach, grazing the pad's edge by its radius",
+		Vector4(0.0, 0.0, 0.8, 0.5): "the plot",
+		Vector4(60.0, 0.0, 0.8, 0.5): "not in the flats",
+		Vector4(0.0, -300.0, 0.8, 0.5): "off the land",
+	}
 	for rock: Vector4 in bad:
 		if FrostDressing.clear(rock):
-			return "A rock was allowed at %s" % rock
+			return "A rock was allowed on %s, at %s" % [bad[rock], rock]
+	return ""
+
+
+func test_a_rock_is_refused_on_a_lamp() -> String:
+	var tried: int = 0
 	for lamp: Vector2 in RoadLamps.spots(&"frost_flats"):
-		if FrostDressing.clear(Vector4(lamp.x, lamp.y, 0.6, 0.4)):
+		# Only the lamps that every earlier rule lets through reach the lamp rule:
+		# put the rock a little off the lamp and then on it, and the lamp decides.
+		var off := Vector4(lamp.x + FrostDressing.LAMP_CLEAR_M + 0.6 + 0.01, lamp.y, 0.6, 0.4)
+		var on := Vector4(lamp.x, lamp.y, 0.6, 0.4)
+		if not FrostDressing.clear(off):
+			continue
+		tried += 1
+		if FrostDressing.clear(on):
 			return "A rock was allowed on the lamp at %s" % lamp
+	if tried == 0:
+		return "No Frost lamp could be tried"
+	return ""
+
+
+func test_a_rock_is_refused_on_a_hill_plant() -> String:
+	var tried: int = 0
+	for plant: HillDressing.Placed in HillDressing.plants():
+		var at := Vector2(plant.at.x, plant.at.z)
+		if BiomeData.biome_at(at) != &"frost_flats":
+			continue
+		tried += 1
+		if FrostDressing.clear(Vector4(at.x, at.y, 0.3, 0.2)):
+			return "A rock was allowed on the plant at %s" % at
+	if tried == 0:
+		return "No hill plant stands in the Frost Flats to try"
 	return ""
 
 
@@ -127,10 +159,36 @@ func test_rocks_sit_on_the_ground_and_stand_the_set_height() -> String:
 		var node := dressing.get_child(i) as MeshInstance3D
 		var top: float = node.position.y + node.scale.y
 		var low: float = FrostDressing.ground_y(rock, none)
-		if absf(top - (low + rock.w)) > 0.001:
-			problem = "The rock at (%s, %s) tops out at %s, want %s" % [rock.x, rock.y, top, low + rock.w]
+		if top < FrostDressing.top_y(rock, none) - 0.001 or top < _highest(rock, none) + rock.w - 0.001:
+			problem = "The rock at (%s, %s) tops out at %s, under the highest ground plus its height" % [rock.x, rock.y, top]
 		if node.position.y - node.scale.y > low:
 			problem = "The rock at (%s, %s) hangs in the air" % [rock.x, rock.y]
+	_cleanup()
+	return problem
+
+
+func _highest(rock: Vector4, dug: Dictionary[Vector2i, int]) -> float:
+	var high: float = -INF
+	for x: int in range(-1, 2):
+		for z: int in range(-1, 2):
+			high = maxf(high, Terrain.height(Vector2(rock.x, rock.y) + Vector2(x, z) * rock.z, dug))
+	return high
+
+
+func test_a_dug_neighbour_does_not_bury_a_rock() -> String:
+	var dressing: FrostDressing = _dressed()
+	var problem: String = ""
+	for i: int in dressing.rock_count():
+		var rock: Vector4 = FrostDressing.spots()[i]
+		var centre: Vector2i = Terrain.cell_at(Vector2(rock.x, rock.y))
+		for step: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+			var dug: Dictionary[Vector2i, int] = {centre + step: 1}
+			dressing.settle(dug)
+			var node := dressing.get_child(i) as Node3D
+			if node.position.y + node.scale.y < _highest(rock, dug) + rock.w - 0.001:
+				problem = "The rock %d is buried by a dug neighbour at %s" % [i, step]
+			if node.position.y - node.scale.y > FrostDressing.ground_y(rock, dug):
+				problem = "The rock %d hangs over a dug neighbour at %s" % [i, step]
 	_cleanup()
 	return problem
 
@@ -198,6 +256,7 @@ func test_a_rock_is_dressing_only() -> String:
 	return problem
 
 
+## Guards pure Frost ground only; near the biome edge the paint blends with a neighbour's.
 func test_the_road_still_shows_against_the_frost_ground() -> String:
 	var ground := TerrainGround.new()
 	var tint: Color = Color.WHITE.lerp(BiomeData.ground_tint(&"frost_flats"), TerrainGround.BIOME_STRENGTH)

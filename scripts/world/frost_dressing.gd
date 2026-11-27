@@ -19,14 +19,17 @@ const ROCKS: Array[Vector4] = [
 	Vector4(12.5, -85.5, 1.0, 0.55),
 	Vector4(-2.5, -88.0, 0.7, 0.4),
 ]
-## The part of a rock's height that is buried, so it sits in the ground.
+## A rock's sphere is 2 high at scale 1; this share of its (stretched) height is
+## under the ground when it stands on level ground, so it sits in the ground.
 const BURIED_SHARE: float = 0.35
-## A rock keeps this far from a built thing, a lamp, a plant and another rock.
+## A rock keeps this far (plus its own radius) from a built thing, a rock or a
+## fissure, and from a lamp. Plants only need their own size.
 const SPOT_CLEAR_M: float = 1.0
 const LAMP_CLEAR_M: float = 1.0
-## The pad's approach: this far to each side of the road line, from the pad to the
-## road, stays open.
+## The pad's approach: this far to each side of the road line, from the pad's far
+## edge to this many metres south of the pad, stays open.
 const APPROACH_HALF_M: float = 3.5
+const APPROACH_LENGTH_M: float = 12.0
 const ROCK_COLOR := Color(0.82, 0.9, 0.96)
 
 static var _spots: Array[Vector4] = []
@@ -76,13 +79,14 @@ static func clear(rock: Vector4) -> bool:
 		return false
 	if BiomeData.road_gap(at) <= BiomeData.ROAD_HALF_M + half:
 		return false
-	for corner: Vector2 in [Vector2(-1, -1), Vector2(-1, 1), Vector2(1, -1), Vector2(1, 1), Vector2.ZERO]:
-		var point: Vector2 = at + corner * half
-		var cell := Vector2i(floori(point.x / Terrain.CELL_M), floori(point.y / Terrain.CELL_M))
-		if BiomeData.is_road_cell(cell) or BiomeMarkers.is_blocked_cell(cell):
-			return false
+	var first: Vector2i = Terrain.cell_at(at - Vector2.ONE * half)
+	var last: Vector2i = Terrain.cell_at(at + Vector2.ONE * half)
+	for x: int in range(first.x, last.x + 1):
+		for z: int in range(first.y, last.y + 1):
+			if BiomeData.is_road_cell(Vector2i(x, z)) or BiomeMarkers.is_blocked_cell(Vector2i(x, z)):
+				return false
 	var pad: Vector2 = BiomeData.marker(&"frost_flats")
-	if absf(at.x - pad.x) < APPROACH_HALF_M + half and at.y > pad.y - BiomeData.PAD_HALF_M:
+	if absf(at.x - pad.x) < APPROACH_HALF_M + half and at.y + half > pad.y - BiomeData.PAD_HALF_M and at.y - half < pad.y + APPROACH_LENGTH_M:
 		return false
 	for box: Vector4 in BiomeData.spots():
 		if absf(at.x - box.x) < box.z + half + SPOT_CLEAR_M and absf(at.y - box.y) < box.w + half + SPOT_CLEAR_M:
@@ -139,7 +143,6 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 		node.mesh = mesh
 		# A different turn for each, so they do not look stamped.
 		node.rotation.y = float(index) * 1.7
-		node.scale = Vector3(rock.z, rock.w / (1.0 - BURIED_SHARE), rock.z * 0.85)
 		node.position = Vector3(rock.x, 0.0, rock.y)
 		add_child(node)
 		_rocks.append(node)
@@ -185,8 +188,22 @@ func is_shown(index: int) -> bool:
 	return _rocks[index].visible
 
 
-## The sphere's middle is the lowest ground plus the part that shows less the buried
-## share, so the top stands `height` over the lowest ground and no edge hangs.
+## The top of a rock: its height over the highest ground under its footprint, so a
+## slope or a dug neighbour cannot bury it.
+static func top_y(rock: Vector4, dug: Dictionary[Vector2i, int]) -> float:
+	var at := Vector2(rock.x, rock.y)
+	var high: float = Terrain.height(at, dug)
+	for x: int in range(-1, 2):
+		for z: int in range(-1, 2):
+			high = maxf(high, Terrain.height(at + Vector2(x, z) * rock.z, dug))
+	return high + rock.w
+
+
+## Stretches the sphere so its top stands at `top_y` and it still reaches below the
+## lowest ground (BURIED_SHARE of the span is under the foot), so no edge hangs.
 func _seat(node: Node3D, rock: Vector4, dug: Dictionary[Vector2i, int]) -> void:
 	var foot: float = ground_y(rock, dug)
-	node.position.y = foot + rock.w - node.scale.y
+	var top: float = top_y(rock, dug)
+	var span: float = maxf(top - foot, rock.w) / (1.0 - BURIED_SHARE)
+	node.scale = Vector3(rock.z, span, rock.z * 0.85)
+	node.position.y = top - span
