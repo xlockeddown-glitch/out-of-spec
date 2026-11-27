@@ -2,6 +2,15 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: Colony Mine look (feat/mine-look)
+
+Gave the Abandoned Colony Mine (`scripts/world/colony_mine.gd`, `scripts/world/mine_rock.gd`, `scenes/colony_mine.tscn`) its own abandoned-mine look via a new static helper class `MineLook` (`scripts/world/mine_look.gd`), without touching `TunnelRock`, `TunnelLook`, `MineDepth`, `GameState`, or any gameplay/collider rules. Every colour, size, placement, and hash choice below is a [PLACEHOLDER]:
+
+- **Palette (`MineLook`):** ore-stained rock tint (`ROCK_TINT = Color(0.96, 0.72, 0.56)`, `ROCK_ROUGHNESS = 0.96`), rust-red and ochre ore veins (`ORE_RUST`, `ORE_OCHRE`, `ORE_DARK`, `ARCH_STONE`), aged mine timber (`TIMBER_OLD`, `TIMBER_AGED`, `TIMBER_SPLIT`), worn rail steel and rusted iron hardware (`RAIL_STEEL`, `RUST_IRON`, `IRON_DARK`), unlit dusty lamp glass and tarnished brass (`LAMP_GLASS`, `LAMP_BRASS`), and faded colony stencil sign colours (`STENCIL_BOARD`, `STENCIL_CREAM`, `STENCIL_BAND`, `CRATE_BODY`). Cached read-only materials live in `MineLook._flat_cache`, isolated from `TunnelLook`.
+- **Rock & environment (`MineRock`, `scenes/colony_mine.tscn`):** `MineRock._ready()` runs `super._ready()` and then tints this scene's `Blocks` material and per-instance `MultiMesh` colours deterministically via `MineLook.hash_int()` (rust/ochre wall strata and iron-oxide floor dust), tints arch lintels/pillars/ribs, and swaps arch brass brackets to rusted iron without mutating `TunnelLook`'s cache. `colony_mine.tscn` warms the `WorldEnvironment` background/ambient and directional `Lamp` colours.
+- **Hub & depth 1 dressing (`ColonyMine`):** added a zero-collision `MineDecor` node holding old timber sets along the hub passages and depth 1 trunk (`span_m = 7.8` / `5.4`, `height_m = 3.0` / `2.9`), flush abandoned steel rail tracks with timber sleepers and a bent end (`RAIL_GAUGE_M = 0.90`, `SLEEPER_STEP_M = 0.75`), dead unlit hanging lamps on the timber caps (no `OmniLight3D`, no emission), and faded colony stencil signs (`COLONY MINE 01`, `LEVEL 01 DRIFT`) flat against the passage walls. Restyled `PropCrate`, `NoticeSign` trim, unshored rubble piles, and shored timber arches via `MineLook` while preserving all node names, positions, labels, and interaction ranges.
+- **Tests:** `tests/test_mine_look.gd` checks `MineLook` builders (zero collision, dead lamp has no light), full `colony_mine.tscn` hub and depth 1 builds, and verifies `basalt_tunnels.tscn` (Lava Tubes) does not receive the mine look or mutated `TunnelLook` materials.
+
 ## 2026-11-27: Service tunnel walker follows loadout changes (fix/tunnel-walker-loadout)
 
 Connected `GameState.loadouts_changed` in `PhobosServiceTunnel` (`scripts/world/phobos_service_tunnel.gd`) to `_dress_walker()` (matching `PhobosHub`) so the walker's suit and loadout update live when loadouts change in the tunnel, and disconnected it in `_exit_tree()`. Added a regression test in `tests/test_phobos_service_tunnel.gd`.
