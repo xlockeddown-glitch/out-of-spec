@@ -16,21 +16,39 @@ signal clicked
 		enabled = value
 		input_ray_pickable = value
 		if not value:
-			_set_hover_cursor(false)
+			set_hover(false)
 
 static var hovered: Clickable = null
 
 
-func _mouse_enter() -> void:
-	if enabled:
+## Sets or clears this Clickable as the hovered target. Both mouse hover
+## and pad selection go through here.
+func set_hover(on: bool) -> void:
+	if on:
+		if not enabled:
+			return
 		hovered = self
 		_set_hover_cursor(true)
+	else:
+		if hovered == self:
+			hovered = null
+		if hovered == null:
+			_set_hover_cursor(false)
+
+
+## Activates this Clickable as if clicked. Both mouse clicks and pad accept
+## go through here.
+func activate() -> void:
+	if enabled:
+		clicked.emit()
+
+
+func _mouse_enter() -> void:
+	set_hover(true)
 
 
 func _mouse_exit() -> void:
-	if hovered == self:
-		hovered = null
-	_set_hover_cursor(false)
+	set_hover(false)
 
 
 func _input_event(_camera: Camera3D, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_idx: int) -> void:
@@ -38,13 +56,12 @@ func _input_event(_camera: Camera3D, event: InputEvent, _position: Vector3, _nor
 		return
 	var mb := event as InputEventMouseButton
 	if mb and mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
-		clicked.emit()
+		activate()
 
 
 func _exit_tree() -> void:
 	if hovered == self:
-		hovered = null
-		_set_hover_cursor(false)
+		set_hover(false)
 
 
 func _set_hover_cursor(on: bool) -> void:
