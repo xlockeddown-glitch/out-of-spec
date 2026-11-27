@@ -2,6 +2,17 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: The Flooded Aquifer (zones step 13)
+
+Hub, depth 1, pump and water hazard, all from primitives. No pressure drop, wet-pack spoilage, quests or walkers yet; Vance's notice reads "[later]". Every number and look below is a [PLACEHOLDER] for Ryan to tune:
+
+- Pump: `PUMP_COST_CREDITS` 150 [PLACEHOLDER], `PUMP_REACH_M` 4.0 [PLACEHOLDER]. One pump per farm, bought at the hub crate.
+- Water depth: `SHALLOW_M` [0.3, 0.5] [PLACEHOLDER] (slows the rover), `DEEP_M` [0.9, 1.1] [PLACEHOLDER] (blocks it until pumped).
+- Depth 1 layout: `ROOMS`, `CARVES` and `LANDING` rects, `PER_ROOM` 2, `ON_LANDING` 1, `KINDS` and `REWARDS` [PLACEHOLDER].
+- Places: `AQUIFER_PAD` (-24, 0, -22) [PLACEHOLDER]; hub cells `HATCH_CELL`, `CRATE_CELL`, `SIGN_CELL` and `HUB_POOL` [PLACEHOLDER].
+- Looks: the wet tint, the sinkhole, the hub props and the sign text [PLACEHOLDER].
+- PROTOCOL 34 to 35, once, because of the new commands (`buy_pump`, `use_pump`, `move_rover_aquifer`) and the synced pump fields.
+
 ## 2026-11-27: The "Meridiani Scope" look, part 1 (feat/scope-ui)
 
 Ryan's pick from three mockups, applied to the calibration bench and the quest board only. The theme sits on the bench panel, not its root, so the two bench games (Set the Zero, Hold the Reading) keep their own look. The field phone and every other screen are untouched. Every colour and number is a [PLACEHOLDER].

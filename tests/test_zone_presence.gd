@@ -80,8 +80,8 @@ func test_an_unknown_zone_is_refused() -> String:
 	problems.append(gs.farm_dict_problem(data))
 	data["rover_zone"] = 3
 	problems.append(gs.farm_dict_problem(data))
-	# A zone with no scene yet is not somewhere the rover can be.
-	data["rover_zone"] = "flooded_aquifer"
+	# A zone that has no scene is not somewhere the rover can be (the Aquifer has one now).
+	data["rover_zone"] = "colony_mine"
 	problems.append(gs.farm_dict_problem(data))
 	data["rover_zone"] = "lava_tubes"
 	var known: String = gs.farm_dict_problem(data)
@@ -109,8 +109,10 @@ func test_the_validator_judges_a_report() -> String:
 		["lava_tubes", ZonePresence.MAX_DEPTH + 1, "player_2", "player_2", false],
 		["farm", 1, "player_2", "player_2", false],
 		["lava_tubes", 4, "player_2", "player_2", false],
-		["flooded_aquifer", 0, "player_2", "player_2", false],
-		["flooded_aquifer", 1, "player_2", "player_2", false],
+		["flooded_aquifer", 0, "player_2", "player_2", true],
+		["flooded_aquifer", 1, "player_2", "player_2", true],
+		["flooded_aquifer", 2, "player_2", "player_2", false],
+		["colony_mine", 0, "player_2", "player_2", false],
 		["farm", 0, "player_1", "player_2", false],
 		["farm", 0, "player_9", "player_9", false],
 		["farm", 0, "", "", false],
@@ -188,7 +190,7 @@ func test_the_host_clock_carries_places_to_a_guest() -> String:
 	var kept: bool = guest.player_places == copy
 	# The same rule as the host's command: no depth on the farm, no scene-less zone.
 	var also_bad: Array[String] = []
-	for entry: Array in [["farm", 1], ["dome", 1], ["flooded_aquifer", 0], ["lava_tubes", 4]]:
+	for entry: Array in [["farm", 1], ["dome", 1], ["colony_mine", 0], ["flooded_aquifer", 2], ["lava_tubes", 4]]:
 		bad["places"] = { "player_2": entry }
 		also_bad.append(FarmSync.follow_clock(bad, guest))
 	if "" in also_bad:
@@ -224,13 +226,13 @@ func test_the_page_says_where_each_player_is() -> String:
 # --- Review fixes --------------------------------------------------------------
 
 func test_the_clock_and_the_command_share_one_rule() -> String:
-	for entry: Array in [["farm", 1], ["dome", 1], ["flooded_aquifer", 0], ["flooded_aquifer", 1], ["lava_tubes", 4], ["lava_tubes", -1], ["nowhere", 0]]:
+	for entry: Array in [["farm", 1], ["dome", 1], ["colony_mine", 0], ["flooded_aquifer", 2], ["lava_tubes", 4], ["lava_tubes", -1], ["nowhere", 0]]:
 		if ZonePresence.place_problem(entry[0], entry[1]) == "" or ZonePresence.table_problem({ "player_2": entry }) == "":
 			return "%s was accepted" % [entry]
-	for entry: Array in [["farm", 0], ["dome", 0], ["lava_tubes", 0], ["lava_tubes", 1]]:
+	for entry: Array in [["farm", 0], ["dome", 0], ["lava_tubes", 0], ["lava_tubes", 1], ["flooded_aquifer", 0], ["flooded_aquifer", 1]]:
 		if ZonePresence.place_problem(entry[0], entry[1]) != "" or ZonePresence.table_problem({ "player_2": entry }) != "":
 			return "%s was refused" % [entry]
-	return "" if ZoneData.is_playable(&"lava_tubes") and ZoneData.is_playable(&"phobos") and ZoneData.is_playable(&"deimos") and not ZoneData.is_playable(&"flooded_aquifer") else "Playable zones are wrong."
+	return "" if ZoneData.is_playable(&"lava_tubes") and ZoneData.is_playable(&"phobos") and ZoneData.is_playable(&"deimos") and ZoneData.is_playable(&"flooded_aquifer") and not ZoneData.is_playable(&"colony_mine") else "Playable zones are wrong."
 
 
 func test_only_the_newest_place_is_sent() -> String:

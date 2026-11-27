@@ -183,7 +183,7 @@ func _on_go(place: Dictionary) -> void:
 		_status.text = FastTravel.text("no_zone")
 		return
 	close()
-	SceneSwitcher.go_to(SceneSwitcher.TUNNELS_SCENE)
+	SceneSwitcher.go_to(SceneSwitcher.scene_for_zone(GameState.rover_zone))
 
 
 ## Her booking changed (here or from a teammate): an old refusal is stale.

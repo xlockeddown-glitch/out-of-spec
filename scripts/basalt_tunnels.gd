@@ -58,32 +58,7 @@ func _ready() -> void:
 	if ZoneDepth.arrive_pending:
 		_rover.global_transform = ZoneDepth.arrive_at
 		ZoneDepth.arrive_pending = false
-	_below = ZoneDepth.local_depth > 0 and not ZoneDepth.local_layout.is_empty()
-	_built_depth = ZoneDepth.local_depth if _below else 0
-	_built_day = GameClock.get_day_index()
-	GameClock.day_started.connect(_on_new_day)
-	_depth_props = ZoneDepthProps.new()
-	_rover.get_parent().add_child(_depth_props)
-	if _below:
-		# The depth has its own finds, and none of the hub's rack, board or beacons.
-		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
-		_vents = ZoneHazards.vents_for(GameState.world_seed, ZoneDepth.ZONE, _built_depth, _built_day)
-		_depth_props.build_vents(_vents)
-		if ZoneDepth.has_way_down(_built_depth):
-			_depth_props.build_hatch(_built_depth)
-		GameState.finds_changed.connect(_on_finds_changed)
-		var wild: Node = get_node_or_null("WorldView/WorldViewport/World/WildSentinel")
-		if wild != null:
-			wild.queue_free()
-	else:
-		_depth_props.build_hatch()
-		_props = LavaHubProps.new()
-		_rover.get_parent().add_child(_props)
-		GameState.beacons_changed.connect(_on_beacons_changed)
-	# The lift station: at the hub, and at the depth that has one. Broken until repaired.
-	if ZoneDepth.is_lift_depth(_built_depth) or _built_depth == 0:
-		_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth()))
-		GameState.lifts_changed.connect(_on_lifts_changed)
+	_build_zone()
 	_hud.set_lights(GameState.rover_lights)
 	GameState.rover_lights_changed.connect(_show_lights)
 	var pause := PauseUI.new()
@@ -129,6 +104,42 @@ func _ready() -> void:
 	if _rover.away_text() == "":
 		_hud.push_log("LIGHTS: press " + Controls.prompt(&"rover_lights") + " to turn them low or on.")
 	_say_if_away()
+
+
+## Builds this scene's depth and props. The Lava Tubes' are here; the Flooded Aquifer's
+## scene (FloodedAquifer) builds its own.
+func _build_zone() -> void:
+	_below = ZoneDepth.local_depth > 0 and not ZoneDepth.local_layout.is_empty()
+	_built_depth = ZoneDepth.local_depth if _below else 0
+	_built_day = GameClock.get_day_index()
+	GameClock.day_started.connect(_on_new_day)
+	_depth_props = ZoneDepthProps.new()
+	_rover.get_parent().add_child(_depth_props)
+	if _below:
+		# The depth has its own finds, and none of the hub's rack, board or beacons.
+		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
+		_vents = ZoneHazards.vents_for(GameState.world_seed, ZoneDepth.ZONE, _built_depth, _built_day)
+		_depth_props.build_vents(_vents)
+		if ZoneDepth.has_way_down(_built_depth):
+			_depth_props.build_hatch(_built_depth)
+		GameState.finds_changed.connect(_on_finds_changed)
+		var wild: Node = get_node_or_null("WorldView/WorldViewport/World/WildSentinel")
+		if wild != null:
+			wild.queue_free()
+	else:
+		_depth_props.build_hatch()
+		_props = LavaHubProps.new()
+		_rover.get_parent().add_child(_props)
+		GameState.beacons_changed.connect(_on_beacons_changed)
+	# The lift station: at the hub, and at the depth that has one. Broken until repaired.
+	if ZoneDepth.is_lift_depth(_built_depth) or _built_depth == 0:
+		_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth()))
+		GameState.lifts_changed.connect(_on_lifts_changed)
+
+
+## The zone this scene shows (ZoneDepth.ZONE): the Flooded Aquifer's scene says its own.
+func _zone_id() -> String:
+	return ZoneDepth.ZONE
 
 
 func _process(_delta: float) -> void:
@@ -453,7 +464,7 @@ func _rebuild_for_depth() -> void:
 		_rover.global_transform = _rover_pose_for_rebuild()
 		ZoneDepth.arrive_at = _rover.global_transform
 		ZoneDepth.arrive_pending = true
-	SceneSwitcher.swap_to(SceneSwitcher.TUNNELS_SCENE)
+	SceneSwitcher.swap_to(SceneSwitcher.scene_for_zone(_zone_id()))
 
 
 ## Where the rebuilt scene's rover starts: where the rover is, if that is inside
@@ -467,14 +478,14 @@ func _rover_pose_for_rebuild() -> Transform3D:
 	var known: Variant = CoopRovers.told_pose(GameState.TUNNEL_ROVER) if FarmCommands.guest else null
 	if known == null and GameState.rover_transforms.has(GameState.TUNNEL_ROVER):
 		known = GameState.parked_rover_transform(GameState.TUNNEL_ROVER)
-	return ZoneDepth.rebuild_pose(known, GameState.rover_depth, GameState.world_seed, GameClock.get_day_index())
+	return ZoneDepth.rebuild_pose(known, GameState.rover_depth, GameState.world_seed, GameClock.get_day_index(), _zone_id())
 
 
 ## Not left to a signal, which a busy swap can swallow and a later snapshot with the
 ## same depth does not send again: if this scene is not the rover's depth, or the day
 ## its finds were drawn for, it is built again. Each frame, and when a swap is done.
 func _resync_depth() -> void:
-	if SceneSwitcher.is_busy() or GameState.rover_zone != GameState.TUNNELS_ZONE or _rover.away_text() != "":
+	if SceneSwitcher.is_busy() or GameState.rover_zone != _zone_id() or _rover.away_text() != "":
 		return
 	if ZoneDepth.needs_rebuild(_built_depth, _built_day, GameState.rover_depth, GameClock.get_day_index()):
 		_rebuild_for_depth()
@@ -649,7 +660,7 @@ func _leave_tunnels() -> void:
 
 ## A guest's copy of the farm may come after the host's yes.
 func _on_rover_place_changed() -> void:
-	if GameState.rover_zone == GameState.TUNNELS_ZONE and GameState.rover_depth != _built_depth and _rover.away_text() == "":
+	if GameState.rover_zone == _zone_id() and GameState.rover_depth != _built_depth and _rover.away_text() == "":
 		_rebuild_for_depth()
 	elif _move_granted and _rover.away_text() != "":
 		_move_granted = false

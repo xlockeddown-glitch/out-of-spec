@@ -91,6 +91,8 @@ const ON_LANDING: int = 1
 ## tunnels. Not saved and not sent: GameState.rover_depth is the truth (saved, and
 ## sent to guests), and the tunnels scene copies it when it is built (follow).
 ## Every screen in the tunnels shows the rover's depth.
+## The zone the screen is in (ZONE, or the Aquifer's: AquiferDepth).
+static var local_zone: String = ZONE
 static var local_depth: int = 0
 static var local_layout: Dictionary = {}
 ## Where the rover starts in the scene built after the rover changed depth.
@@ -242,17 +244,31 @@ static func local_for(world_seed: int, day: int) -> Dictionary:
 
 
 ## Takes the rover's depth for this screen: today's layout of it, or the hub.
-static func follow(depth: int, world_seed: int, day: int) -> void:
-	set_local(depth, layout(world_seed, ZONE, depth, day) if depth > 0 else {})
+static func follow(depth: int, world_seed: int, day: int, zone: String = ZONE) -> void:
+	set_local(depth, _layout_of(zone, depth, world_seed, day) if depth > 0 else {}, zone)
+
+
+## The layout of `depth` in a zone that has depths (the Aquifer's takes today's drained pools).
+static func _layout_of(zone: String, depth: int, world_seed: int, day: int) -> Dictionary:
+	if zone == AquiferDepth.ZONE:
+		return AquiferDepth.layout_today(world_seed, depth, day)
+	return layout(world_seed, ZONE, depth, day)
+
+
+## The most depth a zone has (0 for a zone with none).
+static func max_depth_of(zone: String) -> int:
+	if zone == ZONE:
+		return MAX_DEPTH
+	return AquiferDepth.MAX_DEPTH if zone == AquiferDepth.ZONE else 0
 
 
 ## The map the rover is held to at `depth` on `day`: the hub's, or the layout's.
-static func grid_for(depth: int, world_seed: int, day: int) -> PackedStringArray:
+static func grid_for(depth: int, world_seed: int, day: int, zone: String = ZONE) -> PackedStringArray:
 	if depth > 0:
-		var data: Dictionary = layout(world_seed, ZONE, depth, day)
+		var data: Dictionary = _layout_of(zone, depth, world_seed, day)
 		if not data.is_empty():
 			return data["grid"]
-	return TunnelRock.MAP
+	return AquiferDepth.hub_grid() if zone == AquiferDepth.ZONE else TunnelRock.MAP
 
 
 ## How many finds a depth has (every day the same).
@@ -298,8 +314,8 @@ static func pose_for_depth(depth: int) -> Transform3D:
 
 ## Where a rebuilt scene starts its rover: `known` (the pose the host parked or told,
 ## or null) if it lies inside `depth`'s rock, else where the depth starts it.
-static func rebuild_pose(known: Variant, depth: int, world_seed: int, day: int) -> Transform3D:
-	if known is Transform3D and TunnelRock.holds_in(grid_for(depth, world_seed, day), (known as Transform3D).origin):
+static func rebuild_pose(known: Variant, depth: int, world_seed: int, day: int, zone: String = ZONE) -> Transform3D:
+	if known is Transform3D and TunnelRock.holds_in(grid_for(depth, world_seed, day, zone), (known as Transform3D).origin):
 		return known
 	return pose_for_depth(depth)
 
@@ -311,7 +327,8 @@ static func near_ascent(at: Vector3) -> bool:
 
 
 ## Goes below (or back): the layout the scene is built from, or nothing at depth 0.
-static func set_local(depth: int, layout_data: Dictionary) -> void:
+static func set_local(depth: int, layout_data: Dictionary, zone: String = ZONE) -> void:
+	local_zone = zone
 	local_depth = depth
 	local_layout = layout_data if depth > 0 else {}
 
@@ -418,8 +435,8 @@ static func _kept_clear(depth: int) -> Array[Vector2i]:
 ## Why a player in `place` at `depth` can't take `find_id` from `finds` (today's),
 ## given the ids already `taken` today, or "". The one rule for the host's command;
 ## nearness is its own check (reach_problem).
-static func take_problem(find_id_text: String, finds: Array, taken: Array, place: String, depth: int) -> String:
-	if place != ZONE or depth < DEPTH or depth > MAX_DEPTH:
+static func take_problem(find_id_text: String, finds: Array, taken: Array, place: String, depth: int, zone: String = ZONE) -> String:
+	if place != zone or depth < DEPTH or depth > max_depth_of(zone):
 		return "Finds lie in the Lava Tubes, below the hub."
 	var known: bool = false
 	for find: Variant in finds:
@@ -435,9 +452,9 @@ static func take_problem(find_id_text: String, finds: Array, taken: Array, place
 ## Why the farm's rover can't take a find at `there`, or "". `zone` is
 ## GameState.rover_zone, `known` whether the host has the tunnel rover's place, and
 ## `at` that place. The host's copy of the rover decides, not the player's word.
-static func reach_problem(there: Vector3, zone: String, known: bool, at: Vector3) -> String:
-	if zone != ZONE or not known:
-		return "The rover is not in the Lava Tubes."
+static func reach_problem(there: Vector3, zone: String, known: bool, at: Vector3, want: String = ZONE) -> String:
+	if zone != want or not known:
+		return "The rover is not in the Lava Tubes." if want == ZONE else "The rover is not in the Flooded Aquifer."
 	if Vector2(there.x - at.x, there.z - at.z).length() > REACH_M + HOST_REACH_SLACK_M:
 		return "The rover is too far from that."
 	return ""
