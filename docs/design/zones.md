@@ -454,6 +454,7 @@ Each PR logs its decisions in `docs/decisions.md` and names its placeholders.
 15. **Polar Ice Caves.** One PR: hub, cold hazard.
 16. **Shuttle and license.** The pad, the fee, launch windows, the exam.
     *Built 2026-11-27 (feat/shuttle):* the rules half: `Shuttle` (windows, fare, license, trip reasons), the saved and shown license, Vance's exam, and `book_shuttle`, which always refuses until the moons have a hub. The pad and its terminal come with biomes step 12.
+    *Pad half built 2026-11-27 (feat/landing-pad):* the Landing Field has its slab, edge lights, gantry and a terminal that shows the windows and sends `book_shuttle` (at the terminal, no more people than are here); every booking still ends at "no hub yet" until step 17.
 17. **Phobos hub,** with the station and the escapee hook. Then **Deimos hub,** with the cache and test-pod hooks.
 18. **Expeditions.** A multi-day quest line with a camp.
 19. **Late game zones** (§11), one per PR.

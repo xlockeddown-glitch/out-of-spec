@@ -301,8 +301,7 @@ func test_screens_do_not_change_the_farm_directly() -> String:
 			for found: RegExMatch in asks.search_all(text):
 				asked[StringName(found.get_string(1))] = true
 	for action: StringName in CommandsScript.ACTIONS:
-		# book_shuttle waits for the Landing Field pad's terminal (biomes step 12).
-		if not asked.has(action) and action != &"book_shuttle":
+		if not asked.has(action):
 			problems.append("No screen asks for %s" % action)
 	for action: StringName in asked:
 		if not action in CommandsScript.ACTIONS:

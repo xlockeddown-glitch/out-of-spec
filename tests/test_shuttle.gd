@@ -23,6 +23,11 @@ func _state(credits: int = 500) -> GameStateScript:
 	return gs
 
 
+## The farm rover parked at the landing pad's terminal, so a player in it is there.
+func _park_at_terminal(gs: GameStateScript) -> void:
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
+
+
 func _done(gs: GameStateScript) -> void:
 	GameClock.elapsed_days = float(gs.get_meta(&"saved_clock"))
 	gs.free()
@@ -189,13 +194,14 @@ func test_trip_problem_names_each_reason_in_turn() -> String:
 
 func test_book_shuttle_refuses_with_the_reason_and_charges_nothing() -> String:
 	var gs: GameStateScript = _state(500)
+	_park_at_terminal(gs)
 	var problems: Array[String] = []
 	GameClock.elapsed_days = _h(3.0)
 	var unlicensed: String = gs.book_shuttle(Shuttle.PHOBOS, 1)
 	if unlicensed == "" or gs.credits != 500:
 		problems.append("An unlicensed booking: '%s', %d CR" % [unlicensed, gs.credits])
 	gs.shuttle_licensed = true
-	var no_hub: String = gs.book_shuttle(Shuttle.PHOBOS, 2)
+	var no_hub: String = gs.book_shuttle(Shuttle.PHOBOS, 1)
 	if no_hub != Shuttle.text("no_hub_text") % "Phobos" or gs.credits != 500:
 		problems.append("Every booking ends at the missing hub with no fare taken: '%s', %d CR" % [no_hub, gs.credits])
 	if _lines(gs, "booked") != 0:
@@ -206,6 +212,7 @@ func test_book_shuttle_refuses_with_the_reason_and_charges_nothing() -> String:
 
 func test_book_shuttle_from_a_guest_is_refused_with_the_reason() -> String:
 	var gs: GameStateScript = _state(500)
+	_park_at_terminal(gs)
 	var commands: Node = CommandsScript.new()
 	commands.state = gs
 	var problems: Array[String] = []
@@ -227,6 +234,43 @@ func test_book_shuttle_from_a_guest_is_refused_with_the_reason() -> String:
 	if host != Shuttle.text("no_hub_text") % "Deimos" or gs.credits != 500:
 		problems.append("The host's booking is refused for the hub too: '%s'" % host)
 	commands.free()
+	_done(gs)
+	return "\n".join(problems)
+
+
+func test_book_shuttle_checks_where_and_how_many_before_the_hub() -> String:
+	var gs: GameStateScript = _state(500)
+	var problems: Array[String] = []
+	gs.shuttle_licensed = true
+	GameClock.elapsed_days = _h(3.0)
+	# No pose at all, then the rover far from the terminal: walk there.
+	var walk: String = Shuttle.text("far_text")
+	var nowhere: String = gs.book_shuttle(Shuttle.PHOBOS, 1)
+	if nowhere != walk:
+		problems.append("A player with no position is told to walk to the terminal: '%s'" % nowhere)
+	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(0.0, 0.5, 20.0))
+	var guest_far: String = gs.book_shuttle(Shuttle.PHOBOS, 1, GUEST)
+	if guest_far != walk or gs.credits != 500:
+		problems.append("A guest far from the terminal gets the walk reason: '%s', %d CR" % [guest_far, gs.credits])
+	# At the terminal: more people than are here is refused; one is refused for the hub.
+	_park_at_terminal(gs)
+	var crowd: String = gs.book_shuttle(Shuttle.PHOBOS, gs.players_present().size() + 1)
+	if crowd != Shuttle.text("crowd_text") % SP811.integer(gs.players_present().size()) or gs.credits != 500:
+		problems.append("More people than are present is refused: '%s', %d CR" % [crowd, gs.credits])
+	var at_terminal: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
+	if at_terminal != Shuttle.text("no_hub_text") % "Deimos" or gs.credits != 500:
+		problems.append("A guest at the terminal is refused for the hub, no fare: '%s', %d CR" % [at_terminal, gs.credits])
+	# Away from the farm's own place the terminal is out of reach too.
+	gs.player_places[GUEST] = [ZonePresence.DOME, 0]
+	var elsewhere: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
+	if elsewhere != walk:
+		problems.append("A player in another place is not at the terminal: '%s'" % elsewhere)
+	# The rover away (in the tunnels) leaves no one at the terminal.
+	gs.player_places.erase(GUEST)
+	gs.rover_zone = "lava_tubes"
+	gs.rover_lent = true
+	if gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST) != walk:
+		problems.append("With the rover away, the player in it is not at the terminal.")
 	_done(gs)
 	return "\n".join(problems)
 

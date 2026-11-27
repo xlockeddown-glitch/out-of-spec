@@ -3506,14 +3506,18 @@ func grant_shuttle_license() -> void:
 
 
 ## Books a day trip to `moon` for `people` from the pad's terminal. Runs on the
-## host's clock and refuses with Shuttle.trip_problem's reason, taking no fare;
-## no moon has a hub yet, so every booking is refused for now. The pad PR will
-## carry the party there. Returns "" when booked, else why not.
-@warning_ignore("unused_parameter")
+## host's clock. Before anything else it checks the sender stands at the terminal
+## (on foot there, or in the rover there) and that `people` are all here to go
+## (players_present()); then Shuttle.trip_problem's reasons. A refusal takes no
+## fare. No moon has a hub yet, so every booking is refused for now. Returns "" when
+## booked, else why not.
 func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
-	# The pad PR must also check that the player stands at the pad and that
-	# `people` are all present (players_present()) before a fare is taken; today
-	# every booking is refused, so no fare can be.
+	var id: String = _player(player_id)
+	var at: Variant = standing_at(id)
+	if place_of(id) != ZonePresence.FARM or not Shuttle.terminal_near(at, Shuttle.HOST_SLACK_M):
+		return Shuttle.text("far_text")
+	if people > players_present().size():
+		return Shuttle.text("crowd_text") % SP811.integer(players_present().size())
 	var hub_ready: bool = Shuttle.is_moon(moon) and ZoneData.is_playable(StringName(moon))
 	var reason: String = Shuttle.trip_problem(moon, lab_level(), shuttle_licensed, credits, people, GameClock.elapsed_days, hub_ready)
 	if reason != "":
@@ -3521,6 +3525,16 @@ func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
 	add_credits(-Shuttle.fare() * people)
 	post_phone(Shuttle.text("booked_text") % [Shuttle.moon_name(moon), Shuttle.clock_text(GameClock.elapsed_days), SP811.integer(Shuttle.fare() * people)])
 	return ""
+
+
+## Where a player stands on the farm: their walking pose if they are out, else the
+## farm rover's if it is here (they are in it), else null.
+func standing_at(player_id: String) -> Variant:
+	if CoopWalkers.is_out(player_id):
+		return CoopWalkers.spot(CoopWalkers.out[player_id])
+	if rover_is_away(ROVER):
+		return null
+	return _rover_pose_now(ROVER)
 
 
 ## 06:00 of her day: she does the morning's work, after the robots' cards.

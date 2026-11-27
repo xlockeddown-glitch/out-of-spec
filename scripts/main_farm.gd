@@ -60,6 +60,8 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 var _notice_pad: ParkingPad
 
 var _robots_ui: RobotsUI
+var _shuttle_ui: ShuttleUI
+var _landing: LandingDressing
 ## Whether Bram's buttons were last drawn for the pad.
 var _bram_pad: bool = false
 ## Wring the Blocks, made the first time J opens it.
@@ -114,6 +116,8 @@ func _ready() -> void:
 	$WorldView/WorldViewport/World.add_child(RoadLamps.new())
 	$WorldView/WorldViewport/World.add_child(BasaltDressing.new())
 	$WorldView/WorldViewport/World.add_child(FrostDressing.new())
+	var landing := LandingDressing.new()
+	$WorldView/WorldViewport/World.add_child(landing)
 	var stone_view := StonePiecesView.new()
 	stone_view.name = "StonePieces"
 	$WorldView/WorldViewport/World.add_child(stone_view)
@@ -200,6 +204,10 @@ func _ready() -> void:
 	_hud.get_parent().add_child(CoopUI.new())
 	_hud.get_parent().add_child(ActionsMenuUI.new(ActionsMenuUI.farm_actions()))
 	_say_if_away()
+	_shuttle_ui = ShuttleUI.new()
+	_hud.get_parent().add_child(_shuttle_ui)
+	_landing = landing
+	landing.terminal_click.clicked.connect(_open_shuttle_terminal)
 	_robots_ui = RobotsUI.new()
 	_hud.get_parent().add_child(_robots_ui)
 
@@ -214,7 +222,14 @@ func _process(delta: float) -> void:
 		_inspect_left -= delta
 		return
 	var hovered: Clickable = Clickable.hovered
-	_hover_hint.text = hovered.hint if hovered else _rover.away_text() + _walkers.hint()
+	if hovered:
+		_hover_hint.text = hovered.hint
+		return
+	var lines: PackedStringArray = []
+	for line: String in [_rover.away_text(), _walkers.hint(), _terminal_prompt()]:
+		if line != "":
+			lines.append(line)
+	_hover_hint.text = "  ·  ".join(lines)
 
 
 func _show_inspect(text: String) -> void:
@@ -587,6 +602,28 @@ func _input(event: InputEvent) -> void:
 		_dig_pressed_msec = Time.get_ticks_msec()
 
 
+## A line for someone within reach of the shuttle terminal who is not pointing at it
+## (a controller has no pointer): the key that opens it.
+func _terminal_prompt() -> String:
+	if not _terminal_in_reach():
+		return ""
+	return "Shuttle terminal: press %s." % Controls.prompt(&"interact")
+
+
+## True when the terminal stands clear (not under stone) and the local player is within reach of it.
+func _terminal_in_reach() -> bool:
+	return (_shuttle_ui != null and _landing != null and _landing.terminal_click != null and _landing.terminal_click.enabled
+			and Shuttle.terminal_near(GameState.standing_at(GameState.local_player_id)))
+
+
+## Opens the shuttle terminal's panel, or says to walk up to it.
+func _open_shuttle_terminal() -> void:
+	if _terminal_in_reach():
+		_shuttle_ui.open()
+	else:
+		_hud.push_log("SHUTTLE TERMINAL: " + Shuttle.text("far_text"))
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	# Debug builds only: F8 paints the ground by biome (biomes.md section 6, step 4).
 	# Caught here, outside the world viewport, and handed to the ground.
@@ -599,6 +636,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"get_out_in"):
 		get_viewport().set_input_as_handled()
 		_get_out_or_in()
+	elif event.is_action_pressed(&"interact") and _terminal_in_reach():
+		# At the landing pad's terminal, on foot or in the rover: the same key as the
+		# dome's console, handled before the on-foot refusal below.
+		get_viewport().set_input_as_handled()
+		_open_shuttle_terminal()
 	elif CoopWalkers.on_foot():
 		if (FARM_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key))
 				or ON_FOOT_REFUSED.any(func(key: StringName) -> bool: return event.is_action_pressed(key))):
