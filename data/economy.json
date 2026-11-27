@@ -84,5 +84,21 @@
     "cost_waived_text": "The crew took the last %s CR there was; the rest of the fee is waived.",
     "_note": "Zones doc section 6.1, build step 1 (Ryan, 2026-11-26: 50 CR plus some carried ore, finds kept, no extra drift, the crew brings the rover home). A player in the basalt tunnels is warned at warn_hour and rescued at rescue_hour (hours on the 24 h clock; the day runs 06:00 to 06:00, so 00:00 and 02:00 are late in the day). The fee comes from the shared wallet and never takes it below 0: the crew takes what there is and waives the rest. ore_share is [numerator, denominator] of the crystal ore gained since the rover went in (the farm has one shared pile; ore already in it is never taken), rounded down. The mouth is closed to the rover from rescue_hour to 06:00. Every number and every word here is [PLACEHOLDER]."
   },
+  "lab_sitter": {
+    "name": "Dana Pike",
+    "fee_credits": 40,
+    "title": "LAB SITTER",
+    "offer_text": "%s tends the lab for one day, starting at 06:00 tomorrow: %s.",
+    "fee_text": "%s CR from the shared wallet",
+    "free_text": "free, from a reward",
+    "book": "Book her",
+    "row_booked": "%s is booked to tend the lab on day %s.",
+    "booked_text": "[Odalys Brandt, BNH Dispatch] %s is booked to tend the lab on day %s (%s). Warmly, Dispatch.",
+    "report_text": "[Odalys Brandt, BNH Dispatch] %s kept the lab in good order on day %s. Plots trimmed to their target: %s. Spools collected: %s. Nothing was calibrated and no reading was changed: that is bench work. Warmly, Dispatch.",
+    "console_in_dome": "The lab sitter is booked from the console in the dome.",
+    "already": "The lab sitter is booked already.",
+    "short": "The lab sitter costs %s CR from the shared wallet. The farm has %s CR.",
+    "_note": "Zones doc section 9, build step 11 (Ryan, 2026-11-26: the sitter is a NEW hire, not Lin or Chet; she cannot calibrate). Booked from the dome console for the NEXT day [ASSUMPTION]; she works from 06:00 of that day to 06:00 after, and the report comes then. Free when the farm holds the lab_sitter one-use reward. She waters (trims each growing plot's set point to its crop's target by the plot's own probe reading, as a robot does) and collects the day's spools; she does not feed the spiders (the game has no feeding) and never calibrates. The name, the fee and every word here are [PLACEHOLDER]."
+  },
   "_note": "Starting balance [PLACEHOLDER]. Crops sold to Lin add credits; audit fines, OIRM fees and purchases take them away."
 }

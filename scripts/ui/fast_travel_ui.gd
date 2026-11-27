@@ -14,6 +14,9 @@ const WAIT_S: float = 3.0
 
 var _rows: VBoxContainer
 var _status: Label
+## The lab sitter's line and button (zones section 9, build step 11).
+var _sitter_label: Label
+var _sitter_button: Button
 var _close_button: Button
 var _focus_before: Control
 ## The zone whose warning was shown, so the next press on it goes.
@@ -43,6 +46,15 @@ func _ready() -> void:
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override(&"separation", 8)
 	column.add_child(_rows)
+	var sitter := HBoxContainer.new()
+	_sitter_label = PlanBoardUI._label("", TEXT, 18)
+	_sitter_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_sitter_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	sitter.add_child(_sitter_label)
+	_sitter_button = PlanBoardUI._button(LabSitter.text("book"))
+	_sitter_button.pressed.connect(_on_book_sitter)
+	sitter.add_child(_sitter_button)
+	column.add_child(sitter)
 	_status = PlanBoardUI._label("", TEXT, 18)
 	column.add_child(_status)
 	_close_button = PlanBoardUI._button("%s  (Esc)" % FastTravel.text("close"))
@@ -50,6 +62,8 @@ func _ready() -> void:
 	_close_button.pressed.connect(close)
 	column.add_child(_close_button)
 	GameState.rover_place_changed.connect(_on_place_changed)
+	GameState.lab_sitter_changed.connect(_refresh_sitter)
+	GameState.one_use_changed.connect(_refresh_sitter)
 	hide()
 
 
@@ -81,6 +95,7 @@ func open() -> void:
 	_warned = ""
 	_status.text = ""
 	_refresh()
+	_refresh_sitter()
 	show()
 	_close_button.grab_focus()
 
@@ -162,3 +177,28 @@ func _on_go(place: Dictionary) -> void:
 		return
 	close()
 	SceneSwitcher.go_to(SceneSwitcher.TUNNELS_SCENE)
+
+
+## What the sitter's line says: she is booked for a day, or what a day of her
+## costs (nothing, if the farm holds the free day).
+func _refresh_sitter() -> void:
+	if not is_instance_valid(_sitter_label):
+		return
+	var booked: bool = LabSitter.is_booked(GameState.lab_sitter)
+	if booked:
+		_sitter_label.text = LabSitter.text("row_booked") % [LabSitter.sitter_name(), SP811.integer(int(GameState.lab_sitter["day"]))]
+	else:
+		var free: bool = GameState.one_use_count(GameState.ONE_USE_SITTER, GameState.local_player_id) > 0
+		var price: String = LabSitter.text("free_text") if free else LabSitter.text("fee_text") % SP811.integer(LabSitter.fee())
+		_sitter_label.text = LabSitter.text("offer_text") % [LabSitter.sitter_name(), price]
+	_sitter_button.disabled = booked
+
+
+## The host books her; a refusal is shown as it came.
+func _on_book_sitter() -> void:
+	_sitter_button.disabled = true
+	var problem: String = await FarmCommands.request(&"book_lab_sitter", [])
+	if not is_inside_tree():
+		return
+	_status.text = problem
+	_refresh_sitter()

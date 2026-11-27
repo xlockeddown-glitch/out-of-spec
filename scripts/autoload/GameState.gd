@@ -18,6 +18,7 @@ signal beacons_changed
 signal finds_changed
 ## A lift was repaired, or the deepest depth reached in a zone grew.
 signal lifts_changed
+signal lab_sitter_changed
 signal relay_changed(slotted: bool)
 signal calibration_recorded(record: Dictionary)
 signal phone_message(text: String)
@@ -194,6 +195,9 @@ var finds_taken: Dictionary = {}
 ## The lift stations repaired, for good: zone id -> Array of the depths (ZoneDepth).
 ## Never reset, never expires. Shared by the farm.
 var lifts_repaired: Dictionary = {}
+## The lab sitter's booking (LabSitter): {} for none, else { "day", "watered",
+## "spools" }: the day she works and what she has done so far. Shared by the farm.
+var lab_sitter: Dictionary = {}
 ## The deepest depth the farm's rover has reached in each zone: zone id -> depth.
 ## Only ever grows. Shown on the phone. Shared by the farm.
 var deepest_depth: Dictionary = {}
@@ -696,7 +700,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth"]
+	"lifts_repaired", "deepest_depth", "lab_sitter"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -753,6 +757,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return ZoneDepth.taken_problem(data["finds_taken"])
 	if data.has("lifts_repaired") and ZoneDepth.lifts_problem(data["lifts_repaired"]) != "":
 		return ZoneDepth.lifts_problem(data["lifts_repaired"])
+	if data.has("lab_sitter") and LabSitter.booking_problem(data["lab_sitter"]) != "":
+		return LabSitter.booking_problem(data["lab_sitter"])
 	if data.has("deepest_depth") and ZoneDepth.deepest_problem(data["deepest_depth"]) != "":
 		return ZoneDepth.deepest_problem(data["deepest_depth"])
 	var beacon_steps: String = LavaHub.steps_problem(QuestEngine.quests(), data.get("quest_state", {}), (data.get("beacons_placed", []) as Array).size())
@@ -1075,6 +1081,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	sentinel_changed.emit()
 	rover_lights_changed.emit()
 	lifts_changed.emit()
+	lab_sitter_changed.emit()
 	return ""
 
 
@@ -2465,6 +2472,8 @@ const MOST_ONE_USE: int = 9
 const ONE_USE_DISCOUNT: String = "bram_discount_10"
 ## The next lab space cleared costs nothing (L4's reward).
 const ONE_USE_REFIT: String = "free_lab_refit"
+## One day of the lab sitter, free.
+const ONE_USE_SITTER: String = "lab_sitter"
 
 
 ## Who holds reward `reward_id` for `player_id` ("" = the local player): the
@@ -3439,6 +3448,74 @@ func _grow_pockets(day: int) -> void:
 		pockets_changed.emit()
 
 
+## Books the lab sitter for the next day. Returns "" when booked, else why not.
+## She is booked from the console in the dome, one day at a time, and costs
+## LabSitter.fee() CR from the shared wallet, or one lab_sitter reward.
+func book_lab_sitter(player_id: String = "") -> String:
+	if place_of(_player(player_id)) != ZonePresence.DOME:
+		return LabSitter.text("console_in_dome")
+	if LabSitter.is_booked(lab_sitter):
+		return LabSitter.text("already")
+	var free: bool = one_use_count(ONE_USE_SITTER) > 0
+	var fee: int = LabSitter.fee()
+	if not free and credits < fee:
+		return LabSitter.text("short") % [SP811.integer(fee), SP811.integer(credits)]
+	var day: int = LabSitter.booked_day(GameClock.get_day_index())
+	if free:
+		_spend_one_use(ONE_USE_SITTER)
+		post_phone(QuestEngine.one_use_used_line(ONE_USE_SITTER))
+	else:
+		add_credits(-fee)
+	lab_sitter = LabSitter.new_booking(day)
+	lab_sitter_changed.emit()
+	post_phone(LabSitter.text("booked_text") % [LabSitter.sitter_name(), SP811.integer(day),
+		LabSitter.text("free_text") if free else LabSitter.text("fee_text") % SP811.integer(fee)])
+	return ""
+
+
+## 06:00 of her day: she does the morning's work, after the robots' cards.
+func _open_lab_sitter(day: int) -> void:
+	if LabSitter.is_booked(lab_sitter) and int(lab_sitter["day"]) == day:
+		_sitter_tend()
+
+
+## 06:00 after her day: the last of the work, then the Dispatch line, and she
+## is done. Run before the crops grow so her watering counts for the day.
+func _close_lab_sitter(day: int) -> void:
+	if not LabSitter.is_booked(lab_sitter) or day <= int(lab_sitter["day"]):
+		return
+	_sitter_tend()
+	post_phone(LabSitter.report_text(lab_sitter))
+	lab_sitter = {}
+	lab_sitter_changed.emit()
+
+
+## One round of her work, by the code the players and robots use: she trims
+## each growing plot's set point by the lab's soil probe and collects the spools
+## that are ready, as the Manager (no skill XP). She never calibrates and
+## never touches a sensor's drift or a reading. The lab's shared XP for a spool
+## is still given. The spiders are not fed: the game has no feeding.
+func _sitter_tend() -> void:
+	var watered: int = 0
+	var spools: int = 0
+	for cell: Vector3i in plantings.keys():
+		if is_crop_ready(cell):
+			continue
+		var setpoint: float = plantings[cell]["setpoint"]
+		var target: float = float(crop(plantings[cell]["crop_id"]).get("soil_moisture_target", 0.0))
+		var steps: int = LabSitter.trim_steps(target, soil_probe_reading(cell), setpoint, SETPOINT_STEP)
+		if steps != 0 and adjust_setpoint(cell, steps) != setpoint:
+			watered += 1
+	if collect_spool(MANAGER_ID):
+		spools += 1
+	for species_id: Variant in enclosures.keys():
+		if collect_enclosure_spool(str(species_id), MANAGER_ID):
+			spools += 1
+	lab_sitter["watered"] = int(lab_sitter["watered"]) + watered
+	lab_sitter["spools"] = int(lab_sitter["spools"]) + spools
+	lab_sitter_changed.emit()
+
+
 func _on_day_started(day: int) -> void:
 	# A rover below stands on the new day's floor.
 	settle_rover_depth()
@@ -3458,8 +3535,10 @@ func _on_day_started(day: int) -> void:
 	_morning = true
 	_charge_overdue_credibility(day)
 	_expire_jobs(day)
+	_close_lab_sitter(day)
 	_grow_crops(watered)
 	_run_robot_cards()
+	_open_lab_sitter(day)
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)

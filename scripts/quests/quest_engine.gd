@@ -142,6 +142,8 @@ const KEEPSAKES: String = "keepsakes"
 ## A reward of a one-use reward: its id in the data's ONE_USE_REWARDS.
 const ONE_USE: String = "one_use"
 const ONE_USE_REWARDS: String = "one_use_rewards"
+## The rewards that are the farm's and no discount: a free refit, a day of the lab sitter.
+const FARM_ONLY_USES: Array[String] = ["free_lab_refit", "lab_sitter"]
 ## An entry's one key that is not always there: step id -> the score kept.
 const SCORES: String = "scores"
 ## On a quest: its endings (section 8, S2), a list of { id, when and that check's
@@ -576,6 +578,23 @@ static func one_use_pct(reward_id: String) -> int:
 	return int(DataManager.get_record(TABLE, reward_id, ONE_USE_REWARDS).get("pct", 0))
 
 
+## "" or what is wrong with a one-use reward's own row: its holder is a player
+## or the farm, a percent is 0 to 100, and the ones that are not a discount
+## (the free refit, the lab sitter's day) carry none and are the farm's.
+static func one_use_problem(reward_id: String) -> String:
+	if not has_one_use(reward_id):
+		return "no such reward."
+	var row: Dictionary = DataManager.get_record(TABLE, reward_id, ONE_USE_REWARDS)
+	if not str(row.get("holder", "player")) in ["player", "farm"]:
+		return "its holder is not player or farm."
+	var pct: int = int(row.get("pct", 0))
+	if pct < 0 or pct > 100:
+		return "its percent is not 0 to 100."
+	if reward_id in FARM_ONLY_USES and (not one_use_of_farm(reward_id) or pct != 0):
+		return "it is the farm's and takes no percent."
+	return ""
+
+
 ## A one-use reward's name, or "" for none the data has.
 static func one_use_name(reward_id: String) -> String:
 	if not has_one_use(reward_id):
@@ -708,6 +727,8 @@ static func data_problem(quest: Dictionary) -> String:
 	if one_use != null:
 		if not one_use is String or not has_one_use(one_use):
 			return "its one-use reward is not one the data has."
+		if one_use_problem(one_use) != "":
+			return "its one-use reward is wrong: %s" % one_use_problem(one_use)
 		if is_daily(quest):
 			return "a daily ask pays no one-use reward."
 		if one_use_of_farm(one_use) != (str(quest.get("scope", SCOPE_FARM)) == SCOPE_FARM):
