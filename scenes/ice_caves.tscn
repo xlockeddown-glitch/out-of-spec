@@ -14,10 +14,10 @@
 
 [sub_resource type="Environment" id="Env"]
 background_mode = 1
-background_color = Color(0.035, 0.028, 0.026, 1)
+background_color = Color(0.02, 0.04, 0.065, 1)
 ambient_light_source = 2
-ambient_light_color = Color(1, 0.86, 0.76, 1)
-ambient_light_energy = 0.45
+ambient_light_color = Color(0.72, 0.88, 1, 1)
+ambient_light_energy = 0.52
 tonemap_mode = 2
 glow_enabled = true
 glow_intensity = 0.9
@@ -78,8 +78,8 @@ environment = SubResource("Env")
 
 [node name="Lamp" type="DirectionalLight3D" parent="WorldView/WorldViewport/World"]
 transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
-light_color = Color(1, 0.9, 0.8, 1)
-light_energy = 0.55
+light_color = Color(0.78, 0.92, 1, 1)
+light_energy = 0.6
 shadow_enabled = true
 
 [node name="IsoCamera" type="Camera3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("target")]
