@@ -42,7 +42,11 @@ func _on_screen(id: StringName) -> Color:
 
 func test_every_listed_vent_passes_and_lies_in_the_ridge() -> String:
 	if BasaltDressing.spots().size() != BasaltDressing.VENTS.size():
-		return "%d of %d listed vents passed the rules" % [BasaltDressing.spots().size(), BasaltDressing.VENTS.size()]
+		var refused: Array[Vector2] = []
+		for at: Vector2 in BasaltDressing.VENTS:
+			if not BasaltDressing.clear(at):
+				refused.append(at)
+		return "%d of %d listed vents passed the rules; refused: %s" % [BasaltDressing.spots().size(), BasaltDressing.VENTS.size(), refused]
 	if BasaltDressing.spots().size() < 4:
 		return "Too few vents"
 	for at: Vector2 in BasaltDressing.spots():
@@ -84,6 +88,11 @@ func test_the_rules_refuse_a_bad_spot() -> String:
 		Vector2(-17.0, -10.0),              # a rock, and not in the ridge
 		Vector2(50.0, 20.0),                # not in the ridge
 		Vector2(52.0, 14.0),                # a fissure
+		Vector2(53.0, -41.0),               # a rock, in the ridge
+		Vector2(25.2, -19.8),               # a pad-corner lamp, in the ridge
+		Vector2(25.2, -22.6),               # a way lamp
+		Vector2(30.7, -17.0),               # the pad's sign, in the ridge
+		Vector2(20.5, -15.5),               # the tunnel pad
 		Vector2(500.0, 0.0),                # off the land
 	]
 	for at: Vector2 in bad:
@@ -92,27 +101,103 @@ func test_the_rules_refuse_a_bad_spot() -> String:
 	return ""
 
 
-func test_vents_sit_on_the_ground_and_follow_digging() -> String:
+func test_vents_sit_on_the_ground_with_the_lip_above_every_edge() -> String:
 	var dressing: BasaltDressing = _dressed()
+	var none: Dictionary[Vector2i, int] = {}
 	if dressing.vent_count() != BasaltDressing.spots().size():
 		_cleanup()
 		return "The scene has %d vents, not %d" % [dressing.vent_count(), BasaltDressing.spots().size()]
-	var none: Dictionary[Vector2i, int] = {}
+	var problem: String = ""
 	for vent: Node in dressing.get_children():
-		var at: Vector2 = Vector2((vent as Node3D).position.x, (vent as Node3D).position.z)
-		if absf((vent as Node3D).position.y - Terrain.height(at, none)) > 0.5:
-			_cleanup()
-			return "A vent at %s is off the ground" % at
-	# Dig the cell under the first vent: it follows.
-	var first: Vector2 = BasaltDressing.spots()[0]
-	var cell := Vector2i(floori(first.x / Terrain.CELL_M), floori(first.y / Terrain.CELL_M))
-	var dug: Dictionary[Vector2i, int] = {cell: 2}
-	dressing.settle(dug)
-	var moved: float = (dressing.get_child(0) as Node3D).position.y
-	var want: float = BasaltDressing.ground_y(first, dug)
+		var node := vent as Node3D
+		var at := Vector2(node.position.x, node.position.z)
+		var top: float = node.position.y + (node.get_node("Puff") as Node3D).position.y
+		if absf(node.position.y - Terrain.height(at, none)) > 0.5:
+			problem = "A vent at %s is off the ground" % at
+		for x: int in range(-1, 2):
+			for z: int in range(-1, 2):
+				var edge: float = Terrain.height(at + Vector2(x, z) * BasaltDressing.LIP_RADIUS_M, none)
+				if top < edge + BasaltDressing.RING_HEIGHT_M - 0.001:
+					problem = "The lip of the vent at %s is buried (%s under %s)" % [at, top, edge]
+				if node.position.y > Terrain.height(at + Vector2(x, z) * BasaltDressing.FOOT_RADIUS_M, none) + 0.001:
+					problem = "The foot of the vent at %s hangs in the air" % at
 	_cleanup()
-	if absf(moved - want) > 0.001:
-		return "The vent did not follow the digging"
+	return problem
+
+
+func _nine_around(at: Vector2) -> Dictionary[Vector2i, int]:
+	var centre: Vector2i = Terrain.cell_at(at)
+	var dug: Dictionary[Vector2i, int] = {}
+	for x: int in range(-1, 2):
+		for z: int in range(-1, 2):
+			dug[centre + Vector2i(x, z)] = 1
+	return dug
+
+
+func test_a_dug_neighbour_does_not_bury_the_lip() -> String:
+	var dressing: BasaltDressing = _dressed()
+	var first: Vector2 = BasaltDressing.spots()[0]
+	var centre: Vector2i = Terrain.cell_at(first)
+	var problem: String = ""
+	for step: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+		var dug: Dictionary[Vector2i, int] = {centre + step: 1}
+		dressing.settle(dug)
+		var vent := dressing.get_child(0) as Node3D
+		var lip: float = vent.position.y + (vent.get_node("Puff") as Node3D).position.y
+		if lip < Terrain.height(first, dug) + BasaltDressing.RING_HEIGHT_M - 0.001:
+			problem = "The lip is buried by a dug neighbour at %s" % step
+	_cleanup()
+	return problem
+
+
+func test_a_live_vent_follows_the_digging_and_comes_back() -> String:
+	var dressing := BasaltDressing.new()
+	(Engine.get_main_loop() as SceneTree).root.add_child(dressing)
+	var first: Vector2 = BasaltDressing.spots()[0]
+	var vent := dressing.get_child(0) as Node3D
+	var saved: Dictionary[Vector2i, int] = GameState.dug.duplicate()
+	var before: float = vent.position.y
+	GameState.dug = _nine_around(first)
+	GameState.terrain_changed.emit()
+	var dropped: float = vent.position.y
+	GameState.dug = saved
+	GameState.terrain_changed.emit()
+	var back: float = vent.position.y
+	dressing.get_parent().remove_child(dressing)
+	dressing.free()
+	if not dropped < before:
+		return "The vent did not drop after the cells under it were dug (%s, %s)" % [before, dropped]
+	if not is_equal_approx(back, before):
+		return "The vent did not come back after the digging was undone (%s, %s)" % [before, back]
+	return ""
+
+
+func test_a_vent_hides_under_stone_and_shows_again() -> String:
+	var dressing := BasaltDressing.new()
+	(Engine.get_main_loop() as SceneTree).root.add_child(dressing)
+	var first: Vector2 = BasaltDressing.spots()[0]
+	var saved: Dictionary[Vector2i, int] = GameState.stone_pieces.duplicate()
+	var vent := dressing.get_child(0) as Node3D
+	var puff := vent.get_node("Puff") as CPUParticles3D
+	var shown_at_first: bool = vent.visible and puff.emitting
+	var piece: Dictionary[Vector2i, int] = {Terrain.cell_at(first): 0}
+	GameState.stone_pieces = piece
+	GameState.stone_changed.emit()
+	var hidden: bool = not vent.visible and not puff.emitting
+	var others_shown: bool = dressing.is_shown(1)
+	GameState.stone_pieces = saved
+	GameState.stone_changed.emit()
+	var back: bool = vent.visible and puff.emitting
+	dressing.get_parent().remove_child(dressing)
+	dressing.free()
+	if not shown_at_first:
+		return "The vent was not showing to begin with"
+	if not hidden:
+		return "The vent still shows (or steams) over a stone piece"
+	if not others_shown:
+		return "A vent far from the stone was hidden"
+	if not back:
+		return "The vent did not come back when the stone was taken up"
 	return ""
 
 
@@ -140,8 +225,14 @@ func test_the_tunnel_mouth_lamps_stand_on_the_way_and_are_clear() -> String:
 	var spots: Array[Vector2] = RoadLamps.spots(&"basalt_ridge")
 	if spots.size() != 4 + RoadLamps.BASALT_WAY_SPOTS.size():
 		return "The ridge has %d lamps, want the four corners and %d on the way" % [spots.size(), RoadLamps.BASALT_WAY_SPOTS.size()]
+	for i: int in spots.size():
+		for j: int in range(i + 1, spots.size()):
+			if spots[i].distance_to(spots[j]) < RoadLamps.MIN_GAP_M:
+				return "Lamps %d and %d stand %.2f m apart" % [i, j, spots[i].distance_to(spots[j])]
 	var pad: Vector2 = BiomeData.marker(&"basalt_ridge")
-	var mouth := Vector2(20.5, -19.0)
+	var mouth: Vector2 = BiomeData.entrance_at(&"basalt_ridge", &"lava_tubes") as Vector2
+	var north: int = 0
+	var south: int = 0
 	for at: Vector2 in RoadLamps.BASALT_WAY_SPOTS:
 		if not spots.has(at):
 			return "The way lamp at %s was dropped" % at
@@ -149,8 +240,16 @@ func test_the_tunnel_mouth_lamps_stand_on_the_way_and_are_clear() -> String:
 			return "The lamp at %s is not between the pad and the tunnel mouth" % at
 		if absf(at.x - pad.x) < BiomeData.PAD_HALF_M and absf(at.y - pad.y) < BiomeData.PAD_HALF_M:
 			return "The lamp at %s is on the pad" % at
-		if absf(at.x - mouth.x) < 4.0 and absf(at.y - mouth.y) < 3.0:
-			return "The lamp at %s is on the tunnel mouth" % at
+		# The mouth and the tunnel pad are built things in BiomeData.spots().
+		for box: Vector4 in BiomeData.spots():
+			if absf(at.x - box.x) < box.z and absf(at.y - box.y) < box.w:
+				return "The lamp at %s is on the built thing at %s" % [at, box]
+		if at.y < pad.y:
+			north += 1
+		else:
+			south += 1
+	if north == 0 or south == 0:
+		return "The way lamps should flank the way (%d north, %d south)" % [north, south]
 	return ""
 
 

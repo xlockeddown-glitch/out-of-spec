@@ -20,8 +20,11 @@ const SPOT_CLEAR_M: float = 0.5
 ## A padless biome's lamps stand this far off the pad's middle on each axis.
 const PAD_LAMP_M: float = 2.8
 ## The Basalt Ridge's extra lamps (step 10), along the lit way from its pad to the
-## tunnel mouth: one each side of the way and one near the pad [PLACEHOLDER].
-const BASALT_WAY_SPOTS: Array[Vector2] = [Vector2(25.2, -21.6), Vector2(25.2, -14.2), Vector2(26.6, -23.0)]
+## tunnel mouth: two north of the way and one south of it, all clear of the pad's own
+## corner lamps and of the tunnel pad and mouth [PLACEHOLDER].
+const BASALT_WAY_SPOTS: Array[Vector2] = [Vector2(25.2, -22.6), Vector2(22.5, -22.8), Vector2(23.5, -14.5)]
+## No two lamps of a biome stand closer than this.
+const MIN_GAP_M: float = 1.5
 const POST_HEIGHT_M: float = 1.1
 const HEAD_SIZE_M: float = 0.28
 
@@ -59,7 +62,7 @@ static func spots(id: StringName) -> Array[Vector2]:
 					found.append(spot)
 			if id == &"basalt_ridge":
 				for spot: Vector2 in BASALT_WAY_SPOTS:
-					if _clear(spot):
+					if _clear(spot) and _apart(spot, found):
 						found.append(spot)
 		_spots[id] = found
 	return _spots[id]
@@ -95,6 +98,14 @@ static func _along(line: Array[Vector2]) -> Array[Vector2]:
 			next += SPACING_M
 		walked += length
 	return out
+
+
+## Whether `at` keeps MIN_GAP_M from every lamp already in `found`.
+static func _apart(at: Vector2, found: Array[Vector2]) -> bool:
+	for other: Vector2 in found:
+		if at.distance_to(other) < MIN_GAP_M:
+			return false
+	return true
 
 
 ## Whether a lamp may stand at `at`: on land, off every road cell, pad and sign cell,

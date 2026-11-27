@@ -11,7 +11,7 @@ extends Node3D
 const VENTS: Array[Vector2] = [
 	Vector2(36.0, -38.0),
 	Vector2(46.0, -41.0),
-	Vector2(53.0, -31.0),
+	Vector2(52.0, -29.0),
 	Vector2(44.0, -16.0),
 	Vector2(34.0, -26.0),
 ]
@@ -78,6 +78,9 @@ static func clear(at: Vector2) -> bool:
 			var way: Variant = BiomeData.entrance_at(id, zone)
 			if way is Vector2 and at.distance_to(way as Vector2) < ENTRANCE_CLEAR_M:
 				return false
+	for plant: HillDressing.Placed in HillDressing.plants():
+		if absf(at.x - plant.at.x) < plant.half_m() + VENT_HALF_M and absf(at.y - plant.at.z) < plant.half_m() + VENT_HALF_M:
+			return false
 	for lamp: Vector2 in RoadLamps.spots(&"basalt_ridge"):
 		if at.distance_to(lamp) < LAMP_CLEAR_M:
 			return false
@@ -87,11 +90,17 @@ static func clear(at: Vector2) -> bool:
 func _ready() -> void:
 	name = "BasaltDressing"
 	build(GameState.dug)
+	cover(GameState.stone_pieces)
 	GameState.terrain_changed.connect(_on_terrain_changed)
+	GameState.stone_changed.connect(_on_stone_changed)
 
 
 func _on_terrain_changed() -> void:
 	settle(GameState.dug)
+
+
+func _on_stone_changed() -> void:
+	cover(GameState.stone_pieces)
 
 
 ## Puts the vents in on the ground as `dug` leaves it.
@@ -114,6 +123,7 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 	puff_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	puff_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	puff_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	puff_material.billboard_keep_scale = true
 	puff_material.vertex_color_use_as_albedo = true
 	puff_material.albedo_color = Color(0.85, 0.88, 0.92)
 	var puff_mesh := QuadMesh.new()
@@ -131,7 +141,6 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 		var ring := MeshInstance3D.new()
 		ring.name = "Ring"
 		ring.mesh = ring_mesh
-		ring.position = Vector3(0.0, RING_HEIGHT_M * 0.5, 0.0)
 		vent.add_child(ring)
 		var puff := CPUParticles3D.new()
 		puff.name = "Puff"
@@ -147,10 +156,10 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 		puff.scale_amount_min = 0.6
 		puff.scale_amount_max = 1.8
 		puff.color_ramp = fade
-		puff.position = Vector3(0.0, RING_HEIGHT_M, 0.0)
 		puff.local_coords = false
 		vent.add_child(puff)
 		add_child(vent)
+		_seat(vent, dug)
 		_vents.append(vent)
 		index += 1
 
@@ -158,6 +167,27 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 ## The lowest ground under a vent's ring at `at`, so no edge hangs in the air.
 static func ground_y(at: Vector2, dug: Dictionary[Vector2i, int]) -> float:
 	return HillDressing.lowest_under(at, Vector2.ONE * FOOT_RADIUS_M, dug)
+
+
+## Where the lip of a vent at `at` is: RING_HEIGHT_M over the highest ground under the
+## lip (and the middle), so a slope or a dug neighbour cannot bury the lip or the puff.
+static func top_y(at: Vector2, dug: Dictionary[Vector2i, int]) -> float:
+	var high: float = Terrain.height(at, dug)
+	for x: int in range(-1, 2):
+		for z: int in range(-1, 2):
+			high = maxf(high, Terrain.height(at + Vector2(x, z) * LIP_RADIUS_M, dug))
+	return high + RING_HEIGHT_M
+
+
+## Whether stone covers any cell under a vent's foot at `at`.
+static func covered_by(at: Vector2, pieces: Dictionary[Vector2i, int]) -> bool:
+	var first: Vector2i = Terrain.cell_at(at - Vector2.ONE * FOOT_RADIUS_M)
+	var last: Vector2i = Terrain.cell_at(at + Vector2.ONE * FOOT_RADIUS_M)
+	for x: int in range(first.x, last.x + 1):
+		for z: int in range(first.y, last.y + 1):
+			if pieces.has(Vector2i(x, z)):
+				return true
+	return false
 
 
 ## How many vents there are.
@@ -168,4 +198,30 @@ func vent_count() -> int:
 ## Re-seats every vent on the ground as `dug` leaves it.
 func settle(dug: Dictionary[Vector2i, int]) -> void:
 	for vent: Node3D in _vents:
-		vent.position.y = ground_y(Vector2(vent.position.x, vent.position.z), dug)
+		_seat(vent, dug)
+
+
+## Hides a vent, and stops its puff, while a stone piece covers its foot; shows it again
+## when the stone is taken up.
+func cover(pieces: Dictionary[Vector2i, int]) -> void:
+	for vent: Node3D in _vents:
+		var shown: bool = not covered_by(Vector2(vent.position.x, vent.position.z), pieces)
+		vent.visible = shown
+		(vent.get_node("Puff") as CPUParticles3D).emitting = shown
+
+
+## Whether a vent is showing (not under stone).
+func is_shown(index: int) -> bool:
+	return _vents[index].visible
+
+
+## Sets a vent's foot on the lowest ground, its ring up to the lip, and its puff at the lip.
+func _seat(vent: Node3D, dug: Dictionary[Vector2i, int]) -> void:
+	var at := Vector2(vent.position.x, vent.position.z)
+	var foot: float = ground_y(at, dug)
+	var height: float = maxf(top_y(at, dug) - foot, RING_HEIGHT_M)
+	vent.position.y = foot
+	var ring: Node3D = vent.get_node("Ring") as Node3D
+	ring.scale = Vector3(1.0, height / RING_HEIGHT_M, 1.0)
+	ring.position = Vector3(0.0, height * 0.5, 0.0)
+	(vent.get_node("Puff") as Node3D).position = Vector3(0.0, height, 0.0)
