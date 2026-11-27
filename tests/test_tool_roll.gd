@@ -246,6 +246,7 @@ func test_i_opens_and_closes_and_esc_closes() -> String:
 
 
 func test_it_does_not_open_over_another_panel() -> String:
+	var snap: Dictionary = _snapshot()
 	var roll: ToolRollUI = _roll()
 	var other := Control.new()
 	other.add_to_group(QuestsUI.MODAL_GROUP)
@@ -254,21 +255,25 @@ func test_it_does_not_open_over_another_panel() -> String:
 	var opened: bool = roll.visible
 	_free(other)
 	_free(roll)
+	_restore(snap)
 	return "The roll opened over another panel" if opened else ""
 
 
 func test_the_roll_takes_keys_while_open() -> String:
 	var snap: Dictionary = _snapshot()
 	var roll: ToolRollUI = _roll()
-	roll.open()
-	var event: InputEventKey = _key(KEY_W)
 	var viewport: Viewport = roll.get_viewport()
-	roll._unhandled_input(event)
+	# Control: a real event through the viewport clears the flag, and a closed roll leaves it clear.
+	viewport.push_input(_key(KEY_W))
+	var closed_handled: bool = viewport.is_input_handled()
+	roll.open()
+	viewport.push_input(_key(KEY_W))
 	var handled: bool = viewport.is_input_handled()
-	viewport.set_input_as_handled()
 	roll.close()
 	_free(roll)
 	_restore(snap)
+	if closed_handled:
+		return "A closed roll must leave keys alone (the control case)."
 	return "" if handled else "A key press must not reach the farm while the roll is open."
 
 
@@ -284,6 +289,7 @@ func test_it_updates_when_the_state_changes() -> String:
 	var before: int = roll._grid.get_child_count()
 	GameState.stone = 4
 	GameState.stone_changed.emit()
+	roll._rebuild()
 	# The old slots are freed at the end of the frame; what is parented now is what shows.
 	var after: int = 0
 	for child: Node in roll._grid.get_children():
@@ -301,3 +307,49 @@ func test_the_key_and_the_menu_are_set_up() -> String:
 	if not ActionsMenuUI.PANEL_ACTIONS.has(ToolRollUI.ACTION) or not ActionsMenuUI.farm_actions().has(ToolRollUI.ACTION):
 		return "The pad reaches the roll through the actions menu."
 	return "" if ControlsGuideUI.listed_actions().has(ToolRollUI.ACTION) else "The controls guide must list the key."
+
+
+func test_a_debt_still_shows_in_credits() -> String:
+	var snap: Dictionary = _snapshot()
+	GameState.credits = -120
+	GameState.stone = 0
+	GameState.crystal_ore = 0
+	GameState.optical_silk_spools = 0
+	var credits: Dictionary = _slot(ToolRollUI.TAB_SUPPLIES, "credits")
+	_restore(snap)
+	return "" if not credits.is_empty() and str(credits["count"]).contains("120") else "A negative balance must show, not hide."
+
+
+func test_a_standard_at_oirm_says_so() -> String:
+	var snap_at: Dictionary = GameState.at_oirm.duplicate()
+	var ids: Array[String] = GameState.standard_ids()
+	if ids.is_empty():
+		return "The test needs a standard."
+	var id: String = ids[0]
+	GameState.at_oirm[id] = 12
+	var away: Dictionary = _slot(ToolRollUI.TAB_TOOLS, "standard:" + id)
+	GameState.at_oirm = snap_at
+	var here: Dictionary = _slot(ToolRollUI.TAB_TOOLS, "standard:" + id)
+	if str(away.get("detail", "")) != "At OIRM until day 12":
+		return "An away standard must say so, not '%s'." % away.get("detail", "")
+	return "" if here.get("detail", "") == "Reference standard" else "A standard at home is a plain reference standard."
+
+
+func test_the_focus_falls_back_to_the_tab_when_the_grid_empties() -> String:
+	var snap: Dictionary = _snapshot()
+	GameState.credits = 0
+	GameState.crystal_ore = 0
+	GameState.optical_silk_spools = 0
+	GameState.stone = 5
+	var roll: ToolRollUI = _roll()
+	roll.open()
+	roll._select(ToolRollUI.TAB_SUPPLIES)
+	(roll._grid.get_child(0) as Control).grab_focus()
+	GameState.stone = 0
+	roll._refresh()
+	var owner: Control = roll.get_viewport().gui_get_focus_owner()
+	var tab: Button = roll._tab_buttons[ToolRollUI.TAB_SUPPLIES]
+	roll.close()
+	_free(roll)
+	_restore(snap)
+	return "" if owner == tab else "With the last slot gone the tab must take the focus."

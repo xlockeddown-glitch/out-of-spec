@@ -34,7 +34,12 @@ const SET_TEXT: String = "Set %s / %s"
 const COLUMNS: int = 2
 const SLOT_WIDTH: float = 420.0
 
+## Icons already loaded, by file name: a rebuild frees every slot, so reload would repeat.
+static var _textures: Dictionary[String, Texture2D] = {}
+
 var _tab: StringName = TAB_TOOLS
+## A rebuild is already queued for the end of this frame.
+var _dirty: bool = false
 var _tab_buttons: Dictionary[StringName, Button] = {}
 var _grid: GridContainer
 var _scroll: ScrollContainer
@@ -189,6 +194,14 @@ func _select(tab: StringName) -> void:
 
 
 func _on_changed() -> void:
+	# A farm load fires many of these in a row: one rebuild at the end of the frame.
+	if visible and not _dirty:
+		_dirty = true
+		_rebuild.call_deferred()
+
+
+func _rebuild() -> void:
+	_dirty = false
 	if visible:
 		_refresh()
 
@@ -203,7 +216,10 @@ static func slots(tab: StringName) -> Array[Dictionary]:
 			if GameState.is_in_service(GameState.SOIL_PROBE_ID):
 				out.append(_slot("soil_probe", GameState.instrument_name(GameState.SOIL_PROBE_ID, true), "1", "", "probe"))
 			for id: String in GameState.standard_ids():
-				out.append(_slot("standard:" + id, GameState.instrument_name(id, true), "1", "Reference standard", "wrench"))
+					var away: String = "Reference standard"
+					if GameState.at_oirm.has(id):
+						away = "At OIRM until day %s" % SP811.integer(int(GameState.at_oirm[id]))
+					out.append(_slot("standard:" + id, GameState.instrument_name(id, true), "1", away, "wrench"))
 			if GameState.has_wide_treads:
 				out.append(_slot("wide_treads", "Wide treads", "1", "Fitted to the rover", ""))
 		TAB_CROPS:
@@ -232,9 +248,9 @@ static func slots(tab: StringName) -> Array[Dictionary]:
 				out.append(_slot("gauge_set", "Gauge block set", SET_TEXT % [SP811.integer(pieces.size()), SP811.integer(GaugeSet.size_count())],
 					", ".join(by_grade), "gauge_block_set"))
 				out.append(_slot("blocks_found", "Blocks dug up", SP811.integer(GameState.found_blocks.size()),
-					"Extra blocks add nothing once a size is held", ""))
+					"Each block fills the next free size", ""))
 		TAB_SUPPLIES:
-			if GameState.credits > 0:
+			if GameState.credits != 0:
 				out.append(_slot("credits", "Credits", SP811.integer(GameState.credits), "CR", ""))
 			if GameState.stone > 0:
 				out.append(_slot("stone", "Stone", SP811.integer(GameState.stone), "", ""))
@@ -276,6 +292,9 @@ func _refresh() -> void:
 		_grid.add_child(_slot_node(item))
 	if focused >= 0 and _grid.get_child_count() > 0:
 		(_grid.get_child(mini(focused, _grid.get_child_count() - 1)) as Control).grab_focus()
+	elif focused >= 0:
+		# The slot that had the focus is gone and none is left: the tab takes it.
+		_tab_buttons[_tab].grab_focus()
 	# Down from a tab, and up from CLOSE, reach the slots even when the scroll hides them.
 	var tab_button: Button = _tab_buttons[_tab]
 	if _grid.get_child_count() > 0:
@@ -298,7 +317,6 @@ func _slot_node(item: Dictionary) -> PanelContainer:
 	slot.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	slot.add_theme_stylebox_override(&"panel", ScopeTheme.box(ScopeTheme.ENAMEL, ScopeTheme.ENAMEL_LIP, 3, 8, 10))
 	slot.focus_mode = Control.FOCUS_ALL
-	slot.set_meta(&"item", item)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override(&"separation", 12)
 	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -336,7 +354,10 @@ func _icon_node(item: Dictionary) -> Control:
 	if str(item["icon"]) != "":
 		var picture := TextureRect.new()
 		picture.name = &"Icon"
-		picture.texture = load(ICON_DIR % str(item["icon"])) as Texture2D
+		var file: String = str(item["icon"])
+		if not _textures.has(file):
+			_textures[file] = load(ICON_DIR % file) as Texture2D
+		picture.texture = _textures[file]
 		picture.custom_minimum_size = Vector2(ICON_SIZE, ICON_SIZE)
 		picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
