@@ -136,6 +136,7 @@ func _on_new_farm() -> void:
 func _start_new() -> void:
 	if _starting:
 		return
+	PickerUI.offer_next = true
 	_open(SaveGame.start_new())
 
 

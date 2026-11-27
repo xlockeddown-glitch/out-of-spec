@@ -227,6 +227,7 @@ func _build_hud() -> void:
 	ui.add_child(_hint)
 	ui.add_child(SkillsUI.new())
 	ui.add_child(ToolRollUI.new())
+	ui.add_child(PickerUI.new())
 	ui.add_child(ControlsGuideUI.new())
 	ui.add_child(QuestsUI.new())
 	ui.add_child(CoopUI.new())

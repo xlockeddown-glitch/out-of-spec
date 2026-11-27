@@ -85,6 +85,7 @@ Open `project.godot` in Godot 4.7 and press F5. The farm saves each morning and 
 | Y (in Bram's bay) | Bram re-torques the rover's wheel nuts, once they are due. While his quest "To the Click" is open, Torque to Spec plays first: hold Space, let go at the click line, Esc skips |
 | K | Skills panel |
 | I | Tool Roll (what you hold: tools, crops, blocks, supplies) |
+| P | Character and tractor: name your character and pick its six parts (offered once on a new farm) |
 | O | Quests panel |
 | F7 | Co-op panel (host or see who is here) |
 | F1 | Controls guide: every verb in plain English, grouped, with its key and its pad button. F1 or Esc closes it. On a pad: LB + RB, then CONTROLS |

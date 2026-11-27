@@ -48,6 +48,7 @@ func _physics_process(_delta: float) -> void:
 		# The host may have refused its way out of water that turned deep.
 		_own.leave_deep_water()
 	_own.model.set_suit(WalkerModel.suit_for(own, CoopSession.players))
+	_own.model.set_loadout(GameState.loadout_of(own)["parts"])
 
 
 ## After a dig or a stone changed the water: this screen's walker, if it is in deep
@@ -82,6 +83,7 @@ func _show_friend(player_id: String, pose: Array, delta: float) -> void:
 		share = 1.0
 	var model: WalkerModel = _friends[player_id]
 	model.set_suit(WalkerModel.suit_for(player_id, CoopSession.players))
+	model.set_loadout(GameState.loadout_of(player_id)["parts"])
 	if model.position.distance_to(at) > JUMP_M:
 		share = 1.0
 	model.position = model.position.lerp(at, share)

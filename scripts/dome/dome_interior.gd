@@ -95,6 +95,7 @@ func _ready() -> void:
 	_kestrel_click.clicked.connect(_kestrel_ui.open)
 	$UI.add_child(SkillsUI.new())
 	$UI.add_child(ToolRollUI.new())
+	$UI.add_child(PickerUI.new())
 	$UI.add_child(ControlsGuideUI.new())
 	$UI.add_child(QuestsUI.new())
 	$UI.add_child(CoopUI.new())

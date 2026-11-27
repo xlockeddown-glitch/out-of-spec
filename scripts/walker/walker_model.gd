@@ -29,6 +29,9 @@ var _suit_materials: Array[StandardMaterial3D] = []
 var _pads_materials: Array[StandardMaterial3D] = []
 var _suit: Color = SUIT
 var _walked_m: float = 0.0
+## The picker's parts, and the boxes they add (Loadout). The defaults add none.
+var _parts: Dictionary = Loadout.default_parts()
+var _dressing: Array[MeshInstance3D] = []
 
 
 func _init() -> void:
@@ -77,6 +80,35 @@ func set_suit(color: Color) -> void:
 		material.albedo_color = color
 	for material: StandardMaterial3D in _pads_materials:
 		material.albedo_color = color.darkened(0.25)
+
+
+## Dresses the model in `parts` (Loadout): the head wear, upper body and lower body add
+## their boxes to the suit. The same parts again change nothing.
+func set_loadout(parts: Dictionary) -> void:
+	var cleaned: Dictionary = Loadout.clean(parts)
+	if cleaned == _parts:
+		return
+	_parts = cleaned
+	for old: MeshInstance3D in _dressing:
+		old.get_parent().remove_child(old)
+		old.free()
+	_dressing.clear()
+	for slot: StringName in [Loadout.HEAD, Loadout.UPPER, Loadout.LOWER]:
+		for spec: Dictionary in Loadout.part(slot, cleaned[slot])["look"]:
+			var at: Vector3 = spec["at"]
+			var parent: Node3D = self
+			if slot == Loadout.LOWER:
+				# Leg gear swings with its leg.
+				var side: int = 0 if at.x < 0.0 else 1
+				parent = _legs[side]
+				at -= Vector3(-0.75 if side == 0 else 0.75, 1.5, 0.0)
+			var box: MeshInstance3D = _made(at, spec["size"], spec["color"])
+			parent.add_child(box)
+			_dressing.append(box)
+
+
+func loadout() -> Dictionary:
+	return _parts
 
 
 func suit() -> Color:

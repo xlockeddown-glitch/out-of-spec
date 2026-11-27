@@ -10,12 +10,12 @@ const ACTIONS: Array[StringName] = [
 	&"adjust_setpoint", &"book_lab_sitter", &"book_shuttle", &"build_block_stack", &"build_robot", &"buy_from_kestrel", &"buy_standard", &"buy_wide_treads",
 	&"calibrate_at_bench", &"catch_sentinel", &"change_depth", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"enter_vent", &"fast_travel", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
 	&"harvest_crop", &"hit_boulder", &"leave_zone", &"mine_fissure", &"move_rover", &"place_beacon", &"place_stone", &"plant_crop", &"read_farm_board", &"read_probe", &"release_robot", &"remove_robot_card", &"repair_lift", &"report_place",
-	&"sell_harvest_to_lin", &"send_to_oirm", &"service_wheels", &"set_interlock_override", &"set_rover_lights", &"shuttle_home", &"slot_spool_into_relay", &"spend_xp_certificate",
+	&"sell_harvest_to_lin", &"send_to_oirm", &"service_wheels", &"set_interlock_override", &"set_loadout", &"set_rover_lights", &"shuttle_home", &"slot_spool_into_relay", &"spend_xp_certificate",
 	&"start_lab_grow", &"survey_ore", &"take_find", &"till", &"use_lift", &"zero_steering",
 ]
 ## What a player in bed may do and stay in bed: going to bed, paperwork, and
 ## saying where they are.
-const NO_WAKE: Array[StringName] = [&"go_to_bed", &"report_place", &"spend_xp_certificate"]
+const NO_WAKE: Array[StringName] = [&"go_to_bed", &"report_place", &"set_loadout", &"spend_xp_certificate"]
 ## What is done only in a zone. A late one from a player already carried out (a command
 ## in flight at the 02:00 rescue) is refused by the farm and must not wake them from the
 ## bed they were put in.
@@ -32,7 +32,7 @@ const CELL_REACH_M: float = 6.0
 const FAR_REFUSAL: String = "Too far from the rover."
 ## What someone on a moon may ask for: the way home, saying where they are, and
 ## paperwork. The farm's work waits at the farm (zones doc section 8.1).
-const ON_A_MOON: Array[StringName] = [&"report_place", &"shuttle_home", &"spend_xp_certificate"]
+const ON_A_MOON: Array[StringName] = [&"report_place", &"set_loadout", &"shuttle_home", &"spend_xp_certificate"]
 const MOON_REFUSAL: String = "You are away on the shuttle. Take the return shuttle home first."
 const PLAYER_ARGUMENTS: Array[String] = ["player_id", "performed_by"]
 ## Actions that may carry a mini-game's score after their own arguments: a whole
