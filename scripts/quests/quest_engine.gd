@@ -214,6 +214,16 @@ static func update(farm: Node, present: Array[String], offers: bool = true, play
 	return changed
 
 
+## True if a `day_at_most` offer can never come now: the farm is past its day, or
+## the quest in `unless_taken` is under way (in `farm_state`). The board hides such
+## a quest when it is not taken.
+static func offer_lapsed(offer: Dictionary, farm_state: Dictionary) -> bool:
+	if str(offer.get("when", "")) != "day_at_most":
+		return false
+	var taken: String = str(offer.get("unless_taken", ""))
+	return GameClock.get_day_index() > int(offer.get("day", 0)) or (taken != "" and farm_state.has(taken))
+
+
 ## The farm notice board's own look: takes up the starter jobs (quests with
 ## `board` set) that are offered and not yet taken, and nothing else, so a command
 ## never offers other quests. True if one was taken up. Host only.
@@ -731,6 +741,8 @@ static func data_problem(quest: Dictionary) -> String:
 			return "step '%s' wants more beacons than there are spots." % str(step.get("id", ""))
 	if quest.has(BOARD_KEY) and quest[BOARD_KEY] != NoticeBoard.FARM:
 		return "its board is not one there is (farm)."
+	if quest.has(BOARD_KEY) and (str(quest.get("scope", SCOPE_FARM)) != SCOPE_FARM or is_daily(quest)):
+		return "a board quest must be a farm quest and not a daily ask."
 	for step: Variant in steps:
 		if step.has(PROMPT_KEY) and (not step[PROMPT_KEY] is String or not InputMap.has_action(StringName(step[PROMPT_KEY]))):
 			return "step '%s' has a prompt that is not an input action." % str(step.get("id", ""))
@@ -887,8 +899,7 @@ static func offer_holds(farm: Node, offer: Dictionary, present: Array[String], o
 		return GameClock.get_day_index() >= int(offer.get("day", 0))
 	# A young farm only, and not once the quest named in `unless_taken` is under way.
 	if when == "day_at_most":
-		var taken: String = str(offer.get("unless_taken", ""))
-		return GameClock.get_day_index() <= int(offer.get("day", 0)) and (taken == "" or not farm.quest_state.has(taken))
+		return not offer_lapsed(offer, farm.quest_state)
 	var as_step: Dictionary = offer.duplicate()
 	as_step["check"] = when
 	return check_value(farm, as_step, present, owner) >= step_need(as_step)
@@ -1208,7 +1219,9 @@ static func _keep_score(farm: Node, entry: Dictionary, step: Dictionary, played:
 		return
 	var where: Dictionary = step["where"]
 	for key: Variant in where:
-		if not _same(row.get(key), where[key]):
+		var negated: bool = str(key).begins_with(NOT_PREFIX)
+		var field: String = str(key).trim_prefix(NOT_PREFIX) if negated else str(key)
+		if _same(row.get(field), where[key]) == negated:
 			return
 	var scores: Dictionary = entry.get_or_add(SCORES, {})
 	scores[str(step.get("id", ""))] = score

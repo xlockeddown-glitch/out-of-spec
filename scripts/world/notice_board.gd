@@ -11,10 +11,15 @@ const FARM: String = "farm"
 ## The farm board's place: by the dome's airlock, south of the plot, clear of the
 ## crate and pallet, the weather mast, Bram's bay and the road to the tunnels.
 const FARM_POSITION := Vector3(1.5, 0.0, 17.5)
-## How near the rover must be to use it, in metres [PLACEHOLDER]. It reaches the
-## corners of PAD_SIZE (3.5 m each way is 4.95 m, and the rover's own middle may be a
-## little further out than the part of it that touches the pad).
+## The rover's half-diagonal, in metres.
+const ROVER_HALF_DIAGONAL_M: float = 1.44
+## How near the rover must be to the board to use it, in metres [PLACEHOLDER]: the
+## pad's corners (4.95 m from the middle) plus the rover's half-diagonal, so a rover
+## touching a corner (6.39 m out) is in reach.
 const REACH_M: float = 6.5
+## What the host allows beyond REACH_M [PLACEHOLDER]: a guest's pose lags a little
+## (unreliable drive poses) and a passenger's runs ahead, so a fair press is kept.
+const HOST_REACH_SLACK_M: float = 1.5
 ## The pad round the board that shows the prompt: centred on the board, so a rover
 ## drives up to it from the farm side as well as from behind.
 const PAD_SIZE := Vector3(7.0, 3.0, 7.0)
@@ -22,7 +27,7 @@ const PAD_SIZE := Vector3(7.0, 3.0, 7.0)
 
 ## True if a rover at `at` is near enough to the farm board to read it.
 static func farm_near(at: Vector3) -> bool:
-	return Vector2(FARM_POSITION.x - at.x, FARM_POSITION.z - at.z).length() <= REACH_M
+	return Vector2(FARM_POSITION.x - at.x, FARM_POSITION.z - at.z).length() <= REACH_M + HOST_REACH_SLACK_M
 
 
 ## The lines of the quests with `key` set to `value`: each as not offered yet,
@@ -41,6 +46,9 @@ static func lines(quests: Array, farm_state: Dictionary, own_state: Dictionary, 
 		var own: bool = str(quest.get("scope", "")) == QuestEngine.SCOPE_PLAYER
 		var entry: Variant = (own_state if own else farm_state).get(str(quest.get("id", "")))
 		if not entry is Dictionary or not entry.get("steps_done") is Array:
+			var offer: Variant = quest.get("offer", {})
+			if offer is Dictionary and QuestEngine.offer_lapsed(offer, farm_state):
+				continue
 			var gates: Variant = quest.get("gates", {})
 			var level: int = int(gates.get("lab_level", 0)) if gates is Dictionary else 0
 			out.append("BOARD: %s. Not offered yet%s." % [title, " (lab level %d)" % level if level > 0 else ""])
