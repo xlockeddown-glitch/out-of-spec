@@ -59,6 +59,8 @@ static func problem(cell: Vector2i, kind: int, pieces: Dictionary[Vector2i, int]
 		return "Nothing can be built on this ground."
 	if BiomeMarkers.is_blocked_cell(cell):
 		return BiomeMarkers.BLOCKED_TEXT
+	if BiomeData.is_road_cell(cell):
+		return BiomeData.ROAD_TEXT
 	if pieces.has(cell):
 		return "Something is built here."
 	if kind != CHANNEL and Terrain.is_near_water(cell):

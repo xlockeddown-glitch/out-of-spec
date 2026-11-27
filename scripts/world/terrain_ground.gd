@@ -19,6 +19,13 @@ const BIOME_STRENGTH: float = 0.5
 ## fades over about 2 * (BIOME_BLUR + 1) * BIOME_STEP_M metres [PLACEHOLDER].
 const BIOME_STEP_M: int = 4
 const BIOME_BLUR: int = 1
+## A road's paint (BiomeData road lines): the tint leans this far toward ROAD_TINT
+## inside the strip, 0 to 1, fading over BiomeData.ROAD_EDGE_M [PLACEHOLDER]. A
+## vertex colour is 8 bits, 0 to 1, and multiplies the ground's dark base, so the
+## road can not be brighter than white: it is a dusty warm trail, paler than the
+## dark grounds (the Basalt Ridge) and warmer than the pale ones.
+const ROAD_TINT := Color(1.0, 0.72, 0.5)
+const ROAD_STRENGTH: float = 0.6
 
 @export var material: Material
 ## How far the land reaches from its middle. Only LandMeasure sets it, before the
@@ -65,6 +72,8 @@ func _ready() -> void:
 				var natural_m: float = Terrain.natural_on(Vector2i(x, z), half_m)
 				_heights[_index(x, z)] = natural_m
 				_tints[_index(x, z)] = _tint(natural_m)
+	if half_m == Terrain.HALF_M:
+		_paint_roads()
 	_shape.map_width = 2 * half_m + 1
 	_shape.map_depth = 2 * half_m + 1
 	_shape.map_data = _heights
@@ -78,6 +87,26 @@ func _ready() -> void:
 			add_child(chunk)
 			_chunks[Vector2i(x, z)] = chunk
 			_build(Vector2i(x, z))
+
+
+## Mixes the road colour into the tint of every point within a road's strip and its
+## soft edge. Only the points near each road line are visited. Paint only: no height.
+func _paint_roads() -> void:
+	var weights: Dictionary[int, float] = {}
+	var reach: float = BiomeData.ROAD_HALF_M + BiomeData.ROAD_EDGE_M
+	for id: StringName in BiomeData.ids():
+		var line: Array[Vector2] = BiomeData.road(id)
+		for i: int in range(line.size() - 1):
+			var low: Vector2 = line[i].min(line[i + 1]) - Vector2(reach, reach)
+			var high: Vector2 = line[i].max(line[i + 1]) + Vector2(reach, reach)
+			for z: int in range(maxi(floori(low.y), -half_m), mini(ceili(high.y), half_m) + 1):
+				for x: int in range(maxi(floori(low.x), -half_m), mini(ceili(high.x), half_m) + 1):
+					var weight: float = BiomeData.road_weight(BiomeData.segment_gap(Vector2(x, z), line[i], line[i + 1]))
+					var index: int = _index(x, z)
+					if weight > weights.get(index, 0.0):
+						weights[index] = weight
+	for index: int in weights:
+		_tints[index] = _tints[index].lerp(ROAD_TINT, ROAD_STRENGTH * weights[index])
 
 
 ## Paints the ground by biome (true) or restores its own tints (false), a debug view.
