@@ -2391,4 +2391,24 @@ Added a reusable Meridiani Scope on-screen keyboard (`scripts/ui/pad_keyboard.gd
 - **Local-only UI:** Uses `ScopeTheme` colours only (no raw hex literals); no save or network protocol change.
 - **[PLACEHOLDER]:** Key layout, panel width (820 px), key sizes (64×48 px, action keys 180×48 px), font sizes, stick thresholds (0.6 / 0.35), and button wording (`ENTER NAME`, `PAD`, `SHIFT`, `SPACE`, `BACKSPACE`, `DONE`).
 
+## Lava Tubes props look, part 1 (2026-11-27, feat/tunnel-props-look)
+
+Restyled the primitive-mesh props in `scripts/world/lava_hub_props.gd` and `scripts/world/zone_depth_props.gd` using a new shared `scripts/world/tunnel_look.gd` (`TunnelLook`, static helpers with cached materials) inspired by Ryan's tunnel concept art in `art_inbox/tunnels/`. Look-only PR: positions, collision, node names, rules, save format and protocol are unchanged.
+
+- **Palette (`TunnelLook`, derived from `ScopeTheme`, no raw hex):** `BASALT_DARK` (`SHADOW`), `BASALT_MID` (`GLASS_LINE`), `STEEL` (`INK_DIM`), `TIMBER` (`CARD_INK_MUTED`), `TIMBER_LIGHT` (`ENAMEL_LIP`), `BRASS` (`AMBER`), `REGOLITH` (`TERRA`), `REGOLITH_DARK` (`TERRA_DARK`), `ICE` (`INK`), `CREAM` (`ENAMEL_TOP`), `CRYSTAL` (`TEAL`), `BROKEN_RED` (`RED`), plus `quartz_base_color()` and `vent_hot_color()`.
+- **Hub props (`LavaHubProps`):** Stepped basalt plinths, timber top beams and brass gussets on the beacon rack and notice board (`board_node` also dresses the farm notice board), brass-lugged beacon sockets, a `SupportArch` framing the hub board, and a small `RubblePile` beside the rack.
+- **Depth props (`ZoneDepthProps`):** Ribbed hatch framed by a `SupportArch`, timber-and-steel lift gantry (with a `RubblePile` when broken), ore-vein / ice-seam / sample-canister find markers, and cracked basalt + scorched-regolith slatted vents (shared cached materials; per-vent glow material updated in place by `show_heat`, zero per-frame allocation, no extra lights).
+- **[PLACEHOLDER]:** All colours, mesh dimensions, arch spans/heights, rubble scale, roughness (`0.9`), and `VENT_GLOW_SCALE` (`3.0`).
+
+## Lava Tubes rock walls look, part 2 (2026-11-27, feat/tunnel-walls-look)
+
+Restyled `scripts/world/tunnel_rock.gd` using `TunnelLook` and `ScopeTheme` constants (removing all raw `Color("#...")` literals from `tunnel_rock.gd`), inspired by Ryan's tunnel concept art in `art_inbox/tunnels/`. Look-only PR: `MAP`, `CELL_M`, `holds`/`holds_in`/`in_deep`/`is_floor`, pool/sump numbers, collision bodies/layers, and node names are unchanged.
+
+- **Palette:** Added `TunnelLook.WALL_BASALT` and `TunnelLook.FLOOR_BASALT` (derived to satisfy `test_tunnels.gd`'s arch < wall < floor luminance invariants and `StonePiecesView` sharing); `TunnelRock.TEAL` and `AMBER` point to `ScopeTheme`.
+- **Deterministic variety:** Wall sub-blocks stack banded basalt strata (dark base, mid banded course, subtle cap) with occasional ice-seam (`TunnelLook.ICE`) or ore-vein (`quartz_base_color()` + `TEAL`) wall stripes, and floor sub-blocks blend warm packed regolith with scattered scree chips in Lava Tubes (kept cool/icy in the Flooded Aquifer). Driven purely by `_hash(x, y)` integer coordinates, never `randf()`.
+- **Arch ribs & fade:** Each arch keeps its exact `Pillar` and stepped `lintel` geometry/colliders and adds an overhead timber `ArchRib` with brass pillar brackets above `ARCH_LOW_M`; the timber rib fades smoothly alongside its lintel via `FADE_NEAR_M` / `FADE_ALPHA` with zero per-frame allocation and no new lights.
+- **[PLACEHOLDER]:** `WALL_BASALT`, `FLOOR_BASALT`, `REGOLITH_BLEND_MAX` (`0.24`), scree threshold/size (`0.76`, `0.05 m`), seam hash thresholds (`0.90` / `0.84` / `0.78`), band/rib/gusset heights, and `ARCH_FADE_SPEED` (`3.0`).
+
+
+
 
