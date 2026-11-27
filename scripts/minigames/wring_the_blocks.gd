@@ -413,10 +413,10 @@ func _begin(next: Stage) -> void:
 	_held = false
 	match next:
 		Stage.PICK:
-			_hold_button.text = "TAKE or PUT BACK  [Space]"
+			_hold_button.text = "TAKE or PUT BACK  [%s]" % Controls.prompt(&"ui_accept")
 			_show_pick()
 		Stage.SETTLE:
-			_hold_button.text = "HOLD  [Space]"
+			_hold_button.text = "HOLD  [%s]" % Controls.prompt(&"ui_accept")
 			if _joint == 0:
 				_stage_label.text = "STACK PICKED: %s" % GaugeStack.length_text(_target)
 				_hint_label.text = "Now wring each joint: a slide, then a quarter turn."

@@ -373,7 +373,7 @@ func is_stopped() -> bool:
 func away_text() -> String:
 	if not GameState.rover_is_away(rover_id):
 		return ""
-	return "The rover is %s. Press E to go there." % ("in the tunnels" if GameState.rover_in_tunnels else "on the farm")
+	return "The rover is %s. Press %s to go there." % [("in the tunnels" if GameState.rover_in_tunnels else "on the farm"), Controls.prompt(&"interact")]
 
 
 ## The one rover is on the farm or in the tunnels. In the other scene it is gone.

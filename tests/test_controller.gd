@@ -6,7 +6,7 @@ extends RefCounted
 ## Keyboard-only on purpose: the pad reaches these through the actions menu.
 const MENU_ONLY: Array[StringName] = [
 	&"place_stone", &"check_block", &"block_stack", &"survey", &"sell_lin", &"wheel_service",
-	&"open_robots", &"open_quests", &"open_skills", &"open_coop",
+	&"open_robots", &"open_quests", &"open_skills", &"open_coop", &"open_controls",
 	&"buy_1", &"buy_2", &"buy_3", &"buy_4", &"buy_5", &"buy_6", &"buy_7", &"buy_8", &"buy_9"]
 
 
@@ -290,8 +290,8 @@ func test_the_dome_menu_has_only_the_panels_and_b_closes_it() -> String:
 	var menu: ActionsMenuUI = _menu(ActionsMenuUI.PANEL_ACTIONS, sent)
 	menu.open()
 	var problem: String = ""
-	if menu._rows.get_child_count() != 3:
-		problem = "The dome offers quests, skills and co-op only."
+	if menu._rows.get_child_count() != ActionsMenuUI.PANEL_ACTIONS.size():
+		problem = "The dome offers the panels only: quests, skills, co-op and controls."
 	var cancel := InputEventAction.new()
 	cancel.action = &"ui_cancel"
 	cancel.pressed = true

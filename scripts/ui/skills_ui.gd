@@ -31,7 +31,7 @@ func _ready() -> void:
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override(&"separation", 4)
 	column.add_child(_rows)
-	_close_button = PlanBoardUI._button("CLOSE  (K or Esc)")
+	_close_button = PlanBoardUI._button("CLOSE  (%s or %s)" % [Controls.key_label(&"open_skills"), Controls.key_label(&"ui_cancel")])
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_close_button.pressed.connect(hide)
 	column.add_child(_close_button)
@@ -48,7 +48,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	var toggled: bool = event.is_action_pressed(&"open_skills")
 	if not visible:
-		if toggled:
+		# Not over another panel (the controls guide, a minigame, ...).
+		if toggled and not QuestsUI.other_panel_open(get_tree(), self):
 			get_viewport().set_input_as_handled()
 			open()
 		return

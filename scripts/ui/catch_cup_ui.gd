@@ -47,7 +47,7 @@ func _ready() -> void:
 	_mist = _add(row, "MIST", _change.bind(MIST_PCT))
 	_add(row, "VENT", _change.bind(-VENT_PCT))
 	_add(row, "CLOSE THE CUP", _on_close)
-	_add(row, "LEAVE  (Esc)", hide)
+	_add(row, "LEAVE  (%s)" % Controls.key_label(&"ui_cancel"), hide)
 	hide()
 
 

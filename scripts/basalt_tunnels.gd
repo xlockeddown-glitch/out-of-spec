@@ -118,13 +118,14 @@ func _ready() -> void:
 	_hud.set_ore(GameState.crystal_ore)
 	_on_credibility_changed(0)
 	_hud.get_parent().add_child(SkillsUI.new())
+	_hud.get_parent().add_child(ControlsGuideUI.new())
 	_hud.get_parent().add_child(QuestsUI.new())
 	_hud.get_parent().add_child(CoopUI.new())
 	_hud.get_parent().add_child(ActionsMenuUI.new(ActionsMenuUI.PANEL_ACTIONS))
 	_hud.get_parent().add_child(_cup)
 	_cup.closed.connect(_on_cup_closed)
 	if _rover.away_text() == "":
-		_hud.push_log("LIGHTS: press L to turn them low or on.")
+		_hud.push_log("LIGHTS: press " + Controls.prompt(&"rover_lights") + " to turn them low or on.")
 	_say_if_away()
 
 
@@ -141,7 +142,7 @@ func _process(_delta: float) -> void:
 	var catching: bool = reach and not spot_wins
 	if catching and not _told_reach:
 		_told_reach = true
-		_hud.push_log("SENTINEL: in reach. Press E for the catch cup.")
+		_hud.push_log("SENTINEL: in reach. Press " + Controls.prompt(&"interact") + " for the catch cup.")
 	if not catching and _cup.visible:
 		_cup.hide()
 	_in_reach = catching
@@ -233,7 +234,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_rover_entered_exit() -> void:
-	_hud.push_log("WAY UP: press E to go up." if _below else ("WAY HOME: press E to go back to the dome." if not GameState.rover_lent else "TUNNEL MOUTH: press E to leave."))
+	_hud.push_log("WAY UP: press " + Controls.prompt(&"interact") + " to go up." if _below else ("WAY HOME: press " + Controls.prompt(&"interact") + " to go back to the dome." if not GameState.rover_lent else "TUNNEL MOUTH: press " + Controls.prompt(&"interact") + " to leave."))
 
 
 ## Says what E does when the rover first comes by the rack, the board or a spot.
@@ -244,17 +245,17 @@ func _tell_hub() -> void:
 	_told_hub = key
 	match _hub_near.get("kind", ""):
 		LavaHub.RACK:
-			_hud.push_log("BEACON RACK: press E to take a beacon.")
+			_hud.push_log("BEACON RACK: press " + Controls.prompt(&"interact") + " to take a beacon.")
 		LavaHub.BOARD:
-			_hud.push_log("NOTICE BOARD: press E to read it.")
+			_hud.push_log("NOTICE BOARD: press " + Controls.prompt(&"interact") + " to read it.")
 		LavaHub.SPOT:
-			_hud.push_log("BEACON SPOT: press E to set a beacon down.")
+			_hud.push_log("BEACON SPOT: press " + Controls.prompt(&"interact") + " to set a beacon down.")
 		HATCH:
-			_hud.push_log("WAY DOWN: press E to go down.")
+			_hud.push_log("WAY DOWN: press " + Controls.prompt(&"interact") + " to go down.")
 		LIFT:
 			_hud.push_log(_lift_prompt())
 		FIND:
-			_hud.push_log("FIND: press E to take it.")
+			_hud.push_log("FIND: press " + Controls.prompt(&"interact") + " to take it.")
 
 
 func _use_hub(target: Dictionary) -> void:
@@ -368,9 +369,9 @@ func _station_near() -> Dictionary:
 func _lift_prompt() -> String:
 	var repaired: bool = GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth())
 	if repaired:
-		return "LIFT: press E to ride it %s." % ("up to the hub" if _built_depth > 0 else "down to depth %d" % _lift_depth())
+		return "LIFT: press " + Controls.prompt(&"interact") + " to ride it %s." % ("up to the hub" if _built_depth > 0 else "down to depth %d" % _lift_depth())
 	if _built_depth > 0:
-		return "LIFT: broken. Press E to repair it. %s" % ZoneDepth.repair_cost_text()
+		return "LIFT: broken. Press " + Controls.prompt(&"interact") + " to repair it. %s" % ZoneDepth.repair_cost_text()
 	return "LIFT: broken. It is repaired from its far end, at depth %d." % ZoneDepth.MAX_DEPTH
 
 
@@ -584,7 +585,7 @@ func _on_credibility_changed(_points: int) -> void:
 
 func _on_skill_leveled(player_id: String, skill_id: String, _level: int) -> void:
 	if player_id == "" or player_id == GameState.local_player_id:
-		_hud.push_log("SKILL UP: %s. K shows skills." % GameState.skill_text(skill_id))
+		_hud.push_log("SKILL UP: %s. %s shows skills." % [GameState.skill_text(skill_id), Controls.prompt(&"open_skills")])
 
 
 func _refresh_jobs_hud() -> void:

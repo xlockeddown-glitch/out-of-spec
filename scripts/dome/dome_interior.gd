@@ -2,7 +2,10 @@ extends Node3D
 ## Composition root for the dome interior: wires clickables to GameState,
 ## the bench UI, and the scene switcher, and refreshes the status panel.
 
-const DEFAULT_HINT: String = "Click the bench to calibrate  ·  Plan board: grow the lab  ·  K: skills  ·  F7: co-op  ·  Airlock or Tab: back to farm"
+## Built when shown, so it names the key or button in use.
+static func default_hint() -> String:
+	return "Click the bench to calibrate  ·  Plan board: grow the lab  ·  %s: skills  ·  %s: co-op  ·  Airlock or %s: back to farm" % [
+		Controls.prompt(&"open_skills"), Controls.prompt(&"open_coop"), Controls.prompt(&"swap_scene")]
 const TOAST_SECONDS: float = 3.0
 ## Long messages (dispatches, audit lines) stay up longer.
 const TOAST_SECONDS_PER_CHAR: float = 0.04
@@ -50,6 +53,7 @@ func _ready() -> void:
 	_plan_board.clicked.connect(_plan_board_ui.open)
 	_kestrel_click.clicked.connect(_kestrel_ui.open)
 	$UI.add_child(SkillsUI.new())
+	$UI.add_child(ControlsGuideUI.new())
 	$UI.add_child(QuestsUI.new())
 	$UI.add_child(CoopUI.new())
 	$UI.add_child(ActionsMenuUI.new(ActionsMenuUI.PANEL_ACTIONS))
@@ -107,7 +111,7 @@ func _process(delta: float) -> void:
 	else:
 		_holding_audit = false
 		var hovered: Clickable = Clickable.hovered
-		_hint_label.text = hovered.hint if hovered and hovered.hint != "" else DEFAULT_HINT
+		_hint_label.text = hovered.hint if hovered and hovered.hint != "" else default_hint()
 
 
 func _refresh_status() -> void:
@@ -146,7 +150,7 @@ func _show_reading(sensor: DriftingSensor, ideal: Variant, unit: String, title: 
 
 func _on_skill_leveled(player_id: String, skill_id: String, _level: int) -> void:
 	if not _holding_audit and (player_id == "" or player_id == GameState.local_player_id):
-		_toast("SKILL UP: %s. K shows skills." % GameState.skill_text(skill_id))
+		_toast("SKILL UP: %s. %s shows skills." % [GameState.skill_text(skill_id), Controls.prompt(&"open_skills")])
 
 
 func _on_terrarium_clicked() -> void:

@@ -46,7 +46,7 @@ func _ready() -> void:
 	column.add_child(_text)
 	_note = PlanBoardUI._label("", RobotsUI.AMBER, 20)
 	column.add_child(_note)
-	_resume_button = PlanBoardUI._button("RESUME  (Esc)")
+	_resume_button = PlanBoardUI._button("RESUME  (%s)" % Controls.key_label(&"ui_cancel"))
 	_resume_button.pressed.connect(close)
 	column.add_child(_resume_button)
 	_quit_button = PlanBoardUI._button("SAVE AND QUIT")

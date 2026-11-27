@@ -60,7 +60,7 @@ func _ready() -> void:
 	column.add_child(sitter)
 	_status = PlanBoardUI._label("", TEXT, 18)
 	column.add_child(_status)
-	_close_button = PlanBoardUI._button("%s  (Esc)" % FastTravel.text("close"))
+	_close_button = PlanBoardUI._button("%s  (%s)" % [FastTravel.text("close"), Controls.key_label(&"ui_cancel")])
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_close_button.pressed.connect(close)
 	column.add_child(_close_button)

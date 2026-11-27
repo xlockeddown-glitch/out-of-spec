@@ -35,6 +35,8 @@ const COLOR_FAIL := DriftingSensor.COLOR_OUT_OF_TOLERANCE
 var _log_lines: PackedStringArray = []
 ## Bram's Tier 1 buttons, built in code under the trade button.
 var _standards_box: VBoxContainer
+## The offer ids the standard buttons were built for.
+var _standard_ids: PackedStringArray = []
 var _wheels_button: Button
 ## Lab credibility band, a row under the clock, built in code.
 var _credibility_label: Label
@@ -75,6 +77,35 @@ static func scaled(base: float) -> float:
 	return roundf(base * PHONE_SCALE)
 
 
+## The key or button in each button's brackets follows the device in use.
+## Only the key text changes, never a button's size: Controls.short_prompt is
+## never longer than a button can hold.
+var _keys_pad: bool = false
+var _keys_known: bool = false
+## What Bram's buttons were last told, so a device switch can redraw their text.
+var _trade_cost: int = 0
+var _trade_owned: bool = false
+var _trade_told: bool = false
+var _wheels_text: String = ""
+var _wheels_due: bool = false
+
+
+func _process(_delta: float) -> void:
+	if not _keys_known or Controls.using_pad() != _keys_pad:
+		_refresh_keys()
+
+
+func _refresh_keys() -> void:
+	_keys_known = true
+	_keys_pad = Controls.using_pad()
+	_zero_button.text = "ZERO STEERING  [%s]" % Controls.short_prompt(&"rover_zero_steering")
+	_dome_button.text = "ENTER DOME  [%s]" % Controls.short_prompt(&"swap_scene")
+	if _trade_told:
+		_draw_trade()
+	if _wheels_button != null:
+		_draw_wheels()
+
+
 ## A font size at the phone's scale.
 static func scaled_font(base: int) -> int:
 	return roundi(base * PHONE_SCALE)
@@ -82,6 +113,7 @@ static func scaled_font(base: int) -> int:
 
 func _ready() -> void:
 	anchor_left = LEFT_ANCHOR
+	_refresh_keys()
 	_scale_scene_nodes(self)
 	_zero_button.pressed.connect(func() -> void: zero_steering_pressed.emit())
 	_slot_spool_button.pressed.connect(func() -> void: slot_spool_pressed.emit())
@@ -248,23 +280,46 @@ func show_bram(line: String, cost: int, ore: int, owned: bool) -> void:
 	# His stock needs the room; the log gives way as it did before jobs.
 	_log_label.custom_minimum_size.y = 0.0
 	_bram_label.text = "BRAM: " + line
-	if owned:
+	_trade_cost = cost
+	_trade_owned = owned
+	_trade_told = true
+	_draw_trade()
+	_trade_button.disabled = owned or ore < cost
+
+
+func _draw_trade() -> void:
+	if _trade_owned:
 		_trade_button.text = "WIDE TREADS FITTED"
-		_trade_button.disabled = true
 	else:
-		_trade_button.text = "TRADE %d ORE: WIDE TREADS  [E]" % cost
-		_trade_button.disabled = ore < cost
+		_trade_button.text = "TRADE %d ORE: WIDE TREADS  [%s]" % [_trade_cost, Controls.short_prompt(&"interact")]
 
 
 ## Bram's wheel service, under his trade: one press when the nuts are due.
 func show_wheel_service(text: String, due: bool) -> void:
-	_wheels_button.text = text + ("  [Y]" if due else "")
+	_wheels_text = text
+	_wheels_due = due
+	_draw_wheels()
 	_wheels_button.disabled = not due
+
+
+func _draw_wheels() -> void:
+	_wheels_button.text = _wheels_text + ("  [%s]" % Controls.short_prompt(&"wheel_service") if _wheels_due else "")
 
 
 ## Bram's Tier 1 stock. Each offer is { "id", "text", "disabled" }; `note`
 ## shows instead of buttons when there are none (still locked).
 func show_standards(offers: Array[Dictionary], note: String) -> void:
+	var ids: PackedStringArray = []
+	for offer: Dictionary in offers:
+		ids.append(str(offer["id"]))
+	# Same offers: change the buttons in place, so a click in flight still lands.
+	if not ids.is_empty() and ids == _standard_ids and _standards_box.get_child_count() == ids.size():
+		for i: int in offers.size():
+			var existing := _standards_box.get_child(i) as Button
+			existing.text = str(offers[i]["text"])
+			existing.disabled = bool(offers[i]["disabled"])
+		return
+	_standard_ids = ids
 	for child: Node in _standards_box.get_children():
 		_standards_box.remove_child(child)
 		child.queue_free()

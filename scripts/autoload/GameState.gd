@@ -146,7 +146,7 @@ const SENTINEL_CALM_MPS: float = 3.5
 const SENTINEL_CROWDED_M: float = 1.8
 const SENTINEL_REACH_M: float = 4.0
 ## Told once when it is first in sight; the numbers are the ones above.
-const SENTINEL_HINT: String = "SENTINEL: Lights low (L), creep, stop short."
+const SENTINEL_HINT: String = "SENTINEL: Lights low, creep, stop short."
 ## The chance on its first morning, and again for each morning it isn't met. [PLACEHOLDER]
 const SENTINEL_CHANCE: float = 0.10
 ## How far the cup's relative humidity may really be from its ideal. [PLACEHOLDER]
@@ -537,6 +537,9 @@ const OFFSET_CURRENT: int = -2147483648
 
 
 func _ready() -> void:
+	# Watches the input, for the on-screen key names (Controls). The root is still
+	# busy setting up autoloads, so the node is added a moment later.
+	Controls.install_observer.call_deferred(get_tree())
 	_set_up_farm(_new_seed())
 	GameClock.time_advanced.connect(_on_time_advanced)
 	GameClock.clock_ran.connect(_tick_molt)

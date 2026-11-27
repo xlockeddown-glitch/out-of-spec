@@ -96,7 +96,7 @@ func _build() -> void:
 	column.add_child(_areas_box)
 	_result_label = _label("", AMBER, 20)
 	column.add_child(_result_label)
-	var close_button: Button = _button("CLOSE  (Esc)")
+	var close_button: Button = _button("CLOSE  (%s)" % Controls.key_label(&"ui_cancel"))
 	close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	close_button.pressed.connect(close)
 	column.add_child(close_button)

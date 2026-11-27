@@ -59,7 +59,7 @@ func _ready() -> void:
 	_action = PlanBoardUI._button("")
 	_action.pressed.connect(_on_action)
 	buttons.add_child(_action)
-	_close_button = PlanBoardUI._button("CLOSE  (F7 or Esc)")
+	_close_button = PlanBoardUI._button("CLOSE  (%s or %s)" % [Controls.key_label(&"open_coop"), Controls.key_label(&"ui_cancel")])
 	_close_button.pressed.connect(_panel.hide)
 	buttons.add_child(_close_button)
 	_panel.hide()
@@ -83,7 +83,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	var toggled: bool = event.is_action_pressed(&"open_coop")
 	if not _panel.visible:
-		if toggled:
+		# Not over another panel (the controls guide, a minigame, ...).
+		if toggled and not QuestsUI.other_panel_open(get_tree(), _panel):
 			get_viewport().set_input_as_handled()
 			open()
 		return
@@ -163,15 +164,15 @@ static func strip_text(players: Array[String], own_id: String, hosting: bool, to
 	if hosting and too_big:
 		return "CO-OP  THE FARM IS TOO BIG TO SHARE, SO FRIENDS CAN'T STAY"
 	if players.size() == 1:
-		return "CO-OP  WAITING FOR FRIENDS  (F7)"
+		return "CO-OP  WAITING FOR FRIENDS  (%s)" % Controls.prompt(&"open_coop")
 	if not in_bed.is_empty():
 		var up: PackedStringArray = []
 		for player_id: String in players:
 			if not player_id in in_bed:
 				up.append(player_name(player_id))
-		return "CO-OP  %d OF %d IN BED, STILL UP: %s  (F7)" % [players.size() - up.size(), players.size(), ", ".join(up)]
+		return "CO-OP  %d OF %d IN BED, STILL UP: %s  (%s)" % [players.size() - up.size(), players.size(), ", ".join(up), Controls.prompt(&"open_coop")]
 	var driving: String = ", %s IS DRIVING" % player_name(driver) if driver in players and driver != own_id else ""
-	return "CO-OP  %d PLAYERS, YOU ARE %s%s  (F7)" % [players.size(), player_name(own_id), driving]
+	return "CO-OP  %d PLAYERS, YOU ARE %s%s  (%s)" % [players.size(), player_name(own_id), driving, Controls.prompt(&"open_coop")]
 
 
 ## The host is first. With `show_places`, each line also says where that player is
