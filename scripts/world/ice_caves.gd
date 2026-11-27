@@ -13,6 +13,7 @@ const SIGN: String = "sign"
 const COLD_STEP: int = 10
 var _told_cold_step: int = -1
 var _told_drift: bool = false
+var _decor: Node3D
 
 
 func _zone_id() -> String:
@@ -26,14 +27,52 @@ func _build_zone() -> void:
 	GameClock.day_started.connect(_on_new_day)
 	_depth_props = ZoneDepthProps.new()
 	_rover.get_parent().add_child(_depth_props)
+	_decor = Node3D.new()
+	_decor.name = "IceDecor"
+	_rover.get_parent().add_child(_decor)
 	if _below:
 		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
+		_build_depth_decor()
 		GameState.finds_changed.connect(_on_finds_changed)
 	else:
 		_depth_props.build_hatch()
 		IceLook.add_heater_crate(_depth_props, IceDepth.crate_position())
 		_draw_walls()
 		_draw_sign()
+		_build_hub_decor()
+
+
+## Hub dressing: hanging icicles along wall tops and the north arch, flush
+## floor frost patches, a half-buried frozen probe tucked against the east wall,
+## and an ice-core drill rack flat against the north wall (visual only, zero
+## collision, rover path clear) [PLACEHOLDER].
+func _build_hub_decor() -> void:
+	var hatch: Vector3 = IceDepth.hatch_position()
+	var sign_pos: Vector3 = IceDepth.sign_position()
+	IceLook.add_frost_patch(_decor, Vector3(-1.5, 0.0, 20.5), Vector2(3.2, 2.4), 6.0)
+	IceLook.add_frost_patch(_decor, Vector3(-7.5, 0.0, 19.5), Vector2(2.8, 2.2), -12.0)
+	IceLook.add_frost_patch(_decor, Vector3(-1.5, 0.0, 14.0), Vector2(2.4, 2.8), 4.0)
+	IceLook.add_icicle_cluster(_decor, Vector3(-1.5, 2.85, 10.5), 4.2, 0.85, 0.0)
+	IceLook.add_icicle_cluster(_decor, Vector3(hatch.x - 6.9, 2.6, hatch.z + 4.5), 3.6, 0.85, 90.0)
+	IceLook.add_icicle_cluster(_decor, Vector3(hatch.x + 6.9, 2.6, hatch.z + 4.5), 3.6, 0.85, -90.0)
+	IceLook.add_icicle_cluster(_decor, Vector3(sign_pos.x, 2.2, sign_pos.z + 1.3), 3.8, 0.70, 0.0)
+	IceLook.add_frozen_probe(_decor, Vector3(4.6, 0.0, 19.2), -28.0)
+	IceLook.add_drill_rack(_decor, Vector3(-6.2, 0.0, 15.4), 0.0)
+
+
+## Depth 1 dressing: flush frost patches along the landing and trunk, hanging
+## icicles along passage walls, a frozen probe tucked against the west landing
+## wall, and an ice-core drill rack flat against the east landing wall (visual
+## only, zero collision, rover path clear) [PLACEHOLDER].
+func _build_depth_decor() -> void:
+	IceLook.add_frost_patch(_decor, Vector3(0.0, 0.0, 16.5), Vector2(3.0, 2.2), 8.0)
+	IceLook.add_frost_patch(_decor, Vector3(0.0, 0.0, 3.0), Vector2(2.6, 3.0), -6.0)
+	IceLook.add_frost_patch(_decor, Vector3(0.0, 0.0, -7.5), Vector2(2.6, 3.0), 10.0)
+	IceLook.add_icicle_cluster(_decor, Vector3(-2.6, 2.8, 7.5), 3.2, 0.90, 90.0)
+	IceLook.add_icicle_cluster(_decor, Vector3(2.6, 2.8, -1.5), 3.2, 0.90, -90.0)
+	IceLook.add_icicle_cluster(_decor, Vector3(0.0, 2.8, -13.5), 3.6, 0.85, 0.0)
+	IceLook.add_frozen_probe(_decor, Vector3(-11.4, 0.0, 15.0), 35.0)
+	IceLook.add_drill_rack(_decor, Vector3(8.4, 0.0, 16.5), -90.0)
 
 
 ## Pale layered ice along the hub's west and east edges and behind the board [PLACEHOLDER].
@@ -44,12 +83,13 @@ func _draw_walls() -> void:
 	IceLook.add_ice_wall(_depth_props, IceDepth.sign_position() + Vector3(0.0, 0.0, 1.8), Vector2(5.0, 1.0), 2.2)
 
 
-## The notice board: the Lava hub's, with Vance's notice for later [PLACEHOLDER].
+## The notice board: the Lava hub's with frosted ice trim and Vance's notice for later [PLACEHOLDER].
 func _draw_sign() -> void:
 	var board: Node3D = LavaHubProps.board_node("Vance: [later]")
 	board.name = "NoticeSign"
 	board.position = IceDepth.sign_position()
 	_depth_props.add_child(board)
+	IceLook.add_sign_trim(board)
 
 
 func _process(_delta: float) -> void:

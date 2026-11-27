@@ -1158,7 +1158,7 @@ static func _stray_problem(strays: Variant, origins: Variant, tanks: Dictionary)
 			if not stray is int or stray < 0 or stray >= PhobosServiceTunnel.STRAY_SPOTS.size() or (ids as Array).count(stray) != 1:
 				return "'strays_caught' holds a stray that is not one."
 	for id: Variant in origins:
-		if not id is String or id != String(RUNNER) or not tanks.has(id) 				or not origins[id] is String or origins[id] != STATION_ORIGIN:
+		if not id is String or id != String(RUNNER) or not tanks.has(id) or not origins[id] is String or origins[id] != STATION_ORIGIN:
 			return "'enclosure_origins' has an entry that is not a caught tarantula's origin."
 	return ""
 

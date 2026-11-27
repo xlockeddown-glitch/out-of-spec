@@ -5,7 +5,8 @@ extends Control
 ## and on Phobos; the pad reaches it through the actions menu. The arrow buttons (or the
 ## pad's left and right) cycle a slot; APPLY asks for the change through FarmCommands, so
 ## the host checks it and syncs it to everyone, and a player only ever changes their own
-## loadout. It is offered once when a new farm starts. Every word, size and number here
+## loadout. It is offered once when a new farm starts, and once when a guest joins a farm
+## with no saved loadout for them yet. Every word, size and number here
 ## is a [PLACEHOLDER].
 
 const TITLE: String = "CHARACTER AND TRACTOR"
@@ -21,8 +22,14 @@ const PART_WIDTH: float = 330.0
 const PANEL_WIDTH: float = 1220.0
 const BODY_SEPARATION: int = 14
 
-## Set when a new farm starts: the next picker opens once on its own, then clears this.
+## Set when a new farm starts, or when a guest joins a farm with no saved loadout yet:
+## the next picker opens once on its own, then clears this.
 static var offer_next: bool = false
+
+
+## True when a guest has joined a farm whose synced loadouts have no entry for this player.
+static func should_offer_for_guest(farm: Node = GameState, is_guest: bool = FarmCommands.guest) -> bool:
+	return is_guest and farm.local_player_id != "" and not farm.player_loadouts.has(farm.local_player_id)
 
 var _parts: Dictionary = {}
 var _name_field: LineEdit

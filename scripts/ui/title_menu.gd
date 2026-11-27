@@ -23,6 +23,7 @@ var _join_button: Button
 func _ready() -> void:
 	# No farm's scene is open here, so a friend's farm is left for good.
 	CoopSession.leave()
+	PickerUI.offer_next = false
 	GameClock.seconds_per_day = GameClock.DEFAULT_SECONDS_PER_DAY
 	GameClock.paused = true
 	CoopSession.joined.connect(_on_joined.unbind(1))
@@ -193,6 +194,7 @@ func _on_refused(reason: String) -> void:
 func _on_farm_ready() -> void:
 	_starting = true
 	_note.text = "Opening the farm."
+	PickerUI.offer_next = PickerUI.should_offer_for_guest()
 
 
 func _open(problem: String) -> void:
