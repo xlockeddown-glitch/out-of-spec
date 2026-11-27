@@ -6801,6 +6801,11 @@ func till(cell: Vector3i, player_id: String = "") -> bool:
 	return true
 
 
+## Whether an ore pocket not yet dug lies at this cell.
+func is_live_pocket(at: Vector2i) -> bool:
+	return not found_pockets.has(at) and (at in OrePocket.cells(world_seed) or at in new_pockets)
+
+
 ## Digs a cell of Terrain (y = 0) one step deeper. Returns "" or why not. It costs
 ## nothing [ASSUMPTION]. A block or an ore pocket there comes up once. The digger
 ## gets Earthworks XP for a step deeper than the cell has been, and for a block.

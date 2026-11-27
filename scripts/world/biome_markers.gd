@@ -10,9 +10,8 @@ extends Node3D
 
 ## The sign stands just off the pad's +x edge: its middle this far from the pad's.
 const SIGN_OFFSET_M: float = BiomeData.PAD_HALF_M + 0.7
-## The cells under the pad and the sign can not be dug: x from the pad's -x edge to
-## this far past the middle, z the pad's width.
-const BLOCK_X_MAX_M: float = BiomeData.PAD_HALF_M + 1.4
+## The sign's collider and footprint depth (z), in metres; its width is BOARD_SIZE.x.
+const SIGN_DEPTH_M: float = 0.4
 ## The slab's thickness and how far its top rides above the highest ground under it.
 const SLAB_THICKNESS_M: float = 0.3
 const SLAB_LIFT_M: float = 0.03
@@ -40,13 +39,22 @@ static func is_blocked_cell(cell: Vector2i) -> bool:
 		_blocked.clear()
 		for id: StringName in spoke_ids():
 			var at: Vector2 = BiomeData.marker(id)
-			var low := Vector2i(floori((at.x - BiomeData.PAD_HALF_M) / Terrain.CELL_M), floori((at.y - BiomeData.PAD_HALF_M) / Terrain.CELL_M))
-			var high := Vector2i(floori((at.x + BLOCK_X_MAX_M - 0.001) / Terrain.CELL_M), floori((at.y + BiomeData.PAD_HALF_M - 0.001) / Terrain.CELL_M))
-			for x: int in range(low.x, high.x + 1):
-				for z: int in range(low.y, high.y + 1):
-					_blocked[Vector2i(x, z)] = true
+			var half := Vector2(BiomeData.PAD_HALF_M, BiomeData.PAD_HALF_M)
+			_block(at - half, at + half)
+			var sign_at := Vector2(at.x + SIGN_OFFSET_M, at.y)
+			var sign_half := Vector2(BOARD_SIZE.x, SIGN_DEPTH_M) * 0.5
+			_block(sign_at - sign_half, sign_at + sign_half)
 		_blocked_ready = true
 	return _blocked.has(cell)
+
+
+## Marks every cell the box [low, high) overlaps.
+static func _block(low: Vector2, high: Vector2) -> void:
+	var first := Vector2i(floori(low.x / Terrain.CELL_M), floori(low.y / Terrain.CELL_M))
+	var last := Vector2i(floori((high.x - 0.001) / Terrain.CELL_M), floori((high.y - 0.001) / Terrain.CELL_M))
+	for x: int in range(first.x, last.x + 1):
+		for z: int in range(first.y, last.y + 1):
+			_blocked[Vector2i(x, z)] = true
 
 
 ## Forget the cached cells (for tests that reload the table).
@@ -76,9 +84,9 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 	for id: StringName in spoke_ids():
 		var at: Vector2 = BiomeData.marker(id)
 		var top: float = -INF
-		for ix: int in 3:
-			for iz: int in 3:
-				var corner := Vector2(at.x + (ix - 1) * BiomeData.PAD_HALF_M, at.y + (iz - 1) * BiomeData.PAD_HALF_M)
+		for ix: int in range(-2, 3):
+			for iz: int in range(-2, 3):
+				var corner := Vector2(at.x + ix, at.y + iz)
 				top = maxf(top, Terrain.height(corner, dug))
 		top += SLAB_LIFT_M
 		var slab := MeshInstance3D.new()
@@ -98,7 +106,7 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 		post.position = Vector3(sign_at.x, Terrain.height(sign_at, dug), sign_at.y)
 		var shape := CollisionShape3D.new()
 		var box := BoxShape3D.new()
-		box.size = Vector3(BOARD_SIZE.x, POST_HEIGHT_M, 0.4)
+		box.size = Vector3(BOARD_SIZE.x, POST_HEIGHT_M, SIGN_DEPTH_M)
 		shape.shape = box
 		shape.position = Vector3(0.0, POST_HEIGHT_M * 0.5, 0.0)
 		post.add_child(shape)

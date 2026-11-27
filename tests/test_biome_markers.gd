@@ -46,24 +46,95 @@ func test_the_farm_hub_has_no_sign_or_pad() -> String:
 	return "The farm has a marker prop" if found else ""
 
 
-func test_cells_under_a_pad_are_refused_and_the_next_ones_are_not() -> String:
+func test_the_pad_and_sign_cells_are_refused_and_every_cell_just_outside_is_not() -> String:
 	var none: Dictionary[Vector2i, int] = {}
 	var h: float = BiomeData.PAD_HALF_M
 	for id: StringName in BiomeMarkers.spoke_ids():
 		var at: Vector2 = BiomeData.marker(id)
-		for corner: Vector2 in [Vector2(-h, -h), Vector2(h - 0.01, -h), Vector2(-h, h - 0.01), Vector2(h - 0.01, h - 0.01), Vector2.ZERO]:
-			var cell: Vector2i = _cell_at(at + corner)
+		var pad_low: Vector2i = _cell_at(at - Vector2(h, h))
+		var pad_high: Vector2i = _cell_at(at + Vector2(h, h) - Vector2(0.001, 0.001))
+		var sign_at := Vector2(at.x + BiomeMarkers.SIGN_OFFSET_M, at.y)
+		var sign_half := Vector2(BiomeMarkers.BOARD_SIZE.x, BiomeMarkers.SIGN_DEPTH_M) * 0.5
+		var sign_low: Vector2i = _cell_at(sign_at - sign_half)
+		var sign_high: Vector2i = _cell_at(sign_at + sign_half - Vector2(0.001, 0.001))
+		var inside: Dictionary[Vector2i, bool] = {}
+		for box: Array in [[pad_low, pad_high], [sign_low, sign_high]]:
+			for x: int in range((box[0] as Vector2i).x, (box[1] as Vector2i).x + 1):
+				for z: int in range((box[0] as Vector2i).y, (box[1] as Vector2i).y + 1):
+					inside[Vector2i(x, z)] = true
+		if not inside.has(_cell_at(sign_at)):
+			return "%s: the sign's own cell is not in the box" % id
+		for cell: Vector2i in inside:
 			if not BiomeMarkers.is_blocked_cell(cell):
-				return "%s: pad cell %s is not blocked" % [id, cell]
+				return "%s: cell %s under the pad or sign is not blocked" % [id, cell]
 			if Terrain.dig_problem(cell, none) == "":
-				return "%s: pad cell %s can be dug" % [id, cell]
-		for beside: Vector2 in [Vector2(-h - 2.01, 0.0), Vector2(0.0, -h - 2.01), Vector2(0.0, h + 2.01)]:
-			var cell: Vector2i = _cell_at(at + beside)
-			if BiomeMarkers.is_blocked_cell(cell):
-				return "%s: the cell %s beside the pad is blocked" % [id, cell]
-			if Terrain.dig_problem(cell, none) == BiomeMarkers.BLOCKED_TEXT:
-				return "%s: the cell %s beside the pad gets the pad's refusal" % [id, cell]
+				return "%s: cell %s under the pad or sign can be dug" % [id, cell]
+		# Every cell touching the blocked ones, on all four sides and the corners.
+		for cell: Vector2i in inside:
+			for near: Vector2i in Terrain.neighbors(cell):
+				if inside.has(near):
+					continue
+				if BiomeMarkers.is_blocked_cell(near):
+					return "%s: the cell %s just outside is blocked" % [id, near]
+				if Terrain.dig_problem(near, none) == BiomeMarkers.BLOCKED_TEXT:
+					return "%s: the cell %s just outside gets the pad's refusal" % [id, near]
 	return ""
+
+
+func test_the_sign_stands_on_the_ground_with_a_collider_on_the_interactable_layer() -> String:
+	var markers: BiomeMarkers = _built()
+	var none: Dictionary[Vector2i, int] = {}
+	for id: StringName in BiomeMarkers.spoke_ids():
+		var post: Clickable = markers.get_node("Sign_%s" % id) as Clickable
+		if post.collision_layer != 8 or post.collision_mask != 0:
+			return "%s: the sign's layer is %d" % [id, post.collision_layer]
+		var shapes: int = 0
+		for child: Node in post.get_children():
+			if child is CollisionShape3D:
+				shapes += 1
+		if shapes != 1:
+			return "%s: the sign has %d colliders" % [id, shapes]
+		var ground: float = Terrain.height(Vector2(post.position.x, post.position.z), none)
+		if not is_equal_approx(post.position.y, ground):
+			return "%s: the sign is at y %f, the ground %f" % [id, post.position.y, ground]
+	markers.free()
+	return ""
+
+
+func test_a_stone_piece_cannot_be_built_on_a_pad_but_an_old_save_with_one_loads() -> String:
+	var none: Dictionary[Vector2i, int] = {}
+	var no_rovers: Array[Transform3D] = []
+	var pieces: Dictionary[Vector2i, int] = {}
+	for id: StringName in BiomeMarkers.spoke_ids():
+		var cell: Vector2i = _cell_at(BiomeData.marker(id))
+		if not Terrain.can_dig(cell):
+			continue
+		var why: String = StonePieces.problem(cell, StonePieces.WALL, pieces, no_rovers, none)
+		if why != BiomeMarkers.BLOCKED_TEXT:
+			return "%s: a wall on the pad says '%s'" % [id, why]
+		var old: Dictionary = {cell: StonePieces.WALL}
+		if StonePieces.pieces_problem(old) != "":
+			return "%s: an old piece on the pad is refused: %s" % [id, StonePieces.pieces_problem(old)]
+	return ""
+
+
+func test_digging_a_pad_through_the_game_refuses_but_a_pocket_digs_once() -> String:
+	var gs: Node = load("res://scripts/autoload/GameState.gd").new()
+	gs.build_registry()
+	gs.set_world_seed(424242)
+	var pocket := Vector3i(33, 0, 9)
+	if not gs.is_live_pocket(Vector2i(33, 9)):
+		return "Seed 424242 has no pocket at (33, 9)"
+	var out: String = gs.dig(pocket)
+	if out != "" or gs.dug.get(Vector2i(33, 9), 0) != 1:
+		return "The pocket under the pad did not dig once: '%s'" % out
+	if gs.dig(pocket) != BiomeMarkers.BLOCKED_TEXT:
+		return "A second dig on the pocket's cell was not refused"
+	if gs.fill(pocket) != "" or gs.dig(pocket) != BiomeMarkers.BLOCKED_TEXT:
+		return "After a fill the cell was dug again"
+	var plain: String = gs.dig(Vector3i(34, 0, 10))
+	gs.free()
+	return "" if plain == BiomeMarkers.BLOCKED_TEXT else "An ordinary pad cell said '%s'" % plain
 
 
 func test_an_old_save_with_digging_under_a_pad_still_loads() -> String:

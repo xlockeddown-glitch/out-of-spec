@@ -57,6 +57,8 @@ static func problem(cell: Vector2i, kind: int, pieces: Dictionary[Vector2i, int]
 	# the spawn; the land's edge and what is near a rock go too.
 	if not Terrain.can_dig(cell) or HillDressing.is_at_rock(cell):
 		return "Nothing can be built on this ground."
+	if BiomeMarkers.is_blocked_cell(cell):
+		return BiomeMarkers.BLOCKED_TEXT
 	if pieces.has(cell):
 		return "Something is built here."
 	if kind != CHANNEL and Terrain.is_near_water(cell):

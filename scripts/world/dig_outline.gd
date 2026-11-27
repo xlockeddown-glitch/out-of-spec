@@ -28,6 +28,7 @@ func _process(_delta: float) -> void:
 	visible = (
 		rover.visible and rover.is_stopped() and Terrain.can_dig(cell) and not HillDressing.is_at_rock(cell) and not Terrain.is_near_water(cell)
 		and not CoopWalkers.on_foot()
+		and (not BiomeMarkers.is_blocked_cell(cell) or GameState.dug.has(cell) or GameState.is_live_pocket(cell))
 	)
 	if visible and cell != _cell:
 		_cell = cell
