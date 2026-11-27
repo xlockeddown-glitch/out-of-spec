@@ -307,10 +307,14 @@ static func can_dig(cell: Vector2i) -> bool:
 
 ## Why a cell can't be dug one step deeper, or "". It is at most one step deeper
 ## than any of its neighbors, so a rover can always drive out.
-static func dig_problem(cell: Vector2i, dug: Dictionary[Vector2i, int]) -> String:
+## `pad_ok` lets an ore pocket under a biome pad (BiomeMarkers) still be dug, so a
+## seed's pocket there is not lost; the pocket is drawn from the seed and can't move.
+static func dig_problem(cell: Vector2i, dug: Dictionary[Vector2i, int], pad_ok: bool = false) -> String:
 	# Not in can_dig, so a save with older digging here still loads.
 	if not can_dig(cell) or HillDressing.is_at_rock(cell):
 		return "This ground can't be dug."
+	if not pad_ok and BiomeMarkers.is_blocked_cell(cell):
+		return BiomeMarkers.BLOCKED_TEXT
 	if is_near_water(cell):
 		return "Too near the water to dig."
 	var steps: int = dug.get(cell, 0)

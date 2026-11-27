@@ -6806,7 +6806,8 @@ func till(cell: Vector3i, player_id: String = "") -> bool:
 ## gets Earthworks XP for a step deeper than the cell has been, and for a block.
 func dig(cell: Vector3i, player_id: String = "") -> String:
 	var at := Vector2i(cell.x, cell.z)
-	var problem: String = Terrain.dig_problem(at, dug) if cell.y == 0 else "This ground can't be dug."
+	var pocket: bool = not found_pockets.has(at) and (at in OrePocket.cells(world_seed) or at in new_pockets)
+	var problem: String = Terrain.dig_problem(at, dug, pocket) if cell.y == 0 else "This ground can't be dug."
 	if stone_pieces.has(at):
 		problem = STONE_IN_THE_WAY
 	if problem == "" and cell.y == 0:
