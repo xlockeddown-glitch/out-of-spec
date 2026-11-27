@@ -91,13 +91,13 @@ var _wheels_due: bool = false
 
 
 func _process(_delta: float) -> void:
-	if not _keys_known or Controls.using_pad() != _keys_pad:
+	if not _keys_known or Controls.shown_pad() != _keys_pad:
 		_refresh_keys()
 
 
 func _refresh_keys() -> void:
 	_keys_known = true
-	_keys_pad = Controls.using_pad()
+	_keys_pad = Controls.shown_pad()
 	_zero_button.text = "ZERO STEERING  [%s]" % Controls.short_prompt(&"rover_zero_steering")
 	_dome_button.text = "ENTER DOME  [%s]" % Controls.short_prompt(&"swap_scene")
 	if _trade_told:
