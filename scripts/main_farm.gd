@@ -62,6 +62,10 @@ var _verb_prompt: VerbPrompt
 @onready var _tunnel_pad: ParkingPad = %TunnelPad
 ## The Flooded Aquifer's sinkhole and the pad on it (built in _ready, like the notice board).
 var _aquifer_pad: ParkingPad
+## The Colony Mine's gate on the plateau road and the pad on it (built in _ready): sealed until Bram's key.
+var _mine_pad: ParkingPad
+var _mine_gate_panels: Node3D
+var _mine_gate_label: Label3D
 ## The farm notice board and the pad by it (NoticeBoard), built in _ready.
 var _notice_pad: ParkingPad
 
@@ -89,6 +93,7 @@ var _armed_standard: String = ""
 ## The zone the tunnel mouth leads to (data/zones.json).
 const TUNNELS_ZONE: StringName = &"lava_tubes"
 const AQUIFER_ZONE: StringName = &"flooded_aquifer"
+const MINE_ZONE: StringName = &"colony_mine"
 
 ## This player asked to move the rover; the host said yes.
 var _moving: bool = false
@@ -104,6 +109,7 @@ const VERB_NOTICE: String = "Read notices"
 const VERB_CAL_PAD: String = "Calibrate"
 const VERB_TUNNEL: String = "Enter tunnels"
 const VERB_SINKHOLE: String = "Enter sinkhole"
+const VERB_MINE_GATE: String = "Enter mine"
 const VERB_TRADE: String = "Trade with Bram"
 const VERB_TERMINAL: String = "Open terminal"
 const VERB_ROVER: String = "Get in rover"
@@ -118,6 +124,7 @@ const HINT_CLEAR_PX: float = 90.0
 
 func _ready() -> void:
 	_build_sinkhole()
+	_build_mine_gate()
 	_build_notice_board()
 	_setup_hint_and_prompt()
 	_rover.uplink_changed.connect(_on_uplink_changed)
@@ -189,6 +196,9 @@ func _ready() -> void:
 	_tunnel_pad.rover_exited.connect(func() -> void: _tunnel_warned_day = -1)
 	_aquifer_pad.rover_entered.connect(func() -> void: _hud.push_log("SINKHOLE: press " + Controls.prompt(&"interact") + " to go down."))
 	_aquifer_pad.rover_exited.connect(func() -> void: _tunnel_warned_day = -1)
+	_mine_pad.rover_entered.connect(func() -> void: _hud.push_log("MINE GATE: " + ("press " + Controls.prompt(&"interact") + " to go in." if GameState.mine_gate_open else "sealed. Press " + Controls.prompt(&"interact") + " to try it.")))
+	_mine_pad.rover_exited.connect(func() -> void: _tunnel_warned_day = -1)
+	GameState.mine_changed.connect(_refresh_mine_gate)
 	_notice_pad.rover_entered.connect(func() -> void: _hud.push_log("FARM NOTICE BOARD: press " + Controls.prompt(&"interact") + " to read it."))
 	_hud.trade_pressed.connect(_try_trade)
 	_hud.wheel_service_pressed.connect(_try_wheel_service)
@@ -251,6 +261,7 @@ func _setup_hint_and_prompt() -> void:
 	_cal_pad.verb = VERB_CAL_PAD
 	_tunnel_pad.verb = VERB_TUNNEL
 	_aquifer_pad.verb = VERB_SINKHOLE
+	_mine_pad.verb = VERB_MINE_GATE
 	_bram_bay.verb = VERB_TRADE
 	_notice_pad.verb = VERB_NOTICE
 	_verb_prompt = VerbPrompt.new()
@@ -280,6 +291,8 @@ func verb_target() -> Dictionary:
 		pad = _tunnel_pad if _tunnel_open() else null
 	elif _aquifer_pad != null and _aquifer_pad.rover_inside:
 		pad = _aquifer_pad if _tunnel_open() else null
+	elif _mine_pad != null and _mine_pad.rover_inside:
+		pad = _mine_pad if _tunnel_open() and GameState.mine_gate_open else null
 	elif _bram_bay.rover_inside:
 		pad = _bram_bay if not GameState.has_wide_treads else null
 	if pad == null:
@@ -769,6 +782,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"interact") and _aquifer_pad.rover_inside:
 		get_viewport().set_input_as_handled()
 		_enter_zone(AQUIFER_ZONE)
+	elif event.is_action_pressed(&"interact") and _mine_pad.rover_inside:
+		get_viewport().set_input_as_handled()
+		_enter_zone(MINE_ZONE)
 	elif event.is_action_pressed(&"interact") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_trade()
@@ -1247,14 +1263,18 @@ func _enter_zone(zone: StringName) -> void:
 	# rescue hour, or someone else drives): the player then sees only that refusal.
 	var refused: bool = TunnelRecall.closed(GameClock.elapsed_days) or not CoopRovers.driver(GameState.rover_here()) in ["", GameState.local_player_id]
 	var warning: String = "" if refused else ZoneData.warning_text(zone, GameState.lab_level())
-	var label: String = "SINKHOLE" if zone == AQUIFER_ZONE else "TUNNEL MOUTH"
+	var label: String = "SINKHOLE" if zone == AQUIFER_ZONE else ("MINE GATE" if zone == MINE_ZONE else "TUNNEL MOUTH")
+	# A sealed gate says so and nothing else happens (no warning, no command).
+	if zone == MINE_ZONE and not GameState.mine_gate_open:
+		_hud.push_log(label + ": " + MineDepth.GATE_SEALED_TEXT)
+		return
 	if warning != "" and _tunnel_warned_day != int(GameClock.elapsed_days):
 		_tunnel_warned_day = int(GameClock.elapsed_days)
 		_hud.push_log("%s: %s Press %s again to go in, or drive off the pad to stay." % [label, warning, Controls.prompt(&"interact")])
 		return
 	_tunnel_warned_day = -1
 	_moving = true
-	var problem: String = await FarmCommands.request(&"move_rover_aquifer" if zone == AQUIFER_ZONE else &"move_rover", [true])
+	var problem: String = await FarmCommands.request(&"move_rover_aquifer" if zone == AQUIFER_ZONE else (&"move_rover_mine" if zone == MINE_ZONE else &"move_rover"), [true])
 	if not is_inside_tree():
 		return
 	if problem != "":
@@ -1334,6 +1354,47 @@ func _build_sinkhole() -> void:
 	shape.position = Vector3(0.0, 1.5, 0.0)
 	_aquifer_pad.add_child(shape)
 	world.add_child(_aquifer_pad)
+
+
+## The Colony Mine's gate on the plateau road [PLACEHOLDER spot: GameState.MINE_PAD]: two
+## timber posts, a lintel and two steel leaves that stand shut until Bram's key opens them.
+func _build_mine_gate() -> void:
+	var world: Node3D = $WorldView/WorldViewport/World
+	var gate := Node3D.new()
+	gate.name = "MineGate"
+	gate.position = GameState.MINE_PAD
+	for side: float in [-1.0, 1.0]:
+		gate.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.5, 3.2, 0.5)), Vector3(side * 2.2, 1.6, 0.0), TunnelLook.flat_mat(TunnelLook.TIMBER)))
+	gate.add_child(TunnelLook.part(TunnelLook.box(Vector3(5.2, 0.45, 0.6)), Vector3(0.0, 3.3, 0.0), TunnelLook.flat_mat(TunnelLook.TIMBER_LIGHT)))
+	_mine_gate_panels = Node3D.new()
+	_mine_gate_panels.name = "Leaves"
+	for side: float in [-1.0, 1.0]:
+		_mine_gate_panels.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.9, 2.8, 0.18)), Vector3(side * 1.0, 1.4, 0.0), TunnelLook.flat_mat(TunnelLook.STEEL)))
+	gate.add_child(_mine_gate_panels)
+	_mine_gate_label = TunnelLook.label("", Vector3(0.0, 3.9, 0.0), TunnelLook.BRASS)
+	gate.add_child(_mine_gate_label)
+	world.add_child(gate)
+	_mine_pad = ParkingPad.new()
+	_mine_pad.name = "MineGatePad"
+	_mine_pad.collision_layer = 0
+	_mine_pad.collision_mask = 2
+	_mine_pad.position = GameState.MINE_PAD + GameState.MINE_TRIGGER_OFFSET
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = GameState.MINE_TRIGGER_SIZE
+	shape.shape = box
+	shape.position = Vector3(0.0, 1.5, 0.0)
+	_mine_pad.add_child(shape)
+	world.add_child(_mine_pad)
+	_refresh_mine_gate()
+
+
+## Shows the gate shut or open from the farm's `mine_gate_open`.
+func _refresh_mine_gate() -> void:
+	if _mine_gate_panels == null:
+		return
+	_mine_gate_panels.visible = not GameState.mine_gate_open
+	_mine_gate_label.text = "COLONY MINE" if GameState.mine_gate_open else "COLONY MINE: SEALED"
 
 
 ## The soil probe was clicked: its text and the plot's readout, and the read is

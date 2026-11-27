@@ -146,6 +146,8 @@ const BLOCKS_FOUND: String = "blocks_found"
 const ANY_SUFFIX: String = "*"
 ## A reward that gives the farm the shuttle license (Shuttle). Farm quests only.
 const SHUTTLE_LICENSE: String = "shuttle_license"
+## A reward that opens the Colony Mine's gate for the farm (GameState.open_mine_gate). Farm quests only.
+const MINE_GATE: String = "mine_gate"
 ## A reward of a keepsake: its id in the data's KEEPSAKES. Cosmetic only.
 const KEEPSAKE: String = "keepsake"
 const KEEPSAKES: String = "keepsakes"
@@ -501,6 +503,8 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 			points[str(quest["id"])] = maxi(int(rewards["quest_points"]), int(points.get(str(quest["id"]), 0)))
 	if rewards.get(SHUTTLE_LICENSE, false) is bool and rewards.get(SHUTTLE_LICENSE, false):
 		farm.grant_shuttle_license()
+	if rewards.get(MINE_GATE, false) is bool and rewards.get(MINE_GATE, false) and farm.has_method("open_mine_gate"):
+		farm.open_mine_gate()
 	# One each, held until its player spends it (GameState.spend_xp_certificate).
 	# A player who holds or has spent this quest's certificate, here or on another
 	# farm, is not given it again.
@@ -581,6 +585,8 @@ static func reward_text(quest: Dictionary) -> String:
 		parts.append("an XP certificate (%s XP)" % SP811.integer(int(rewards[XP_CERTIFICATE])))
 	if rewards.get(SHUTTLE_LICENSE, false) is bool and rewards.get(SHUTTLE_LICENSE, false):
 		parts.append("the shuttle license")
+	if rewards.get(MINE_GATE, false) is bool and rewards.get(MINE_GATE, false):
+		parts.append("the key to the Mine's gate")
 	if keepsake_name(str(rewards.get(KEEPSAKE, ""))) != "":
 		parts.append("a keepsake (%s)" % keepsake_name(str(rewards[KEEPSAKE])))
 	if one_use_name(str(rewards.get(ONE_USE, ""))) != "":
@@ -771,6 +777,12 @@ static func data_problem(quest: Dictionary) -> String:
 			return "its shuttle_license reward is not true."
 		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_FARM or is_daily(quest):
 			return "the shuttle license is the farm's: a farm quest that is not a daily ask."
+	if (quest.get("rewards", {}) as Dictionary).has(MINE_GATE):
+		var gate_key: Variant = (quest["rewards"] as Dictionary)[MINE_GATE]
+		if typeof(gate_key) != TYPE_BOOL or not gate_key:
+			return "its mine_gate reward is not true."
+		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_FARM or is_daily(quest):
+			return "the Mine's gate is the farm's: a farm quest that is not a daily ask."
 	var keepsake: Variant = (quest.get("rewards", {}) as Dictionary).get(KEEPSAKE)
 	if keepsake != null:
 		if not keepsake is String or not DataManager.has_record(TABLE, keepsake, KEEPSAKES):

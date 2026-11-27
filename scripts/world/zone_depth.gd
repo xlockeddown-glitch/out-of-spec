@@ -252,6 +252,8 @@ static func follow(depth: int, world_seed: int, day: int, zone: String = ZONE) -
 static func _layout_of(zone: String, depth: int, world_seed: int, day: int) -> Dictionary:
 	if zone == AquiferDepth.ZONE:
 		return AquiferDepth.layout_today(world_seed, depth, day)
+	if zone == MineDepth.ZONE:
+		return MineDepth.layout_today(world_seed, depth, day)
 	return layout(world_seed, ZONE, depth, day)
 
 
@@ -259,6 +261,8 @@ static func _layout_of(zone: String, depth: int, world_seed: int, day: int) -> D
 static func max_depth_of(zone: String) -> int:
 	if zone == ZONE:
 		return MAX_DEPTH
+	if zone == MineDepth.ZONE:
+		return MineDepth.MAX_DEPTH
 	return AquiferDepth.MAX_DEPTH if zone == AquiferDepth.ZONE else 0
 
 
@@ -437,7 +441,7 @@ static func _kept_clear(depth: int) -> Array[Vector2i]:
 ## nearness is its own check (reach_problem).
 static func take_problem(find_id_text: String, finds: Array, taken: Array, place: String, depth: int, zone: String = ZONE) -> String:
 	if place != zone or depth < DEPTH or depth > max_depth_of(zone):
-		return "Finds lie in the Lava Tubes, below the hub." if zone == ZONE else "Finds lie in the Flooded Aquifer, below the hub."
+		return _finds_lie_text(zone)
 	var known: bool = false
 	for find: Variant in finds:
 		if find is Dictionary and str(find.get("id", "")) == find_id_text:
@@ -454,10 +458,22 @@ static func take_problem(find_id_text: String, finds: Array, taken: Array, place
 ## `at` that place. The host's copy of the rover decides, not the player's word.
 static func reach_problem(there: Vector3, zone: String, known: bool, at: Vector3, want: String = ZONE) -> String:
 	if zone != want or not known:
-		return "The rover is not in the Lava Tubes." if want == ZONE else "The rover is not in the Flooded Aquifer."
+		return _rover_not_in_text(want)
 	if Vector2(there.x - at.x, there.z - at.z).length() > REACH_M + HOST_REACH_SLACK_M:
 		return "The rover is too far from that."
 	return ""
+
+
+static func _finds_lie_text(zone: String) -> String:
+	if zone == MineDepth.ZONE:
+		return "Finds lie in the Colony Mine, below the hub."
+	return "Finds lie in the Lava Tubes, below the hub." if zone == ZONE else "Finds lie in the Flooded Aquifer, below the hub."
+
+
+static func _rover_not_in_text(want: String) -> String:
+	if want == MineDepth.ZONE:
+		return "The rover is not in the Colony Mine."
+	return "The rover is not in the Lava Tubes." if want == ZONE else "The rover is not in the Flooded Aquifer."
 
 
 ## What a find pays: { "crystal_ore": n, "credits": n }, only what it has.

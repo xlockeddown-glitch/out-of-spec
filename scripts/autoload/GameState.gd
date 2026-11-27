@@ -17,6 +17,7 @@ signal beacons_changed
 ## A find was taken below the Lava Tubes.
 signal finds_changed
 signal pump_changed  # the farm's pump was bought, or a pool was pumped dry
+signal mine_changed  # the Colony Mine's gate opened, shoring props were bought, or a room was shored
 signal camps_changed  # a camp was opened for the farm, or its supplies were bought or used
 ## A lift was repaired, or the deepest depth reached in a zone grew.
 signal lifts_changed
@@ -214,6 +215,12 @@ var camp_supplies: int = 0
 var _campers: Dictionary = {}
 ## The Aquifer's pools drained today: zone id -> { "day": int, "ids": [pool ids] }, like finds_taken.
 var pools_drained: Dictionary = {}
+## The Colony Mine's gate on the plateau road is open (Bram's key quest opens it), saved.
+var mine_gate_open: bool = false
+## Shoring props the farm holds, bought at the Mine hub's crate (shared stock), saved.
+var mine_props: int = 0
+## The Mine's rooms shored today: zone id -> { "day": int, "ids": [rockfall ids] }, like pools_drained.
+var rooms_shored: Dictionary = {}
 ## The lift stations repaired, for good: zone id -> Array of the depths (ZoneDepth).
 ## Never reset, never expires. Shared by the farm.
 var lifts_repaired: Dictionary = {}
@@ -320,7 +327,7 @@ var rover_zone: String = "":
 		rover_zone = value
 		# Depth is only below the Lava Tubes: it goes when the rover really leaves them
 		# (setting the same zone again, as a load does, keeps it).
-		if value != old and value != TUNNELS_ZONE and value != AquiferDepth.ZONE:
+		if value != old and value != TUNNELS_ZONE and value != AquiferDepth.ZONE and value != MineDepth.ZONE:
 			rover_depth = 0
 		if value != old:
 			zone_heat_trip = false  # a heat trip is one rover trip: every way the rover leaves or arrives ends it
@@ -374,6 +381,13 @@ const TUNNELS_ZONE: String = "lava_tubes"
 ## Where the farm's rover goes into the Flooded Aquifer: a sinkhole south of the plateau
 ## [PLACEHOLDER]. Within TUNNEL_PAD_REACH_M of it the rover is on the pad.
 const AQUIFER_PAD: Vector3 = Vector3(-24.0, 0.0, -22.0)
+## Where the farm's rover goes into the Colony Mine: a sealed gate on the plateau road
+## [PLACEHOLDER]. Within TUNNEL_PAD_REACH_M of it the rover is on the pad.
+const MINE_PAD: Vector3 = Vector3(12.0, 0.0, -34.0)
+## The gate's trigger box sits in front of the gate, wholly within TUNNEL_PAD_REACH_M of MINE_PAD, so
+## a rover that is told to go in is never refused for distance [PLACEHOLDER].
+const MINE_TRIGGER_OFFSET: Vector3 = Vector3(0.0, 0.0, 1.5)
+const MINE_TRIGGER_SIZE: Vector3 = Vector3(5.0, 3.0, 3.0)
 ## Host: where each player is, as player id -> [place, depth] (ZonePresence). A
 ## player not in it is on the farm. Not saved: a loaded farm has everyone on the
 ## farm. A guest holds the host's copy, from the clock (FarmSync).
@@ -744,7 +758,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "camps_open", "camp_supplies"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -770,6 +784,7 @@ func farm_to_dict() -> Dictionary:
 	# A find taken on a past day is gone: it is not kept.
 	out["finds_taken"] = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	out["pools_drained"] = ZoneDepth.prune(pools_drained, GameClock.get_day_index())
+	out["rooms_shored"] = ZoneDepth.prune(rooms_shored, GameClock.get_day_index())
 	return out
 
 
@@ -803,6 +818,12 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return ZoneDepth.taken_problem(data["finds_taken"])
 	if data.has("pools_drained") and AquiferDepth.drained_problem(data["pools_drained"]) != "":
 		return AquiferDepth.drained_problem(data["pools_drained"])
+	if data.has("rooms_shored") and MineDepth.shored_problem(data["rooms_shored"]) != "":
+		return MineDepth.shored_problem(data["rooms_shored"])
+	if data.has("mine_props") and MineDepth.props_problem(data["mine_props"]) != "":
+		return MineDepth.props_problem(data["mine_props"])
+	if data.has("mine_gate_open") and not data["mine_gate_open"] is bool:
+		return "'mine_gate_open' is not a yes or no."
 	if data.has("pump_owned") and not data["pump_owned"] is bool:
 		return "'pump_owned' is not a yes or no."
 	if data.has("camps_open") and Camp.open_problem(data["camps_open"]) != "":
@@ -878,7 +899,7 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var depth: Variant = data.get("rover_depth", 0)
 	if depth is int and (depth < 0 or depth > ZoneDepth.max_depth_of(str(data.get("rover_zone", TUNNELS_ZONE)))):
 		return "'rover_depth' is out of range."
-	if depth is int and depth > 0 and not data.get("rover_zone", "") in [TUNNELS_ZONE, AquiferDepth.ZONE]:
+	if depth is int and depth > 0 and not data.get("rover_zone", "") in [TUNNELS_ZONE, AquiferDepth.ZONE, MineDepth.ZONE]:
 		return "'rover_depth' is set for a rover that is not in a zone with depths."
 	if data.has("rover_lent") and not data["rover_lent"] is bool:
 		return "'rover_lent' is not a yes or no."
@@ -1106,6 +1127,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	put_farm(data)
 	finds_taken = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	pools_drained = ZoneDepth.prune(pools_drained, GameClock.get_day_index())
+	rooms_shored = ZoneDepth.prune(rooms_shored, GameClock.get_day_index())
 	settle_rover_depth(false)
 	sentinel_sighted = false
 	player_places.clear()
@@ -4759,17 +4781,18 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 	if reason != "":
 		return reason
 	var aquifer: bool = rover_zone == AquiferDepth.ZONE
+	var mine: bool = rover_zone == MineDepth.ZONE
 	if target_depth < 0 or target_depth > ZoneDepth.max_depth_of(rover_zone) or absi(target_depth - rover_depth) != 1:
 		return "There is no way there from here."
 	var going_down: bool = target_depth > rover_depth
-	var down_at: Vector3 = AquiferDepth.hatch_position() if aquifer else ZoneDepth.descent_position(rover_depth)
+	var down_at: Vector3 = AquiferDepth.hatch_position() if aquifer else (MineDepth.hatch_position() if mine else ZoneDepth.descent_position(rover_depth))
 	var there: Vector3 = down_at if going_down else ZoneDepth.ascent_position()
 	reason = _rover_reach_problem(there, rover_zone)
 	if reason != "":
 		return reason
 	var pose: Transform3D = ZoneDepth.arrival_pose(target_depth, going_down, false)
-	if aquifer and not going_down:
-		pose = Transform3D(Basis.IDENTITY, down_at + Vector3(0.0, 0.05, TunnelRock.CELL_M))  # beside the Aquifer's hatch
+	if (aquifer or mine) and not going_down:
+		pose = Transform3D(Basis.IDENTITY, down_at + Vector3(0.0, 0.05, TunnelRock.CELL_M))  # beside the Aquifer's or Mine's hatch
 	_move_rover_to(target_depth, pose)
 	return ""
 
@@ -4779,7 +4802,7 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 ## second after the rover stops): the host and solo player, or a player who is in the
 ## tunnels at the rover's depth; or, while someone drives, that player. Returns "" or why.
 func _rover_trip_problem(player_id: String) -> String:
-	if not rover_zone in [TUNNELS_ZONE, AquiferDepth.ZONE]:
+	if not rover_zone in [TUNNELS_ZONE, AquiferDepth.ZONE, MineDepth.ZONE]:
 		return "The rover is not in a zone."
 	var driver: String = CoopRovers.driver(TUNNEL_ROVER)
 	if driver == "":
@@ -4949,6 +4972,23 @@ func move_rover_aquifer(into: bool, player_id: String = "") -> String:
 	return _move_rover(AquiferDepth.ZONE, into, player_id)
 
 
+## Host: the same for the Colony Mine's gate (on the plateau road). The gate has to be open
+## (Bram's key quest); until then nothing goes in and nothing else happens.
+func move_rover_mine(into: bool, player_id: String = "") -> String:
+	if into and not mine_gate_open:
+		return MineDepth.GATE_SEALED_TEXT
+	return _move_rover(MineDepth.ZONE, into, player_id)
+
+
+## Where a zone's mouth is on the farm.
+func _mouth_of(zone: String) -> Vector3:
+	if zone == AquiferDepth.ZONE:
+		return AQUIFER_PAD
+	if zone == MineDepth.ZONE:
+		return MINE_PAD
+	return TUNNEL_PAD
+
+
 ## The one trip in or out for a zone with a mouth on the farm (the Lava Tubes' and the
 ## Aquifer's sinkhole): `zone` is the one the rover goes into, or comes out of.
 func _move_rover(zone: String, into_tunnels: bool, player_id: String) -> String:
@@ -4970,7 +5010,7 @@ func _move_rover(zone: String, into_tunnels: bool, player_id: String) -> String:
 			return "The rover goes in from the farm."
 		if not into_tunnels and (place_of(who) != zone or depth_of(who) != 0):
 			return "The way out is from the hub."
-	var pad: Vector3 = (AQUIFER_PAD if zone == AquiferDepth.ZONE else TUNNEL_PAD) if into_tunnels else TUNNEL_EXIT
+	var pad: Vector3 = _mouth_of(zone) if into_tunnels else TUNNEL_EXIT
 	var at: Variant = _rover_pose_now(rover_here())  # honours the told pose: no save of this screen's rover over it
 	if at == null or (at as Vector3).distance_to(pad) > TUNNEL_PAD_REACH_M:
 		return "The rover is not on the pad."
@@ -5342,7 +5382,7 @@ func bring_rover_home() -> void:
 		_release_field_rover()
 		_emit_field_rover_changed()
 		return
-	var mouth: Vector3 = AQUIFER_PAD if rover_zone == AquiferDepth.ZONE else TUNNEL_PAD  # the way it came in
+	var mouth: Vector3 = _mouth_of(rover_zone)  # the way it came in
 	var home: Transform3D = parked_rover_transform(ROVER, Transform3D(Basis.IDENTITY, mouth))
 	if home.origin.distance_to(mouth) > TUNNEL_PAD_REACH_M:
 		home = Transform3D(Basis.IDENTITY, mouth)
@@ -5847,10 +5887,18 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 	var day: int = GameClock.get_day_index()
 	if layout_day != day:
 		return "That was yesterday's floor. Look again."
-	var zone: String = AquiferDepth.ZONE if rover_zone == AquiferDepth.ZONE else ZoneDepth.ZONE
+	var zone: String = rover_zone if rover_zone in [AquiferDepth.ZONE, MineDepth.ZONE] else ZoneDepth.ZONE
 	var aquifer: bool = zone == AquiferDepth.ZONE
+	var mine: bool = zone == MineDepth.ZONE
 	finds_taken = ZoneDepth.prune(finds_taken, day)
-	var today: Dictionary = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day)) if aquifer else ZoneDepth.layout(world_seed, ZoneDepth.ZONE, rover_depth, day)
+	rooms_shored = ZoneDepth.prune(rooms_shored, day)
+	var today: Dictionary = {}
+	if aquifer:
+		today = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day))
+	elif mine:
+		today = MineDepth.layout(world_seed, rover_depth, day, MineDepth.shored_today(rooms_shored, day))
+	else:
+		today = ZoneDepth.layout(world_seed, ZoneDepth.ZONE, rover_depth, day)
 	var taken: Array = ZoneDepth.taken_today(finds_taken, zone, day)
 	var reason: String = ""
 	if rover_depth < ZoneDepth.DEPTH or rover_depth > ZoneDepth.max_depth_of(zone):
@@ -5859,6 +5907,8 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 		reason = "Finds lie where the rover is."
 	if reason == "":
 		reason = ZoneDepth.take_problem(find_id, today.get("finds", []), taken, place_of(player_id), depth_of(player_id), zone)
+	if reason == "" and mine:
+		reason = MineDepth.blocked_problem(today, find_id)  # a rockfall buries its room until it is shored
 	if reason == "":
 		var find: Dictionary = ZoneDepth.find_in(today, find_id)
 		var at: Variant = _rover_pose_now(TUNNEL_ROVER)  # honours the told pose and the drive lease
@@ -5869,7 +5919,7 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 	if reason != "":
 		return reason
 	var kind: String = str(ZoneDepth.find_in(today, find_id)["kind"])
-	var pay: Dictionary = AquiferDepth.reward(kind) if aquifer else ZoneDepth.reward(kind)
+	var pay: Dictionary = AquiferDepth.reward(kind) if aquifer else (MineDepth.reward(kind) if mine else ZoneDepth.reward(kind))
 	finds_taken = ZoneDepth.with_taken(finds_taken, zone, day, find_id)
 	if pay.has("crystal_ore"):
 		crystal_ore += int(pay["crystal_ore"])
@@ -5877,6 +5927,56 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 	if pay.has("credits"):
 		add_credits(int(pay["credits"]))
 	finds_changed.emit()
+	return ""
+
+
+## Host: Bram's key quest (or a test) opens the Colony Mine's gate for the farm. Only the
+## host's farm does; opening it twice changes nothing. Returns "" or why not.
+func open_mine_gate() -> String:
+	if FarmCommands.guest:
+		return "Only the host's farm opens the Mine's gate."
+	if not mine_gate_open:
+		mine_gate_open = true
+		mine_changed.emit()
+	return ""
+
+
+## Host: the farm buys shoring props at the Mine hub's crate, for the player there. Props
+## cost crystal ore from the shared stock [PLACEHOLDER], as a lift repair does. Returns ""
+## or why not (MineDepth.buy_problem).
+func buy_mine_props(player_id: String = "") -> String:
+	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+	var near: bool = rover_zone == MineDepth.ZONE and rover_depth == 0 and at != null and MineDepth.near_crate(at)
+	var here: String = place_of(player_id) if rover_zone == MineDepth.ZONE else ""
+	var reason: String = MineDepth.buy_problem(here, depth_of(player_id), crystal_ore, near, mine_props)
+	if reason != "":
+		return reason
+	crystal_ore -= MineDepth.PROP_COST_ORE
+	ore_changed.emit(crystal_ore)
+	mine_props += MineDepth.PROPS_PER_BUY
+	mine_changed.emit()
+	return ""
+
+
+## Host: the rover shores `rockfall_id` for today, spending a prop, for the player at
+## depth 1. Returns "" or why not (MineDepth.shore_problem). `layout_day` is the day the
+## player's screen drew the rockfalls for.
+func shore_room(rockfall_id: String, layout_day: int, player_id: String = "") -> String:
+	var day: int = GameClock.get_day_index()
+	if layout_day != day:
+		return "That was yesterday's floor. Look again."
+	if rover_zone != MineDepth.ZONE or rover_depth < 1 or depth_of(player_id) != rover_depth or place_of(player_id) != MineDepth.ZONE:
+		return "Rockfalls are below the Colony Mine's hub, where the rover is."
+	rooms_shored = ZoneDepth.prune(rooms_shored, day)
+	var shored: Array = MineDepth.shored_today(rooms_shored, day)
+	var today: Dictionary = MineDepth.layout(world_seed, rover_depth, day, shored)
+	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+	var reason: String = MineDepth.shore_problem(today, rockfall_id, shored, mine_props, at if at != null else Vector3(1.0e6, 0.0, 1.0e6))
+	if reason != "":
+		return reason
+	mine_props -= MineDepth.PROPS_PER_ROOM
+	rooms_shored = ZoneDepth.with_taken(rooms_shored, MineDepth.ZONE, day, rockfall_id)
+	mine_changed.emit()
 	return ""
 
 

@@ -20,12 +20,18 @@ static func is_place(place: String) -> bool:
 	return place == FARM or place == DOME or (place != "" and ZoneData.is_playable(StringName(place)))
 
 
+static func _max_depth(place: String) -> int:
+	if place == AquiferDepth.ZONE:
+		return AquiferDepth.MAX_DEPTH
+	return MineDepth.MAX_DEPTH if place == MineDepth.ZONE else MAX_DEPTH
+
+
 ## Why [place, depth] cannot be: the one rule for the host's command and for a
 ## guest checking the host's table. "" if it can.
 static func place_problem(place: String, depth: int) -> String:
 	if not is_place(place):
 		return "'%s' is not a place." % place
-	if depth < 0 or depth > (AquiferDepth.MAX_DEPTH if place == AquiferDepth.ZONE else MAX_DEPTH):
+	if depth < 0 or depth > _max_depth(place):
 		return "Depth %d is out of range." % depth
 	if depth > 0 and (place == FARM or place == DOME):
 		return "The %s has no depth." % place
@@ -52,7 +58,7 @@ static func for_scene(path: String) -> Array:
 		return [DOME, 0]
 	for id: StringName in ZoneData.ids():
 		if path != "" and ZoneData.hub_scene(id) == path:
-			return [String(id), ZoneDepth.local_depth if String(id) in [ZoneDepth.ZONE, AquiferDepth.ZONE] else 0]
+			return [String(id), ZoneDepth.local_depth if String(id) in [ZoneDepth.ZONE, AquiferDepth.ZONE, MineDepth.ZONE] else 0]
 	return []
 
 
