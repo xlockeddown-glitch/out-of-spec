@@ -8,8 +8,14 @@ extends RefCounted
 const IDS: Array[StringName] = [&"farm", &"lab_quarter", &"badlands", &"basalt_ridge", &"frost_flats", &"landing_field"]
 
 
+var _file_rows: Array = []
+
+
+## A deep copy of the file's rows, read from the file once for the whole suite.
 func _good_rows() -> Array:
-	return BiomeData.raw_rows().duplicate(true)
+	if _file_rows.is_empty():
+		_file_rows = BiomeData.raw_rows()
+	return _file_rows.duplicate(true)
 
 
 ## A copy of the rows with one field of one row changed.
@@ -31,11 +37,11 @@ func _has_line(rows: Array, want: String) -> String:
 
 
 func test_the_table_parses_and_is_sound() -> String:
-	var raw: Array = BiomeData.raw_rows()
-	if raw.size() != IDS.size():
-		return "Expected %d rows, the file gave %d." % [IDS.size(), raw.size()]
-	var problems: Array[String] = BiomeData.problems(raw)
-	return "" if problems.is_empty() else "; ".join(problems)
+	var found: Dictionary = BiomeData.read_file(BiomeData.PATH)
+	if not (found["errors"] as Array).is_empty():
+		return "; ".join(found["errors"] as Array)
+	var count: int = (found["rows"] as Array).size()
+	return "" if count == IDS.size() else "Expected %d rows, the file gave %d." % [IDS.size(), count]
 
 
 func test_the_six_ids_are_the_doc_s_in_order() -> String:
@@ -72,6 +78,14 @@ func test_the_cached_rows_are_read_only() -> String:
 		return "An entrance can still be changed"
 	if not BiomeData.rows().is_read_only():
 		return "The list of rows can still be changed"
+	return ""
+
+
+## Even when the file fails, the empty list a reader gets cannot be changed.
+func test_the_cache_is_read_only_when_the_load_fails() -> String:
+	var found: Dictionary = BiomeData.read_file("res://data/no_such_biomes.json")
+	if not (found["rows"] as Array).is_empty():
+		return "A failed read gave rows"
 	return ""
 
 
@@ -201,7 +215,7 @@ func test_the_way_to_the_tunnel_mouth_is_farm_then_basalt() -> String:
 func test_every_point_of_the_land_maps_to_some_id() -> String:
 	var seen: Dictionary = {}
 	var step: int = 2
-	var half: int = int(BiomeData.LAND_HALF_M)
+	var half: int = Terrain.HALF_M
 	for x: int in range(-half, half + 1, step):
 		for z: int in range(-half, half + 1, step):
 			var id: StringName = BiomeData.biome_at(Vector2(x, z))
@@ -267,13 +281,22 @@ func test_the_spot_list_holds_the_real_rocks_and_props() -> String:
 ## The pad check refuses the old farm marker (-12, -18), a pad on the plot, a pad
 ## on a hill, and a pad on the relay road.
 func test_the_pad_check_refuses_known_bad_places() -> String:
-	var bad: Dictionary = {
-		"RockB": Vector2(-12, -18), "the plot": Vector2(4, 4), "the Basalt hill": Vector2(27, -24),
-		"the Badlands hill": Vector2(58, 24), "the relay road": Vector2(-20, -20),
-	}
-	for label: String in bad:
-		if BiomeData.pad_problems("t", "marker", bad[label] as Vector2).is_empty():
-			return "A pad on %s was accepted" % label
+	var bad: Array = [
+		["RockB", Vector2(-12, -18), "farm: marker pad is on or too near the thing at (-9.0, -17.0)"],
+		["the plot", Vector2(4, 4), "farm: marker is on the farm plot"],
+		["the relay road", Vector2(-20, -20), "farm: marker pad is 0.0 m from the relay road, inside its 5 m level strip"],
+		["the Basalt hill", Vector2(44, -40), "farm: marker pad ground varies by"],
+		["the Badlands hill", Vector2(58, 24), "farm: marker pad ground varies by"],
+	]
+	for c: Array in bad:
+		var lines: Array[String] = BiomeData.pad_problems("farm", "marker", c[1] as Vector2)
+		var found: bool = false
+		for line: String in lines:
+			found = found or (c[2] as String) in line
+		if not found:
+			return "A pad on %s: expected '%s', got %s" % [c[0], c[2], lines]
+		if "hill" in (c[0] as String) and lines.size() != 1:
+			return "A pad on %s should fail on the ground alone, got %s" % [c[0], lines]
 	return ""
 
 
@@ -316,7 +339,7 @@ func test_the_checker_catches_bad_rows() -> String:
 		["marker on the plot", "farm", "marker", [4, 4], "farm: marker is on the farm plot"],
 		["marker on a prop", "basalt_ridge", "marker", [21, -18], "basalt_ridge: marker pad is on or too near the thing"],
 		["marker on a hill", "badlands", "marker", [58, 24], "badlands: marker pad ground varies by"],
-		["marker on the road", "lab_quarter", "marker", [-30, -30], "lab_quarter: marker pad is"],
+		["marker on the road", "lab_quarter", "marker", [-30, -30], "lab_quarter: marker pad is 0.0 m from the relay road"],
 		["marker not a point", "lab_quarter", "marker", [1], "lab_quarter: marker must be [x, z]"],
 		["reach zero", "badlands", "reach_m", 0, "badlands: reach_m must be above 0"],
 		["reach negative", "basalt_ridge", "reach_m", -5, "basalt_ridge: reach_m must be above 0"],
@@ -329,7 +352,7 @@ func test_the_checker_catches_bad_rows() -> String:
 		["unknown zone", "basalt_ridge", "entrances", [{"zone": "moon_base", "at": [28, -30]}], "basalt_ridge: entrance 0 zone moon_base is not a zones.json id"],
 		["entrance without at", "lab_quarter", "entrances", [{"zone": "ice_caves"}], "lab_quarter: entrance 0 must be {zone, at}"],
 		["entrance claimed twice", "frost_flats", "entrances", [{"zone": "lava_tubes", "at": null}], "frost_flats: zone lava_tubes is also an entrance of basalt_ridge"],
-		["marker on its entrance", "badlands", "entrances", [{"zone": "flooded_aquifer", "at": [69, 22]}], "badlands: marker is on its flooded_aquifer entrance"],
+		["marker on its entrance", "badlands", "entrances", [{"zone": "flooded_aquifer", "at": [69, 22]}], "badlands: marker is on the flooded_aquifer entrance of badlands"],
 		["entrance in another biome", "badlands", "entrances", [{"zone": "flooded_aquifer", "at": [0, 0]}], "badlands: its flooded_aquifer entrance falls in farm"],
 		["unknown role", "lab_quarter", "role", "wedge", "lab_quarter: unknown role wedge"],
 		["marker in another biome", "lab_quarter", "marker", [0, 40], "lab_quarter: its marker falls in"],
@@ -344,6 +367,11 @@ func test_the_checker_catches_bad_rows() -> String:
 		if failed != "":
 			return "%s: %s" % [c[0], failed]
 	return ""
+
+
+## A marker on any biome's entrance is refused, not only its own.
+func test_a_marker_on_another_biomes_entrance_is_refused() -> String:
+	return _has_line(_with("lab_quarter", "marker", [20, -20]), "marker is on the lava_tubes entrance of basalt_ridge")
 
 
 func test_a_marker_on_another_marker_is_refused() -> String:

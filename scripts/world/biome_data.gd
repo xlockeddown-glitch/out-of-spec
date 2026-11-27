@@ -14,9 +14,9 @@ extends RefCounted
 const PATH: String = "res://data/biomes.json"
 const FARM: StringName = &"farm"
 
-## The land the table is laid on: x and z run from -120 to 120 m (biomes.md 7.1,
-## Question 5). The old middle, which keeps its ground, is the inner 80 m.
-const LAND_HALF_M: float = 120.0
+## The land the table is laid on is Terrain.HALF_M each way from the middle (120 m,
+## 240 m across; biomes.md 7.1, Question 5). The old middle, which keeps its
+## ground, is the inner Terrain.OLD_HALF_M.
 ## A marker keeps this far from the edge, so its pad has ground under it.
 const EDGE_MARGIN_M: float = 4.0
 ## The farm plot is 12 by 12 cells of 2 m (GameState.PLOT), half-width in metres.
@@ -62,10 +62,19 @@ const FIELDS: Dictionary = {
 const SCENE_SPOTS: Array[Vector4] = [
 	Vector4(0, 2, 1.2, 1.6),        # rover start
 	Vector4(8, 14, 2.5, 2.0),       # dome airlock
-	Vector4(13.5, 15, 2.5, 2.5),    # field calibration pad
+	Vector4(13.5, 14.5, 3.5, 3.0),  # field calibration pad, with its tripod, jig and table
 	Vector4(-3, 14, 2.0, 2.0),      # drop pod
 	Vector4(1.5, 17.5, 3.5, 3.5),   # farm notice board (its pad is 7 by 7)
-	Vector4(16, -2, 3.5, 3.5),      # Bram's bay and the rover pad beside it
+	Vector4(16.5, -2, 4.0, 3.5),    # Bram's bay, the rover pad and the air dryer
+	Vector4(-11.6, 13.2, 1.5, 1.5), # water cistern
+	Vector4(-9, 13.2, 1.0, 1.0),    # irrigation junction
+	Vector4(-7.8, 12.5, 0.5, 0.5),  # soil probe
+	Vector4(3, 13, 1.0, 1.0),       # harvest crate
+	Vector4(1, 13.3, 1.5, 1.5),     # shipping pallet
+	Vector4(-20, 8, 1.0, 1.0),      # scrub bush A
+	Vector4(9, -20, 1.0, 1.0),      # scrub bush B
+	Vector4(-6, 19, 1.0, 1.0),      # dry stump A
+	Vector4(17, -14, 1.0, 1.0),     # dry stump B
 	Vector4(20.5, -19, 4.0, 3.0),   # tunnel mouth
 	Vector4(20.5, -15.5, 2.0, 2.0), # tunnel pad
 	Vector4(-70, -70, 4.0, 4.0),    # satellite relay
@@ -106,7 +115,7 @@ static func rows() -> Array[Dictionary]:
 			_cache.assign(found["rows"])
 			for row: Dictionary in _cache:
 				_freeze(row)
-			_cache.make_read_only()
+		_cache.make_read_only()
 		_loaded = true
 	return _cache
 
@@ -117,16 +126,16 @@ static func reload() -> void:
 	_loaded = false
 
 
-## The rows exactly as the file holds them (for the check), unchecked and not
-## read-only. Empty if the file is unreadable.
+## The rows exactly as the file holds them, unchecked and not read-only (so a
+## test can feed problems() a bad file). Empty if the file is unreadable.
 static func raw_rows() -> Array:
-	return read_file(PATH)["rows"] as Array
+	return read_raw(PATH)["rows"] as Array
 
 
-## Reads and checks one file: {"rows": the rows, "errors": one line each}. A
-## missing file, a JSON fault (with its line), a missing "biomes" list or any
-## problem of the check gives errors, and then rows is empty.
-static func read_file(path: String) -> Dictionary:
+## Reads one file, without checking the rows: {"rows": the rows, "errors": one
+## line each}. A missing file, a JSON fault (with its line) or a missing "biomes"
+## list gives errors, and then rows is empty.
+static func read_raw(path: String) -> Dictionary:
 	var out: Dictionary = {"rows": [], "errors": []}
 	var errors: Array = out["errors"]
 	if not FileAccess.file_exists(path):
@@ -140,11 +149,20 @@ static func read_file(path: String) -> Dictionary:
 	if not data is Dictionary or not (data as Dictionary).get("biomes") is Array:
 		errors.append("%s: no \"biomes\" list" % path)
 		return out
-	var table: Array = (data as Dictionary)["biomes"]
-	for line: String in problems(table):
-		errors.append("%s: %s" % [path, line])
+	out["rows"] = (data as Dictionary)["biomes"]
+	return out
+
+
+## Reads and checks one file: {"rows": the rows, "errors": one line each}. Any
+## fault of read_raw or of problems() gives errors, and then rows is empty.
+static func read_file(path: String) -> Dictionary:
+	var out: Dictionary = read_raw(path)
+	var errors: Array = out["errors"]
 	if errors.is_empty():
-		out["rows"] = table
+		for line: String in problems(out["rows"] as Array):
+			errors.append("%s: %s" % [path, line])
+	if not errors.is_empty():
+		out["rows"] = []
 	return out
 
 
@@ -290,15 +308,16 @@ static func spots() -> Array[Vector4]:
 
 
 ## The height spread (highest less lowest) of the ground under a 4 by 4 m pad
-## whose middle is `at`, over its corners, edge middles and middle, on the 240 m
-## land as Terrain models it.
+## whose middle is `at`: every 1 m point of the 5 by 5 grid over the pad, read with
+## Terrain.height (which blends between the 1 m points, so a middle that is not on
+## a whole metre is read right) on the land as it is with no digging.
 static func pad_spread_m(at: Vector2) -> float:
 	var low: float = INF
 	var high: float = -INF
-	for dx: int in [-1, 0, 1]:
-		for dz: int in [-1, 0, 1]:
-			var point := Vector2(at.x + dx * PAD_HALF_M, at.y + dz * PAD_HALF_M)
-			var h: float = Terrain.natural_on(Vector2i(roundi(point.x), roundi(point.y)), int(LAND_HALF_M))
+	var none: Dictionary[Vector2i, int] = {}
+	for dx: int in range(-2, 3):
+		for dz: int in range(-2, 3):
+			var h: float = Terrain.height(Vector2(at.x + dx, at.y + dz), none)
 			low = minf(low, h)
 			high = maxf(high, h)
 	return high - low
@@ -434,10 +453,10 @@ static func _point_problems(label: String, field: String, raw: Variant) -> Array
 			out.append("%s: %s must be two numbers" % [label, field])
 			return out
 	var is_marker: bool = field == "marker"
-	var limit: float = LAND_HALF_M - (EDGE_MARGIN_M if is_marker else 0.0)
+	var limit: float = Terrain.HALF_M - (EDGE_MARGIN_M if is_marker else 0.0)
 	var p: Vector2 = _point(raw)
 	if absf(p.x) > limit or absf(p.y) > limit:
-		var rule: String = "%d m land's %d m edge margin" % [int(LAND_HALF_M * 2.0), int(EDGE_MARGIN_M)] if is_marker else "%d m land" % int(LAND_HALF_M * 2.0)
+		var rule: String = "%d m land's %d m edge margin" % [int(Terrain.HALF_M * 2.0), int(EDGE_MARGIN_M)] if is_marker else "%d m land" % int(Terrain.HALF_M * 2.0)
 		out.append("%s: %s (%s, %s) is outside the %s" % [label, field, p.x, p.y, rule])
 	return out
 
@@ -474,6 +493,15 @@ static func _table_problems(table: Array[Dictionary]) -> Array[String]:
 				out.append("%s: zone %s is also an entrance of %s" % [id, zone, claimed[zone]])
 			claimed[zone] = id
 		pads.append({"id": id, "at": _point(row["marker"])})
+	for row: Dictionary in table:
+		for entrance: Dictionary in row["entrances"]:
+			if entrance["at"] == null:
+				continue
+			var at: Vector2 = _point(entrance["at"])
+			for pad: Dictionary in pads:
+				var m: Vector2 = pad["at"]
+				if absf(at.x - m.x) < PAD_HALF_M + PAD_CLEAR_M and absf(at.y - m.y) < PAD_HALF_M + PAD_CLEAR_M:
+					out.append("%s: marker is on the %s entrance of %s" % [pad["id"], entrance["zone"], row["id"]])
 	for i: int in pads.size():
 		for j: int in range(i + 1, pads.size()):
 			var a: Vector2 = pads[i]["at"]
@@ -502,8 +530,6 @@ static func _place_problems(label: String, row: Dictionary, table: Array) -> Arr
 		var at: Vector2 = _point(entrance["at"])
 		if at_in(table, at) != id:
 			out.append("%s: its %s entrance falls in %s" % [label, entrance["zone"], at_in(table, at)])
-		if absf(at.x - marker_at.x) < PAD_HALF_M + PAD_CLEAR_M and absf(at.y - marker_at.y) < PAD_HALF_M + PAD_CLEAR_M:
-			out.append("%s: marker is on its %s entrance" % [label, entrance["zone"]])
 	if str(row["role"]) != "hub":
 		var actual: float = fposmod(rad_to_deg(atan2(centre_at.x, -centre_at.y)), 360.0)
 		var gap: float = absf(fposmod(float(row["bearing_deg"]) - actual + 180.0, 360.0) - 180.0)
