@@ -1,6 +1,6 @@
 # Biomes: laying out the surface around the farm (design proposal)
 
-Status: **design, 2026-11-26. For Ryan to answer (§7).** This PR changes no code and no data. Every number and name below is a [PLACEHOLDER] or an [ASSUMPTION] until Ryan sets it.
+Status: **design, 2026-11-26. Ryan answered §7 the same day (§7.1).** This PR changes no code and no data. Every number and name below is a [PLACEHOLDER] or an [ASSUMPTION] until Ryan sets it.
 
 Ryan, after playtesting: "the map needs to be laid out better. We should make like 'biomes' with farm being center and different things in different areas extending from there." He also said the beginning needs a few tips and an idea of what you are doing (§4).
 
@@ -253,3 +253,28 @@ Each has a recommended option first.
     - (a) The Aquifer sinkhole in the Badlands (recommended: digging and pit water are already there).
     - (b) The Colony Mine gate on the Basalt Ridge road.
     - (c) The Ice Caves ramp in the Frost Flats.
+
+### 7.1 Ryan's answers (2026-11-26)
+
+| # | Question | Ryan's answer |
+|---|---|---|
+| 1 | Layout | (a) Hub and spokes: roads out of the farm |
+| 2 | How many biomes | (a) Five: Lab Quarter, Badlands, Basalt Ridge, Frost Flats, Landing Field |
+| 3 | Lab Quarter its own biome | (a) Yes |
+| 4 | Gates | (a) None: a sign warns and a road lights up |
+| 5 | Land size | **(b) Grow to about 240 m** (not the recommended 160 m) |
+| 6 | Bram's bay | (a) At the farm's edge |
+| 7 | Travel | (a) The shared rover, plus a free parking pad at each biome sign |
+| 8 | Look | (a) Ground tint, rocks, plants and a few props; Ryan's packs as style reference |
+| 9 | First-hour teaching | (a) A farm quest board with three starter jobs, plus lit roads |
+| 10 | Digging | (a) Everywhere except roads and pads; the Badlands pays best |
+| 11 | Old saves | (a) Keep their ground |
+| 12 | First surface zone entrance | (a) The Aquifer sinkhole in the Badlands |
+
+What follows from the answers:
+
+- **240 m and "keep the ground" together.** The land grows outward; today's 160 m middle keeps exactly the heights it has, so dug cells, found blocks and pockets stay where they are. The new ring outside it is new ground. The grow PR must test that every point inside the old 160 m is unchanged for an existing seed [ASSUMPTION: anything in `Terrain` that depends on `SIZE_M`, such as the rim, is kept for the inner square or moved out to the new edge].
+- **Land size moves up the build order** (§6 step 13 becomes step 2, after measuring), so biome centres are placed on the 240 m land from the start. The measure PR checks ground build time and the uplink at 240 m first. [RISK] stays as §3.2 says.
+- **Roads and old saves.** A road that would level ground over a dug or tilled cell in an old save is only painted there, not levelled [ASSUMPTION], so Question 11 holds. New ground (outside 160 m) has no such cells.
+- **The farm quest board (Question 9) is the first-day tips work** Ryan asked for: three starter jobs that teach water, check the probe, and first calibration. It can be built before the biomes, on today's map.
+- Everything else in §2 to §6 stands as proposed.
