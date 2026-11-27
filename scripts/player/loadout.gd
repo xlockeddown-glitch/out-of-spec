@@ -28,6 +28,8 @@ const DRIVE_KEYS: Array[StringName] = [&"speed", &"accel", &"brake", &"turn", &"
 ## accepts a rover pose only up to CoopRovers.REACH_MPS, and the base is 6 m/s. The best
 ## pair of parts gives 1.21; drive() clamps to this, so no table edit can pass it.
 const MAX_SPEED_FACTOR: float = 1.21
+## Matte roughness for generated tractor loadout look meshes [PLACEHOLDER].
+const LOOK_ROUGHNESS: float = 0.9
 
 ## Slot -> its four parts, the default first. A part: id, name, trade-off text (wheels
 ## and power only), the drive multipliers it changes, and its look: boxes of centre,
@@ -227,6 +229,31 @@ static func drive(parts: Variant) -> Dictionary:
 			out[key] = float(out[key]) * float(changes[key])
 	out[&"speed"] = minf(float(out[&"speed"]), MAX_SPEED_FACTOR)
 	return out
+
+
+## Builds the rover's LoadoutLook Node3D for the tractor slots (chassis, power, wheels)
+## in `parts`, or returns null when those parts add no look meshes.
+static func build_look(parts: Dictionary) -> Node3D:
+	var cleaned: Dictionary = clean(parts)
+	var specs: Array = []
+	for slot: StringName in [CHASSIS, POWER, WHEELS]:
+		specs.append_array(part(slot, cleaned[slot])["look"])
+	if specs.is_empty():
+		return null
+	var root := Node3D.new()
+	root.name = &"LoadoutLook"
+	for spec: Dictionary in specs:
+		var mesh := BoxMesh.new()
+		mesh.size = spec["size"]
+		var material := StandardMaterial3D.new()
+		material.albedo_color = spec["color"]
+		material.roughness = LOOK_ROUGHNESS
+		mesh.material = material
+		var box := MeshInstance3D.new()
+		box.mesh = mesh
+		box.position = spec["at"]
+		root.add_child(box)
+	return root
 
 
 ## "" or why a stored loadout (name and parts) can't be loaded. An unknown part is not a

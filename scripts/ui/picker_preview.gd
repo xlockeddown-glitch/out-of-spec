@@ -52,8 +52,6 @@ const WALKER_POSITION := Vector3(-1.15, 0.0, 0.25)
 const TRACTOR_POSITION := Vector3(0.55, 0.0, -0.1)
 ## Tractor voxel scale (0.1 m per voxel, matching main_farm) [PLACEHOLDER].
 const TRACTOR_SCALE: float = 0.1
-## Loadout look box roughness [PLACEHOLDER].
-const LOOK_ROUGHNESS: float = 0.9
 ## Caption font size, in pixels [PLACEHOLDER].
 const CAPTION_FONT_SIZE: int = 15
 ## Stat row font size, in pixels [PLACEHOLDER].
@@ -271,25 +269,9 @@ func _set_tractor_look(parts: Dictionary) -> void:
 		_tractor_look.get_parent().remove_child(_tractor_look)
 		_tractor_look.free()
 		_tractor_look = null
-	var specs: Array = []
-	for slot: StringName in [Loadout.CHASSIS, Loadout.POWER, Loadout.WHEELS]:
-		specs.append_array(Loadout.part(slot, parts[slot])["look"])
-	if specs.is_empty():
-		return
-	_tractor_look = Node3D.new()
-	_tractor_look.name = &"LoadoutLook"
-	for spec: Dictionary in specs:
-		var mesh := BoxMesh.new()
-		mesh.size = spec["size"]
-		var material := StandardMaterial3D.new()
-		material.albedo_color = spec["color"]
-		material.roughness = LOOK_ROUGHNESS
-		mesh.material = material
-		var box := MeshInstance3D.new()
-		box.mesh = mesh
-		box.position = spec["at"]
-		_tractor_look.add_child(box)
-	_tractor_root.add_child(_tractor_look)
+	_tractor_look = Loadout.build_look(parts)
+	if _tractor_look != null:
+		_tractor_root.add_child(_tractor_look)
 
 
 func _refresh_stats(parts: Dictionary) -> void:

@@ -56,6 +56,7 @@ func test_preview_shows_defaults_on_open() -> String:
 			if preview.stat_color(key) != ScopeTheme.INK_MUTED:
 				problem = "Default %s should use ScopeTheme.INK_MUTED." % key
 				break
+	picker.close()
 	_free(picker)
 	_restore(snap)
 	return problem
@@ -97,6 +98,7 @@ func test_cycling_parts_updates_3d_preview_and_combined_drive_stats() -> String:
 			problem = "Expected combined speed '%s19 %%', got '%s'." % [SP811.MINUS, preview.stat_text(&"speed")]
 		elif preview.stat_text(&"brake") != PickerPreview.BASE_TEXT:
 			problem = "Unchanged brake should stay Base, got '%s'." % preview.stat_text(&"brake")
+	picker.close()
 	_free(picker)
 	_restore(snap)
 	return problem
