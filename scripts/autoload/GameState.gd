@@ -3569,7 +3569,7 @@ func grant_shuttle_license() -> void:
 ## host's clock. Before anything else it checks the sender stands at the terminal
 ## (on foot there, or in the rover there) and that `people` are all here to go
 ## (players_present()); then Shuttle.trip_problem's reasons. A refusal takes no
-## fare. Phobos has a hub; Deimos has none yet, so its bookings are refused. Only the
+## fare. Phobos and Deimos have a hub (a moon with none is refused). Only the
 ## sender flies for now (people must be 1) [PLACEHOLDER: parties come later]. Booked
 ## means paid once from the shared wallet, the trip recorded (shuttle_trips) and the
 ## sender at the moon's hub: their place is the moon's and they are no longer on foot on
@@ -3634,7 +3634,7 @@ func _end_due_trips() -> void:
 
 ## Host: a traveller comes home. Their trip is over (nothing is charged), their place is
 ## the farm and they stand on foot beside the pad's terminal, a phone line says so, and
-## their screen goes back to the farm (the hub sees its trip end: Phobos hub script). A
+## their screen goes back to the farm (the hub sees its trip end: PhobosHub, which DeimosHub extends). A
 ## guest is told by the farm they have.
 func _return_traveller(player_id: String, line: String) -> void:
 	var moon: String = str(shuttle_trips.get(player_id, {}).get("moon", ""))
@@ -4475,7 +4475,7 @@ func report_place(place: String, depth: int, player_id: String = "") -> String:
 	if Shuttle.is_moon(place) and depth != 0:
 		return Shuttle.text("not_away_text")
 	# A moon is reached by booking the shuttle, never by a report.
-	if Shuttle.is_moon(place) and not shuttle_trips.has(player_id):
+	if Shuttle.is_moon(place) and str((shuttle_trips.get(player_id, {}) as Dictionary).get("moon", "")) != place:
 		return Shuttle.text("not_away_text")
 	if not Shuttle.is_moon(place) and shuttle_trips.has(player_id) and Shuttle.is_moon(place_of(player_id)):
 		return Shuttle.text("home_by_console_text")
