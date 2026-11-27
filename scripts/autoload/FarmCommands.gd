@@ -15,7 +15,7 @@ const ACTIONS: Array[StringName] = [
 ]
 ## What a player in bed may do and stay in bed: going to bed, paperwork, and
 ## saying where they are.
-const NO_WAKE: Array[StringName] = [&"go_to_bed", &"report_place", &"set_loadout", &"spend_xp_certificate"]
+const NO_WAKE: Array[StringName] = [&"buy_camp_supplies", &"go_to_bed", &"report_place", &"set_loadout", &"spend_xp_certificate"]
 ## What is done only in a zone. A late one from a player already carried out (a command
 ## in flight at the 02:00 rescue) is refused by the farm and must not wake them from the
 ## bed they were put in.

@@ -276,7 +276,9 @@ func _tell_hub() -> void:
 		FIND:
 			_hud.push_log("FIND: press " + Controls.prompt(&"interact") + " to take it.")
 		CAMP:
-			if GameState.camp_supplies > 0:
+			if CoopBeds.in_bed.has(GameState.local_player_id):
+				_hud.push_log("CAMP: you are asleep. Press %s to get up." % Controls.prompt(&"interact"))
+			elif GameState.camp_supplies > 0:
 				_hud.push_log("CAMP: press %s to sleep the night here (%d of supplies held)." % [Controls.prompt(&"interact"), GameState.camp_supplies])
 			else:
 				_hud.push_log("CAMP: press %s to buy a night's supplies (%d credits)." % [Controls.prompt(&"interact"), Camp.SUPPLY_COST_CREDITS])
@@ -403,11 +405,20 @@ func _camp_near() -> Dictionary:
 
 ## E at the camp: sleep the night if the farm holds supplies, else buy a night's (host-run).
 func _use_camp() -> void:
-	var buying: bool = GameState.camp_supplies < 1
-	var problem: String = await FarmCommands.request(&"buy_camp_supplies" if buying else &"go_to_bed", [])
+	var asleep: bool = CoopBeds.in_bed.has(GameState.local_player_id)
+	var buying: bool = GameState.camp_supplies < 1 and not asleep
+	var problem: String = ""
+	if asleep:
+		problem = await FarmCommands.request(&"get_up", [])
+	elif buying:
+		problem = await FarmCommands.request(&"buy_camp_supplies", [])
+	else:
+		problem = await FarmCommands.request(&"go_to_bed", [])
 	if not is_inside_tree():
 		return
-	if problem != "":
+	if asleep and problem == "":
+		_hud.push_log("CAMP: you get up.")
+	elif problem != "":
 		_hud.push_log("CAMP: " + problem)
 	elif buying:
 		_hud.push_log("CAMP: the farm bought a night's supplies for %d credits." % Camp.SUPPLY_COST_CREDITS)

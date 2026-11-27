@@ -346,6 +346,79 @@ func test_a_new_day_clears_the_campers() -> String:
 	return problem
 
 
+func test_the_camps_own_buy_does_not_wake_the_camper() -> String:
+	if not &"buy_camp_supplies" in FarmCommands.NO_WAKE:
+		return "The camp's own buy is a command that leaves a sleeper in bed"
+	return ""
+
+
+func test_getting_up_and_lying_down_again_the_same_night_costs_and_counts_nothing_more() -> String:
+	return _camp_farm(true, func(gs: GameStateScript, _beds: Node, _clock: Node) -> String:
+		gs.recall_in_tunnels = func() -> bool: return false
+		_hub(gs, [GUEST], Camp.position(ZONE), true, 2)
+		var problems: Array[String] = []
+		if gs.go_to_bed(GUEST) != "":
+			problems.append("The first night")
+		gs.get_up(GUEST)
+		if gs.is_camping(GUEST):
+			problems.append("Up, the guest is not camping")
+		var why: String = gs.go_to_bed(GUEST)
+		var counted: int = int(((gs.action_counts.get(GUEST, {}) as Dictionary).get(Camp.NIGHT_COUNT, {}) as Dictionary).get("count", 0))
+		if why != "" or gs.camp_supplies != 1:
+			problems.append("Back to bed costs nothing more: '%s', %d left" % [why, gs.camp_supplies])
+		if counted != 1:
+			problems.append("One night is counted once: %d" % counted)
+		if not gs.is_camping(GUEST):
+			problems.append("Back in bed, the guest is camping again")
+		# Away from the camp the second lie-down is still refused.
+		gs.get_up(GUEST)
+		gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, FAR)
+		if gs.go_to_bed(GUEST) == "":
+			problems.append("A paid camper far from the camp is still refused")
+		return "
+".join(problems))
+
+
+func test_a_refused_bed_gives_back_the_supply_and_the_night() -> String:
+	return _camp_farm(false, func(gs: GameStateScript, beds: Node, _clock: Node) -> String:
+		_hub(gs, [HOST], Camp.position(ZONE), true, 2)
+		beds._last_solo_msec = Time.get_ticks_msec()  # the solo cooldown refuses
+		var why: String = gs.go_to_bed(HOST)
+		var counted: int = int(((gs.action_counts.get(HOST, {}) as Dictionary).get(Camp.NIGHT_COUNT, {}) as Dictionary).get("count", 0))
+		var problems: Array[String] = []
+		if why == "":
+			problems.append("The cooldown refuses the bed")
+		if gs.camp_supplies != 2 or gs._campers.has(HOST) or counted != 0:
+			problems.append("Nothing is spent or counted: %d supplies, camper %s, %d nights" % [gs.camp_supplies, gs._campers.has(HOST), counted])
+		return "
+".join(problems))
+
+
+func test_after_a_camp_night_the_depth_reseeds_and_the_lab_drifts() -> String:
+	return _camp_farm(false, func(gs: GameStateScript, _beds: Node, _clock: Node) -> String:
+		_hub(gs, [HOST], Camp.position(ZONE))
+		gs.go_to_bed(HOST)
+		var drifted: bool = false
+		var before: Dictionary = {}
+		for id: Variant in gs.sensors:
+			before[id] = (gs.sensors[id] as DriftingSensor).error
+		gs._on_time_advanced(1.0)
+		for id: Variant in gs.sensors:
+			if not is_equal_approx((gs.sensors[id] as DriftingSensor).error, float(before[id])):
+				drifted = true
+		gs.rover_depth = 2
+		gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, FAR)
+		var epoch: int = gs.rover_epoch
+		gs._on_day_started(2)
+		var problems: Array[String] = []
+		if not drifted:
+			problems.append("The lab's instruments drift through a camp night")
+		if gs.rover_epoch == epoch:
+			problems.append("06:00 reseeds the depth the rover stands on")
+		return "
+".join(problems))
+
+
 # --- Save and the wire ------------------------------------------------------------------
 
 func test_the_camp_and_its_supplies_are_saved_and_an_old_save_loads() -> String:
@@ -365,12 +438,16 @@ func test_the_camp_and_its_supplies_are_saved_and_an_old_save_loads() -> String:
 		problems.append("An old save has a shut camp and no supplies")
 	var bad: Dictionary = data.duplicate(true)
 	bad["camps_open"] = ["nowhere"]
-	if _state().farm_from_dict(bad) == "":
+	var refused_zone: GameStateScript = _state()
+	if refused_zone.farm_from_dict(bad) == "":
 		problems.append("A camp in a zone with none is refused")
 	bad = data.duplicate(true)
 	bad["camp_supplies"] = 99
-	if _state().farm_from_dict(bad) == "":
+	var refused_supplies: GameStateScript = _state()
+	if refused_supplies.farm_from_dict(bad) == "":
 		problems.append("Too many supplies is refused")
+	refused_zone.free()
+	refused_supplies.free()
 	gs.free()
 	back.free()
 	past.free()
@@ -433,6 +510,15 @@ func test_taking_two_sunsets_opens_the_camp_and_one_night_completes_it() -> Stri
 		if not QuestEngine.is_done(gs, "two_sunsets", HOST):
 			problems.append("One night completes it")
 		return "\n".join(problems))
+
+
+func test_a_held_camp_quest_opens_its_camp_on_a_later_look() -> String:
+	return _camp_farm(false, func(gs: GameStateScript, _beds: Node, _clock: Node) -> String:
+		gs.lab_xp = gs.xp_for_level(5)
+		QuestEngine.update(gs, [HOST] as Array[String])
+		gs.camps_open.clear()  # a loaded or merged farm that holds the quest but not the camp
+		QuestEngine.update(gs, [HOST] as Array[String])
+		return "" if gs.camps_open.has(ZONE) else "A held, unfinished camp quest opens its camp")
 
 
 func test_a_camp_stays_shut_for_a_farm_that_took_no_quest() -> String:

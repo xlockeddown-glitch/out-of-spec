@@ -367,12 +367,13 @@ static func _update_one(farm: Node, quest: Dictionary, state: Dictionary, presen
 				return true
 			return false
 		state[id] = _accepted(farm, quest, present, owner)
-		# A quest that carries a camp opens that zone's camp for the farm once it is taken.
-		if quest.has(CAMP) and farm.has_method("open_camp"):
-			farm.open_camp(str(quest[CAMP]))
 	var entry: Dictionary = state[id]
 	if int(entry["done"]) >= 0:
 		return false
+	# A quest that carries a camp holds that zone's camp open for the farm while it is under
+	# way: on taking it, and on a look at a loaded or merged one (open_camp is idempotent).
+	if quest.has(CAMP) and farm.has_method("open_camp"):
+		farm.open_camp(str(quest[CAMP]))
 	var title: String = str(quest["title"])
 	var steps: Array = quest["steps"]
 	var done: Array = entry["steps_done"]
