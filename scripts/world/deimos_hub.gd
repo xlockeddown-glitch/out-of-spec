@@ -54,9 +54,9 @@ func _board_text() -> String:
 func _build_world() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = ScopeTheme.GLASS_DEEP.darkened(0.8)
+	env.background_color = MoonLook.DEIMOS_SKY
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = ScopeTheme.INK_MUTED
+	env.ambient_light_color = MoonLook.DEIMOS_AMBIENT
 	env.ambient_light_energy = 0.7
 	var world_env := WorldEnvironment.new()
 	world_env.name = "Sky"
@@ -67,7 +67,7 @@ func _build_world() -> void:
 	sun.rotation_degrees = Vector3(-42.0, -25.0, 0.0)
 	sun.light_energy = 1.0
 	add_child(sun)
-	# The deck: one flat slab, pale blue-grey, with tan dust drifted in patches.
+	# The deck: one flat slab, smoother pale blue-grey, with tan dust drifts and subtle craters.
 	var floor_body := StaticBody3D.new()
 	floor_body.name = "Deck"
 	floor_body.collision_layer = 1
@@ -78,39 +78,33 @@ func _build_world() -> void:
 	floor_shape.position.y = -0.5
 	floor_body.add_child(floor_shape)
 	add_child(floor_body)
-	add_child(_part("DeckPlate", Vector3(0.0, -0.05, 0.0), Vector3(72.0, 0.1, 72.0), ScopeTheme.INK_DIM.lightened(0.1)))
-	for dust: Vector3 in [Vector3(-12.0, 0.0, -14.0), Vector3(14.0, 0.0, 10.0), Vector3(-20.0, 0.0, 16.0), Vector3(2.0, 0.0, -24.0), Vector3(22.0, 0.0, -18.0)]:
-		add_child(_drum("Dust", Vector3(dust.x, 0.03, dust.z), 5.0, 0.04, ScopeTheme.ENAMEL_LIP.darkened(0.35), 14))
-	# A hex lander pad where the shuttle sits, with an amber edge strip.
-	add_child(_drum("Pad", Vector3(-14.0, 0.05, 1.0), 8.0, 0.1, ScopeTheme.SHADOW, 6))
-	add_child(_drum("PadRim", Vector3(-14.0, 0.02, 1.0), 8.6, 0.06, ScopeTheme.AMBER.darkened(0.3), 6))
+	add_child(_part("DeckPlate", Vector3(0.0, -0.05, 0.0), Vector3(72.0, 0.1, 72.0), MoonLook.DEIMOS_DECK))
+	var dust_spots: Array[Vector3] = [Vector3(-12.0, 0.0, -14.0), Vector3(14.0, 0.0, 10.0), Vector3(-20.0, 0.0, 16.0), Vector3(2.0, 0.0, -24.0), Vector3(22.0, 0.0, -18.0)]
+	for i: int in dust_spots.size():
+		var dust: Vector3 = dust_spots[i]
+		add_child(_drum("Dust", Vector3(dust.x, 0.03, dust.z), 5.0, 0.04, MoonLook.DEIMOS_DUST if i % 2 == 0 else MoonLook.DEIMOS_DUST_LIGHT, 14))
+	MoonLook.add_crater(self, Vector3(18.0, 0.0, 14.0), 3.4, MoonLook.DEIMOS_CRATER, MoonLook.DEIMOS_RIM, 201)
+	MoonLook.add_crater(self, Vector3(-24.0, 0.0, -18.0), 3.8, MoonLook.DEIMOS_CRATER, MoonLook.DEIMOS_RIM, 202)
+	MoonLook.add_outer_rocks(self, 202, MoonLook.DEIMOS_BOULDER, MoonLook.DEIMOS_RIM, true)
+	# A hex lander pad where the shuttle sits, with amber markings and approach beacons.
+	MoonLook.add_lander_pad(self, Vector3(-14.0, 0.0, 1.0), true)
 	# Mars: a flat-shaded sphere on the horizon, behind the outpost.
-	var mars := MeshInstance3D.new()
-	mars.name = "Mars"
-	var ball := SphereMesh.new()
-	ball.radius = 40.0
-	ball.height = 80.0
-	ball.radial_segments = 24
-	ball.rings = 12
-	mars.mesh = ball
-	var red := _flat(ScopeTheme.TERRA)
-	red.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mars.material_override = red
-	mars.position = Vector3(60.0, 14.0, -95.0)
-	add_child(mars)
-	# The parked shuttle: boxes, paler than at Phobos.
-	add_child(_part("ShuttleBody", Vector3(-14.0, 1.6, 1.0), Vector3(9.0, 3.2, 3.6), ScopeTheme.ENAMEL_TOP, true))
-	add_child(_part("ShuttleCockpit", Vector3(-19.2, 1.9, 1.0), Vector3(2.0, 2.0, 2.6), ScopeTheme.TEAL.darkened(0.55), true))
-	add_child(_part("ShuttleWingA", Vector3(-13.0, 0.5, -2.6), Vector3(4.0, 0.3, 3.0), ScopeTheme.ENAMEL_INSET, true))
-	add_child(_part("ShuttleWingB", Vector3(-13.0, 0.5, 4.6), Vector3(4.0, 0.3, 3.0), ScopeTheme.ENAMEL_INSET, true))
-	# The outpost hab: a small cream drum with a terracotta skirt, a door and a dish.
+	MoonLook.add_mars(self, Vector3(60.0, 14.0, -95.0), 40.0, MoonLook.DEIMOS_MARS)
+	# The parked shuttle: solid collision boxes, paler than at Phobos, plus visual details.
+	add_child(_part("ShuttleBody", Vector3(-14.0, 1.6, 1.0), Vector3(9.0, 3.2, 3.6), MoonLook.DEIMOS_HULL, true))
+	add_child(_part("ShuttleCockpit", Vector3(-19.2, 1.9, 1.0), Vector3(2.0, 2.0, 2.6), MoonLook.COCKPIT_GLASS, true))
+	add_child(_part("ShuttleWingA", Vector3(-13.0, 0.5, -2.6), Vector3(4.0, 0.3, 3.0), MoonLook.DEIMOS_WING, true))
+	add_child(_part("ShuttleWingB", Vector3(-13.0, 0.5, 4.6), Vector3(4.0, 0.3, 3.0), MoonLook.DEIMOS_WING, true))
+	MoonLook.add_shuttle_detail(self, MoonLook.DEIMOS_HULL, MoonLook.DEIMOS_WING)
+	# The outpost hab: a small cream drum with a terracotta skirt, structural ribs, a door and a dish.
 	var hab := Vector3(4.0, 0.0, -15.0)
-	add_child(_drum("HabSkirt", hab + Vector3(0.0, 0.7, 0.0), 4.6, 1.4, ScopeTheme.TERRA, 12, true))
-	add_child(_drum("HabBody", hab + Vector3(0.0, 2.4, 0.0), 4.4, 2.0, ScopeTheme.ENAMEL, 12, true))
-	add_child(_drum("HabRoof", hab + Vector3(0.0, 3.6, 0.0), 3.2, 0.5, ScopeTheme.ENAMEL_TOP, 12))
-	add_child(_part("HabDish", hab + Vector3(0.0, 4.3, 0.0), Vector3(1.4, 0.2, 1.4), ScopeTheme.INK_MUTED))
-	add_child(_part("HabDoor", hab + Vector3(-1.2, 1.3, 4.3), Vector3(1.0, 2.2, 0.2), ScopeTheme.INK_MUTED))
-	add_child(_part("HabPortA", hab + Vector3(1.8, 2.5, 4.0), Vector3(0.8, 0.8, 0.2), ScopeTheme.TEAL.darkened(0.5)))
+	add_child(_drum("HabSkirt", hab + Vector3(0.0, 0.7, 0.0), 4.6, 1.4, MoonLook.DEIMOS_HAB_SKIRT, 12, true))
+	add_child(_drum("HabBody", hab + Vector3(0.0, 2.4, 0.0), 4.4, 2.0, MoonLook.DEIMOS_HAB_BODY, 12, true))
+	add_child(_drum("HabRoof", hab + Vector3(0.0, 3.6, 0.0), 3.2, 0.5, MoonLook.DEIMOS_HAB_ROOF, 12))
+	add_child(_part("HabDish", hab + Vector3(0.0, 4.3, 0.0), Vector3(1.4, 0.2, 1.4), MoonLook.DEIMOS_AMBIENT))
+	add_child(_part("HabDoor", hab + Vector3(-1.2, 1.3, 4.3), Vector3(1.0, 2.2, 0.2), MoonLook.DEIMOS_AMBIENT))
+	add_child(_part("HabPortA", hab + Vector3(1.8, 2.5, 4.0), Vector3(0.8, 0.8, 0.2), MoonLook.COCKPIT_GLASS))
+	MoonLook.add_deimos_hab_detail(self, hab)
 	console_click = _make_console()
 	board_click = _make_board()
 	board_click.hint = Shuttle.text("deimos_hint_board")
@@ -150,12 +144,13 @@ func _drum(part_name: String, at: Vector3, radius: float, height: float, colour:
 ## The cache: ochre crates in a tidy stack with a small padlock, on a swept square.
 func _make_cache() -> Inspectable:
 	var at: Vector3 = DEIMOS_SPOTS["Cache"]
-	var ochre: Color = ScopeTheme.AMBER.darkened(0.4)
-	add_child(_part("CacheSwept", at + Vector3(0.0, 0.02, 0.0), Vector3(4.0, 0.04, 3.0), ScopeTheme.INK_DIM.lightened(0.25)))
+	var ochre: Color = MoonLook.DEIMOS_CACHE
+	add_child(_part("CacheSwept", at + Vector3(0.0, 0.02, 0.0), Vector3(4.0, 0.04, 3.0), MoonLook.DEIMOS_DUST_LIGHT))
 	add_child(_part("CrateA", at + Vector3(-0.7, 0.5, 0.0), Vector3(1.2, 1.0, 1.0), ochre, true))
 	add_child(_part("CrateB", at + Vector3(0.7, 0.45, 0.2), Vector3(1.0, 0.9, 1.0), ochre.darkened(0.15), true))
 	add_child(_part("CrateC", at + Vector3(0.0, 1.4, 0.0), Vector3(1.1, 0.8, 0.9), ochre.lightened(0.1)))
-	add_child(_part("CachePadlock", at + Vector3(-0.7, 0.7, 0.55), Vector3(0.22, 0.28, 0.1), ScopeTheme.TEAL))
+	add_child(_part("CachePadlock", at + Vector3(-0.7, 0.7, 0.55), Vector3(0.22, 0.28, 0.1), MoonLook.SCREEN_GLOW))
+	MoonLook.add_cache_detail(self, at)
 	var click: Inspectable = get_node("CacheSign") as Inspectable
 	_clickable(click, at + Vector3(0.0, 0.9, 0.0), Vector3(3.2, 2.0, 2.4), "")
 	return click
@@ -164,9 +159,10 @@ func _make_cache() -> Inspectable:
 ## The test pod: a pale capsule box with a fogged window, a warm glow at its foot.
 func _make_pod() -> Inspectable:
 	var at: Vector3 = DEIMOS_SPOTS["Pod"]
-	add_child(_part("PodShell", at + Vector3(0.0, 0.8, 0.0), Vector3(1.6, 1.6, 2.6), ScopeTheme.ENAMEL_TOP, true))
-	add_child(_part("PodGlass", at + Vector3(0.0, 1.0, 1.33), Vector3(1.0, 0.7, 0.08), ScopeTheme.INK_MUTED.lightened(0.3)))
-	add_child(_part("PodWarmth", at + Vector3(0.0, 0.1, 1.5), Vector3(1.2, 0.1, 0.5), ScopeTheme.AMBER))
+	add_child(_part("PodShell", at + Vector3(0.0, 0.8, 0.0), Vector3(1.6, 1.6, 2.6), MoonLook.CREAM, true))
+	add_child(_part("PodGlass", at + Vector3(0.0, 1.0, 1.33), Vector3(1.0, 0.7, 0.08), MoonLook.POD_GLASS))
+	add_child(_part("PodWarmth", at + Vector3(0.0, 0.1, 1.5), Vector3(1.2, 0.1, 0.5), MoonLook.WINDOW_GLOW))
+	MoonLook.add_pod_detail(self, at)
 	var click: Inspectable = get_node("PodSign") as Inspectable
 	_clickable(click, at + Vector3(0.0, 0.9, 0.5), Vector3(2.4, 1.8, 3.4), "")
 	return click

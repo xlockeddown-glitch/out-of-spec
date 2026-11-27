@@ -18,6 +18,10 @@ extends Node3D
 const REACH_M: float = 9.0
 ## Where the walker arrives, by the shuttle.
 const ARRIVE_AT := Vector3(-2.0, 0.0, 7.0)
+## Offset from the hatch when climbing back up from the service tunnel [PLACEHOLDER].
+const HATCH_ARRIVE_OFFSET := Vector3(-2.0, 0.0, 0.0)
+## Set by PhobosServiceTunnel when climbing back up the ladder.
+static var arrive_at_hatch: bool = false
 ## A trip not seen this long after the scene opened is taken as gone, so a screen that
 ## never got it is not stranded [PLACEHOLDER].
 const GRACE_S: float = 3.0
@@ -149,9 +153,9 @@ func _trip_not_seen() -> void:
 func _build_world() -> void:
 	var env := Environment.new()
 	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.0, 0.0, 0.01)
+	env.background_color = MoonLook.PHOBOS_SKY
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = Color(0.34, 0.33, 0.36)
+	env.ambient_light_color = MoonLook.PHOBOS_AMBIENT
 	env.ambient_light_energy = 0.8
 	var world_env := WorldEnvironment.new()
 	world_env.name = "Sky"
@@ -162,7 +166,7 @@ func _build_world() -> void:
 	sun.rotation_degrees = Vector3(-50.0, 30.0, 0.0)
 	sun.light_energy = 1.1
 	add_child(sun)
-	# The deck: one flat slab to stand on, with shallow darker craters on it.
+	# The deck: one flat slab to stand on, with shallow cratered basins and outer ridges.
 	var floor_body := StaticBody3D.new()
 	floor_body.name = "Deck"
 	floor_body.collision_layer = 1
@@ -173,41 +177,25 @@ func _build_world() -> void:
 	floor_shape.position.y = -0.5
 	floor_body.add_child(floor_shape)
 	add_child(floor_body)
-	add_child(_part("DeckPlate", Vector3(0.0, -0.05, 0.0), Vector3(72.0, 0.1, 72.0), Color(0.2, 0.2, 0.22)))
-	for crater: Vector3 in [Vector3(-14.0, 0.0, -16.0), Vector3(18.0, 0.0, 12.0), Vector3(-22.0, 0.0, 14.0), Vector3(6.0, 0.0, -24.0)]:
-		var pit := MeshInstance3D.new()
-		pit.name = "Crater"
-		var disc := CylinderMesh.new()
-		disc.top_radius = 4.0
-		disc.bottom_radius = 4.0
-		disc.height = 0.04
-		pit.mesh = disc
-		pit.material_override = _flat(Color(0.12, 0.12, 0.14))
-		pit.position = Vector3(crater.x, 0.03, crater.z)
-		add_child(pit)
+	add_child(_part("DeckPlate", Vector3(0.0, -0.05, 0.0), Vector3(72.0, 0.1, 72.0), MoonLook.PHOBOS_DECK))
+	var crater_spots: Array[Vector3] = [Vector3(-14.0, 0.0, -16.0), Vector3(18.0, 0.0, 12.0), Vector3(-22.0, 0.0, 14.0), Vector3(6.0, 0.0, -24.0)]
+	for i: int in crater_spots.size():
+		MoonLook.add_crater(self, crater_spots[i], 4.0, MoonLook.PHOBOS_CRATER, MoonLook.PHOBOS_RIM, 11 + i)
+	MoonLook.add_outer_rocks(self, 101, MoonLook.PHOBOS_BOULDER, MoonLook.PHOBOS_RIM, false)
+	MoonLook.add_lander_pad(self, Vector3(-14.0, 0.0, 1.0), false)
 	# Mars: a big flat-shaded sphere low on the horizon, behind the station.
-	var mars := MeshInstance3D.new()
-	mars.name = "Mars"
-	var ball := SphereMesh.new()
-	ball.radius = 60.0
-	ball.height = 120.0
-	ball.radial_segments = 24
-	ball.rings = 12
-	mars.mesh = ball
-	var red := _flat(Color(0.72, 0.34, 0.2))
-	red.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mars.material_override = red
-	mars.position = Vector3(-75.0, 12.0, -90.0)
-	add_child(mars)
-	# The parked shuttle: boxes.
-	add_child(_part("ShuttleBody", Vector3(-14.0, 1.6, 1.0), Vector3(9.0, 3.2, 3.6), Color(0.78, 0.78, 0.8), true))
-	add_child(_part("ShuttleCockpit", Vector3(-19.2, 1.9, 1.0), Vector3(2.0, 2.0, 2.6), Color(0.25, 0.4, 0.5), true))
-	add_child(_part("ShuttleWingA", Vector3(-13.0, 0.5, -2.6), Vector3(4.0, 0.3, 3.0), Color(0.6, 0.6, 0.64), true))
-	add_child(_part("ShuttleWingB", Vector3(-13.0, 0.5, 4.6), Vector3(4.0, 0.3, 3.0), Color(0.6, 0.6, 0.64), true))
-	# The station module and its door.
-	add_child(_part("Station", Vector3(2.0, 2.2, -14.0), Vector3(22.0, 4.4, 7.0), Color(0.52, 0.54, 0.58), true))
-	add_child(_part("StationDoor", Vector3(2.0, 1.4, -10.45), Vector3(2.2, 2.8, 0.2), Color(0.18, 0.2, 0.24)))
-	add_child(_part("StationDome", Vector3(8.0, 4.8, -14.0), Vector3(4.0, 1.2, 4.0), Color(0.62, 0.64, 0.68), true))
+	MoonLook.add_mars(self, Vector3(-75.0, 12.0, -90.0), 60.0, MoonLook.PHOBOS_MARS)
+	# The parked shuttle: solid collision boxes + visual details.
+	add_child(_part("ShuttleBody", Vector3(-14.0, 1.6, 1.0), Vector3(9.0, 3.2, 3.6), MoonLook.PHOBOS_HULL, true))
+	add_child(_part("ShuttleCockpit", Vector3(-19.2, 1.9, 1.0), Vector3(2.0, 2.0, 2.6), MoonLook.COCKPIT_GLASS, true))
+	add_child(_part("ShuttleWingA", Vector3(-13.0, 0.5, -2.6), Vector3(4.0, 0.3, 3.0), MoonLook.PHOBOS_WING, true))
+	add_child(_part("ShuttleWingB", Vector3(-13.0, 0.5, 4.6), Vector3(4.0, 0.3, 3.0), MoonLook.PHOBOS_WING, true))
+	MoonLook.add_shuttle_detail(self, MoonLook.PHOBOS_HULL, MoonLook.PHOBOS_WING)
+	# The station module, its door, and visual facade dressing.
+	add_child(_part("Station", Vector3(2.0, 2.2, -14.0), Vector3(22.0, 4.4, 7.0), MoonLook.PHOBOS_STATION, true))
+	add_child(_part("StationDoor", Vector3(2.0, 1.4, -10.45), Vector3(2.2, 2.8, 0.2), MoonLook.DARK_METAL))
+	add_child(_part("StationDome", Vector3(8.0, 4.8, -14.0), Vector3(4.0, 1.2, 4.0), MoonLook.PHOBOS_WING, true))
+	MoonLook.add_phobos_station_detail(self)
 	console_click = _make_console()
 	board_click = _make_board()
 	hook_click = _make_hook_sign()
@@ -227,7 +215,11 @@ func _build_walker() -> void:
 	walker.name = "Walker"
 	walker.camera = camera
 	add_child(walker)
-	walker.position = ARRIVE_AT
+	if arrive_at_hatch:
+		arrive_at_hatch = false
+		walker.position = SPOTS["Hatch"] + HATCH_ARRIVE_OFFSET
+	else:
+		walker.position = ARRIVE_AT
 	walker.model.set_suit(WalkerModel.suit_for(GameState.local_player_id, CoopSession.players))
 	_dress_walker()
 	GameState.loadouts_changed.connect(_dress_walker)
@@ -289,10 +281,7 @@ func _part(part_name: String, at: Vector3, size: Vector3, colour: Color, solid: 
 
 
 func _flat(colour: Color) -> StandardMaterial3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = colour
-	material.roughness = 1.0
-	return material
+	return TunnelLook.flat_mat(colour)
 
 
 ## A click target: layer 8, no mask, a box of `size` at `at`.
@@ -329,11 +318,12 @@ func _make_console() -> Clickable:
 	var root := Node3D.new()
 	root.name = "ConsoleDesk"
 	root.position = at
-	root.add_child(_part("Desk", Vector3(0.0, 0.5, 0.0), Vector3(1.4, 1.0, 0.7), Color(0.3, 0.32, 0.36), true))
-	var screen: Node3D = _part("Screen", Vector3(0.0, 1.3, -0.1), Vector3(1.2, 0.7, 0.06), Color(0.1, 0.4, 0.38))
+	root.add_child(_part("Desk", Vector3(0.0, 0.5, 0.0), Vector3(1.4, 1.0, 0.7), MoonLook.PHOBOS_STATION_TRIM, true))
+	var screen: Node3D = _part("Screen", Vector3(0.0, 1.3, -0.1), Vector3(1.2, 0.7, 0.06), MoonLook.COCKPIT_GLASS)
 	screen.rotation_degrees = Vector3(-12.0, 0.0, 0.0)
 	root.add_child(screen)
-	root.add_child(_label("RETURN SHUTTLE", Vector3(0.0, 1.3, -0.05), 40, Color(0.22, 0.88, 0.78)))
+	MoonLook.add_console_detail(root)
+	root.add_child(_label("RETURN SHUTTLE", Vector3(0.0, 1.3, -0.02), 40, MoonLook.SCREEN_GLOW))
 	add_child(root)
 	var click: Clickable = _clickable(Clickable.new(), at + Vector3(0.0, 0.9, 0.0), Vector3(1.5, 1.8, 0.9), Shuttle.text("hub_hint_console"))
 	click.name = "Console"
@@ -342,8 +332,9 @@ func _make_console() -> Clickable:
 
 func _make_board() -> Clickable:
 	var at: Vector3 = _spots()["Board"]
-	add_child(_part("BoardPanel", at + Vector3(0.0, 1.6, 0.0), Vector3(3.0, 1.8, 0.12), Color(0.25, 0.2, 0.14)))
-	add_child(_label(_board_painted(), at + Vector3(0.0, 1.6, 0.1), 24, Color(0.95, 0.9, 0.75)))
+	add_child(_part("BoardPanel", at + Vector3(0.0, 1.6, 0.0), Vector3(3.0, 1.8, 0.12), MoonLook.BOARD_WOOD))
+	MoonLook.add_board_detail(self, at)
+	add_child(_label(_board_painted(), at + Vector3(0.0, 1.6, 0.1), 24, MoonLook.CREAM))
 	var click: Clickable = _clickable(Clickable.new(), at + Vector3(0.0, 1.5, 0.0), Vector3(3.2, 2.2, 0.8), Shuttle.text("hub_hint_board"))
 	click.name = "Board"
 	return click
@@ -352,9 +343,10 @@ func _make_board() -> Clickable:
 func _make_hook_sign() -> Inspectable:
 	var at: Vector3 = SPOTS["HookSign"]
 	# A torn mesh grille low on the station wall, a pale shed skin caught in it.
-	add_child(_part("Grille", at + Vector3(0.0, 0.7, 0.0), Vector3(1.6, 1.0, 0.1), Color(0.14, 0.14, 0.16)))
-	add_child(_part("GrilleTear", at + Vector3(0.2, 0.55, 0.08), Vector3(0.7, 0.6, 0.05), Color(0.02, 0.02, 0.03)))
-	add_child(_part("ShedSkin", at + Vector3(0.9, 0.3, 0.35), Vector3(0.6, 0.18, 0.3), Color(0.93, 0.88, 0.7)))
+	add_child(_part("Grille", at + Vector3(0.0, 0.7, 0.0), Vector3(1.6, 1.0, 0.1), MoonLook.PHOBOS_BOULDER))
+	add_child(_part("GrilleTear", at + Vector3(0.2, 0.55, 0.08), Vector3(0.7, 0.6, 0.05), MoonLook.DARK_METAL))
+	add_child(_part("ShedSkin", at + Vector3(0.9, 0.3, 0.35), Vector3(0.6, 0.18, 0.3), MoonLook.SKIN_PALE))
+	MoonLook.add_hook_detail(self, at)
 	# The sign is placed in the scene file (its prop_id is data/props.json's); this
 	# gives it a shape and a place.
 	var click: Inspectable = get_node("HookSign") as Inspectable
@@ -364,8 +356,9 @@ func _make_hook_sign() -> Inspectable:
 
 func _make_hatch() -> Clickable:
 	var at: Vector3 = SPOTS["Hatch"]
-	add_child(_part("HatchPlate", at + Vector3(0.0, 0.06, 0.0), Vector3(2.4, 0.12, 2.4), Color(0.45, 0.4, 0.1)))
-	add_child(_part("HatchLid", at + Vector3(0.0, 0.14, 0.0), Vector3(2.0, 0.06, 2.0), Color(0.16, 0.16, 0.18)))
+	add_child(_part("HatchPlate", at + Vector3(0.0, 0.06, 0.0), Vector3(2.4, 0.12, 2.4), MoonLook.HATCH_RIM))
+	add_child(_part("HatchLid", at + Vector3(0.0, 0.14, 0.0), Vector3(2.0, 0.06, 2.0), MoonLook.PHOBOS_BOULDER))
+	MoonLook.add_hatch_detail(self, at)
 	var click: Clickable = _clickable(Clickable.new(), at + Vector3(0.0, 0.3, 0.0), Vector3(2.6, 0.8, 2.6), Shuttle.text("hub_hint_hatch"))
 	click.name = "Hatch"
 	return click
@@ -402,8 +395,16 @@ func _on_board() -> void:
 
 
 func _on_hatch() -> void:
-	if _near("Hatch"):
+	if _moon() != MOON:
 		_toast(Shuttle.text("hub_hatch_text"))
+		return
+	if not _near("Hatch") or _leaving:
+		return
+	_leaving = true
+	if change_scene.is_valid():
+		change_scene.call(PhobosServiceTunnel.SCENE_PATH)
+	else:
+		SceneSwitcher.go_to(PhobosServiceTunnel.SCENE_PATH)
 
 
 func _toast(text: String) -> void:
