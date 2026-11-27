@@ -9,6 +9,9 @@ extends RefCounted
 ## Palette derived from ScopeTheme (no raw hex literals) [PLACEHOLDER].
 const BASALT_DARK: Color = ScopeTheme.SHADOW
 const BASALT_MID: Color = ScopeTheme.GLASS_LINE
+## Wall and floor basalt tones meeting TunnelRock's luminance bands [PLACEHOLDER].
+const WALL_BASALT := Color(0.26, 0.29, 0.34)
+const FLOOR_BASALT := Color(0.35, 0.39, 0.45)
 const STEEL: Color = ScopeTheme.INK_DIM
 const TIMBER: Color = ScopeTheme.CARD_INK_MUTED
 const TIMBER_LIGHT: Color = ScopeTheme.ENAMEL_LIP

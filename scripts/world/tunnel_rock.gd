@@ -75,20 +75,34 @@ const ARCH_COURSES: int = 2
 const FADE_NEAR_M: float = 6.0  # [PLACEHOLDER]
 const FADE_ALPHA: float = 0.2  # [PLACEHOLDER]
 
-const BASALT := Color("#353c49")  # lighter than the first #232832 [PLACEHOLDER]
-const BASALT_FLOOR := Color("#495261")
+const BASALT: Color = TunnelLook.WALL_BASALT  # lighter than the first dark basalt [PLACEHOLDER]
+const BASALT_FLOOR: Color = TunnelLook.FLOOR_BASALT
 ## Tint ranges. Invariant (tested): arch stone < wall tints < floor tints in
 ## luminance, so pillars and the floor never blend and walls stay under the floor.
 const FLOOR_DARKEN_MAX: float = 0.14
 const WALL_LIGHTEN_MAX: float = 0.03
 const ARCH_DARKEN: float = 0.15
-const TEAL := Color("#38e1c6")
-const AMBER := Color("#f5a623")
+const TEAL: Color = ScopeTheme.TEAL
+const AMBER: Color = ScopeTheme.AMBER
+## Deterministic wall strata, regolith scree, and seam thresholds [PLACEHOLDER].
+const REGOLITH_BLEND_MAX: float = 0.24
+const SCREE_THRESHOLD: float = 0.76
+const SCREE_HEIGHT_M: float = 0.05
+const SCREE_FOOTPRINT_M: float = 0.34
+const SEAM_ICE_THRESHOLD: float = 0.90
+const SEAM_ORE_THRESHOLD: float = 0.84
+const SEAM_AQUIFER_ICE_THRESHOLD: float = 0.78
+const SEAM_BAND_HEIGHT_M: float = 0.26
+const ARCH_RIB_HEIGHT_M: float = 0.22
+const ARCH_GUSSET_HEIGHT_M: float = 0.24
+const ARCH_FADE_SPEED: float = 3.0
 
 @export var rover: Node3D
 
 ## Each arch's middle and the material of its lintel.
 var _lintels: Dictionary[Vector3, StandardMaterial3D] = {}
+## Extra fading materials per arch middle (timber overhead ribs) [PLACEHOLDER].
+var _lintel_trims: Dictionary[Vector3, StandardMaterial3D] = {}
 
 
 ## The map in use: the hub's MAP, or below it (ZoneDepth) the layout of the depth
@@ -246,8 +260,12 @@ func _process(delta: float) -> void:
 		return
 	for middle: Vector3 in _lintels:
 		var near: bool = middle.distance_to(rover.global_position) < FADE_NEAR_M
+		var target_alpha: float = FADE_ALPHA if near else 1.0
 		var material: StandardMaterial3D = _lintels[middle]
-		material.albedo_color.a = move_toward(material.albedo_color.a, FADE_ALPHA if near else 1.0, delta * 3.0)
+		material.albedo_color.a = move_toward(material.albedo_color.a, target_alpha, delta * ARCH_FADE_SPEED)
+		if _lintel_trims.has(middle):
+			var trim: StandardMaterial3D = _lintel_trims[middle]
+			trim.albedo_color.a = move_toward(trim.albedo_color.a, target_alpha, delta * ARCH_FADE_SPEED)
 
 
 ## Rock this near the floor is drawn; past it is dark.
@@ -358,12 +376,50 @@ func _build_blocks() -> void:
 						_add_hollow_blocks(part, half, rock, rock_colors)
 						continue
 					var top_m: float = 0.0
+					var aquifer: bool = ZoneDepth.local_zone == AquiferDepth.ZONE
+					var pick2: float = _hash(x * 13 + east * 5 + 3, y * 17 + south * 7 + 11)
 					var color: Color = BASALT_FLOOR.darkened(pick * FLOOR_DARKEN_MAX)
 					if kind == "#":
-						top_m = 0.5 + 0.35 * pick if _hides_floor(cell) else 2.2 + 1.2 * pick
+						var low_wall: bool = _hides_floor(cell)
+						top_m = 0.5 + 0.35 * pick if low_wall else 2.2 + 1.2 * pick
 						color = BASALT.lightened(pick * WALL_LIGHTEN_MAX)
-					rock.append(_block(part + Vector3.UP * (top_m - 1.0) * 0.5, Vector3(half, top_m + 1.0, half)))
-					rock_colors.append(color)
+						if low_wall:
+							rock.append(_block(part + Vector3.UP * (top_m - 1.0) * 0.5, Vector3(half, top_m + 1.0, half)))
+							rock_colors.append(color)
+						else:
+							# Banded basalt strata: dark base course, mid banded course, optional seam/cap [PLACEHOLDER].
+							var base_h: float = top_m * 0.42
+							var mid_h: float = top_m * 0.36
+							var cap_h: float = top_m - base_h - mid_h
+							rock.append(_block(part + Vector3.UP * (base_h - 1.0) * 0.5, Vector3(half, base_h + 1.0, half)))
+							rock_colors.append(color.darkened(0.10))
+							rock.append(_block(part + Vector3.UP * (base_h + mid_h * 0.5), Vector3(half * 0.99, mid_h, half * 0.99)))
+							var mid_col: Color = color if aquifer else color.lerp(TunnelLook.REGOLITH_DARK, pick2 * 0.18)
+							rock_colors.append(mid_col)
+							rock.append(_block(part + Vector3.UP * (base_h + mid_h + cap_h * 0.5), Vector3(half * 0.96, cap_h, half * 0.96)))
+							rock_colors.append(color.lightened(0.02))
+							# Occasional deterministic ice-seam or ore-vein wall stripe [PLACEHOLDER].
+							var ice_cut: float = SEAM_AQUIFER_ICE_THRESHOLD if aquifer else SEAM_ICE_THRESHOLD
+							if pick2 >= ice_cut:
+								rock.append(_block(part + Vector3.UP * (base_h + mid_h * 0.5), Vector3(half + 0.04, SEAM_BAND_HEIGHT_M, half + 0.04)))
+								rock_colors.append(TunnelLook.ICE)
+							elif not aquifer and pick2 >= SEAM_ORE_THRESHOLD:
+								rock.append(_block(part + Vector3.UP * (base_h + mid_h * 0.35), Vector3(half + 0.04, SEAM_BAND_HEIGHT_M, half + 0.04)))
+								rock_colors.append(TunnelLook.quartz_base_color())
+								rock.append(_block(part + Vector3.UP * (base_h + mid_h * 0.35), Vector3(half + 0.06, SEAM_BAND_HEIGHT_M * 0.45, half * 0.45)))
+								rock_colors.append(TEAL)
+					else:
+						# Packed regolith floor tint (kept cool in Aquifer) + occasional scree [PLACEHOLDER].
+						if not aquifer:
+							color = color.lerp(TunnelLook.REGOLITH_DARK, pick2 * REGOLITH_BLEND_MAX)
+						rock.append(_block(part + Vector3.UP * (top_m - 1.0) * 0.5, Vector3(half, top_m + 1.0, half)))
+						rock_colors.append(color)
+						if kind == "." and pick2 >= SCREE_THRESHOLD:
+							var ox: float = (pick - 0.5) * half * 0.45
+							var oz: float = (pick2 - 0.85) * half * 0.9
+							var scree_col: Color = TunnelLook.BASALT_MID if aquifer else TunnelLook.REGOLITH
+							rock.append(_block(part + Vector3(ox, SCREE_HEIGHT_M * 0.5, oz), Vector3(SCREE_FOOTPRINT_M, SCREE_HEIGHT_M, SCREE_FOOTPRINT_M * 0.85)))
+							rock_colors.append(scree_col)
 	var stone := StandardMaterial3D.new()
 	stone.vertex_color_use_as_albedo = true
 	stone.vertex_color_is_srgb = true
@@ -450,7 +506,24 @@ func _build_arch(cell: Vector2i, along: Vector2i) -> void:
 				step * reach_m + across * 2.0 + Vector3.UP * course_m, lintel)
 	_add_mesh(middle + Vector3.UP * (ARCH_HIGH_M - course_m * 0.5),
 		step * (width_m + PILLAR_M) + across * 2.0 + Vector3.UP * course_m, lintel)
+	# Overhead timber support rib & brass pillar brackets above ARCH_LOW_M [PLACEHOLDER].
+	var trim := StandardMaterial3D.new()
+	trim.albedo_color = TunnelLook.TIMBER
+	trim.roughness = TunnelLook.MATTE_ROUGHNESS
+	trim.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	trim.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_ALWAYS
+	var rib_root := Node3D.new()
+	rib_root.name = &"ArchRib"
+	rib_root.add_child(TunnelLook.part(TunnelLook.box(step * (width_m + PILLAR_M * 1.15) + across * 2.18 + Vector3.UP * ARCH_RIB_HEIGHT_M),
+		middle + Vector3.UP * (ARCH_HIGH_M + ARCH_RIB_HEIGHT_M * 0.4), trim))
+	var brass_mat: Material = TunnelLook.flat_mat(TunnelLook.BRASS)
+	for side: float in [-1.0, 1.0]:
+		var bracket_at: Vector3 = middle + step * side * width_m * 0.5 + Vector3.UP * (ARCH_LOW_M - ARCH_GUSSET_HEIGHT_M * 0.5)
+		rib_root.add_child(TunnelLook.part(TunnelLook.box(step * (PILLAR_M + 0.08) + across * 2.12 + Vector3.UP * ARCH_GUSSET_HEIGHT_M),
+			bracket_at, brass_mat))
+	add_child(rib_root)
 	_lintels[middle] = lintel
+	_lintel_trims[middle] = trim
 
 
 ## A model that stops the rover and, but for the low sump, the signal as rock does.
