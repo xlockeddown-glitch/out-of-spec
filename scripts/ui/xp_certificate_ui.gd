@@ -7,13 +7,14 @@ extends Control
 ## spends it; Esc or BACK takes the question back. The skills view (K) opens it;
 ## it has no key of its own.
 
-const TEAL: Color = Color("38E1C6")
-const TEXT: Color = Color(0.85, 0.95, 0.88)
-const DIM: Color = Color(0.6, 0.68, 0.63)
+const TEAL: Color = ScopeTheme.TEAL
+const TEXT: Color = ScopeTheme.INK
+const DIM: Color = ScopeTheme.INK_MUTED
 
 var _rows: VBoxContainer
 var _note: Label
 var _close_button: Button
+var _glyph: Label
 ## The certificate whose skills are listed; "" picks the first held.
 var _picked: String = ""
 ## The skill the player has clicked once and not yet confirmed, or "".
@@ -72,32 +73,53 @@ static func choice_text(row: Dictionary) -> String:
 
 func _ready() -> void:
 	add_to_group(QuestsUI.MODAL_GROUP)
+	theme = ScopeTheme.theme()
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var panel := PanelContainer.new()
+	panel.theme_type_variation = ScopeTheme.SHELL
 	panel.custom_minimum_size = Vector2(640, 0)
-	panel.add_theme_stylebox_override(&"panel", PlanBoardUI._panel_style())
 	center.add_child(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override(&"separation", 12)
 	panel.add_child(column)
-	column.add_child(PlanBoardUI._label("XP CERTIFICATES", TEAL, 30))
+	var header := PanelContainer.new()
+	header.theme_type_variation = ScopeTheme.HEADER
+	var title := Label.new()
+	title.text = "XP CERTIFICATES"
+	title.theme_type_variation = ScopeTheme.TITLE
+	title.add_theme_font_size_override(&"font_size", 30)
+	header.add_child(title)
+	column.add_child(header)
+	var glass := PanelContainer.new()
+	glass.theme_type_variation = ScopeTheme.GLASS
+	column.add_child(glass)
+	var inner := VBoxContainer.new()
+	inner.add_theme_constant_override(&"separation", 8)
+	glass.add_child(inner)
 	_rows = VBoxContainer.new()
 	_rows.add_theme_constant_override(&"separation", 6)
-	column.add_child(_rows)
-	_note = PlanBoardUI._label("", DIM, 16)
-	column.add_child(_note)
-	_close_button = PlanBoardUI._button("BACK  (%s)" % Controls.key_label(&"ui_cancel"))
+	inner.add_child(_rows)
+	_note = ScopeTheme.label("", DIM, 16)
+	inner.add_child(_note)
+	_close_button = ScopeTheme.button("BACK  (%s)" % Controls.key_label(&"ui_cancel"), 20)
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_close_button.pressed.connect(step_back)
+	_glyph = ScopeTheme.badge(&"ui_cancel")
+	_close_button.add_child(_glyph)
 	column.add_child(_close_button)
 	GameState.xp_certificates_changed.connect(_on_changed)
 	# A save loaded, or a host joined: another farm, and nothing of it spent here.
 	GameState.farm_loaded.connect(_on_farm_loaded)
 	hide()
+
+
+func _process(_delta: float) -> void:
+	if visible:
+		ScopeTheme.refresh_badge(_glyph)
 
 
 func open() -> void:
@@ -165,7 +187,7 @@ func _build_rows() -> void:
 	var held: Dictionary = spendable()
 	if held.is_empty():
 		_asked = ""
-		_rows.add_child(PlanBoardUI._label("You hold no XP certificate.", TEXT, 20))
+		_rows.add_child(ScopeTheme.label("You hold no XP certificate.", TEXT, 20))
 		return
 	if not held.has(_picked):
 		_picked = str(held.keys()[0])
@@ -173,15 +195,15 @@ func _build_rows() -> void:
 	# More than one held: pick which to spend.
 	if held.size() > 1:
 		for id: String in held:
-			var pick: Button = PlanBoardUI._button(("> " if id == _picked else "") + certificate_text(id, int(held[id])))
+			var pick: Button = ScopeTheme.button(("> " if id == _picked else "") + certificate_text(id, int(held[id])), 20)
 			pick.set_meta(&"row", "certificate " + id)
 			pick.pressed.connect(_pick.bind(id))
 			_rows.add_child(pick)
-	_rows.add_child(PlanBoardUI._label("Spend %s on one skill:" % certificate_text(_picked, int(held[_picked])), TEXT, 20))
+	_rows.add_child(ScopeTheme.label("Spend %s on one skill:" % certificate_text(_picked, int(held[_picked])), TEXT, 20))
 	for row: Dictionary in choices(GameState, _picked):
 		var skill: String = str(row["skill"])
 		var asked: bool = skill == _asked and row["problem"] == ""
-		var spend: Button = PlanBoardUI._button(confirm_text(row) if asked else choice_text(row))
+		var spend: Button = ScopeTheme.button(confirm_text(row) if asked else choice_text(row), 20)
 		spend.disabled = row["problem"] != ""
 		spend.set_meta(&"row", "skill " + skill)
 		if asked:

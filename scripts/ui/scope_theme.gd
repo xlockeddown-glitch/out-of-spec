@@ -182,6 +182,15 @@ static func _build() -> Theme:
 	for color_name: StringName in [&"font_color", &"font_hover_color", &"font_pressed_color", &"font_focus_color"]:
 		t.set_color(color_name, PHONE_KEY_OUTLINE, CARD_INK)
 	t.set_color(&"font_disabled_color", PHONE_KEY_OUTLINE, Color(CARD_INK, 0.45))
+	# Text fields on the glass: dark recessed box, teal focus ring [PLACEHOLDER].
+	t.set_stylebox(&"normal", &"LineEdit", box(GLASS_DEEP, GLASS_LINE, 2, 8, 10))
+	t.set_stylebox(&"read_only", &"LineEdit", box(GLASS_CARD, GLASS_LINE, 2, 8, 10))
+	t.set_stylebox(&"focus", &"LineEdit", focus_box(8))
+	t.set_color(&"font_color", &"LineEdit", INK)
+	t.set_color(&"font_placeholder_color", &"LineEdit", INK_DIM)
+	t.set_color(&"font_uneditable_color", &"LineEdit", INK_MUTED)
+	t.set_color(&"caret_color", &"LineEdit", TEAL)
+	t.set_color(&"selection_color", &"LineEdit", Color(TEAL, 0.3))
 	# The drop-down list.
 	t.set_stylebox(&"panel", &"PopupMenu", box(GLASS_DEEP, TEAL, 2, 6, 6))
 	t.set_stylebox(&"hover", &"PopupMenu", box(Color(TEAL, 0.25), TEAL, 0, 4, 4))
@@ -219,6 +228,24 @@ static func _button_styles(t: Theme, kind: StringName, face: Color, edge: Color,
 	t.set_color(&"font_pressed_color", kind, text)
 	t.set_color(&"font_focus_color", kind, text)
 	t.set_color(&"font_disabled_color", kind, text_off)
+
+
+## A word-wrapped Label in a ScopeTheme ink colour and font size.
+static func label(text: String, color: Color = INK, font_size: int = 18) -> Label:
+	var out := Label.new()
+	out.text = text
+	out.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	out.add_theme_color_override(&"font_color", color)
+	out.add_theme_font_size_override(&"font_size", font_size)
+	return out
+
+
+## A ScopeTheme button with the given label and font size.
+static func button(text: String, font_size: int = 20) -> Button:
+	var out := Button.new()
+	out.text = text
+	out.add_theme_font_size_override(&"font_size", font_size)
+	return out
 
 
 ## A tag: a bordered chip around one Label. The chip is a PanelContainer.
