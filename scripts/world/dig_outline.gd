@@ -1,8 +1,12 @@
 class_name DigOutline
 extends MeshInstance3D
-## A teal line around the cell a standing rover would dig or fill.
+## A line around the cell a dig would act on (the rover's dig_target(), the cell the
+## dig command digs). Teal when pressing dig would work, amber when it would be
+## refused (the rover's dig_problem(), the host's own rule). Hidden only when no dig
+## can be aimed: no rover on the farm's ground, away, or the player out on foot.
 
-const COLOR := Color("#38e1c6")
+enum State { HIDDEN, DIGGABLE, BLOCKED }
+
 ## How far above the ground, and how wide [PLACEHOLDER].
 const LIFT_M: float = 0.06
 const WIDTH_M: float = 0.08
@@ -10,8 +14,20 @@ const WIDTH_M: float = 0.08
 @export var rover: RoverController
 
 var _cell := Vector2i.MAX
+var _state: int = State.HIDDEN
 var _mesh := ImmediateMesh.new()
 var _material := StandardMaterial3D.new()
+
+
+## What the outline shows for this rover now. Also what the tests ask.
+static func state_of(of_rover: RoverController) -> int:
+	if of_rover == null or not of_rover.can_aim_dig():
+		return State.HIDDEN
+	return State.DIGGABLE if of_rover.dig_problem() == "" else State.BLOCKED
+
+
+static func color_of(state: int) -> Color:
+	return ScopeTheme.TEAL if state == State.DIGGABLE else ScopeTheme.AMBER
 
 
 func _ready() -> void:
@@ -19,18 +35,20 @@ func _ready() -> void:
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-	_material.albedo_color = COLOR
+	_material.albedo_color = color_of(State.DIGGABLE)
 	GameState.terrain_changed.connect(_forget)
 
 
 func _process(_delta: float) -> void:
-	var cell: Vector2i = rover.dig_cell()
-	visible = (
-		rover.visible and rover.is_stopped() and Terrain.can_dig(cell) and not HillDressing.is_at_rock(cell) and not Terrain.is_near_water(cell)
-		and not CoopWalkers.on_foot()
-		and (not (BiomeMarkers.is_blocked_cell(cell) or BiomeData.is_road_cell(cell)) or GameState.dug.has(cell) or GameState.is_live_pocket(cell))
-	)
-	if visible and cell != _cell:
+	var state: int = state_of(rover)
+	visible = state != State.HIDDEN
+	if not visible:
+		return
+	if state != _state:
+		_state = state
+		_material.albedo_color = color_of(state)
+	var cell: Vector2i = rover.dig_target()
+	if cell != _cell:
 		_cell = cell
 		_draw()
 

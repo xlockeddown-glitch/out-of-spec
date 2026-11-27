@@ -556,6 +556,8 @@ func _ready() -> void:
 	# busy setting up autoloads, so the node is added a moment later.
 	Controls.install_observer.call_deferred(get_tree())
 	_set_up_farm(_new_seed())
+	for changed: Signal in [terrain_changed, stone_changed, pockets_changed, farm_loaded]:
+		changed.connect(_forget_pad_problems)
 	GameClock.time_advanced.connect(_on_time_advanced)
 	GameClock.clock_ran.connect(_tick_molt)
 	GameClock.day_started.connect(_on_day_started)
@@ -725,6 +727,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
+	"_pad_problems",
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
 	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players",
@@ -7002,12 +7005,7 @@ func is_live_pocket(at: Vector2i) -> bool:
 ## gets Earthworks XP for a step deeper than the cell has been, and for a block.
 func dig(cell: Vector3i, player_id: String = "") -> String:
 	var at := Vector2i(cell.x, cell.z)
-	var pocket: bool = not found_pockets.has(at) and (at in OrePocket.cells(world_seed) or at in new_pockets)
-	var problem: String = Terrain.dig_problem(at, dug, pocket) if cell.y == 0 else "This ground can't be dug."
-	if stone_pieces.has(at):
-		problem = STONE_IN_THE_WAY
-	if problem == "" and cell.y == 0:
-		problem = StonePieces.dig_beside_pad_problem(at, dug)
+	var problem: String = dig_problem(at) if cell.y == 0 else "This ground can't be dug."
 	if problem == "":
 		dug[at] = dug.get(at, 0) + 1
 		if dug[at] > dug_paid.get(at, 0):
@@ -7031,6 +7029,32 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 
 
 const STONE_IN_THE_WAY: String = "Stone is built here. Take it up first."
+
+
+## Why a cell can't be dug one step deeper now, or "". The one rule: dig() answers
+## with it and the dig outline lights the cell by it, so the outline is teal exactly
+## when the dig would work.
+## `cached` (the outline, every frame) reuses the beside-the-pad answer, which
+## copies the dug cells, until the ground, the stone or the pockets change.
+func dig_problem(at: Vector2i, cached: bool = false) -> String:
+	if stone_pieces.has(at):
+		return STONE_IN_THE_WAY
+	var pocket: bool = not found_pockets.has(at) and (at in OrePocket.cells(world_seed) or at in new_pockets)
+	var problem: String = Terrain.dig_problem(at, dug, pocket)
+	if problem != "":
+		return problem
+	if not cached:
+		return StonePieces.dig_beside_pad_problem(at, dug)
+	if not _pad_problems.has(at):
+		_pad_problems[at] = StonePieces.dig_beside_pad_problem(at, dug)
+	return _pad_problems[at]
+
+
+var _pad_problems: Dictionary[Vector2i, String] = {}
+
+
+func _forget_pad_problems() -> void:
+	_pad_problems.clear()
 
 
 ## Builds a piece of `kind` (StonePieces) on a cell of Terrain (y = 0), or with

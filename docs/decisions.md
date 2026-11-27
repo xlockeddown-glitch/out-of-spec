@@ -2300,3 +2300,14 @@ Ryan picked "Mix": keep the putty case and terracotta band, and put cream cards 
 - **Hint line.** Farm HoverHint is centred, 30 px (was 22, left), Scope INK from `ScopeTheme` (no hex in the scene), 8 px outline.
 - **Not covered yet.** No prompt for joining an away rover in the tunnels, nor for the farm airlock; other dome clickables read "Use".
 - **Placeholders.** Label 28 px, 8 px outline, 56 px above the point, 24 px from the edge, 2.2 m above the spot's ground; the verb words above; hint 30 px.
+
+## Digging: always light the cell that will be dug (2026-11-27, feat/dig-highlight)
+
+- **Ask.** Ryan's playtest: he could not tell which cell a dig would hit, and the outline vanished in places, which read as "can't dig".
+- **One cell, one rule.** `RoverController.dig_target()` is the cell a dig acts on: the cell a dig in flight was pressed for, else the one 2 m ahead (`dig_cell()`). The DIG command records it when the key is pressed and digs that cell when it lands; `DigOutline` lights the same call. No second picker. Keys, mouse and pad all press the same action, so the cell is the same for each.
+- **Two states, hidden only when no dig can be aimed.** `GameState.dig_problem(cell)` is the host's own rule, now shared: `dig()` answers with it and the outline asks it. Teal (`ScopeTheme.TEAL`) when it says "", amber (`ScopeTheme.AMBER`) when it gives a reason (stone built, pad, road, rock, water, full depth, dig around first, steep beside a pad) or the rover rolls faster than the allowance. Hidden only when the rover is out of view, away, has no ground, or the player is on foot. Red is not used: nothing here is a failed action.
+- **Small movement keeps the dig.** A dig in flight holds while the rover is within `dig_drift_m` of where the key was pressed and rolls no faster than `dig_drift_speed_mps` when it lands; farther, it is dropped at once with "You moved away. Dig cancelled." A dig on landing is still the host's call (`FarmCommands` `dig`), with its usual reach check. Fill and stone still need a full stop.
+- **Not done.** No "[key] Dig" in the verb prompt: the rover would be offered a dig nearly everywhere it stands, which is noise, and `verb_target()` tests expect no verb on open ground.
+- **Save and protocol.** None changed.
+- **Placeholders.** Drift 0.75 m, landing speed 0.6 m/s (was: full stop, 0.05 m/s), outline lift 6 cm, width 8 cm (as before).
+- **Review fixes (Fable, PR 231).** Each press records the cell in front and the rover's place at that press (no chaining of a stale cell with a fresh origin); the outline shows the dig that lands first. Several digs drifting out together say "You moved away" once. The outline's beside-the-pad answer is cached by cell and cleared on terrain, stone, pocket and farm-load changes (`GameState._pad_problems`, not saved), so no per-frame copy of the dug cells. The keys-and-pad test was dropped: the cell does not read the device, so it could not fail.
