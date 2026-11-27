@@ -778,24 +778,9 @@ func _refresh_loadout() -> void:
 		_look_node.get_parent().remove_child(_look_node)
 		_look_node.free()
 		_look_node = null
-	var specs: Array = []
-	for slot: StringName in [Loadout.CHASSIS, Loadout.POWER, Loadout.WHEELS]:
-		specs.append_array(Loadout.part(slot, parts[slot])["look"])
-	if specs.is_empty():
+	_look_node = Loadout.build_look(parts)
+	if _look_node == null:
 		return
-	_look_node = Node3D.new()
-	_look_node.name = "LoadoutLook"
-	for spec: Dictionary in specs:
-		var mesh := BoxMesh.new()
-		mesh.size = spec["size"]
-		var material := StandardMaterial3D.new()
-		material.albedo_color = spec["color"]
-		material.roughness = 0.9
-		mesh.material = material
-		var box := MeshInstance3D.new()
-		box.mesh = mesh
-		box.position = spec["at"]
-		_look_node.add_child(box)
 	(_visual if _visual != null else self).add_child(_look_node)
 
 

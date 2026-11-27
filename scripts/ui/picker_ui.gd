@@ -17,6 +17,8 @@ const BACK_TEXT: String = "CLOSE"
 const NO_TRADE_OFF: String = "A look only. It does not change driving."
 const SLOT_WIDTH: float = 190.0
 const PART_WIDTH: float = 330.0
+const PANEL_WIDTH: float = 1220.0
+const BODY_SEPARATION: int = 14
 
 ## Set when a new farm starts: the next picker opens once on its own, then clears this.
 static var offer_next: bool = false
@@ -27,6 +29,7 @@ var _part_labels: Dictionary[StringName, Label] = {}
 var _trade_labels: Dictionary[StringName, Label] = {}
 var _prev_buttons: Dictionary[StringName, Button] = {}
 var _next_buttons: Dictionary[StringName, Button] = {}
+var _preview: PickerPreview
 var _note: Label
 var _apply_button: Button
 var _close_button: Button
@@ -47,7 +50,7 @@ func _ready() -> void:
 	add_child(center)
 	var panel := PanelContainer.new()
 	panel.theme_type_variation = ScopeTheme.SHELL
-	panel.custom_minimum_size = Vector2(980, 0)
+	panel.custom_minimum_size = Vector2(PANEL_WIDTH, 0)
 	center.add_child(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override(&"separation", 12)
@@ -60,9 +63,15 @@ func _ready() -> void:
 	title.add_theme_font_size_override(&"font_size", 30)
 	header.add_child(title)
 	column.add_child(header)
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override(&"separation", BODY_SEPARATION)
+	column.add_child(body)
 	var card := PanelContainer.new()
 	card.theme_type_variation = ScopeTheme.PHONE_CARD
-	column.add_child(card)
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(card)
+	_preview = PickerPreview.new()
+	body.add_child(_preview)
 	var rows := VBoxContainer.new()
 	rows.add_theme_constant_override(&"separation", 10)
 	card.add_child(rows)
@@ -233,6 +242,8 @@ func _show_parts() -> void:
 		_part_labels[slot].text = String(entry["name"])
 		var trade: String = String(entry["trade_off"])
 		_trade_labels[slot].text = trade if trade != "" else NO_TRADE_OFF
+	if _preview != null:
+		_preview.show_loadout(_parts)
 
 
 ## Asks for the picked loadout and name. Returns the refusal, or "" when it was taken;
