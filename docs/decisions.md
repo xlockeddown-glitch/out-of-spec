@@ -2,6 +2,15 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: Dome gamepad pointer (feat/dome-pad)
+
+Moved the dome's gamepad selection logic out of `dome_interior.gd` into a dedicated `DomePadPointer` node (`scripts/dome/dome_pad_pointer.gd`) and added additive `set_hover(on)` and `activate()` methods on `Clickable` (`scripts/world/clickable.gd`) shared by both mouse and pad paths so farm and Phobos Clickables are unchanged.
+
+- **Selection rule:** screen-space directional nearest. When nothing is picked, steps to the usable on-screen Clickable closest to the viewport centre; from a picked Clickable, steps to the candidate strictly in the pressed D-pad or left-stick direction (`along > 1.0`) with minimum `along + |perp| * OFF_LINE_COST`.
+- **Hover, activate, and pause/restore:** `DomePadPointer` calls `Clickable.set_hover(true/false)` only on selection changes, pause, or resume (no per-frame rebuilds), and `dome_interior.gd` only updates `_hint_label.text` when the text changes. Pad accept (`interact` / `ui_accept`) calls `Clickable.activate()`. Opening any modal panel (`QuestsUI.other_panel_open`) pauses the selection (clears hover and ignores pad input); closing it restores the previous selection and hover if still valid.
+- **[PLACEHOLDER] tuning constants (in `DomePadPointer`):** `STICK_STEP = 0.6` (left-stick push threshold), `STICK_REST = 0.35` (return-to-rest hysteresis; one step per push, no auto-repeat delay), `OFF_LINE_COST = 2.0` (perpendicular screen-space penalty), and `MOUSE_TAKEOVER_PX = 6.0` (cumulative mouse travel before mouse reclaims hover/hint).
+- **Tests:** added `tests/test_dome_pad.gd` covering `DomePadPointer` creation, D-pad/stick stepping and `Clickable.hovered` sync, pad accept vs mouse click parity through `activate()`, panel open pause and close restore, mouse hover/click compatibility, and idle stability.
+
 ## 2026-11-27: Colony Mine look (feat/mine-look)
 
 Gave the Abandoned Colony Mine (`scripts/world/colony_mine.gd`, `scripts/world/mine_rock.gd`, `scenes/colony_mine.tscn`) its own abandoned-mine look via a new static helper class `MineLook` (`scripts/world/mine_look.gd`), without touching `TunnelRock`, `TunnelLook`, `MineDepth`, `GameState`, or any gameplay/collider rules. Every colour, size, placement, and hash choice below is a [PLACEHOLDER]:
