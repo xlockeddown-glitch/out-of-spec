@@ -347,5 +347,5 @@ func test_an_old_save_with_digging_and_stone_on_a_road_loads_and_can_be_put_righ
 	return bad
 
 
-func test_the_protocol_is_30() -> String:
-	return "" if CoopSession.PROTOCOL == 30 else "The protocol is %d, not 30." % CoopSession.PROTOCOL
+func test_the_protocol_is_31() -> String:
+	return "" if CoopSession.PROTOCOL == 31 else "The protocol is %d, not 31." % CoopSession.PROTOCOL

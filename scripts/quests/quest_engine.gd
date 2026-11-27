@@ -142,6 +142,8 @@ const BLOCKS_FOUND: String = "blocks_found"
 ## A `counter` that ends with this adds up every count whose name starts with
 ## what is before it: "check_with_block:*" is a check of any instrument.
 const ANY_SUFFIX: String = "*"
+## A reward that gives the farm the shuttle license (Shuttle). Farm quests only.
+const SHUTTLE_LICENSE: String = "shuttle_license"
 ## A reward of a keepsake: its id in the data's KEEPSAKES. Cosmetic only.
 const KEEPSAKE: String = "keepsake"
 const KEEPSAKES: String = "keepsakes"
@@ -491,6 +493,8 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 		for player: String in players:
 			var points: Dictionary = farm.quest_points.get_or_add(player, {})
 			points[str(quest["id"])] = maxi(int(rewards["quest_points"]), int(points.get(str(quest["id"]), 0)))
+	if rewards.get(SHUTTLE_LICENSE, false) is bool and rewards.get(SHUTTLE_LICENSE, false):
+		farm.grant_shuttle_license()
 	# One each, held until its player spends it (GameState.spend_xp_certificate).
 	# A player who holds or has spent this quest's certificate, here or on another
 	# farm, is not given it again.
@@ -569,6 +573,8 @@ static func reward_text(quest: Dictionary) -> String:
 		parts.append("%s quest %s" % [SP811.integer(points), "point" if points == 1 else "points"])
 	if int(rewards.get(XP_CERTIFICATE, 0)) > 0:
 		parts.append("an XP certificate (%s XP)" % SP811.integer(int(rewards[XP_CERTIFICATE])))
+	if rewards.get(SHUTTLE_LICENSE, false) is bool and rewards.get(SHUTTLE_LICENSE, false):
+		parts.append("the shuttle license")
 	if keepsake_name(str(rewards.get(KEEPSAKE, ""))) != "":
 		parts.append("a keepsake (%s)" % keepsake_name(str(rewards[KEEPSAKE])))
 	if one_use_name(str(rewards.get(ONE_USE, ""))) != "":
@@ -751,6 +757,12 @@ static func data_problem(quest: Dictionary) -> String:
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:
 		if quest.has(key) and not quest[key] is Dictionary:
 			return "'%s' is not a dictionary." % key
+	if (quest.get("rewards", {}) as Dictionary).has(SHUTTLE_LICENSE):
+		var license: Variant = (quest["rewards"] as Dictionary)[SHUTTLE_LICENSE]
+		if typeof(license) != TYPE_BOOL or not license:
+			return "its shuttle_license reward is not true."
+		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_FARM or is_daily(quest):
+			return "the shuttle license is the farm's: a farm quest that is not a daily ask."
 	var keepsake: Variant = (quest.get("rewards", {}) as Dictionary).get(KEEPSAKE)
 	if keepsake != null:
 		if not keepsake is String or not DataManager.has_record(TABLE, keepsake, KEEPSAKES):
