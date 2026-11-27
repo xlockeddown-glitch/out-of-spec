@@ -32,6 +32,32 @@ const TORQUE_TO_SPEC: String = "torque_to_spec"
 ## The games played at the bench before ZERO / CALIBRATE. Which one an
 ## instrument gets is game_for(); a quest step may name either.
 const BENCH_GAMES: Array[String] = [SET_THE_ZERO, HOLD_THE_READING]
+## Instrument-kind games [PLACEHOLDER: which kinds]. They score like Set the Zero
+## (the as-left residual) and are a way to play it, so game_for() and the
+## quests never see them: only the bench's daily pick (bench_game) does.
+const FIXED_POINTS: String = "fixed_points"
+const PUMP_TO_POINTS: String = "pump_to_points"
+## The extra games an instrument kind can play at the bench in place of Set the
+## Zero, by instrument_type(): a thermometer reads fixed points, a pressure gauge
+## is pumped to test points. A kind not listed keeps its one game.
+const KIND_GAMES: Dictionary = {
+	"terrarium_thermometer": [FIXED_POINTS],
+	"rover_tire_pressure": [PUMP_TO_POINTS],
+	"dome_pressure": [PUMP_TO_POINTS],
+}
+## The word a game's result starts with, and its name on the bench.
+const GAME_LABELS: Dictionary = {
+	SET_THE_ZERO: "Zero",
+	HOLD_THE_READING: "Hold",
+	FIXED_POINTS: "Fixed",
+	PUMP_TO_POINTS: "Pump",
+}
+const GAME_NAMES: Dictionary = {
+	SET_THE_ZERO: "Set the Zero",
+	HOLD_THE_READING: "Hold the Reading",
+	FIXED_POINTS: "Fixed Points",
+	PUMP_TO_POINTS: "Pump to Points",
+}
 ## The standards that settle (section 7.1: "humidity generator, pressure
 ## controller"). A unit calibrated against one of these plays Hold the Reading
 ## in place of Set the Zero [ASSUMPTION: these two ids, and units only].
@@ -86,6 +112,41 @@ static func game_for(farm: Node, instrument_id: String) -> String:
 	if sensor != null and sensor.role != "standard" and sensor.calibrated_by in SETTLING_STANDARDS:
 		return HOLD_THE_READING
 	return SET_THE_ZERO
+
+
+## The games the bench can show for this instrument: its game_for() game, and,
+## for a unit that would play Set the Zero, the extra games of its kind.
+static func games_for_bench(farm: Node, instrument_id: String) -> Array[String]:
+	var base: String = game_for(farm, instrument_id)
+	var games: Array[String] = [base]
+	if base == SET_THE_ZERO:
+		for extra: String in KIND_GAMES.get(instrument_type(instrument_id), []):
+			games.append(extra)
+	return games
+
+
+## A number from an instrument id, the same on every machine (not String.hash,
+## which a build may change).
+static func id_offset(instrument_id: String) -> int:
+	var h: int = 2166136261
+	for byte: int in instrument_id.to_utf8_buffer():
+		h = ((h ^ byte) * 16777619) & 0xFFFFFFFF
+	return h
+
+
+## Today's bench game for this instrument: the day number plus the instrument's
+## own offset picks one of games_for_bench(), so every machine agrees, each game
+## comes round in turn, and two instruments do not share a day's pattern. An
+## instrument with one game keeps it. No new save data: the day is the clock's,
+## which a guest takes from the host.
+static func bench_game(farm: Node, instrument_id: String, day: int = GameClock.get_day_index()) -> String:
+	var games: Array[String] = games_for_bench(farm, instrument_id)
+	return games[posmod(day + id_offset(instrument_id), games.size())]
+
+
+## The bench's name for a game.
+static func game_name(game: String) -> String:
+	return str(GAME_NAMES.get(game, game))
 
 
 ## The bench games this instrument can play by the data alone, with no farm:
@@ -152,6 +213,7 @@ const NOT_COUNTED_TEXT: String = "Score not counted (not a key moment)."
 ## Hold the Reading: "Hold score 97 of 100: REFERENCE, your share of the
 ## uncertainty 60 % smaller."
 static func result_text(score: int, game: String = SET_THE_ZERO) -> String:
+	# Fixed Points and Pump to Points score as Set the Zero does, and read as it.
 	if score < 0:
 		return ""
 	var factor: float = residual_factor(score)
@@ -161,7 +223,7 @@ static func result_text(score: int, game: String = SET_THE_ZERO) -> String:
 		gain = ", your share of the uncertainty %d %% smaller" % roundi((1.0 - factor) * 100.0)
 	elif factor < 1.0:
 		gain = ", as-left residual %d %% of standard" % roundi(factor * 100.0)
-	return "%s score %d of %d: %s%s." % ["Hold" if hold else "Zero", score, MAX_SCORE, grade_name(score).to_upper(), gain]
+	return "%s score %d of %d: %s%s." % [GAME_LABELS.get(game, "Zero"), score, MAX_SCORE, grade_name(score).to_upper(), gain]
 
 
 ## The kind of instrument: a robot's sensor ("laser@TR-1") is its sensor's kind.

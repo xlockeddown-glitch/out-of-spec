@@ -1,9 +1,11 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/cal_bench_ui.gd" id="1_bench"]
 [ext_resource type="Script" path="res://scripts/ui/band_meter.gd" id="2_meter"]
 [ext_resource type="PackedScene" path="res://ui/minigames/set_the_zero.tscn" id="3_zero"]
 [ext_resource type="PackedScene" path="res://ui/minigames/hold_the_reading.tscn" id="4_hold"]
+[ext_resource type="PackedScene" path="res://ui/minigames/fixed_points.tscn" id="5_fixed"]
+[ext_resource type="PackedScene" path="res://ui/minigames/pump_to_points.tscn" id="6_pump"]
 
 [node name="CalBenchUI" type="Control"]
 layout_mode = 3
@@ -241,6 +243,16 @@ visible = false
 layout_mode = 1
 
 [node name="HoldGame" parent="." instance=ExtResource("4_hold")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+
+[node name="FixedGame" parent="." instance=ExtResource("5_fixed")]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+
+[node name="PumpGame" parent="." instance=ExtResource("6_pump")]
 unique_name_in_owner = true
 visible = false
 layout_mode = 1
