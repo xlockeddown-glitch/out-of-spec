@@ -104,6 +104,10 @@ const STATES: Array[String] = ["contract_state"]
 const LOGS: Dictionary = { "cal_log": "cal_log", "job_log": "job_log", "audit_log": "audit_log", "certificates": "certificate_log", "oirm_trips": "oirm_trips" }
 ## Checks that count from the day the quest was accepted, unless `ever`.
 const COUNTING: Array[String] = ["count", "counter"]
+## The quest key that puts a quest on the farm notice board (NoticeBoard), and the
+## step key that names an input action for the board to show the key of.
+const BOARD_KEY: String = "board"
+const PROMPT_KEY: String = "prompt"
 ## The checks check_value() knows: what a step's `check` may be, and with
 ## `always` and `day_at_least` (WHENS) what a `when` may be.
 const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due", "beacons_placed"]
@@ -710,6 +714,11 @@ static func data_problem(quest: Dictionary) -> String:
 	for step: Variant in steps:
 		if str(step.get("check", "")) == "beacons_placed" and step_need(step) > LavaHub.SPOTS.size():
 			return "step '%s' wants more beacons than there are spots." % str(step.get("id", ""))
+	if quest.has(BOARD_KEY) and quest[BOARD_KEY] != NoticeBoard.FARM:
+		return "its board is not one there is (farm)."
+	for step: Variant in steps:
+		if step.has(PROMPT_KEY) and (not step[PROMPT_KEY] is String or not InputMap.has_action(StringName(step[PROMPT_KEY]))):
+			return "step '%s' has a prompt that is not an input action." % str(step.get("id", ""))
 	if quest.has("zone") and (not quest["zone"] is String or not ZoneData.has_zone(StringName(quest["zone"]))):
 		return "its zone is not one data/zones.json has."
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:

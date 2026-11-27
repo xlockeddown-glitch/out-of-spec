@@ -153,25 +153,4 @@ static func nearest(at: Vector3, placed: Array, only_spots: bool = false) -> Dic
 ## they are offered, so the board has no separate "offered". Reading only:
 ## nothing here accepts anything. `placed` is how many beacons are down.
 static func board_lines(quests: Array, farm_state: Dictionary, own_state: Dictionary, placed: int) -> Array[String]:
-	var lines: Array[String] = []
-	for quest: Variant in quests:
-		if not quest is Dictionary or str(quest.get("zone", "")) != ZONE:
-			continue
-		var title: String = str(quest.get("title", ""))
-		var own: bool = str(quest.get("scope", "")) == QuestEngine.SCOPE_PLAYER
-		var entry: Variant = (own_state if own else farm_state).get(str(quest.get("id", "")))
-		if not entry is Dictionary or not entry.get("steps_done") is Array:
-			var gates: Variant = quest.get("gates", {})
-			var level: int = int(gates.get("lab_level", 0)) if gates is Dictionary else 0
-			lines.append("BOARD: %s. Not offered yet%s." % [title, " (lab level %d)" % level if level > 0 else ""])
-		elif int(entry.get("done", -1)) >= 0:
-			lines.append("BOARD: %s. Done." % title)
-		else:
-			var step: Dictionary = QuestLog.open_step(quest, entry)
-			var count: String = ""
-			if str(step.get("check", "")) == "beacons_placed":
-				count = " (%d of %d)" % [mini(placed, QuestEngine.step_need(step)), QuestEngine.step_need(step)]
-			lines.append("BOARD: %s. Accepted. Next: %s%s" % [title, str(step.get("text", "")), count])
-	if lines.is_empty():
-		lines.append("BOARD: no notices.")
-	return lines
+	return NoticeBoard.lines(quests, farm_state, own_state, "zone", ZONE, placed)

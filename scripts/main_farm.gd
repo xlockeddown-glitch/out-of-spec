@@ -56,6 +56,8 @@ var _last_band: int = DriftingSensor.Band.IN_BAND
 ## the tire gauge against the WD-1 without going into the dome.
 @onready var _cal_pad: ParkingPad = %FieldCalPad
 @onready var _tunnel_pad: ParkingPad = %TunnelPad
+## The farm notice board and the pad by it (NoticeBoard), built in _ready.
+var _notice_pad: ParkingPad
 
 var _robots_ui: RobotsUI
 ## Whether Bram's buttons were last drawn for the pad.
@@ -89,6 +91,7 @@ var _tunnel_warned_day: int = -1
 
 
 func _ready() -> void:
+	_build_notice_board()
 	_rover.uplink_changed.connect(_on_uplink_changed)
 	_rover.drift_changed.connect(_on_drift_changed)
 	_rover.steering_zeroed.connect(_on_steering_zeroed)
@@ -123,8 +126,7 @@ func _ready() -> void:
 		# push dispatches and audits out of it.
 		if prop.prop_id == SOIL_PROBE_PROP:
 			# Ryan (2026-11-22): "both". The probe also reads out the plot.
-			prop.inspected.connect(func(text: String) -> void:
-				_show_inspect(text + " " + GameState.soil_probe_text()))
+			prop.inspected.connect(_read_probe)
 		elif prop.prop_id == CISTERN_PROP:
 			prop.inspected.connect(func(text: String) -> void:
 				_show_inspect(text + " " + GameState.cistern_text()))
@@ -151,6 +153,7 @@ func _ready() -> void:
 	_cal_pad.rover_entered.connect(_on_rover_entered_cal_pad)
 	_tunnel_pad.rover_entered.connect(func() -> void: _hud.push_log("TUNNEL MOUTH: press " + Controls.prompt(&"interact") + " to enter."))
 	_tunnel_pad.rover_exited.connect(func() -> void: _tunnel_warned_day = -1)
+	_notice_pad.rover_entered.connect(func() -> void: _hud.push_log("FARM NOTICE BOARD: press " + Controls.prompt(&"interact") + " to read it."))
 	_hud.trade_pressed.connect(_try_trade)
 	_hud.wheel_service_pressed.connect(_try_wheel_service)
 	GameState.wheels_changed.connect(_on_wheels_changed)
@@ -602,6 +605,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif away and not event is InputEventJoypadMotion and ROVER_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key)):
 		get_viewport().set_input_as_handled()
 		_say_if_away()
+	elif event.is_action_pressed(&"interact") and _notice_pad.rover_inside:
+		get_viewport().set_input_as_handled()
+		_read_notice_board()
 	elif event.is_action_pressed(&"interact") and _cal_pad.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_field_cal()
@@ -1109,3 +1115,47 @@ func _on_rover_place_changed() -> void:
 		SceneSwitcher.go_to(SceneSwitcher.TUNNELS_SCENE)
 	elif not _moving:
 		_say_if_away()
+
+
+## Puts the farm notice board (a lava hub board's look, NoticeBoard.FARM_POSITION)
+## in the world with a pad by it: park the rover there and press interact.
+func _build_notice_board() -> void:
+	var world: Node3D = $WorldView/WorldViewport/World
+	var board: Node3D = LavaHubProps.board_node("FARM NOTICE BOARD")
+	board.position = NoticeBoard.FARM_POSITION
+	world.add_child(board)
+	_notice_pad = ParkingPad.new()
+	_notice_pad.name = "NoticeBoardPad"
+	_notice_pad.collision_layer = 0
+	_notice_pad.collision_mask = 2
+	_notice_pad.position = NoticeBoard.FARM_POSITION + Vector3(0.0, 0.0, 2.0)
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(4.0, 3.0, 3.0)
+	shape.shape = box
+	shape.position = Vector3(0.0, 1.5, 0.0)
+	_notice_pad.add_child(shape)
+	world.add_child(_notice_pad)
+
+
+## The soil probe was clicked: its text and the plot's readout, and the read is
+## counted (FarmCommands read_probe) for the Read the Probe starter job.
+func _read_probe(text: String) -> void:
+	_show_inspect(text + " " + GameState.soil_probe_text())
+	await FarmCommands.request(&"read_probe")
+
+
+## Interact at the farm notice board: the host takes any starter job offered (a
+## guest asks for it) and the board's lines go to the phone log. A guest reads its
+## own copy of the quests, which the host keeps up to date; with none yet, what the
+## host answered.
+func _read_notice_board() -> void:
+	var answer: Variant = await FarmCommands.request(&"read_farm_board")
+	if not is_inside_tree():
+		return
+	var own: Variant = GameState.player_quest_state.get(GameState.local_player_id, {})
+	var lines: Array[String] = NoticeBoard.farm_lines(QuestEngine.quests(), GameState.quest_state, own if own is Dictionary else {}, true)
+	if FarmCommands.guest and GameState.quest_state.is_empty():
+		lines.assign(str(answer).split("\n"))
+	for line: String in lines:
+		_hud.push_log(line)

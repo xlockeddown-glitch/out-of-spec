@@ -87,16 +87,24 @@ func _show_rack(placed: int) -> void:
 
 
 func _build_board() -> void:
-	var board := Node3D.new()
-	board.name = "NoticeBoard"
+	var board: Node3D = board_node("NOTICE BOARD")
 	board.position = LavaHub.board_position()
 	add_child(board)
+
+
+## A notice board: two posts, a board with two notes pinned, and `title` over it.
+## The lava hub's and the farm's (NoticeBoard) are built the same way, at the
+## origin of the node returned; the caller puts it down.
+static func board_node(title: String) -> Node3D:
+	var board := Node3D.new()
+	board.name = "NoticeBoard"
 	board.add_child(_part(_box(Vector3(0.12, 1.5, 0.12)), Vector3(-0.8, 0.75, 0.0), _flat(STEEL)))
 	board.add_child(_part(_box(Vector3(0.12, 1.5, 0.12)), Vector3(0.8, 0.75, 0.0), _flat(STEEL)))
 	board.add_child(_part(_box(Vector3(1.9, 1.0, 0.1)), Vector3(0.0, 1.1, 0.0), _flat(Color(0.30, 0.24, 0.17))))
 	board.add_child(_part(_box(Vector3(0.5, 0.35, 0.02)), Vector3(-0.4, 1.25, 0.07), _flat(Color(0.9, 0.88, 0.8))))
 	board.add_child(_part(_box(Vector3(0.5, 0.35, 0.02)), Vector3(0.35, 0.95, 0.07), _flat(Color(0.9, 0.88, 0.8))))
-	board.add_child(_label("NOTICE BOARD", Vector3(0.0, 2.0, 0.0)))
+	board.add_child(_label(title, Vector3(0.0, 2.0, 0.0)))
+	return board
 
 
 static func _box(size: Vector3) -> Mesh:

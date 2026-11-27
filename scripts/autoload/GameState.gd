@@ -79,6 +79,11 @@ const STEERING_ID: String = "rover_steering_encoder"
 ## What a check against a block is counted under in action_counts, before the
 ## instrument's id ("check_with_block:rover_steering_encoder"). Kept in saves.
 const BLOCK_CHECK_COUNT: String = "check_with_block:"
+## What a read of the soil probe is counted under in action_counts (read_probe).
+## Kept in saves.
+const READ_PROBE_COUNT: String = "read_probe"
+## The phone line of a new farm's first morning, pointing at the farm notice board.
+const FARM_BOARD_LINE: String = "Notices are up on the farm board."
 ## What a built stack of gauge blocks is counted under in action_counts
 ## (build_block_stack). Kept in saves.
 const BLOCK_STACK_COUNT: String = "build_block_stack"
@@ -573,6 +578,9 @@ func _set_up_farm(p_seed: int) -> void:
 	credits = int(DataManager.get_number(ECONOMY_TABLE, "starting_credits", 0.0))
 	reset_credibility()
 	_post_morning_dispatch(1)  # day 1 is already under way at boot
+	# Only a new farm is told, once: it is in the phone log from then on, and a
+	# farm loaded from a save never comes through here.
+	post_phone(FARM_BOARD_LINE)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -6933,6 +6941,27 @@ func check_with_block(instrument_id: String, player_id: String = "") -> Dictiona
 		var done: Dictionary = (action_counts.get_or_add(_player(player_id), {}) as Dictionary).get_or_add(BLOCK_CHECK_COUNT + instrument_id, { "count": 0, "xp": 0 })
 		done["count"] = int(done["count"]) + 1
 	return result
+
+
+## A player reading the farm notice board (interact, with the rover by it). The
+## host takes the starter jobs offered to the farm, if any is not taken yet, then
+## answers with the board's lines, one to a line and with no key names in them
+## (the player's own screen adds those). A reader the farm does not know gets
+## the farm's own lines. On the host only: the quests are the host's.
+func read_farm_board(player_id: String = "") -> String:
+	update_quests()
+	var own: Variant = player_quest_state.get(_player(player_id), {})
+	return "\n".join(NoticeBoard.farm_lines(QuestEngine.quests(), quest_state, own if own is Dictionary else {}))
+
+
+## A player's read of the soil probe (a click on it in the plot). Counted for who
+## did it (action_counts, as READ_PROBE_COUNT, with no XP): the Read the Probe
+## starter job counts it, and nothing else reads it. Returns the readout.
+func read_probe(player_id: String = "") -> String:
+	if _player(player_id) != MANAGER_ID:
+		var done: Dictionary = (action_counts.get_or_add(_player(player_id), {}) as Dictionary).get_or_add(READ_PROBE_COUNT, { "count": 0, "xp": 0 })
+		done["count"] = int(done["count"]) + 1
+	return soil_probe_text()
 
 
 ## The length a player ("" = the local player) is asked to build from the gauge
