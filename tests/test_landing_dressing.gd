@@ -189,6 +189,21 @@ func test_posts_keep_their_tops_and_reach_the_dug_ground() -> String:
 	return result
 
 
+func test_a_post_reaches_one_dug_cell_under_its_middle() -> String:
+	# One 2 m cell dug under the west post's middle: a post under 1 m wide must
+	# still find that low ground, not only its corners' (review round 2).
+	var dressing: LandingDressing = _dressed()
+	var west: MeshInstance3D = dressing.get_node("Gantry/Post_west") as MeshInstance3D
+	var middle := Vector2(-LandingDressing.GANTRY_X_M, LandingDressing.GANTRY_Z_M)
+	var dug: Dictionary[Vector2i, int] = {Terrain.cell_at(middle): 3}
+	dressing.settle(dug)
+	var result: String = ""
+	if _bottom_of(west) > Terrain.height(middle, dug) + 0.001:
+		result = "The west post's foot %.2f hangs over the dug ground under its middle, %.2f" % [_bottom_of(west), Terrain.height(middle, dug)]
+	_cleanup()
+	return result
+
+
 func test_stone_hides_the_parts_and_the_terminal_stops_being_clickable() -> String:
 	var found: Dictionary[String, Vector4] = LandingDressing.parts()
 	var dressing: LandingDressing = _dressed()

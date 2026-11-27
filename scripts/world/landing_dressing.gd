@@ -212,8 +212,8 @@ static func lowest_under(part: Vector4, dug: Dictionary[Vector2i, int]) -> float
 
 static func _extreme(part: Vector4, dug: Dictionary[Vector2i, int], highest: bool) -> float:
 	var found: float = -INF if highest else INF
-	var nx: int = maxi(1, ceili(part.z * 2.0))
-	var nz: int = maxi(1, ceili(part.w * 2.0))
+	var nx: int = maxi(2, ceili(part.z * 2.0))
+	var nz: int = maxi(2, ceili(part.w * 2.0))
 	for i: int in nx + 1:
 		for j: int in nz + 1:
 			var at := Vector2(part.x - part.z + part.z * 2.0 * float(i) / float(nx), part.y - part.w + part.w * 2.0 * float(j) / float(nz))
@@ -315,7 +315,7 @@ func build(dug: Dictionary[Vector2i, int]) -> void:
 	screen_mesh.size = Vector3(TERMINAL_HALF.x * 2.0 - 0.1, 0.55, 0.05)
 	screen_mesh.material = screen_material
 	screen.mesh = screen_mesh
-	screen.position = Vector3(0.0, 0.0, -TERMINAL_HALF.y - 0.02)
+	screen.position = Vector3(0.0, 0.0, -TERMINAL_HALF.y - 0.05)
 	screen.rotation_degrees = Vector3(12.0, 0.0, 0.0)
 	_screen = screen
 	_terminal.add_child(screen)
