@@ -4,7 +4,7 @@ Short log of calls that shape code and data. Newest first.
 
 ## 2026-11-26: Surface biomes proposal (design only)
 
-Ryan after playtesting: the map needs a better layout, with biomes and the farm at the centre. `docs/design/biomes.md` proposes five surface biomes (Lab Quarter, Badlands, Basalt Ridge, Frost Flats, Landing Field) joined to zone entrances, two layouts, one big scene, props moved but ground not. No code or data changed; 12 open questions await Ryan.
+Ryan after playtesting: the map needs a better layout, with biomes and the farm at the centre. `docs/design/biomes.md` proposes five surface biomes (Lab Quarter, Badlands, Basalt Ridge, Frost Flats, Landing Field) joined to zone entrances, two layouts, one big scene, props moved but ground not. No code or data changed. Ryan answered all 12 the same day (`biomes.md` §7.1): hub and spokes, five biomes, no gates, land grows to about 240 m (the doc keeps the old 160 m middle's ground so old saves are safe), Bram at the farm's edge, parking pads, tint and props only, a farm quest board for first-hour tips, no digging on roads or pads, old saves keep their ground, the Aquifer sinkhole first.
 
 ## 2026-11-26: The 02:00 rescue for guests (zones sections 6.1 and 12.4)
 

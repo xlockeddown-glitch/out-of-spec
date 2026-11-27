@@ -1,6 +1,6 @@
 # Biomes: laying out the surface around the farm (design proposal)
 
-Status: **design, 2026-11-26. For Ryan to answer (§7).** This PR changes no code and no data. Every number and name below is a [PLACEHOLDER] or an [ASSUMPTION] until Ryan sets it.
+Status: **design, 2026-11-26. Ryan answered §7 the same day (§7.1).** This PR changes no code and no data. Every number and name below is a [PLACEHOLDER] or an [ASSUMPTION] until Ryan sets it.
 
 Ryan, after playtesting: "the map needs to be laid out better. We should make like 'biomes' with farm being center and different things in different areas extending from there." He also said the beginning needs a few tips and an idea of what you are doing (§4).
 
@@ -30,7 +30,7 @@ Read from `scenes/main_farm.tscn`, `scripts/world/terrain.gd` and `scripts/main_
 
 ## 2. The ring idea
 
-The farm is the centre. Around it, **five biomes**, each with one main job and, where it has one, one zone entrance. The land keeps its 160 m square shape; the biomes are painted onto it.
+The farm is the centre. Around it, **five biomes**, each with one main job and, where it has one, one zone entrance. The land grows to about 240 m (Question 5, §7.1) and the biomes are painted onto it. The old 160 m middle keeps its ground.
 
 | Biome | Job in play | Systems | Look [ASSUMPTION] | What you find | Level band [PLACEHOLDER] | Zone entrance |
 |---|---|---|---|---|---|---|
@@ -114,7 +114,7 @@ The land is 160 m square today. I did not trace the rover's top speed, so times 
 
 - **Walking is for the middle** (farm, Lab Quarter, Landing Field), where the walkers go (`scripts/walker/`).
 - **The rover is for the ring**, as it already is for the dome and the tunnels (`docs/decisions.md`, co-op).
-- **No bigger land at first.** 160 m fits five biomes of 40 to 60 m if the middle is tidied [ASSUMPTION]. Grow it only if a biome needs it (Question 5).
+- **The land grows to about 240 m** (Question 5). The old 160 m middle keeps its heights, and the new outer ring gives the biomes room (§7.1).
 
 ### 3.2 How the world is held
 
@@ -122,7 +122,7 @@ The biggest technical choice.
 
 | Option | What it means | Co-op and save | Risk |
 |---|---|---|---|
-| **A. One big scene (recommended)** | Keep `main_farm.tscn`. Paint biomes into `Terrain`; add props from data. | Nothing changes: the host's farm, `GameState.dug`, the farm seed and the saves stay. | Low while the land stays near 160 m. The ground is already built in 16 m chunks (`TerrainGround.CHUNK_M`). |
+| **A. One big scene (recommended)** | Keep `main_farm.tscn`. Paint biomes into `Terrain`; add props from data. | Nothing changes: the host's farm, `GameState.dug`, the farm seed and the saves stay. | Low at 160 m; measured again at 240 m (§6 step 1). The ground is already built in 16 m chunks (`TerrainGround.CHUNK_M`). |
 | **B. Streamed chunks** | Load and unload tiles as the rover drives. | Each PC would have a different loaded part, but the host must answer dig and till anywhere. | **High [RISK].** Nothing streams today. The land-hash tests need a rethink. |
 | **C. A scene per biome** | Like the dome and the tunnels: a pad switches scene. | Matches `zones.md` (one scene per PC), but "the rover is in one place" (`rover_in_tunnels`) grows into one flag per biome. | **Medium to high [RISK].** Breaks the open land Ryan asked for. |
 
@@ -172,7 +172,7 @@ The rule is **move props, not ground.**
 | Drop pod (-3, 14) | Lab Quarter | Stays or a short move [ASSUMPTION] |
 | Dome airlock (8, 14) | Lab Quarter, west road | Stays or a short move |
 | Field calibration pad (13.5, 15) | Lab Quarter | Stays or a short move |
-| Bram's bay (16, -2) | Farm edge or Landing Field | Question 6 |
+| Bram's bay (16, -2) | Farm's edge | Question 6: at the farm's edge |
 | Tunnel mouth (20.5, -19) and pad | Basalt Ridge | Stays; a road is added |
 | Eight ore fissures near the plot | Badlands side, outside the plot ring | Move out; they are scene props, not in a save |
 | Relay (-70, -70) and its road | West road to the Lab Quarter | Stays |
@@ -189,19 +189,18 @@ The rule is **move props, not ground.**
 
 Small PRs, one job each, smallest first.
 
-1. **Measure.** A test or dev scene that prints rover top speed and ground build time at 160 m, to put real numbers in §3.1. No change to play.
-2. **Biome table.** `data/biomes.json` and a pure `BiomeData` class (ids, centres, reach, band, tint, zone entrance). Tests only.
-3. **Paint the map.** A debug overlay (a key) that colours the ground by biome, so Ryan can see layout A against B before art is spent.
-4. **Tint the ground by biome.** `TerrainGround` takes the tint. Heights do not change, so the land hash and old saves are safe.
-5. **Signs and parking pads.** One sign and one rover pad per biome, on the existing land. Hover text only.
-6. **Move the fissures out of the middle.** Scene props only. Old-save test.
-7. **Roads.** Level roads from the farm to each biome, as the relay road is. This moves the land hash, so it is its own PR with a migration note (§3.4).
-8. **Quest board on the farm.** Three first-hour tips as quests in `data/quests.json`.
+1. **Measure.** A test or dev scene that prints rover top speed, ground build time and uplink dead spots at 160 m and 240 m, to put real numbers in §3.1. No change to play.
+2. **Land size.** Grow the land to about 240 m. Every point inside the old 160 m keeps its height for an existing seed (§7.1); a test checks it.
+3. **Biome table.** `data/biomes.json` and a pure `BiomeData` class (ids, centres, reach, band, tint, zone entrance). Tests only.
+4. **Paint the map.** A debug overlay (a key) that colours the ground by biome, so Ryan can see layout A against B before art is spent.
+5. **Tint the ground by biome.** `TerrainGround` takes the tint. Heights do not change, so the land hash and old saves are safe.
+6. **Signs and parking pads.** One sign and one rover pad per biome, on the existing land. Hover text only.
+7. **Move the fissures out of the middle.** Scene props only. Old-save test.
+8. **Roads.** Roads from the farm to each biome. Inside the old 160 m they are painted, not levelled, so old saves keep their ground (Question 11). On the new outer ring they can be levelled, as the relay road is.
 9. **Gating hints.** Road lighting and signs tied to lab level and the first audit (§4).
 10. **Basalt Ridge dressing.** Dark ground, steam, a lit road to the tunnel mouth.
 11. **Frost Flats.** An empty flat, a sign and a small rock set. The ice-cave ramp comes with that zone.
 12. **Landing Field.** The pad and terminal, when the shuttle is built.
-13. **Land size.** Only if a PR finds a need: grow the land and re-measure.
 
 ## 7. Open questions for Ryan
 
@@ -253,3 +252,28 @@ Each has a recommended option first.
     - (a) The Aquifer sinkhole in the Badlands (recommended: digging and pit water are already there).
     - (b) The Colony Mine gate on the Basalt Ridge road.
     - (c) The Ice Caves ramp in the Frost Flats.
+
+### 7.1 Ryan's answers (2026-11-26)
+
+| # | Question | Ryan's answer |
+|---|---|---|
+| 1 | Layout | (a) Hub and spokes: roads out of the farm |
+| 2 | How many biomes | (a) Five: Lab Quarter, Badlands, Basalt Ridge, Frost Flats, Landing Field |
+| 3 | Lab Quarter its own biome | (a) Yes |
+| 4 | Gates | (a) None: a sign warns and a road lights up |
+| 5 | Land size | **(b) Grow to about 240 m** (not the recommended 160 m) |
+| 6 | Bram's bay | (a) At the farm's edge |
+| 7 | Travel | (a) The shared rover, plus a free parking pad at each biome sign |
+| 8 | Look | (a) Ground tint, rocks, plants and a few props; Ryan's packs as style reference |
+| 9 | First-hour teaching | (a) A farm quest board with three starter jobs, plus lit roads |
+| 10 | Digging | (a) Everywhere except roads and pads; the Badlands pays best |
+| 11 | Old saves | (a) Keep their ground |
+| 12 | First surface zone entrance | (a) The Aquifer sinkhole in the Badlands |
+
+What follows from the answers:
+
+- **240 m and "keep the ground" together.** The land grows outward; today's 160 m middle keeps exactly the heights it has, so dug cells, found blocks and pockets stay where they are. The new ring outside it is new ground. The grow PR must test that every point inside the old 160 m is unchanged for an existing seed [ASSUMPTION: anything in `Terrain` that depends on `SIZE_M`, such as the rim, is kept for the inner square or moved out to the new edge; the seven hills keep their places, so the corner and edge hills end up inside the land, not at its edge].
+- **Land size moves up the build order** (now §6 step 2, after measuring), so biome centres are placed on the 240 m land from the start. [RISK] stays as §3.2 says.
+- **Roads and old saves.** Inside the old 160 m, roads are painted, not levelled, so Question 11 holds (§6 step 8). New ground outside it has no saved cells, so roads there can be levelled.
+- **The farm quest board (Question 9) is the first-day tips work** Ryan asked for: three starter jobs that teach water, check the probe, and first calibration. It needs no biome work, so it is built first: right after the controller and controls guide PRs, before §6 step 1, on today's map. It is no longer a §6 step.
+- Everything else in §2 to §6 stands as proposed.
