@@ -259,13 +259,13 @@ static func shored_problem(shored: Variant) -> String:
 	return ""
 
 
-## Why a saved `mine_props` can't be, or "".
 ## True if the rockfall in reach should be offered instead of `find_id`: the find's room is
 ## still buried, so the find cannot be taken yet.
 static func prefer_rockfall(layout_data: Dictionary, find_id: String, fall_in_reach: bool) -> bool:
 	return fall_in_reach and blocked_problem(layout_data, find_id) != ""
 
 
+## Why a saved `mine_props` can't be, or "".
 static func props_problem(props: Variant) -> String:
 	if not props is int or props < 0 or props > MAX_PROPS:
 		return "'mine_props' is not a number of props."
