@@ -134,14 +134,14 @@ func _not_on_level(of: Node, under: Transform3D) -> String:
 
 ## Level ground has no height tint; only a biome's own colour (step 5) may tint it, and
 ## the farm's is white, and the blend reaches only a few metres into it, so level
-## ground in the farm's middle keeps its color.
+## ground on the whole plot keeps its color.
 func test_level_ground_keeps_its_color() -> String:
 	var ground := TerrainGround.new()
 	ground._ready()
 	var problem: String = ""
 	for x: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
 		for z: int in range(-Terrain.HALF_M, Terrain.HALF_M + 1):
-			if Terrain.is_level(Vector2(x, z)) and Vector2(x, z).length() <= 14.0 and ground._tints[ground._index(x, z)] != Color.WHITE:
+			if Terrain.is_level(Vector2(x, z)) and absi(x) <= int(BiomeData.PLOT_HALF_M) and absi(z) <= int(BiomeData.PLOT_HALF_M) and ground._tints[ground._index(x, z)] != Color.WHITE:
 				problem = "Level ground is tinted at (%d, %d)." % [x, z]
 	if ground._tints[ground._index(48, 47)].is_equal_approx(Color.WHITE):
 		problem = "A hill must not look like level ground."

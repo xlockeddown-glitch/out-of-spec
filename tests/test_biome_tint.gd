@@ -38,6 +38,11 @@ func test_deep_in_each_biome_the_tint_leans_to_its_colour() -> String:
 		if _distance(got, BiomeData.ground_tint(id)) >= _distance(plain, BiomeData.ground_tint(id)):
 			fail = "The ground at the centre of %s is no nearer its colour than the height tint." % id
 			break
+		# Deep in, the lean is the biome's full strength, not a trace of it.
+		var full: Color = plain * Color.WHITE.lerp(BiomeData.ground_tint(id), TerrainGround.BIOME_STRENGTH)
+		if _distance(got, full) > 0.02:
+			fail = "The ground at the centre of %s does not lean the full way." % id
+			break
 	ground.free()
 	return fail
 
@@ -75,7 +80,7 @@ func test_no_hard_step_across_a_biome_edge() -> String:
 				fail = "A hard step on the way to %s at %s." % [id, at]
 			last_id = here_id
 			last = here
-		if not crossed:
+		if not crossed and fail == "":
 			fail = "The line to %s crossed no biome edge." % id
 		if fail != "":
 			break
