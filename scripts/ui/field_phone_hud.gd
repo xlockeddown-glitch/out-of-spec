@@ -35,6 +35,8 @@ const COLOR_FAIL := DriftingSensor.COLOR_OUT_OF_TOLERANCE
 var _log_lines: PackedStringArray = []
 ## Bram's Tier 1 buttons, built in code under the trade button.
 var _standards_box: VBoxContainer
+## The offer ids the standard buttons were built for.
+var _standard_ids: PackedStringArray = []
 var _wheels_button: Button
 ## Lab credibility band, a row under the clock, built in code.
 var _credibility_label: Label
@@ -307,6 +309,17 @@ func _draw_wheels() -> void:
 ## Bram's Tier 1 stock. Each offer is { "id", "text", "disabled" }; `note`
 ## shows instead of buttons when there are none (still locked).
 func show_standards(offers: Array[Dictionary], note: String) -> void:
+	var ids: PackedStringArray = []
+	for offer: Dictionary in offers:
+		ids.append(str(offer["id"]))
+	# Same offers: change the buttons in place, so a click in flight still lands.
+	if not ids.is_empty() and ids == _standard_ids and _standards_box.get_child_count() == ids.size():
+		for i: int in offers.size():
+			var existing := _standards_box.get_child(i) as Button
+			existing.text = str(offers[i]["text"])
+			existing.disabled = bool(offers[i]["disabled"])
+		return
+	_standard_ids = ids
 	for child: Node in _standards_box.get_children():
 		_standards_box.remove_child(child)
 		child.queue_free()

@@ -76,6 +76,7 @@ var _close_button: Button
 var _focus_before: Control
 ## The rover's input block as it was when the guide opened: it goes back to that.
 var _blocked_before: bool = false
+var _scroll_carry: float = 0.0
 
 
 func _ready() -> void:
@@ -111,8 +112,17 @@ func _ready() -> void:
 
 ## The D-pad, the stick and the arrow keys scroll it smoothly while held.
 func _process(delta: float) -> void:
-	if visible:
-		_scroll.scroll_vertical += int(Input.get_axis(&"ui_up", &"ui_down") * SCROLL_SPEED * delta)
+	if not visible:
+		return
+	var axis: float = Input.get_axis(&"ui_up", &"ui_down")
+	if is_zero_approx(axis):
+		_scroll_carry = 0.0
+		return
+	# Keep the part of a pixel that int() would drop, so a light push still moves.
+	_scroll_carry += axis * SCROLL_SPEED * delta
+	var whole: int = int(_scroll_carry)
+	_scroll_carry -= float(whole)
+	_scroll.scroll_vertical += whole
 
 
 ## Taken before the button's focus moves: up and down only scroll.
@@ -139,9 +149,12 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func open() -> void:
-	_blocked_before = RoverController.input_blocked
+	# Opening again while open must not save our own block as the old state.
+	if not visible:
+		_blocked_before = RoverController.input_blocked
+		_focus_before = get_viewport().gui_get_focus_owner()
 	RoverController.input_blocked = true
-	_focus_before = get_viewport().gui_get_focus_owner()
+	_scroll_carry = 0.0
 	_refresh()
 	show()
 	_scroll.scroll_vertical = 0

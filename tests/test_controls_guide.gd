@@ -495,3 +495,72 @@ func test_the_phone_follows_the_device_and_the_unplugging() -> String:
 	hud.free()
 	_reset()
 	return problem
+
+
+## A device flip redraws Bram's offers: the same Button nodes stay, so a click
+## that is already on its way still lands. New offers do rebuild them.
+func test_a_device_flip_keeps_bram_s_buttons() -> String:
+	_reset()
+	var hud: FieldPhoneHUD = _hud()
+	var offers: Array[Dictionary] = [
+		{"id": "a", "text": "BUY A  [1]", "disabled": false},
+		{"id": "b", "text": "BUY B  [2]", "disabled": true},
+	]
+	hud.show_standards(offers, "")
+	var first: Node = hud._standards_box.get_child(0)
+	var second: Node = hud._standards_box.get_child(1)
+	var changed: Array[Dictionary] = [
+		{"id": "a", "text": "BUY A", "disabled": false},
+		{"id": "b", "text": "B: NOT OPEN YET", "disabled": false},
+	]
+	hud.show_standards(changed, "")
+	var problem: String = ""
+	if hud._standards_box.get_child(0) != first or hud._standards_box.get_child(1) != second:
+		problem = "The same offers must keep the same buttons"
+	elif (first as Button).text != "BUY A" or (second as Button).disabled:
+		problem = "The kept buttons must take the new text and state"
+	var more: Array[Dictionary] = changed.duplicate()
+	more.append({"id": "c", "text": "BUY C", "disabled": false})
+	hud.show_standards(more, "")
+	if problem == "" and hud._standards_box.get_child_count() != 3:
+		problem = "New offers must rebuild the list"
+	_root().remove_child(hud)
+	hud.free()
+	return problem
+
+
+## A light push on the stick still scrolls: the part of a pixel is carried over.
+func test_a_gentle_scroll_is_carried_not_dropped() -> String:
+	var guide: ControlsGuideUI = _guide()
+	guide.open()
+	Input.action_press(&"ui_down", 0.1)
+	for i: int in 4:
+		guide._process(1.0 / 240.0)
+	Input.action_release(&"ui_down")
+	var carried: float = guide._scroll_carry
+	guide._process(0.016)
+	var problem: String = ""
+	if carried <= 0.0:
+		problem = "Small steps must add up, got %s" % carried
+	elif guide._scroll_carry != 0.0:
+		problem = "Letting go of the stick must clear the carry"
+	_root().remove_child(guide)
+	guide.free()
+	RoverController.input_blocked = false
+	return problem
+
+
+## Opening twice must not save the guide's own block as the old state.
+func test_opening_twice_keeps_the_first_saved_state() -> String:
+	var guide: ControlsGuideUI = _guide()
+	RoverController.input_blocked = false
+	guide.open()
+	guide.open()
+	guide.close()
+	var problem: String = ""
+	if RoverController.input_blocked:
+		problem = "Close must give back the state from before the first open"
+	_root().remove_child(guide)
+	guide.free()
+	RoverController.input_blocked = false
+	return problem

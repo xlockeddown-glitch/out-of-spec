@@ -83,7 +83,7 @@ static func _key_list(action: StringName) -> PackedStringArray:
 	for event: InputEvent in _events(action):
 		if event is InputEventKey:
 			var text: String = _key_name(event as InputEventKey)
-			if not text in found:
+			if text != "" and not text in found:
 				found.append(text)
 	if PREFERRED_KEYS.has(action):
 		var want: String = KEY_NAMES.get(PREFERRED_KEYS[action], "")
@@ -172,11 +172,15 @@ static func _key_name(event: InputEventKey) -> String:
 		## A letter key shows what is printed on this keyboard (AZERTY, QWERTZ).
 		if code >= KEY_A and code <= KEY_Z and DisplayServer.get_name() != "headless":
 			var printed: int = DisplayServer.keyboard_get_label_from_physical(code as Key)
-			if printed != KEY_NONE:
+			if printed != KEY_NONE and printed != KEY_UNKNOWN:
 				code = printed
 	if KEY_NAMES.has(code):
 		return KEY_NAMES[code]
-	return OS.get_keycode_string(code)
+	var named: String = OS.get_keycode_string(code)
+	if named == "" and event.physical_keycode != KEY_NONE:
+		# No label for this key: the physical key's own name is better than nothing.
+		named = OS.get_keycode_string(event.physical_keycode)
+	return named
 
 
 static func _axis_name(event: InputEventJoypadMotion) -> String:
