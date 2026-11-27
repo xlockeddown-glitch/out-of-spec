@@ -112,6 +112,7 @@ func _ready() -> void:
 	$WorldView/WorldViewport/World.add_child(pit_water)
 	$WorldView/WorldViewport/World.add_child(BiomeMarkers.new())
 	$WorldView/WorldViewport/World.add_child(RoadLamps.new())
+	$WorldView/WorldViewport/World.add_child(BasaltDressing.new())
 	var stone_view := StonePiecesView.new()
 	stone_view.name = "StonePieces"
 	$WorldView/WorldViewport/World.add_child(stone_view)
