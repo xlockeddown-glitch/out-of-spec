@@ -27,6 +27,7 @@ var _close_button: Button
 var _focus_before: Control
 ## The open rows the list showed last.
 var _open_rows: Array = []
+var _glyph: Label
 
 
 func _ready() -> void:
@@ -69,7 +70,8 @@ func _ready() -> void:
 	_close_button.add_theme_font_size_override(&"font_size", 22)
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	_close_button.pressed.connect(close)
-	_close_button.add_child(ScopeTheme.badge(&"ui_cancel"))
+	_glyph = ScopeTheme.badge(&"ui_cancel")
+	_close_button.add_child(_glyph)
 	column.add_child(_close_button)
 	GameState.quests_changed.connect(_on_changed)
 	# The contract's run is a count the list shows.
@@ -79,7 +81,7 @@ func _ready() -> void:
 
 func _process(_delta: float) -> void:
 	if visible:
-		ScopeTheme.refresh_badge(_close_button.get_node("PadGlyph") as Label)
+		ScopeTheme.refresh_badge(_glyph)
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -134,6 +136,12 @@ func _on_changed() -> void:
 
 
 func _refresh() -> void:
+	# A rebuild must not strand a pad: remember which stop had the focus.
+	var focused: int = -1
+	var stops: Array[Node] = _rows.get_children().filter(func(n: Node) -> bool: return n is Control and (n as Control).focus_mode == Control.FOCUS_ALL)
+	var owner: Control = get_viewport().gui_get_focus_owner() if is_inside_tree() else null
+	if owner != null:
+		focused = stops.find(owner)
 	for child: Node in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
@@ -145,19 +153,62 @@ func _refresh() -> void:
 		_rows.add_child(_text(NONE_OPEN, TEXT, 20))
 	for row: Dictionary in open_rows:
 		_rows.add_child(_card(row))
+	# DONE and KEEPSAKES are focus stops too, so a pad or keys can scroll to them.
 	if not done_rows.is_empty():
-		_rows.add_child(_text(DONE_TITLE, DIM, 20))
-	var latest: Dictionary = QuestLog.latest_done(done_rows)
-	for row: Dictionary in latest["rows"]:
-		_rows.add_child(_text("    " + QuestLog.title_text(row), DIM, 16))
-	if int(latest["more"]) > 0:
-		_rows.add_child(_text("    " + MORE % SP811.integer(int(latest["more"])), DIM, 16))
+		var done: VBoxContainer = VBoxContainer.new()
+		done.add_child(_text(DONE_TITLE, DIM, 20))
+		var latest: Dictionary = QuestLog.latest_done(done_rows)
+		for row: Dictionary in latest["rows"]:
+			done.add_child(_text("    " + QuestLog.title_text(row), DIM, 16))
+		if int(latest["more"]) > 0:
+			done.add_child(_text("    " + MORE % SP811.integer(int(latest["more"])), DIM, 16))
+		_rows.add_child(_stop(done, &"DoneStop"))
 	# The keepsakes this player holds, as the shelf in the dome shows them.
 	var kept: Array[String] = QuestEngine.keepsakes_of(GameState, GameState.local_player_id)
 	if not kept.is_empty():
-		_rows.add_child(_text(KEEPSAKES_TITLE, DIM, 20))
-	for id: String in kept:
-		_rows.add_child(_text("    " + QuestEngine.keepsake_name(id), DIM, 16))
+		var shelf: VBoxContainer = VBoxContainer.new()
+		shelf.add_child(_text(KEEPSAKES_TITLE, DIM, 20))
+		for id: String in kept:
+			shelf.add_child(_text("    " + QuestEngine.keepsake_name(id), DIM, 16))
+		_rows.add_child(_stop(shelf, &"KeepsakesStop"))
+	var now: Array[Node] = _rows.get_children().filter(func(n: Node) -> bool: return n is Control and (n as Control).focus_mode == Control.FOCUS_ALL)
+	# A long list runs past the scroll area, so up from CLOSE (and down from the
+	# last stop) are joined by hand: the search by position would not find them.
+	if now.is_empty():
+		_close_button.focus_neighbor_top = NodePath()
+	else:
+		var last: Control = now[now.size() - 1] as Control
+		_close_button.focus_neighbor_top = _close_button.get_path_to(last)
+		last.focus_neighbor_bottom = last.get_path_to(_close_button)
+	if focused >= 0:
+		if not now.is_empty():
+			(now[mini(focused, now.size() - 1)] as Control).grab_focus()
+		else:
+			_close_button.grab_focus()
+
+
+## A block of text a pad or the keys can stop on (and so scroll to), with the big ring.
+func _stop(content: Control, stop_name: StringName) -> PanelContainer:
+	var holder := PanelContainer.new()
+	holder.name = stop_name
+	holder.theme_type_variation = ScopeTheme.CARD
+	holder.focus_mode = Control.FOCUS_ALL
+	content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	holder.add_child(content)
+	_add_ring(holder)
+	return holder
+
+
+func _add_ring(holder: PanelContainer) -> void:
+	var ring := Panel.new()
+	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ring.add_theme_stylebox_override(&"panel", ScopeTheme.focus_box())
+	ring.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	ring.name = &"FocusRing"
+	ring.hide()
+	holder.add_child(ring)
+	holder.focus_entered.connect(ring.show)
+	holder.focus_exited.connect(ring.hide)
 
 
 func _text(text: String, color: Color, size: int) -> Label:
@@ -186,13 +237,5 @@ func _card(row: Dictionary) -> PanelContainer:
 		tag.name = &"NewTag"
 		top.add_child(tag)
 	inner.add_child(_text(QuestLog.step_text(row), DIM, 16))
-	var ring := Panel.new()
-	ring.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	ring.add_theme_stylebox_override(&"panel", ScopeTheme.focus_box())
-	ring.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	ring.name = &"FocusRing"
-	ring.hide()
-	card.add_child(ring)
-	card.focus_entered.connect(ring.show)
-	card.focus_exited.connect(ring.hide)
+	_add_ring(card)
 	return card

@@ -64,6 +64,8 @@ const STEADY_HOLD_MARGINAL: String = "%s; without it TUR %s:1, marginal, under %
 @onready var _close_button: Button = %CloseButton
 @onready var _careful_check: CheckButton = %CarefulCheck
 @onready var _game_option: OptionButton = %GameOption
+var _glyphs: Array[Label] = []
+var _open_tween: Tween
 @onready var _found_col: PanelContainer = %FoundCol
 @onready var _left_col: PanelContainer = %LeftCol
 @onready var _result_plate: PanelContainer = %ResultPlate
@@ -75,7 +77,8 @@ const STEADY_HOLD_MARGINAL: String = "%s; without it TUR %s:1, marginal, under %
 
 func _ready() -> void:
 	add_to_group(QuestsUI.MODAL_GROUP)
-	theme = ScopeTheme.theme()
+	# On the panel, not the root: the two minigames beside it keep their own look.
+	($Panel as Control).theme = ScopeTheme.theme()
 	_dress()
 	hide()
 	_rebuild_list()
@@ -135,16 +138,20 @@ func _dress() -> void:
 	stamp.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_seal.add_child(stamp)
 	_seal.pivot_offset = _seal.custom_minimum_size * 0.5
-	_calibrate_button.add_child(ScopeTheme.badge(&"ui_accept"))
-	_close_button.add_child(ScopeTheme.badge(&"ui_cancel"))
-	_send_button.add_child(ScopeTheme.badge(&"ui_accept"))
+	for pair: Array in [[_calibrate_button, &"ui_accept"], [_close_button, &"ui_cancel"], [_send_button, &"ui_accept"]]:
+		var glyph: Label = ScopeTheme.badge(pair[1])
+		(pair[0] as Button).add_child(glyph)
+		_glyphs.append(glyph)
 
 
 func _process(_delta: float) -> void:
 	if not visible:
 		return
-	for button: Button in [_calibrate_button, _send_button, _close_button]:
-		ScopeTheme.refresh_badge(button.get_node("PadGlyph") as Label)
+	for glyph: Label in _glyphs:
+		ScopeTheme.refresh_badge(glyph)
+		# A shows only on the button that has the focus (A on the pickers opens them).
+		if glyph.get_meta(&"action") == &"ui_accept":
+			glyph.visible = glyph.visible and (glyph.get_parent() as Control).has_focus()
 
 
 ## A quick fade and settle as the bench opens (ScopeTheme.OPEN_SECONDS, at most 150 ms).
@@ -153,7 +160,10 @@ func _open_animation() -> void:
 	panel.pivot_offset = panel.size * 0.5
 	panel.modulate.a = 0.0
 	panel.scale = Vector2(0.97, 0.97)
+	if _open_tween != null:
+		_open_tween.kill()
 	var tween: Tween = create_tween().set_parallel(true)
+	_open_tween = tween
 	tween.tween_property(panel, "modulate:a", 1.0, ScopeTheme.OPEN_SECONDS)
 	tween.tween_property(panel, "scale", Vector2.ONE, ScopeTheme.OPEN_SECONDS).set_ease(Tween.EASE_OUT)
 
@@ -200,6 +210,24 @@ func _bench_focus(on: bool) -> void:
 		control.focus_mode = mode
 		if not on and control.has_focus():
 			control.release_focus()
+
+
+## A pad moves along the button row (CALIBRATE, SEND, CLOSE, whichever show) and up
+## to the pickers. Never points at a hidden button.
+func _wire_focus() -> void:
+	var row: Array[Control] = []
+	for button: Button in [_calibrate_button, _send_button, _close_button]:
+		if button.visible:
+			row.append(button)
+	for i: int in row.size():
+		var at: Control = row[i]
+		at.focus_neighbor_left = at.get_path_to(row[maxi(i - 1, 0)])
+		at.focus_neighbor_right = at.get_path_to(row[mini(i + 1, row.size() - 1)])
+		at.focus_neighbor_top = at.get_path_to(_game_option if at == _close_button else _instrument_option)
+		at.focus_neighbor_bottom = at.get_path_to(at)
+	for top: Control in [_instrument_option, _careful_check]:
+		top.focus_neighbor_bottom = top.get_path_to(row[0])
+	_game_option.focus_neighbor_bottom = _game_option.get_path_to(_close_button)
 
 
 ## Instruments in service right now: buying a Tier 1 standard from Bram adds
@@ -326,6 +354,11 @@ func _on_row_picked(index: int) -> void:
 
 
 func _on_instrument_selected(index: int) -> void:
+	_select(index)
+	_wire_focus()
+
+
+func _select(index: int) -> void:
 	_current_id = _ids[index]
 	_calibrated = false
 	_away = _away_text()
@@ -366,6 +399,7 @@ func _on_instrument_selected(index: int) -> void:
 	if GameState.at_oirm.has(standard_id):
 		_found_value.text = "--"
 		_fit(_found_value)
+		_tint_card(_found_col, ScopeTheme.GLASS_LINE)
 		_found_band.text = "STANDARD AT OIRM"
 		_found_band.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
 		_found_meter.show_needle = false
@@ -384,7 +418,7 @@ func _show_send() -> void:
 
 
 ## A standard with no reference on this bench: its error is unknown until OIRM
-## measures it. Shows its certificate, chain and the send button only.
+## measures it. Shows its certificate, its chain chips and the send button only.
 func _show_standard(sensor: DriftingSensor) -> void:
 	_budget = {}
 	_limit = sensor.mpe
@@ -395,6 +429,9 @@ func _show_standard(sensor: DriftingSensor) -> void:
 	_mpe_label.text = "%s   MPE ±%s   (reference standard)" % [
 		sensor.quantity_title(), _unsigned_precise(sensor, sensor.mpe)]
 	_standard_label.text = _certificate_text(_current_id)
+	_show_chain(_current_id)
+	_tint_card(_found_col, ScopeTheme.GLASS_LINE)
+	_tint_card(_left_col, ScopeTheme.GLASS_LINE)
 	for label: Label in [_found_value, _left_value]:
 		label.text = "--"
 		_fit(label)
@@ -427,6 +464,8 @@ func _show_job(job: Dictionary) -> void:
 	for label: Label in [_found_value, _left_value]:
 		label.text = "--"
 		_fit(label)
+	_tint_card(_found_col, ScopeTheme.GLASS_LINE)
+	_tint_card(_left_col, ScopeTheme.GLASS_LINE)
 	_found_band.text = "CUSTOMER JOB"
 	_found_band.add_theme_color_override("font_color", ScopeTheme.INK_MUTED)
 	_left_band.text = ""

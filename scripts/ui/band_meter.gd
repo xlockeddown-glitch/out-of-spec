@@ -61,7 +61,7 @@ func _settle() -> void:
 		_shown = value
 		return
 	_tween = create_tween()
-	_tween.tween_property(self, "_shown", value, SETTLE_SECONDS).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	_tween.tween_property(self, "_shown", value, SETTLE_SECONDS).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 
 
 func _draw() -> void:

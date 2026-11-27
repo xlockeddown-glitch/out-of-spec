@@ -145,7 +145,6 @@ static func _button_styles(t: Theme, kind: StringName, face: Color, edge: Color,
 	var pressed: StyleBoxFlat = normal.duplicate()
 	pressed.bg_color = face.darkened(0.12)
 	pressed.border_width_bottom = 3
-	pressed.content_margin_top = 17
 	var disabled: StyleBoxFlat = normal.duplicate()
 	disabled.bg_color = face.darkened(0.08)
 	disabled.border_width_bottom = 4

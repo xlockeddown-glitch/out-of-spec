@@ -3,7 +3,7 @@ extends RefCounted
 ## Which quests this PC's player has already looked at on the board, so a new one
 ## can wear a NEW tag. Local to this PC only: one ConfigFile in the player's own
 ## user folder (like MinigameSettings), never in the farm save and never sent.
-## A quest is keyed by the farm's seed, its id, and for a daily quest the day.
+## A quest is keyed by the farm's seed, its id, and for a daily quest today's day.
 
 const SECTION: String = "seen"
 
@@ -18,8 +18,16 @@ static var _file: ConfigFile
 static func key_of(row: Dictionary) -> String:
 	var key: String = "%s|%s" % [GameState.world_seed, str(row.get("id", ""))]
 	if str(row.get("kind", "")) == QuestEngine.KIND_DAILY:
-		key += "|%s" % str(row.get("day", 0))
+		# An open row's own "day" is -1 (it is the day done), so a daily ask is keyed
+		# by today's date: it is new again each day it is asked. Not saved anywhere else.
+		key += "|%s" % GameClock.get_day_index()
 	return key
+
+
+## Forgets the cached file (the path changed, or a test starts clean).
+static func reset() -> void:
+	_file = null
+	_loaded_from = ""
 
 
 static func is_new(row: Dictionary) -> bool:
