@@ -238,6 +238,26 @@
       "rewards": { "xp_field_ops": 100, "quest_points": 1, "one_use": "bram_discount_10", "phone": "npcs/bram/quests/brams_ore_run_done" }
     },
     {
+      "id": "shuttle_exam",
+      "kind": "lab",
+      "giver": "vance",
+      "title": "The Shuttle Exam",
+      "scope": "farm",
+      "gates": { "lab_level": 20 },
+      "offer": { "when": "always" },
+      "offer_line": "npcs/vance/quests/shuttle_exam_offer",
+      "steps": [
+        {
+          "id": "clean_calibration",
+          "text": "Calibrate any instrument at the bench in the dome: traceable, by your own hand, and on time.",
+          "check": "count",
+          "log": "cal_log",
+          "where": { "traceable": true, "on_time": true, "not_performed_by": "Manager" }
+        }
+      ],
+      "rewards": { "shuttle_license": true, "phone": "npcs/vance/quests/shuttle_exam_done" }
+    },
+    {
       "id": "on_the_dot", "kind": "personal", "giver": "vance", "title": "On the Dot", "scope": "player",
       "gates": { "skill": { "id": "uncertainty", "level": 5 } },
       "offer": { "when": "always" },

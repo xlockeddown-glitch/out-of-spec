@@ -2,6 +2,19 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: The shuttle's rules and the license (zones step 16, rules half)
+
+`Shuttle` (scripts/world/shuttle.gd) holds the rules; every number and word is in `data/economy.json` "shuttle" and a [PLACEHOLDER]. The Landing Field pad and its terminal come next, with biomes step 12.
+
+- **Windows are a pure function of the clock:** nothing stored or sent. Phobos opens every 11 game hours for 1 h (so two or three a day, drifting through the day); Deimos is up 60 h, then down 60 h. Hours count from 06:00 of day 1. `is_open`, `next_window` (the next start after now), `closes_at` and `window_line` ("Phobos: next window 14:20, in 3 h 10 min.").
+- **Fare:** 40 CR a person from the shared wallet (Ryan, Nov 26). A party is 1 to 4.
+- **`trip_problem` reasons, in order:** not a moon or a bad party, no license, the moon down, the wallet short, the 6 h day trip running past the 02:00 recall, and the moon having no hub. No hub exists (zones step 17), so every trip ends at that last reason for now.
+- **The license is the farm's:** `GameState.shuttle_licensed`, saved (SAVED_LATER, so an old save loads unlicensed) and shown to guests (FarmSync SHOWN_BY). Vance's `shuttle_exam` quest grants it through a `shuttle_license` reward; a farm quest only (`QuestEngine.data_problem`).
+- **The exam's check:** the engine's `count` of `cal_log` rows that are traceable, on time and not the Manager's: one clean calibration at the bench, by a player. Offered at lab level 20 by the quest's own `lab_level` gate, which a test holds equal to `Shuttle.license_level()`.
+- **`lab_gates` row left `built:false`:** the exam reads the quest's own gate and the economy number, not the row, so the row stays a table entry for tuning, as the other zone rows do.
+- **`book_shuttle(moon, people = 1)`:** a farm command a guest can send. It runs `trip_problem` on the host's clock and returns the reason. A refused trip takes no fare and posts no booking. It always refuses for now.
+- **`CoopSession.PROTOCOL` 30 to 31:** a new command and a new synced field.
+
 ## 2026-11-26: The land grows to 240 m (biomes step 2)
 
 `Terrain.SIZE_M` 160 to 240, `HALF_M` 80 to 120; the old edge stays as `OLD_HALF_M` (80) and `OLD_SIZE_M` (160).

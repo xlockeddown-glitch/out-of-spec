@@ -233,6 +233,8 @@
       "name": "Inspector Vance",
       "quests": {
         "every_sticker_counts_done": "One audit with nothing to write down. The stickers on your bench mean something now. Keep them that way.",
+        "shuttle_exam_offer": "[PLACEHOLDER] The shuttle takes people whose paperwork holds up. One clean calibration at the bench, traceable and on time, by your own hand, and the farm gets its license.",
+        "shuttle_exam_done": "[PLACEHOLDER] Traceable and on time. The license is the farm's; mind the recall hour on the way back.",
         "on_the_dot_offer": "[PLACEHOLDER] Anyone can calibrate. I want to see five instruments calibrated on the day they are due, by your own hand, and none of them a day late.",
         "on_the_dot_done": "[PLACEHOLDER] Five on the day. Here is something to keep time by. Do not be late for the next one."
       }

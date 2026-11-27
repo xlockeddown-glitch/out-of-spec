@@ -19,6 +19,8 @@ signal finds_changed
 ## A lift was repaired, or the deepest depth reached in a zone grew.
 signal lifts_changed
 signal lab_sitter_changed
+## The farm was given the shuttle license.
+signal shuttle_license_changed
 signal relay_changed(slotted: bool)
 signal calibration_recorded(record: Dictionary)
 signal phone_message(text: String)
@@ -203,6 +205,9 @@ var lifts_repaired: Dictionary = {}
 ## The lab sitter's booking (LabSitter): {} for none, else { "day", "watered",
 ## "spools" }: the day she works and what she has done so far. Shared by the farm.
 var lab_sitter: Dictionary = {}
+## Whether the farm holds the shuttle license (Shuttle): Vance's exam grants it,
+## and it is never lost. Shared by the farm.
+var shuttle_licensed: bool = false
 ## The deepest depth the farm's rover has reached in each zone: zone id -> depth.
 ## Only ever grows. Shown on the phone. Shared by the farm.
 var deepest_depth: Dictionary = {}
@@ -711,7 +716,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -1093,6 +1098,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	rover_lights_changed.emit()
 	lifts_changed.emit()
 	lab_sitter_changed.emit()
+	shuttle_license_changed.emit()
 	return ""
 
 
@@ -3486,6 +3492,30 @@ func book_lab_sitter(for_day: int, player_id: String = "") -> String:
 	lab_sitter_changed.emit()
 	post_phone(LabSitter.text("booked_text") % [LabSitter.sitter_name(), SP811.integer(day),
 		LabSitter.text("free_text") if free else LabSitter.text("fee_text") % SP811.integer(fee)])
+	return ""
+
+
+## The farm passes Vance's shuttle exam: the license is the farm's, kept for good.
+## Said once; a second grant changes nothing.
+func grant_shuttle_license() -> void:
+	if shuttle_licensed:
+		return
+	shuttle_licensed = true
+	shuttle_license_changed.emit()
+	post_phone(Shuttle.text("granted_text") % SP811.integer(Shuttle.fare()))
+
+
+## Books a day trip to `moon` for `people` from the pad's terminal. Runs on the
+## host's clock and refuses with Shuttle.trip_problem's reason, taking no fare;
+## no moon has a hub yet, so every booking is refused for now. The pad PR will
+## carry the party there. Returns "" when booked, else why not.
+func book_shuttle(moon: String, people: int = 1, player_id: String = "") -> String:
+	var hub_ready: bool = Shuttle.is_moon(moon) and ZoneData.hub_scene(StringName(moon)) != ""
+	var reason: String = Shuttle.trip_problem(moon, lab_level(), shuttle_licensed, credits, people, GameClock.elapsed_days, hub_ready)
+	if reason != "":
+		return reason
+	add_credits(-Shuttle.fare() * people)
+	post_phone(Shuttle.text("booked_text") % [Shuttle.moon_name(moon), Shuttle.clock_text(GameClock.elapsed_days), SP811.integer(Shuttle.fare() * people)])
 	return ""
 
 
