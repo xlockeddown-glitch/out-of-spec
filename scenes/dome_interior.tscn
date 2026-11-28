@@ -1,4 +1,4 @@
-[gd_scene load_steps=43 format=3]
+[gd_scene load_steps=44 format=3]
 
 [ext_resource type="Script" path="res://scripts/dome/dome_interior.gd" id="1_dome"]
 [ext_resource type="Script" path="res://scripts/dome/terrarium.gd" id="2_terr"]
@@ -11,6 +11,7 @@
 [ext_resource type="Script" path="res://scripts/world/inspectable.gd" id="30_inspect"]
 [ext_resource type="Script" path="res://scripts/world/tarantula_rig.gd" id="40_rig"]
 [ext_resource type="Script" path="res://scripts/dome/keepsake_shelf.gd" id="41_shelf"]
+[ext_resource type="Script" path="res://scripts/dome/certificate_wall.gd" id="42_certwall"]
 
 [sub_resource type="Environment" id="Env"]
 background_mode = 1
@@ -905,3 +906,8 @@ greybox = [NodePath("../Body"), NodePath("../Screen")]
 position = Vector3(-6.7, 1.8, 1.5)
 rotation = Vector3(0, 1.5707964, 0)
 script = ExtResource("41_shelf")
+
+[node name="CertificateWall" type="Node3D" parent="."]
+position = Vector3(6.7, 2.2, -1.8)
+rotation = Vector3(0, -1.5707964, 0)
+script = ExtResource("42_certwall")
