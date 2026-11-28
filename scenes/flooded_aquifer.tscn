@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/world/flooded_aquifer.gd" id="1_main"]
 [ext_resource type="Script" path="res://scripts/rover/rover_controller.gd" id="2_rover"]
 [ext_resource type="Script" path="res://scripts/world/satellite_relay.gd" id="3_relay"]
-[ext_resource type="Script" path="res://scripts/world/tunnel_rock.gd" id="4_rock"]
+[ext_resource type="Script" path="res://scripts/world/aquifer_rock.gd" id="4_rock"]
 [ext_resource type="Script" path="res://scripts/camera/iso_camera.gd" id="5_cam"]
 [ext_resource type="PackedScene" path="res://ui/field_phone_hud.tscn" id="6_hud"]
 [ext_resource type="Script" path="res://scripts/world/model_slot.gd" id="12_slot"]
@@ -14,10 +14,10 @@
 
 [sub_resource type="Environment" id="Env"]
 background_mode = 1
-background_color = Color(0.035, 0.028, 0.026, 1)
+background_color = Color(0.018, 0.036, 0.042, 1)
 ambient_light_source = 2
-ambient_light_color = Color(1, 0.86, 0.76, 1)
-ambient_light_energy = 0.45
+ambient_light_color = Color(0.68, 0.86, 0.84, 1)
+ambient_light_energy = 0.48
 tonemap_mode = 2
 glow_enabled = true
 glow_intensity = 0.9
@@ -78,7 +78,7 @@ environment = SubResource("Env")
 
 [node name="Lamp" type="DirectionalLight3D" parent="WorldView/WorldViewport/World"]
 transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
-light_color = Color(1, 0.9, 0.8, 1)
+light_color = Color(0.76, 0.92, 0.9, 1)
 light_energy = 0.55
 shadow_enabled = true
 
