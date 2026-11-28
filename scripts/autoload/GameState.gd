@@ -7461,13 +7461,64 @@ func collect_enclosure_spool(species_id: String, player_id: String = "") -> bool
 
 # --- Relay ----------------------------------------------------------------------
 
+const GOSSAMER_QUEST_ID: String = "gossamer_link"
+const GOSSAMER_SPECIES: StringName = &"orbital_silk_spinner"
+## Extra multiplicative lag cut while the Gossamer link is up [PLACEHOLDER].
+const GOSSAMER_LAG_CUT_PCT: float = 20.0
+
+
+## True while the relay holds a whole spool from `species_id` (or any whole spool if empty).
+func has_relay_spool(species_id: StringName = &"") -> bool:
+	return relay_slotted and not slotted_spool_damaged and (species_id == &"" or slotted_spool_species == species_id)
+
+
+## True once The Gossamer Link lab quest is done (derived from quest_state, no saved flag).
+func gossamer_link_unlocked() -> bool:
+	return QuestEngine.is_done(self, GOSSAMER_QUEST_ID)
+
+
+## True when the Gossamer link is active: quest done AND a whole Silk-Spinner spool seated.
+func gossamer_link_up() -> bool:
+	return gossamer_link_unlocked() and has_relay_spool(GOSSAMER_SPECIES)
+
+
+## Phone/HUD status text for the Gossamer link once unlocked, or "" before then.
+func gossamer_status_text() -> String:
+	if not gossamer_link_unlocked():
+		return ""
+	return "Gossamer link: up" if has_relay_spool(GOSSAMER_SPECIES) else "Gossamer link: stuttering"
+
+
+func _wants_gossamer_spool() -> bool:
+	return quest_state.has(GOSSAMER_QUEST_ID) and not has_relay_spool(GOSSAMER_SPECIES)
+
+
+func _find_whole_spool(species_id: StringName) -> int:
+	for i: int in _spool_species.size():
+		if _spool_species[i] == species_id and not _is_spool_damaged(i):
+			return i
+	return -1
+
+
+func _take_spool_at(index: int) -> Array:
+	optical_silk_spools -= 1
+	var taken: Array = [_spool_species[index], _is_spool_damaged(index)]
+	_spool_species.remove_at(index)
+	if index < _spool_damaged.size():
+		_spool_damaged.remove_at(index)
+	return taken
+
+
 ## A whole spool may take the place of a damaged one, which is thrown away, or of a
 ## whole one that cuts the lag less, which goes back into stock [ASSUMPTION].
+## Once The Gossamer Link is offered or done, a whole Silk-Spinner spool may also be seated.
 func can_slot_spool() -> bool:
 	if not relay_slotted:
 		return optical_silk_spools > 0
 	if slotted_spool_damaged:
 		return optical_silk_spools > damaged_spools()
+	if _wants_gossamer_spool() and _find_whole_spool(GOSSAMER_SPECIES) >= 0:
+		return true
 	for i: int in _spool_species.size():
 		if not _is_spool_damaged(i) and _species_lag_pct(_spool_species[i]) > _species_lag_pct(slotted_spool_species):
 			return true
@@ -7481,7 +7532,8 @@ func can_slot_spool() -> bool:
 func slot_spool_into_relay(player_id: String = "", score: int = MinigameScore.SKIPPED) -> bool:
 	if not can_slot_spool():
 		return false
-	var taken: Array = _take_spool(false)
+	var gossamer_idx: int = _find_whole_spool(GOSSAMER_SPECIES) if _wants_gossamer_spool() else -1
+	var taken: Array = _take_spool_at(gossamer_idx) if gossamer_idx >= 0 else _take_spool(false)
 	if relay_slotted and not slotted_spool_damaged:
 		_add_spool(slotted_spool_species)
 	slotted_spool_species = taken[0]
@@ -7498,7 +7550,8 @@ func slot_spool_into_relay(player_id: String = "", score: int = MinigameScore.SK
 ## Multiplier applied to rover uplink lag (1.0 = no upgrade). The spool's base
 ## cut and the spinning species' lag_reduction_pct stack multiplicatively:
 ## (1 - spool%) * (1 - species%). Curlyhair: 0.40 * 0.95 = 0.38. A damaged spool
-## gives only part of the base cut.
+## gives only part of the base cut. Once The Gossamer Link is done and a whole
+## Silk-Spinner spool stays seated, an extra 20 % cut stacks multiplicatively.
 func get_relay_lag_multiplier() -> float:
 	if not relay_slotted:
 		return 1.0
@@ -7506,7 +7559,10 @@ func get_relay_lag_multiplier() -> float:
 	if slotted_spool_damaged:
 		spool_pct *= DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/damaged_reduction_share", 1.0)
 	var species_pct: float = _species_lag_pct(slotted_spool_species)
-	return clampf((1.0 - spool_pct / 100.0) * (1.0 - species_pct / 100.0), 0.0, 1.0)
+	var mult: float = (1.0 - spool_pct / 100.0) * (1.0 - species_pct / 100.0)
+	if gossamer_link_up():
+		mult *= (1.0 - GOSSAMER_LAG_CUT_PCT / 100.0)
+	return clampf(mult, 0.0, 1.0)
 
 
 ## The species' own cut. One not set (an undesigned morph) cuts nothing.

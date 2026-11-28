@@ -186,6 +186,7 @@ func _ready() -> void:
 	# Bound methods so the autoload drops them when this scene is freed.
 	GameState.silk_changed.connect(_on_silk_changed)
 	GameState.relay_changed.connect(_on_relay_changed)
+	GameState.quests_changed.connect(_on_relay_changed.bind(false))
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.skill_leveled.connect(_on_skill_leveled)
 	SaveGame.save_failed.connect(_hud.push_log)
@@ -463,7 +464,7 @@ func _on_relay_changed(_slotted: bool) -> void:
 
 
 func _refresh_relay_hud() -> void:
-	_hud.set_relay(GameState.relay_slotted, GameState.slotted_spool_damaged, GameState.spool_count_text(), GameState.can_slot_spool())
+	_hud.set_relay(GameState.relay_slotted, GameState.slotted_spool_damaged, GameState.spool_count_text(), GameState.can_slot_spool(), GameState.gossamer_status_text())
 
 
 func _on_soil_tilled(cell: Vector3i) -> void:

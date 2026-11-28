@@ -439,6 +439,25 @@
           "check": "counter", "counter": "camp_night_ice_caves" }
       ],
       "rewards": { "xp_certificate": 30, "phone": "npcs/orin/quests/a_night_on_the_ice_done" }
+    },
+    {
+      "id": "gossamer_link",
+      "kind": "lab",
+      "giver": "odalys",
+      "title": "The Gossamer Link",
+      "scope": "farm",
+      "gates": { "lab_gate": "relay_dish" },
+      "offer": { "when": "always" },
+      "offer_line": "npcs/odalys/quests/gossamer_link_offer",
+      "steps": [
+        { "id": "seat_silk", "text": "Seat a whole Orbital Silk-Spinner spool in the relay dish.",
+          "check": "relay_spool", "species": "orbital_silk_spinner" },
+        { "id": "calibrate_dish", "text": "Complete 1 traceable, on-time calibration of the relay dish azimuth.",
+          "check": "count", "log": "cal_log",
+          "where": { "instrument_id": "relay_dish_azimuth", "traceable": true, "on_time": true },
+          "at_least": 1 }
+      ],
+      "rewards": { "credits": 500, "lab_xp": 1000, "phone": "npcs/odalys/quests/gossamer_link_done" }
     }
   ],
   "keepsakes": [
