@@ -940,7 +940,7 @@ func test_the_lava_tubes_and_the_aquifer_keep_their_own_gates() -> String:
 
 func test_the_protocol_did_not_move_for_depths_two_to_six() -> String:
 	# 42 when the Mine landed; the Ice Caves slice the Ice Caves slice then moved it, and later slices again.
-	if not CoopSession.PROTOCOL in [42, 43, 44, 45]:
+	if not CoopSession.PROTOCOL in [42, 43, 44, 45, 46]:
 		return "PROTOCOL is %d; depths 2 to 6 add no command or synced field, so it stays where the other slices put it." % CoopSession.PROTOCOL
 	return ""
 
