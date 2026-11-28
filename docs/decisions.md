@@ -2,6 +2,20 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-28: Ice Caves slick ice, studs and white-out (feat/ice-slick)
+
+Slice 14. Every number and word below is a [PLACEHOLDER].
+
+- **Slick ice [PLACEHOLDER]:** about 1 floor cell in 7 (`IceSlick.SLICK_ONE_IN`) on Ice Caves depth 1 is slick, picked from the layout's own hash (`ZoneDepth.stream`, tags 400 and up). Never on the start, the way up, the hub hatch, a find, or any cell touching one of those. A slick cell is still floor, so the layout stays reachable (tested over 20 days). The hub has no patches (open choice: skipped).
+- **Skid [PLACEHOLDER]:** rolling onto a slick cell slides the rover one more cell the way it was going (four sides only, a diagonal does not skid) if that cell is open floor. Never into rock, off the map, onto a find, the start, the way up or the hatch. The target is a pure function of the grid (`IceSlick.skid_target`). The host decides every skid itself (`GameState.ice_rolled`): for a guest driver from the poses it accepts in `CoopRovers._on_driven`, for its own driving from `ice_caves._watch_ice`. A guest sends nothing extra and there is no `ice_skid` command (removed, not kept as a hint). On a skid the host adds 6 m of wear through `add_rover_usage` (the same place the Lava vents and the cold multiply it, so a skid in the drift wears 1.5 times as much), parks the rover at the target and bumps `rover_epoch`, so every PC snaps to it the way a fast travel does; the poses already in flight carry the old epoch and are ignored, so the slide is not also billed as drive distance. Only the current driver, or nobody leased, can cause one (a passenger cannot). It is charged once per cell: `_skid_last` (epoch, day, cell, not saved) stops a repeat until the rover has left that cell. Wear only, no game minutes (open choice). The slide is a teleport with a log line, no animation (open choice).
+- **Studs [PLACEHOLDER]:** Bram sells ice studs for 60 credits from the shared wallet, once (`buy_ice_studs`, host-run, refused without credits, when fitted, while the rover is lent to a zone, or when the buyer is not on the farm, as `service_wheels` is). With studs there is no skid and no wear (open choice: no skid at all, not a reduced one). `has_ice_studs` is saved (`SAVED_LATER`, old saves have none) and shown to guests (`FarmSync`, `upgrades_changed`). The studs button has no number key, and the tier-1 note line is not shown while Bram has offers (open choices).
+- **White-out [PLACEHOLDER]:** about 1 day in 3 has a spell, starting 08:00 to 16:00, lasting 60 to 120 game minutes (so over by 18:00, far from the 00:00 warning and the 02:00 recall). A pure function of the world seed and the shared clock (`IceSlick.spell_of`, `whiteout_active`), so every PC agrees with nothing synced. Effect: fog on the scene's Environment (density 0.06, pale ice colour), and finds more than 9 m from the rover are not drawn. The hatch, the entry, the way up and every other prop are never hidden. A HUD log line at the start and the end. Recalls and rescues do not read it.
+- **Skid parking:** the rover is parked square to the slide (axis-aligned, not at the driver's yaw) and only where `TunnelRock.holds_body_in` says the body fits; otherwise it stays on the slick cell (the wear is still charged, no move). The host sends the farm at once after a skid so guests do not wait for the next tick. `_skid_last` is cleared on load.
+- **Open choices:** the standards note is hidden behind the studs row in Bram's panel; a blocked skid (no room to slide) still charges the bump wear. Both left as they are for Ryan to decide.
+- **Protocol:** `CoopSession.PROTOCOL` moved once for the studs command and the new synced field: 42 to 43 on this branch, then 43 to 44 after merging the Deimos cache (PR 270), which took 43 first. Test pins updated.
+- **Unchanged:** Lava Tubes, Aquifer and Mine (no slick cells, `ice_rolled` ignores them), the cold and heater.
+- **Tests:** `tests/test_ice_slick.gd`.
+
 ## 2026-11-27: Colony Mine depths 2 to 6 (feat/mine-deep)
 
 Slice 13. Every number and word below is a [PLACEHOLDER].

@@ -248,6 +248,10 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 	# A rover in the host's own scene looks for the relay itself.
 	if now - _here_at.get(rover_id, -STILL_MS) >= STILL_MS:
 		farm.set_rover_uplink(rover_id, pose[5])
+	# The host decides a skid on the Ice Caves' slick ice from the poses it accepts (the guest sends no request).
+	if rover_id == farm.TUNNEL_ROVER:
+		if farm.ice_rolled(player_id, ZoneHazards.cell_of(from.origin), ZoneHazards.cell_of(to.origin), to.basis):
+			CoopSync.send_farm.call_deferred()  # guests are told the new place now, not up to a second later
 
 
 ## The farm's rover is on the land. The tunnels have their own bounds (the rock).

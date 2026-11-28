@@ -12,7 +12,7 @@ extends RefCounted
 ## wear on a rover driven in the caves is multiplied by DRIFT_MULTIPLIER. Nothing else changes.
 ## A heater cartridge (the hub crate, credits) resets it; leaving the caves pauses it
 ## (back within the grace it resumes; later, after a rescue or on a new day it starts from 0).
-## Not built here (later PRs): slick ice, white-out, the lift, depth 2 and below, an Ice camp.
+## Slick ice and white-out are IceSlick. Not built here (later PRs): the lift, depth 2 and below, an Ice camp.
 
 const ZONE: String = "ice_caves"
 ## One depth below the hub: no lift, no depth 2.

@@ -360,6 +360,8 @@ var _drop_pod_departure_at: float = 0.0
 var crystal_ore: int = 0
 var mined_fissures: Dictionary = {}
 var has_wide_treads: bool = false
+## Ice studs on the rover (Bram, credits): slick ice no longer skids it. Saved; an old save has none.
+var has_ice_studs: bool = false
 
 ## One-time grace: the first audit that would fine you becomes a warning,
 ## because your manager recalibrated the offenders before Vance got in.
@@ -823,14 +825,14 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "deimos_cache"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
 	"_pad_problems",
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
-	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_expedition_warned_day", "_expedition_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers", "_cold_kept",
+	"rover_place_scope", "_skid_last", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_expedition_warned_day", "_expedition_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers", "_cold_kept",
 	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip",
 ]
 
@@ -902,6 +904,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return "'mine_gate_open' is not a yes or no."
 	if data.has("pump_owned") and not data["pump_owned"] is bool:
 		return "'pump_owned' is not a yes or no."
+	if data.has("has_ice_studs") and not data["has_ice_studs"] is bool:
+		return "'has_ice_studs' is not a yes or no."
 	if data.has("camps_open") and Camp.open_problem(data["camps_open"]) != "":
 		return Camp.open_problem(data["camps_open"])
 	if data.has("camp_supplies") and Camp.supplies_problem(data["camp_supplies"]) != "":
@@ -1250,6 +1254,7 @@ func farm_from_dict(data: Dictionary) -> String:
 		return problem
 	put_farm(data)
 	_hold_deep_rover()
+	_skid_last = []
 	finds_taken = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	pools_drained = ZoneDepth.prune(pools_drained, GameClock.get_day_index())
 	valves_shut = ZoneDepth.prune(valves_shut, GameClock.get_day_index())
@@ -6704,6 +6709,67 @@ func buy_heater(player_id: String = "") -> String:
 	cold_since[who] = GameClock.elapsed_days
 	ice_changed.emit()
 	return ""
+
+
+## Host: the farm buys ice studs at Bram's bay: IceSlick.STUD_COST_CREDITS from the shared
+## wallet [PLACEHOLDER], charged once, for the rover. Bram's bay is on the farm: not while the
+## rover is lent to the tunnels, and not for someone who is away from it. Returns "" or why not.
+func buy_ice_studs(player_id: String = "") -> String:
+	if rover_lent:
+		return "The rover is in the tunnels. Bram's bay is up on the farm."
+	if place_of(_player(player_id)) != ZonePresence.FARM:
+		return "Bram's bay is on the farm."
+	var reason: String = IceSlick.studs_problem(has_ice_studs, credits)
+	if reason != "":
+		return reason
+	add_credits(-IceSlick.STUD_COST_CREDITS)
+	has_ice_studs = true
+	upgrades_changed.emit()
+	post_phone(IceSlick.WORDS["studs"])
+	return ""
+
+
+## The last skid: [rover_epoch, day, cell] where the rover was put, or [] (not saved). Until the
+## rover leaves that cell nothing more is charged for it.
+var _skid_last: Array = []
+
+
+## Host: the rover that `player_id` drives moved from `from` to `to` (cells of the Ice Caves'
+## floor). If that rolled it onto a slick cell from a side cell, with no studs, it skids: the host
+## parks it IceSlick.skid_target on, bumps rover_epoch so every PC snaps to the place (the jump is
+## never driven distance: poses sent before the bump are old news) and adds the wear once through
+## add_rover_usage. Only the rover's driver (or anyone when nobody drives) can cause one; a guest
+## sends nothing for it. Returns true if the rover skidded.
+func ice_rolled(player_id: String, from: Vector2i, to: Vector2i, heading: Basis = Basis.IDENTITY) -> bool:
+	if FarmCommands.guest or rover_zone != IceDepth.ZONE or rover_depth != ZoneDepth.DEPTH or not rover_transforms.has(TUNNEL_ROVER):
+		return false
+	var rovers: Node = rovers_node if rovers_node != null else CoopRovers
+	var who: String = _player(player_id)
+	if not rovers.driver(TUNNEL_ROVER) in ["", who] or place_of(who) != IceDepth.ZONE:
+		return false
+	var day: int = GameClock.get_day_index()
+	if not _skid_last.is_empty() and (_skid_last[0] != rover_epoch or _skid_last[1] != day or _skid_last[2] != to):
+		_skid_last = []  # it has left that cell, or the place changed
+	var dir: Vector2i = IceSlick.step_between(from, to)
+	if has_ice_studs or dir == Vector2i.ZERO or not _skid_last.is_empty():
+		return false
+	var today: Dictionary = IceDepth.layout(world_seed, rover_depth, day)
+	if today.is_empty() or not IceSlick.is_slick(IceSlick.slick_cells(world_seed, rover_depth, day), to):
+		return false
+	var finds: Array = []
+	for find: Dictionary in today["finds"]:
+		finds.append(find["cell"])
+	var grid: PackedStringArray = today["grid"]
+	var target: Vector2i = IceSlick.skid_target(grid, finds, to, dir)
+	add_rover_usage(IceSlick.SKID_WEAR_M, who, TUNNEL_ROVER)
+	# Parked square to the skid line (a driver's yaw could poke a corner into rock), and only where the body fits.
+	var parked := Transform3D(Basis.looking_at(Vector3(dir.x, 0.0, dir.y)), TunnelRock.at_in(grid, target))
+	if target != to and TunnelRock.holds_body_in(grid, parked):
+		rover_transforms[TUNNEL_ROVER] = parked
+		rover_epoch += 1
+		_emit_field_rover_changed()
+	_skid_last = [rover_epoch, day, to]
+	return true
 
 
 ## Host: the farm buys shoring props at the Mine hub's crate, for the player there. Props
