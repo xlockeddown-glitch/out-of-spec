@@ -668,7 +668,7 @@ func _refresh_jobs_hud() -> void:
 		var problem: String = GameState.job_accept_problem(job)
 		offers.append({ "text": GameState.job_offer_text(job) + (" (%s)" % problem if problem != "" else ""),
 			"disabled": problem != "", "tooltip": problem })
-	_hud.show_jobs(active, offers, GameState.job_board_note())
+	_hud.show_jobs(active, offers, GameState.job_board_note(), GameState.job_board_slot_note())
 
 
 func _try_accept_job(index: int) -> void:

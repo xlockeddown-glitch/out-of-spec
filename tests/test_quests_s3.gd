@@ -268,7 +268,7 @@ func _check_issued(gs: GameStateScript) -> String:
 			gs.refresh_job_board(day)
 			if _on_board(gs) or _quest_jobs(gs) != 1:
 				return "The board must not show or lose the envelope (day %d)." % day
-			if gs.job_board.size() != int(gs._jobs_number("board_size", 0.0)):
+			if gs.job_board.size() != gs.job_board_size():
 				return "The envelope must not take a place on the board (day %d)." % day
 	return ""
 

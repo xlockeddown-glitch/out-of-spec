@@ -7482,6 +7482,41 @@ func _expire_jobs(day: int) -> void:
 			jobs_changed.emit()
 
 
+## Rows of lab_gates that each add one job to the board's base size, in order.
+const BOARD_SLOT_GATES: Array[String] = ["board_4_jobs", "board_5_jobs"]
+const BOARD_SLOT_WORDS: Array[String] = ["A fourth job", "A fifth job"]
+
+
+## True if this extra-slot row is in the table, built, and open (a kept row counts).
+func _board_slot_open(gate_id: String) -> bool:
+	var row: Dictionary = DataManager.get_record(SKILLS_TABLE, StringName(gate_id), "lab_gates")
+	return not row.is_empty() and row.get("built", true) and lab_gate_open(gate_id)
+
+
+## How many jobs a board holds: economy `board_size`, plus one for each open
+## extra-slot row (4th job at lab level 28, 5th at 65 [PLACEHOLDER]). Taken at
+## the board refresh, so a slot that opens mid-day shows at the next one.
+func job_board_size() -> int:
+	var size: int = maxi(int(_jobs_number("board_size", 3.0)), 0)
+	for gate: String in BOARD_SLOT_GATES:
+		if _board_slot_open(gate):
+			size += 1
+	return size
+
+
+## When the next slot opens, in the board note's words: "A fourth job at lab
+## level 28." "" when the board is shut or every slot is open.
+func job_board_slot_note() -> String:
+	if jobs_open_band() == "" or not lab_gate_open("job_board"):
+		return ""
+	for i: int in BOARD_SLOT_GATES.size():
+		var row: Dictionary = DataManager.get_record(SKILLS_TABLE, StringName(BOARD_SLOT_GATES[i]), "lab_gates")
+		if row.is_empty() or not row.get("built", true) or lab_gate_open(BOARD_SLOT_GATES[i]):
+			continue
+		return "%s at lab level %s." % [BOARD_SLOT_WORDS[i], SP811.integer(lab_gate_level(BOARD_SLOT_GATES[i]))]
+	return ""
+
+
 ## Replaces today's offers with jobs the lab's band allows, rotating through
 ## them by day, skipping any already accepted.
 func refresh_job_board(day: int) -> void:
@@ -7501,7 +7536,7 @@ func refresh_job_board(day: int) -> void:
 			taken = taken or job.get("id", "") == template.get("id", "")
 		if not taken:
 			eligible.append(template)
-	var count: int = mini(maxi(int(_jobs_number("board_size", 3.0)), 0), eligible.size())
+	var count: int = mini(job_board_size(), eligible.size())
 	if count > 0:
 		var start: int = posmod(day * count, eligible.size())
 		for i: int in count:
