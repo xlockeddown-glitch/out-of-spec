@@ -179,8 +179,8 @@ func test_change_depth_goes_one_step_at_a_time_by_the_hatch_and_the_way_up() -> 
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.descent_position(2))
 	if gs.change_depth(3) != "" or gs.rover_depth != 3:
 		problems.append("Depth 2's hatch did not go to depth 3.")
-	if ZoneDepth.has_way_down(3) or gs.change_depth(4) == "":
-		problems.append("Depth 3 has a way down.")
+	if not ZoneDepth.has_way_down(3) or gs.change_depth(4) == "" or gs.rover_depth != 3:
+		problems.append("Depth 3's hatch was not shut to the deep depths (tests/test_lava_deep.gd has the gate).")
 	gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.ascent_position())
 	if gs.change_depth(2) != "" or gs.rover_depth != 2:
 		problems.append("Depth 3's way up did not go to depth 2.")

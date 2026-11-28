@@ -5132,6 +5132,10 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 	if target_depth < 0 or target_depth > ZoneDepth.max_depth_of(rover_zone) or absi(target_depth - rover_depth) != 1:
 		return "There is no way there from here."
 	var going_down: bool = target_depth > rover_depth
+	if going_down and rover_zone == TUNNELS_ZONE and ZoneDepth.is_deep(target_depth):
+		reason = lava_deep_problem()
+		if reason != "":
+			return reason
 	var down_at: Vector3 = AquiferDepth.hatch_position() if aquifer else (MineDepth.hatch_position() if mine else (IceDepth.hatch_position() if ice else ZoneDepth.descent_position(rover_depth)))
 	var there: Vector3 = down_at if going_down else ZoneDepth.ascent_position()
 	reason = _rover_reach_problem(there, rover_zone)
@@ -5142,6 +5146,20 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 		pose = Transform3D(Basis.IDENTITY, down_at + Vector3(0.0, 0.05, TunnelRock.CELL_M))  # beside the Aquifer's or Mine's hatch
 	_move_rover_to(target_depth, pose)
 	return ""
+
+
+## "" if the farm may go below depth 3 of the Lava Tubes, or what is missing in plain
+## words: the lab level of the gate row ZoneDepth.DEEP_GATE and the lift at depth 3 repaired.
+func lava_deep_problem() -> String:
+	var missing: PackedStringArray = []
+	var level: String = lab_gate_problem(ZoneDepth.DEEP_GATE, "Depth 4 and below")
+	if level != "":
+		missing.append(level)
+	if not is_lift_repaired(TUNNELS_ZONE, ZoneDepth.LIFT_EVERY):
+		missing.append("The lift at depth %d is not repaired." % ZoneDepth.LIFT_EVERY)
+	if missing.is_empty():
+		return ""
+	return "The way below depth %d is shut. %s" % [ZoneDepth.FIRST_DEEP - 1, " ".join(missing)]
 
 
 ## Host: the checks every move of the rover between depths has to pass: it is in the
@@ -5207,7 +5225,7 @@ func repaired_lift_depth(zone: String) -> int:
 ## whole farm, for good. `player_id` is filled in from the connection. Returns "" or why
 ## not. The player is in the Lava Tubes at a depth with a lift, the rover is there and
 ## within reach of the lift, the lift is not repaired yet, and the shared wallet and
-## stock hold the cost (ZoneDepth.LIFT_COST_CREDITS and LIFT_COST_ORE, taken once).
+## stock hold the cost (ZoneDepth.lift_cost: more at the deep lift, taken once).
 func repair_lift(player_id: String = "") -> String:
 	var depth: int = depth_of(player_id) if player_id != "" else rover_depth
 	if player_id != "" and place_of(player_id) != TUNNELS_ZONE:
@@ -5219,10 +5237,11 @@ func repair_lift(player_id: String = "") -> String:
 	var reason: String = _rover_reach_problem(ZoneDepth.lift_position(depth))
 	if reason != "":
 		return reason
-	if credits < ZoneDepth.LIFT_COST_CREDITS or crystal_ore < ZoneDepth.LIFT_COST_ORE:
-		return ZoneDepth.repair_cost_text() + " The farm does not have it yet."
-	add_credits(-ZoneDepth.LIFT_COST_CREDITS)
-	crystal_ore -= ZoneDepth.LIFT_COST_ORE
+	var cost: Vector2i = ZoneDepth.lift_cost(depth)
+	if credits < cost.x or crystal_ore < cost.y:
+		return ZoneDepth.repair_cost_text(depth) + " The farm does not have it yet."
+	add_credits(-cost.x)
+	crystal_ore -= cost.y
 	ore_changed.emit(crystal_ore)
 	var depths: Array = (lifts_repaired.get(TUNNELS_ZONE, []) as Array).duplicate()
 	depths.append(depth)
@@ -5255,6 +5274,10 @@ func use_lift(target_depth: int, player_id: String = "") -> String:
 		return "The lift is broken."
 	if target != target_depth:
 		return "The rover has moved: look again."
+	if ZoneDepth.is_deep(target):
+		reason = lava_deep_problem()
+		if reason != "":
+			return reason
 	reason = _rover_reach_problem(ZoneDepth.lift_position(rover_depth))
 	if reason != "":
 		return reason
@@ -6402,7 +6425,7 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 		return reason
 	var taken_find: Dictionary = ZoneDepth.find_in(today, find_id)
 	var kind: String = str(taken_find["kind"])
-	var pay: Dictionary = AquiferDepth.reward(kind) if aquifer else (MineDepth.reward(kind) if mine else (IceDepth.reward(kind) if ice else ZoneDepth.reward(kind)))
+	var pay: Dictionary = AquiferDepth.reward(kind) if aquifer else (MineDepth.reward(kind) if mine else (IceDepth.reward(kind) if ice else ZoneDepth.reward(kind, rover_depth)))
 	finds_taken = ZoneDepth.with_taken(finds_taken, zone, day, find_id)
 	if pay.has("crystal_ore"):
 		crystal_ore += int(pay["crystal_ore"])

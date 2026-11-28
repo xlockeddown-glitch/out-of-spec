@@ -2,6 +2,19 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: Deep Lava Tubes, depths 4 to 6 (feat/lava-deep)
+
+Slice 11. Every number and word below is a [PLACEHOLDER].
+
+- **Depths [PLACEHOLDER]:** three more floors (4, 5, 6), new `ZoneDepth.PLANS` rows from the same integer hash of (farm seed, zone, depth, day). Depths 1 to 3 are byte for byte as they were; depth 3 gains a hatch (cell 11,13), which no room or landing uses. Depth 6 is last (no hatch). `ZoneDepth.MAX_DEPTH` and the Lava Tubes' `ZonePresence` limit are 6; every other place keeps 3 (`ZonePresence.OTHER_MAX_DEPTH`; the Mine and Aquifer keep their own).
+- **Gate [PLACEHOLDER]:** lab level 10 (the existing `lava_tubes_deep` row in `lab_gates`, now `built: true`, so no new `lava_deep` row) AND the depth 3 lift repaired. `GameState.lava_deep_problem()` gives "The way below depth 3 is shut." plus what is missing (the lab line from `lab_gate_problem`, and "The lift at depth 3 is not repaired."). It is checked first in `change_depth` and in `use_lift` for any target of 4 or more, so nothing moves on a refusal. The hatch prompt on depth 3 shows the same text. A farm from before the gates that kept the row open is open (the existing `lab_gates_kept` rule).
+- **Lift at depth 6 [PLACEHOLDER]:** `LIFT_EVERY` puts the lift at 6. Repair is the same host-run `repair_lift`, 200 CR and 4 ore (`ZoneDepth.lift_cost(depth)`; depth 3 stays 100 CR and 2 ore). Once 6 is repaired, the hub's lift goes to 6 (it skips depth 3, as the rule is "the deepest repaired"); the gate is checked on that ride too. No migration: `lifts_repaired` already holds depths.
+- **Finds [PLACEHOLDER]:** `ZoneDepth.reward(kind, depth)`: per level below 3 (depth 4 is level 1), ore finds give +1 crystal ore, minerals +8 credits, samples +4 credits and +1 crystal ore every second level. No new item. The host's `take_find` passes the rover's depth.
+- **Loose basalt [PLACEHOLDER]:** one rockfall a day on each of depths 4 to 6, from the hash (tag 60), across one side passage (a short cross-section line of cells). I chose BLOCKED over a wear cost: it is part of the layout grid, a pure function, so guests see the same floor and no command or synced field is needed. A candidate that touches a room or would cut any floor off is skipped (BFS over the whole floor), and each room has two passages to the trunk so a fall can always be bypassed. Drawn as a rubble pile and a "LOOSE BASALT" label. Vents stay on depth 1.
+- **Unchanged:** the 00:00 warning and 02:00 recall (depth independent), `deepest_depth` (up to 6, on the phone line), the 06:00 reseed of every depth, FastTravel.
+- **Protocol:** stays 42. No new command and no new synced field, so there are no pins to move. Old saves load as they were.
+- **Tests:** `tests/test_lava_deep.gd` (10 cases); old tests that assumed depth 3 was last or 4 was out of range now use 7.
+
 ## 2026-11-27: Shuttle parties (feat/shuttle-party)
 
 More than one seat on a moon trip. The fare is per person (zones.md section 8.2), so the booking is now for a party.

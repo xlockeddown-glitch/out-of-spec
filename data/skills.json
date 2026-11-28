@@ -55,7 +55,7 @@
     { "id": "certificate_wall", "level": 8, "opens": "Certificate wall", "built": true },
     { "id": "aquifer_hub", "level": 8, "opens": "Flooded Aquifer hub (warning below this level)", "built": false },
     { "id": "job_board", "level": 10, "opens": "The job board", "needs": "Trusted credibility" },
-    { "id": "lava_tubes_deep", "level": 10, "opens": "Lava Tubes depth 4 and below", "needs": "a lift repaired at depth 3", "built": false },
+    { "id": "lava_tubes_deep", "level": 10, "opens": "Lava Tubes depth 4 and below", "needs": "a lift repaired at depth 3", "built": true },
     { "id": "oirm_account", "level": 12, "opens": "An OIRM account" },
     { "id": "colony_mine_hub", "level": 12, "opens": "Abandoned Colony Mine hub (warning below this level)", "needs": "the gate-key quest", "built": false },
     { "id": "aquifer_deep", "level": 14, "opens": "Flooded Aquifer depth 4 and below", "needs": "a pump", "built": false },

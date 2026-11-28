@@ -122,6 +122,7 @@ func _build_zone() -> void:
 		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
 		_vents = ZoneHazards.vents_for(GameState.world_seed, ZoneDepth.ZONE, _built_depth, _built_day)
 		_depth_props.build_vents(_vents)
+		_depth_props.build_rockfall(ZoneDepth.local_layout)
 		if ZoneDepth.has_way_down(_built_depth):
 			_depth_props.build_hatch(_built_depth)
 		GameState.finds_changed.connect(_on_finds_changed)
@@ -270,7 +271,8 @@ func _tell_hub() -> void:
 		LavaHub.SPOT:
 			_hud.push_log("BEACON SPOT: press " + Controls.prompt(&"interact") + " to set a beacon down.")
 		HATCH:
-			_hud.push_log("WAY DOWN: press " + Controls.prompt(&"interact") + " to go down.")
+			var shut: String = GameState.lava_deep_problem() if ZoneDepth.is_deep(_built_depth + 1) else ""
+			_hud.push_log("WAY DOWN: press " + Controls.prompt(&"interact") + " to go down." if shut == "" else "WAY DOWN: " + shut)
 		LIFT:
 			_hud.push_log(_lift_prompt())
 		FIND:
@@ -375,7 +377,7 @@ func _use_find(find_id: String) -> void:
 		_hud.push_log("FIND: " + problem)
 		return
 	var find: Dictionary = ZoneDepth.find_in(ZoneDepth.local_layout, find_id)
-	_hud.push_log("FIND: " + ZoneDepth.reward_text(str(find.get("kind", ""))))
+	_hud.push_log("FIND: " + ZoneDepth.reward_text(str(find.get("kind", "")), _built_depth))
 
 
 ## The depth whose lift this screen shows: the hub's (0) goes to the deepest repaired
@@ -431,8 +433,8 @@ func _lift_prompt() -> String:
 	if repaired:
 		return "LIFT: press " + Controls.prompt(&"interact") + " to ride it %s." % ("up to the hub" if _built_depth > 0 else "down to depth %d" % _lift_depth())
 	if _built_depth > 0:
-		return "LIFT: broken. Press " + Controls.prompt(&"interact") + " to repair it. %s" % ZoneDepth.repair_cost_text()
-	return "LIFT: broken. It is repaired from its far end, at depth %d." % ZoneDepth.MAX_DEPTH
+		return "LIFT: broken. Press " + Controls.prompt(&"interact") + " to repair it. %s" % ZoneDepth.repair_cost_text(_built_depth)
+	return "LIFT: broken. It is repaired from its far end, at depth %d." % ZoneDepth.LIFT_EVERY
 
 
 ## E at a lift: repair it where it is broken (below), or ride it. The host decides.
