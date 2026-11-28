@@ -11,7 +11,7 @@ extends RefCounted
 ## into one or two of the three side rooms. A find in a blocked room cannot be taken that
 ## day, whatever the rover does. Shoring the room (a prop, bought at the hub's crate for
 ## crystal ore) clears it until 06:00. Not built here (later PRs): bad air, old charges,
-## the lift, depth 2 and below, a Mine camp, the Old Props and Colonist's Set quests.
+## the lift (and Old Props' lift step), depth 2 and below, a Mine camp.
 
 const ZONE: String = "colony_mine"
 ## One depth below the hub: no lift, no depth 2.
@@ -41,6 +41,16 @@ const ROCKFALL_IDS: Array[String] = ["r0", "r1", "r2"]
 ## At least this many rooms are blocked each day, and at most this many [PLACEHOLDER].
 const MIN_BLOCKED: int = 1
 const MAX_BLOCKED: int = 2
+## What shoring a rockfall and opening a colonist's case count under in GameState.action_counts.
+const SHORE_COUNT: String = "shore_room"
+const CASE_COUNT: String = "open_colonist_case"
+## A colonist's case: at most one a day in a side room, on 1 day in CASE_ODDS [PLACEHOLDER].
+const CASE: String = "colonist_case"
+const CASE_ODDS: int = 2
+const CASE_DAY_TAG: int = 400
+const CASE_SLOT_TAG: int = 401
+## What a colonist's case pays when the farm has found every reference block [PLACEHOLDER].
+const CASE_FALLBACK_CREDITS: int = 15
 ## What a find is, by kind, and what it pays [PLACEHOLDER].
 const KINDS: Array[String] = ["ore", "ore", "ore", "mineral", "scrap", "scrap"]
 const REWARDS: Dictionary = {
@@ -48,7 +58,16 @@ const REWARDS: Dictionary = {
 	"mineral": { "credits": 14 },
 	"scrap": { "credits": 9 },
 }
-const NAMES: Dictionary = { "ore": "stained ore", "mineral": "a mineral", "scrap": "colony scrap" }
+const NAMES: Dictionary = {
+	"ore": "stained ore",
+	"mineral": "a mineral",
+	"scrap": "colony scrap",
+	"colonist_case": "a colonist's case",
+}
+
+static var _block_cells: Array[Vector2i] = []
+static var _block_cells_seed: int = 0
+static var _block_cells_ready: bool = false
 
 
 # --- The hub --------------------------------------------------------------------
@@ -133,9 +152,11 @@ static func blocked_rooms(base: int) -> Array[int]:
 
 ## The finds: PER_ROOM in each room and ON_LANDING on the landing, never on the start,
 ## the way up or a rockfall. Ids are "d1_f<number>" in this order (as the other zones'
-## are); "room" is the room's number, or -1 on the landing.
+## are); "room" is the room's number, or -1 on the landing. On case days (has_case), one
+## side-room find becomes a colonist's case so a rockfall can bury it.
 static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], used_in: Array[Vector2i]) -> Array:
 	var finds: Array = []
+	var room_slots: Array[int] = []
 	var used: Array[Vector2i] = used_in.duplicate()
 	var places: Array = []
 	for index: int in rooms.size():
@@ -153,9 +174,20 @@ static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], use
 			var index: int = finds.size()
 			var cell: Vector2i = free[ZoneDepth.draw(base, 100 + index, free.size())]
 			used.append(cell)
+			var room: int = int(area[2])
+			if room >= 0:
+				room_slots.append(index)
 			finds.append({ "id": ZoneDepth.find_id(index, 1), "kind": KINDS[ZoneDepth.draw(base, 200 + index, KINDS.size())],
-					"cell": cell, "room": int(area[2]) })
+					"cell": cell, "room": room })
+	if not room_slots.is_empty() and has_case(base):
+		var chosen: int = room_slots[ZoneDepth.draw(base, CASE_SLOT_TAG, room_slots.size())]
+		(finds[chosen] as Dictionary)["kind"] = CASE
 	return finds
+
+
+## True on days whose stream places a colonist's case in one of the side rooms [PLACEHOLDER].
+static func has_case(base: int) -> bool:
+	return ZoneDepth.draw(base, CASE_DAY_TAG, CASE_ODDS) == 0
 
 
 static func find_count() -> int:
@@ -168,6 +200,8 @@ static func reward(kind: String) -> Dictionary:
 
 
 static func reward_text(kind: String) -> String:
+	if kind == CASE:
+		return "Took %s: a reference block." % NAMES.get(kind, kind)
 	var parts: PackedStringArray = []
 	var pay: Dictionary = reward(kind)
 	if pay.has("crystal_ore"):
@@ -175,6 +209,43 @@ static func reward_text(kind: String) -> String:
 	if pay.has("credits"):
 		parts.append("%d credits" % int(pay["credits"]))
 	return "Took %s: %s." % [NAMES.get(kind, kind), " and ".join(parts)]
+
+
+static func case_fallback_reply() -> String:
+	return "Took a colonist's case: every reference block on the farm is found already, so you keep %d credits." % CASE_FALLBACK_CREDITS
+
+
+static func is_case_fallback_reply(text: String) -> bool:
+	return text == case_fallback_reply()
+
+
+## Every farm cell holding a buried reference block for `world_seed`, in sorted (x, y) order.
+static func block_cells(world_seed: int) -> Array[Vector2i]:
+	if not _block_cells_ready or _block_cells_seed != world_seed:
+		_block_cells.clear()
+		_block_cells_seed = world_seed
+		_block_cells_ready = true
+		@warning_ignore("integer_division")
+		var edge: int = Terrain.OLD_HALF_M / Terrain.CELL_M - 1
+		for x: int in range(-edge, edge):
+			for y: int in range(-edge, edge):
+				var cell := Vector2i(x, y)
+				if not ReferenceBlock.at(world_seed, cell).is_empty():
+					_block_cells.append(cell)
+	return _block_cells
+
+
+## The first farm cell holding a reference block not yet in `found`, or null when all are found.
+static func next_block_cell(world_seed: int, found: Dictionary) -> Variant:
+	for cell: Vector2i in block_cells(world_seed):
+		if not found.has(cell):
+			return cell
+	return null
+
+
+## The hub notice board's lines for the Colony Mine's quests (`zone`: `colony_mine`).
+static func board_lines(quests: Array, farm_state: Dictionary, own_state: Dictionary) -> Array[String]:
+	return NoticeBoard.lines(quests, farm_state, own_state, "zone", ZONE)
 
 
 # --- The collapse ---------------------------------------------------------------
