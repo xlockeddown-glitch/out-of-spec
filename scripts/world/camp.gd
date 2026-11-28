@@ -10,6 +10,11 @@ extends RefCounted
 ## A later PR gives another zone a camp with one line here.
 const CELLS: Dictionary[String, Vector2i] = {
 	"lava_tubes": Vector2i(16, 12),
+	# The Aquifer's hub is a stem and one room with a pool: the camp sits in the room's
+	# south west corner, two cells from the pool, off the hatch, lift, crate and sign [PLACEHOLDER].
+	"flooded_aquifer": Vector2i(9, 12),
+	# The Ice Caves' hub is the Lava hub's map: the same east chamber as the Lava camp [PLACEHOLDER].
+	"ice_caves": Vector2i(16, 12),
 }
 ## A moon's camp spot, on its hub's deck (x, y, z) [PLACEHOLDER]: Deimos' expedition camp
 ## (zones step 18). Clear of the console, board, cache, pod, hab, shuttle, craters and the
@@ -38,6 +43,22 @@ const REACH_M: float = 4.0
 const HOST_REACH_SLACK_M: float = 1.5
 ## The count a night at the camp adds to a player's action_counts, for the Two Sunsets step.
 const NIGHT_COUNT: String = "camp_night"
+
+
+## The count a night at `zone`'s camp adds. The Lava Tubes keep NIGHT_COUNT (Two Sunsets reads
+## it); every other zone counts its own, so a night in one zone never counts for another's quest.
+static func night_key(zone: String) -> String:
+	return NIGHT_COUNT if zone == "lava_tubes" else NIGHT_COUNT + "_" + zone
+
+
+## A night at the Ice Caves camp needs the heater the cold rule already uses: the player's
+## pack must have been warmed by a heater cartridge lately, so the cold is under the drift
+## threshold [PLACEHOLDER: no extra supply]. The camp's heater then keeps the night warm.
+## Returns "" or why not; any other zone has no cold rule here.
+static func cold_problem(zone: String, cold: float) -> String:
+	if zone != IceDepth.ZONE or cold < IceDepth.COLD_THRESHOLD:
+		return ""
+	return "Too cold to sleep out: buy a heater cartridge at the hub crate first (%d credits). The pack is at %d %%." % [IceDepth.HEATER_COST_CREDITS, int(cold)]
 
 
 static func has_camp(zone: String) -> bool:

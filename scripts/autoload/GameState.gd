@@ -1827,7 +1827,8 @@ func _beds() -> Object:
 func camp_problem(player_id: String, zone: String, paid: bool = false) -> String:
 	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
 	var near: bool = at != null and Camp.near(zone, at, Camp.HOST_REACH_SLACK_M)
-	return Camp.sleep_problem(zone, camps_open.has(zone), depth_of(player_id), rover_zone == zone and rover_depth == 0, near, maxi(camp_supplies, 1 if paid else 0))
+	var why: String = Camp.sleep_problem(zone, camps_open.has(zone), depth_of(player_id), rover_zone == zone and rover_depth == 0, near, maxi(camp_supplies, 1 if paid else 0))
+	return why if why != "" else Camp.cold_problem(zone, cold_of(player_id))
 
 
 ## Host: the player goes to bed at the open camp of `zone`. Uses one night's supplies and
@@ -1846,7 +1847,7 @@ func _go_to_camp_bed(player_id: String, zone: String) -> String:
 	var why: String = camp_problem(player_id, zone, paid)
 	if why != "":
 		return why
-	return _camp_night(player_id, Camp.NIGHT_COUNT, paid)
+	return _camp_night(player_id, Camp.night_key(zone), paid)
 
 
 ## Host: one night at a camp for `player_id`: uses a night's supplies (not again if they
@@ -4257,6 +4258,7 @@ func _sitter_tend() -> void:
 
 
 func _on_day_started(day: int) -> void:
+	_warm_ice_campers()
 	_campers.clear()  # the night at a camp is over: they wake there, and the recall is theirs again
 	_cold_kept.clear()  # yesterday's cold never comes back, whatever the grace
 	# A rover below stands on the new day's floor.
@@ -4701,6 +4703,8 @@ const ICE_CORE_RETURN_LAB_XP: int = 80
 const ICE_CORE_SAMPLE_KIND: String = "ice_core"
 ## Action counters for Vance's quest A Core to Certify (no XP on their own).
 const ICE_CORE_TAKEN_COUNT: String = "take_ice_core"
+## A player's finds taken in the Flooded Aquifer, for Vance's The Sump Sample (no XP).
+const AQUIFER_FIND_COUNT: String = "take_aquifer_find"
 const ICE_CORE_CERTIFIED_COUNT: String = "ice_core_certified"
 const ICE_CORE_TAKEN_REPLY: String = "Took an ice core. It goes in the cold box for OIRM."
 
@@ -5163,6 +5167,20 @@ func _prune_cold() -> void:
 	var kept: Dictionary = _cold_in_caves()
 	if kept.size() != cold_since.size():
 		cold_since = kept
+		ice_changed.emit()
+
+
+## Host: whoever slept at the Ice Caves camp wakes warm, the camp's heater having run all night
+## (the cold starts again from the morning) [PLACEHOLDER].
+func _warm_ice_campers() -> void:
+	if FarmCommands.guest:
+		return
+	var warmed: bool = false
+	for who: Variant in _campers:
+		if cold_since.has(who) and place_of(str(who)) == IceDepth.ZONE:
+			cold_since[who] = GameClock.elapsed_days
+			warmed = true
+	if warmed:
 		ice_changed.emit()
 
 
@@ -5643,7 +5661,7 @@ func _move_rover(zone: String, into_tunnels: bool, player_id: String) -> String:
 		_ore_at_entry = crystal_ore
 		if not zones_unlocked.has(zone):
 			zones_unlocked.append(zone)  # the first real visit opens it to the console
-		if zone == IceDepth.ZONE and who != MANAGER_ID:
+		if zone in [IceDepth.ZONE, AquiferDepth.ZONE] and who != MANAGER_ID:
 			var visited: Dictionary = (action_counts.get_or_add(who, {}) as Dictionary).get_or_add(REACHED_PREFIX + zone, { "count": 0, "xp": 0 })
 			visited["count"] = int(visited["count"]) + 1
 	rover_zone = zone if into_tunnels else ""
@@ -5697,7 +5715,7 @@ func fast_travel(zone_id: String, player_id: String = "") -> String:
 		rover_transforms[TUNNEL_ROVER] = TUNNEL_START
 		rover_epoch += 1
 	_set_place(player_id, zone_id, rover_depth)
-	if zone_id == IceDepth.ZONE and _player(player_id) != MANAGER_ID:
+	if zone_id in [IceDepth.ZONE, AquiferDepth.ZONE] and _player(player_id) != MANAGER_ID:
 		var visited_ft: Dictionary = (action_counts.get_or_add(_player(player_id), {}) as Dictionary).get_or_add(REACHED_PREFIX + zone_id, { "count": 0, "xp": 0 })
 		visited_ft["count"] = int(visited_ft["count"]) + 1
 	_trip_players[player_id] = true
@@ -6789,6 +6807,9 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 			ore_changed.emit(crystal_ore)
 		if pay.has("credits"):
 			add_credits(int(pay["credits"]))
+	if aquifer and _player(player_id) != MANAGER_ID:
+		var sampled: Dictionary = (action_counts.get_or_add(_player(player_id), {}) as Dictionary).get_or_add(AQUIFER_FIND_COUNT, { "count": 0, "xp": 0 })
+		sampled["count"] = int(sampled["count"]) + 1
 	if mine and kind == MineDepth.CASE:
 		var who_case: String = _player(player_id)
 		var next_cell: Variant = MineDepth.next_block_cell(world_seed, found_blocks)

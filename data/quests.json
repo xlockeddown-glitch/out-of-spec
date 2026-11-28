@@ -397,6 +397,31 @@
           "check": "counter", "counter": "ice_core_certified" }
       ],
       "rewards": { "lab_xp": 300, "xp_certificate": 50, "phone": "npcs/vance/quests/a_core_to_certify_done" }
+    },
+    {
+      "id": "the_sump_sample", "kind": "lab", "giver": "vance", "title": "The Sump Sample", "scope": "farm", "zone": "flooded_aquifer", "camp": "flooded_aquifer",
+      "gates": { "lab_level": 8 },
+      "offer": { "when": "counter", "counter": "reached_flooded_aquifer", "at_least": 1 },
+      "offer_line": "npcs/vance/quests/the_sump_sample_offer",
+      "any_order": true,
+      "steps": [
+        { "id": "night", "text": "Park the rover at the Flooded Aquifer camp and go to bed there.",
+          "check": "counter", "counter": "camp_night_flooded_aquifer" },
+        { "id": "sample", "text": "Take one find from the Flooded Aquifer's depths.",
+          "check": "counter", "counter": "take_aquifer_find" }
+      ],
+      "rewards": { "lab_xp": 150, "phone": "npcs/vance/quests/the_sump_sample_done" }
+    },
+    {
+      "id": "a_night_on_the_ice", "kind": "personal", "giver": "orin", "title": "A Night on the Ice", "scope": "player", "zone": "ice_caves", "camp": "ice_caves",
+      "gates": { "lab_level": 12 },
+      "offer": { "when": "counter", "counter": "reached_ice_caves", "at_least": 1 },
+      "offer_line": "npcs/orin/quests/a_night_on_the_ice_offer",
+      "steps": [
+        { "id": "night", "text": "Warm your pack with a heater cartridge, park the rover at the Polar Ice Caves camp and go to bed there.",
+          "check": "counter", "counter": "camp_night_ice_caves" }
+      ],
+      "rewards": { "xp_certificate": 30, "phone": "npcs/orin/quests/a_night_on_the_ice_done" }
     }
   ],
   "keepsakes": [

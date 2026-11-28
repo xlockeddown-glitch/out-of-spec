@@ -2,6 +2,18 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-28: Aquifer and Ice Caves camps (feat/camps-aquifer-ice)
+
+Slice 21. Every number and line of text below is a [PLACEHOLDER].
+
+- **Camp cells [PLACEHOLDER]:** `Camp.CELLS` gains `flooded_aquifer` at (9, 12), the south west corner of the hub's room, two cells from the pool and off the hatch, lift, crate and sign, and `ice_caves` at (16, 12), the Lava camp's cell (the Ice hub is the Lava hub's map). Both are dry open floor in the hub (depth 0), which the 06:00 reseed never touches. Both scenes add `CampProps` in the hub, and the rover prompt and E use are the Lava scene's (`_tell_camp`, `_use_camp`).
+- **Ice Caves cold rule [PLACEHOLDER: the heater, not one more supply]:** a night at the Ice Caves camp needs the heater cartridge the cold rule already uses: the player's pack must be under `IceDepth.COLD_THRESHOLD` (50 %), which a heater bought at the hub crate gives for the next 5 game hours. A colder pack is refused with "buy a heater cartridge at the hub crate first", before any supply is spent or night counted; a refused player is not in bed, so the 02:00 recall still carries them out. A camper wakes warm (`_warm_ice_campers` restarts the cold at 06:00). No extra supply, so the 30 CR supply price stays the one price.
+- **Per-zone night counts:** the Lava Tubes keep `camp_night` (Two Sunsets reads it); every other camp counts `camp_night_<zone>` (`Camp.night_key`), so a night in one zone never counts for another's quest.
+- **Quests [PLACEHOLDER: rewards 150 lab XP and a 30 XP certificate]:** Vance's The Sump Sample (`the_sump_sample`, lab, farm scope, zone and camp `flooded_aquifer`, lab level 8, offered after `reached_flooded_aquifer >= 1`; steps in any order: a night at the Aquifer camp and one Aquifer find; 150 lab XP and a phone message). Orin's A Night on the Ice (`a_night_on_the_ice`, personal, player scope, zone and camp `ice_caves`, lab level 12, offered after `reached_ice_caves >= 1`; one night at the Ice camp; a 30 XP certificate). Both are on their zone's notice board (the Aquifer sign now lists its zone's quests too). Their dispatch lines are [PLACEHOLDER] text.
+- **Counters:** the Aquifer had none, so entering it now records `reached_flooded_aquifer` (with the Ice Caves, by `_move_rover` and `fast_travel`), and taking an Aquifer find counts `take_aquifer_find`.
+- **Protocol:** unchanged at 45. No command or synced field is new: `camps_open`, `camp_supplies`, `cold_since` and `action_counts` are already saved and synced, and a night uses `go_to_bed`, `buy_camp_supplies` and `buy_heater`.
+- **Tests:** `tests/test_camps_aquifer_ice.gd`; `tests/test_campouts.gd` now uses `colony_mine` as the zone with no camp.
+
 ## 2026-11-28: Ice core samples and Vance's "A Core to Certify" (feat/ice-cores)
 
 Every new number and line of text below is a [PLACEHOLDER].
