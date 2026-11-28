@@ -1107,9 +1107,13 @@ func farm_dict_problem(data: Dictionary) -> String:
 	for record: Dictionary in data["cal_log"]:
 		if not record.get("as_found_in_tolerance") is bool or not record.get("traceable", true) is bool or not record.get("performed_by", "") is String or not record.get("standard_problem", "") is String:
 			return "'cal_log' has an entry with a field missing."
+		if record.has("cal_initials") and not record["cal_initials"] is String:
+			return "'cal_log' has a bad cal_initials."
 	for cert: Dictionary in data["certificate_log"]:
-		if not _optional_fields(cert, ["issuer"], []):
+		if not _optional_fields(cert, ["issuer", "cal_initials", "cert_title"], []):
 			return "'certificate_log' has a field of the wrong type."
+		if cert.has("gold_border") and not cert["gold_border"] is bool:
+			return "'certificate_log' has a bad gold_border."
 		# A maker's certificate has no as-found; an in-house one names its reference.
 		if not cert.has("as_found") or not (cert["as_found"] == null or cert["as_found"] is float or cert["as_found"] is int) or not cert.get("as_found_in_tolerance") is bool or (cert.has("reference_id") and not _has_fields(cert, ["reference_id", "reference_certificate"], [])):
 			return "'certificate_log' has an entry with a field missing."
@@ -1213,6 +1217,8 @@ static func _audit_problem(report: Dictionary) -> String:
 	for key: String in ["day", "total_fine", "phone_count"]:
 		if not (report.get(key, 0) is int or report.get(key, 0) is float):
 			return key
+	if report.has("gold_border") and not report["gold_border"] is bool:
+		return "gold_border"
 	for pair: Array in [["lines", "instrument_id"], ["interlocks", "robot_id"]]:
 		var entries: Variant = report.get(pair[0], [])
 		if not entries is Array:
@@ -2536,9 +2542,9 @@ func lab_gates_opened_text(after: int, upto: int) -> String:
 # --- Late-level cosmetics (slice 35; Cosmetics) ---------------------------------
 
 ## Host: sets a robot's paint color and sanitized nameplate once lab gate
-## `robot_paint` (level 85) is open. `player_id` comes from the connection.
+## `robot_paint` (level 85) is open. Robots are farm-shared, so any player may
+## paint or name any robot (keep `player_id` name for FarmCommands).
 func set_robot_cosmetic(robot_id: String, paint_id: String, nameplate: String, player_id: String = "") -> String:
-	var _who: String = _player(player_id)
 	var gate: String = lab_gate_problem(Cosmetics.GATE_ROBOT_PAINT, "Robot paint and nameplates")
 	if gate != "":
 		return gate
@@ -2595,7 +2601,7 @@ func lab_coat_color(player_id: String = "") -> String:
 
 ## Sends Odalys's mug once when the lab reaches level 99. Pays nothing.
 func _deliver_odalys_mug_if_due() -> void:
-	if odalys_mug_sent or not lab_gate_open(Cosmetics.GATE_GOLD_BORDER):
+	if FarmCommands.guest or odalys_mug_sent or not lab_gate_open(Cosmetics.GATE_GOLD_BORDER):
 		return
 	odalys_mug_sent = true
 	post_phone(Cosmetics.ODALYS_MUG_PHONE)
@@ -3321,7 +3327,7 @@ func _robots_dict_problem(saved: Dictionary) -> String:
 			return "Robot '%s' has a bad override_by." % id
 		if robot.has("paint") and not Cosmetics.is_robot_paint(robot["paint"]):
 			return "Robot '%s' has a bad paint." % id
-		if robot.has("nameplate") and (typeof(robot["nameplate"]) != TYPE_STRING or (robot["nameplate"] as String).length() > Cosmetics.MAX_NAMEPLATE):
+		if robot.has("nameplate") and (typeof(robot["nameplate"]) != TYPE_STRING or Cosmetics.clean_nameplate(robot["nameplate"]) != robot["nameplate"]):
 			return "Robot '%s' has a bad nameplate." % id
 	return ""
 
@@ -4738,7 +4744,7 @@ func _issue_certificate(standard_id: String, day: int, as_found: Variant, as_lef
 		"k": sensor.certificate_k,
 		"founding": founding,
 	}
-	if not founding and lab_gate_open(Cosmetics.GATE_GOLD_BORDER):
+	if not founding and issuer == IN_HOUSE and lab_gate_open(Cosmetics.GATE_GOLD_BORDER):
 		cert["gold_border"] = true
 	_next_certificate_number += 1
 	certificates[standard_id] = cert

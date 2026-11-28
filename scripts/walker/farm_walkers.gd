@@ -18,22 +18,49 @@ var camera: IsoCamera
 var _own: Walker
 ## Player -> model.
 var _friends: Dictionary[String, WalkerModel] = {}
-## Player -> their parts, read again only after the loadouts changed.
+## Player -> their parts, coat color, and name tag, cached until loadouts/skills/farm change.
 var _parts: Dictionary = {}
+var _coat_colors: Dictionary = {}
+var _name_tags: Dictionary = {}
 
 
 func _ready() -> void:
-	GameState.loadouts_changed.connect(_forget_parts)
+	GameState.loadouts_changed.connect(_forget_cosmetics)
+	GameState.farm_loaded.connect(_forget_cosmetics)
+	GameState.skill_leveled.connect(_forget_name_tag_for)
+	GameState.skill_xp_changed.connect(_forget_name_tag_xp)
 
 
-func _forget_parts() -> void:
+func _forget_cosmetics() -> void:
 	_parts.clear()
+	_coat_colors.clear()
+	_name_tags.clear()
+
+
+func _forget_name_tag_for(player_id: String, _skill_id: String, _level: int) -> void:
+	_name_tags.erase(player_id)
+
+
+func _forget_name_tag_xp(player_id: String, _skill_id: String) -> void:
+	_name_tags.erase(player_id)
 
 
 func _parts_of(player_id: String) -> Dictionary:
 	if not _parts.has(player_id):
 		_parts[player_id] = GameState.loadout_of(player_id)["parts"]
 	return _parts[player_id]
+
+
+func _coat_of(player_id: String) -> String:
+	if not _coat_colors.has(player_id):
+		_coat_colors[player_id] = GameState.lab_coat_color(player_id)
+	return _coat_colors[player_id]
+
+
+func _name_tag_of(player_id: String) -> String:
+	if not _name_tags.has(player_id):
+		_name_tags[player_id] = Cosmetics.name_tag_text(GameState, player_id)
+	return _name_tags[player_id]
 
 
 func _exit_tree() -> void:
@@ -65,8 +92,8 @@ func _physics_process(_delta: float) -> void:
 		_own.leave_deep_water()
 	_own.model.set_suit(WalkerModel.suit_for(own, CoopSession.players))
 	_own.model.set_loadout(_parts_of(own))
-	_own.model.set_coat_color(GameState.lab_coat_color(own))
-	_own.model.set_name_tag(Cosmetics.name_tag_text(GameState, own) if CoopSession.players.size() > 1 else "")
+	_own.model.set_coat_color(_coat_of(own))
+	_own.model.set_name_tag(_name_tag_of(own) if CoopSession.players.size() > 1 else "")
 
 
 ## After a dig or a stone changed the water: this screen's walker, if it is in deep
@@ -102,8 +129,8 @@ func _show_friend(player_id: String, pose: Array, delta: float) -> void:
 	var model: WalkerModel = _friends[player_id]
 	model.set_suit(WalkerModel.suit_for(player_id, CoopSession.players))
 	model.set_loadout(_parts_of(player_id))
-	model.set_coat_color(GameState.lab_coat_color(player_id))
-	model.set_name_tag(Cosmetics.name_tag_text(GameState, player_id))
+	model.set_coat_color(_coat_of(player_id))
+	model.set_name_tag(_name_tag_of(player_id))
 	if model.position.distance_to(at) > JUMP_M:
 		share = 1.0
 	model.position = model.position.lerp(at, share)

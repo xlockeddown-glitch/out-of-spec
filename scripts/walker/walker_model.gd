@@ -33,7 +33,7 @@ var _walked_m: float = 0.0
 var _parts: Dictionary = Loadout.default_parts()
 var _dressing: Array[MeshInstance3D] = []
 var _coat_color_id: String = ""
-var _coat_mesh: MeshInstance3D = null
+var _coat_root: Node3D = null
 var _name_tag: Label3D = null
 
 
@@ -119,22 +119,37 @@ func suit() -> Color:
 
 
 ## Applies a personal lab coat color (Cosmetics.COAT_COLORS, unlocked at any skill 50).
+## Built as an open-front coat (back panel + left/right panels) leaving a 1.2-voxel
+## vertical chest stripe of the suit color visible so co-op players stay distinct,
+## while keeping the DARK back pack visible behind the back panel.
 ## Empty string clears the custom coat mesh.
 func set_coat_color(color_id: String) -> void:
 	var clean: String = color_id if Cosmetics.is_coat_color(color_id) else ""
 	if clean == _coat_color_id:
 		return
 	_coat_color_id = clean
-	if _coat_mesh != null:
-		if _coat_mesh.get_parent() != null:
-			_coat_mesh.get_parent().remove_child(_coat_mesh)
-		_coat_mesh.free()
-		_coat_mesh = null
+	if _coat_root != null:
+		if _coat_root.get_parent() != null:
+			_coat_root.get_parent().remove_child(_coat_root)
+		_coat_root.free()
+		_coat_root = null
 	if clean == "":
 		return
-	_coat_mesh = _made(Vector3(0.0, 3.9, 0.0), Vector3(3.0, 3.25, 1.9), Cosmetics.coat_color(clean))
-	_coat_mesh.name = "LabCoatColor"
-	add_child(_coat_mesh)
+	var tint: Color = Cosmetics.coat_color(clean)
+	_coat_root = Node3D.new()
+	_coat_root.name = "LabCoatColor"
+	# Back panel behind the torso (+Z), stopping at z = 0.95 so the DARK pack (0.75..1.75) stays visible.
+	var back: MeshInstance3D = _made(Vector3(0.0, 3.9, 0.775), Vector3(3.0, 3.25, 0.35), tint)
+	back.name = "BackPanel"
+	_coat_root.add_child(back)
+	# Left and right side/front panels leaving x in [-0.6, +0.6] (1.2 voxels) open on the chest.
+	var left: MeshInstance3D = _made(Vector3(-1.05, 3.9, 0.0), Vector3(0.9, 3.25, 1.9), tint)
+	left.name = "LeftPanel"
+	_coat_root.add_child(left)
+	var right: MeshInstance3D = _made(Vector3(1.05, 3.9, 0.0), Vector3(0.9, 3.25, 1.9), tint)
+	right.name = "RightPanel"
+	_coat_root.add_child(right)
+	add_child(_coat_root)
 
 
 func coat_color() -> String:
@@ -157,7 +172,8 @@ func set_name_tag(text: String) -> void:
 		_name_tag.modulate = ScopeTheme.INK
 		_name_tag.position = Vector3(0.0, 9.6, 0.0) * VOXEL_M
 		add_child(_name_tag)
-	_name_tag.text = text
+	if _name_tag.text != text:
+		_name_tag.text = text
 	_name_tag.visible = true
 
 

@@ -129,6 +129,7 @@ static func earned_from(farm: Node) -> Array[Dictionary]:
 			"kind": "lab_quest",
 			"title": str(quest.get("title", qid)),
 			"day": done_day,
+			"gold_border": bool(entry.get("gold_border", false)),
 			"_order": 1,
 			"_index": i,
 		})

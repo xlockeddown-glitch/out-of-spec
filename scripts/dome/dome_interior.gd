@@ -196,15 +196,24 @@ func _build_odalys_mug() -> void:
 ## warning has been used. A guest sees the host's farm, so the host's ring.
 ## Odalys's mug sits on the same bench spot once lab level 99 delivers it.
 func _show_mug_ring() -> void:
+	var mug_sent: bool = GameState.odalys_mug_sent
+	var ring_active: bool = GameState.audit_grace_used and not mug_sent
 	_mug_ring.visible = GameState.audit_grace_used
-	if _mug_ring_click.enabled != _mug_ring.visible:
-		_mug_ring_click.enabled = _mug_ring.visible
+	_mug_ring_click.visible = ring_active
+	_mug_ring_click.monitorable = ring_active
+	_mug_ring_click.input_ray_pickable = ring_active
+	_mug_ring_click.collision_layer = 8 if ring_active else 0
+	if _mug_ring_click.enabled != ring_active:
+		_mug_ring_click.enabled = ring_active
 		if Clickable.hovered == _mug_ring_click:
 			Clickable.hovered = null
 	if _odalys_mug != null:
-		_odalys_mug.visible = GameState.odalys_mug_sent
-		if _odalys_mug_click.enabled != _odalys_mug.visible:
-			_odalys_mug_click.enabled = _odalys_mug.visible
+		_odalys_mug.visible = mug_sent
+		_odalys_mug_click.monitorable = mug_sent
+		_odalys_mug_click.input_ray_pickable = mug_sent
+		_odalys_mug_click.collision_layer = 8 if mug_sent else 0
+		if _odalys_mug_click.enabled != mug_sent:
+			_odalys_mug_click.enabled = mug_sent
 			if Clickable.hovered == _odalys_mug_click:
 				Clickable.hovered = null
 

@@ -88,6 +88,8 @@ const ENTRY_KEYS: Array[String] = ["accepted", "steps_done", "base", "shown", "p
 const PLAYER_ENTRY_KEYS: Array[String] = ["accepted", "steps_done", "base", "shown", "players", "done", "carried"]
 const SCOPE_FARM: String = "farm"
 const SCOPE_PLAYER: String = "player"
+## Optional flag on a finished farm lab quest earned at lab level 99.
+const GOLD_BORDER: String = "gold_border"
 ## A daily ask's `kind`. See _update_dailies().
 const KIND_DAILY: String = "daily"
 ## A counter step's `whose` when every player's doing counts, in a player's own
@@ -461,6 +463,9 @@ static func _accepted(farm: Node, quest: Dictionary, present: Array[String], own
 ## A player's own quest (`owner`) pays that player.
 static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: Array[String], owner: String = "") -> void:
 	entry["done"] = GameClock.get_day_index()
+	if owner == "" and str(quest.get("kind", "")) == "lab" and str(quest.get("scope", SCOPE_FARM)) == SCOPE_FARM \
+			and farm.lab_gate_open(Cosmetics.GATE_GOLD_BORDER):
+		entry[GOLD_BORDER] = true
 	# Before anything is paid: a reward must not change which ending it is.
 	var line: String = phone_line(ending_line(farm, quest, present, owner))
 	var reward: String = reward_text(quest)
@@ -1298,8 +1303,10 @@ static func quest_score(quest: Dictionary, entry: Dictionary) -> int:
 static func state_problem(state: Dictionary, keys: Array[String] = ENTRY_KEYS, name: String = "quest_state") -> String:
 	for id: Variant in state:
 		var entry: Variant = state[id]
-		# `scores` is there only once a mini-game step was played to a grade.
-		if not id is String or id == "" or typeof(entry) != TYPE_DICTIONARY or entry.size() != keys.size() + int(entry.has(SCORES)) or not entry.has_all(keys):
+		# `scores` is there only once a mini-game step was played to a grade;
+		# `gold_border` only on a farm lab quest finished at lab level 99.
+		var extra_keys: int = int(entry is Dictionary and entry.has(SCORES)) + int(entry is Dictionary and entry.has(GOLD_BORDER))
+		if not id is String or id == "" or typeof(entry) != TYPE_DICTIONARY or entry.size() != keys.size() + extra_keys or not entry.has_all(keys):
 			return "'%s' has an entry that is not a quest's." % name
 		if not entry["accepted"] is int or not entry["done"] is int or entry["accepted"] < 0 or entry["done"] < -1:
 			return "'%s' has a day that is not a day." % name
@@ -1307,6 +1314,8 @@ static func state_problem(state: Dictionary, keys: Array[String] = ENTRY_KEYS, n
 			return "'%s' has a list that is not of names." % name
 		if not _text_to_counts(entry["base"]) or not _text_to_counts(entry["shown"]) or not _text_to_counts(entry.get("carried", {})):
 			return "'%s' has a count that is not a whole number." % name
+		if entry.has(GOLD_BORDER) and not entry[GOLD_BORDER] is bool:
+			return "'%s' has a gold_border that is not a bool." % name
 		if entry.has(SCORES):
 			if not _text_to_counts(entry[SCORES]):
 				return "'%s' has a score that is not a mini-game's." % name
