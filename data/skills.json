@@ -71,7 +71,7 @@
     { "id": "collect_spool_card", "level": 30, "opens": "COLLECT SPOOL cards", "needs": "Robotics" },
     { "id": "expedition_permit", "level": 30, "opens": "The expedition permit: multi-day trips", "built": true },
     { "id": "robot_2", "level": 35, "opens": "A second robot", "needs": "Robotics" },
-    { "id": "second_contract", "level": 35, "opens": "The second contract", "built": false, "beat": true },
+    { "id": "second_contract", "level": 35, "opens": "The second OIRM contract", "needs": "the first contract complete", "built": true, "beat": true },
     { "id": "ice_caves_cores", "level": 35, "opens": "Ice Caves deep cores", "built": false },
     { "id": "tier3", "level": 40, "opens": "Tier 3 standards", "needs": "a traceable lab and a certified Tier 2 standard" },
     { "id": "phobos_deep", "level": 40, "opens": "Phobos deep station", "built": false },
