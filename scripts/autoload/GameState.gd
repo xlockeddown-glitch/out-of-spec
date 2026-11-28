@@ -5133,31 +5133,59 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 	if target_depth < 0 or target_depth > ZoneDepth.max_depth_of(rover_zone) or absi(target_depth - rover_depth) != 1:
 		return "There is no way there from here."
 	var going_down: bool = target_depth > rover_depth
-	if rover_zone == TUNNELS_ZONE and ZoneDepth.is_deep(target_depth):  # down into them or between them
-		reason = lava_deep_problem()
+	if ZoneDepth.is_deep(target_depth):  # down into the deep depths or between them, in either zone
+		reason = deep_problem(rover_zone)
 		if reason != "":
 			return reason
-	var down_at: Vector3 = AquiferDepth.hatch_position() if aquifer else (MineDepth.hatch_position() if mine else (IceDepth.hatch_position() if ice else ZoneDepth.descent_position(rover_depth)))
+	var hub_hatch: Vector3 = AquiferDepth.hatch_position() if aquifer else (MineDepth.hatch_position() if mine else (IceDepth.hatch_position() if ice else ZoneDepth.descent_position(0)))
+	var down_at: Vector3 = hub_hatch if rover_depth == 0 else ZoneDepth.descent_position(rover_depth)
 	var there: Vector3 = down_at if going_down else ZoneDepth.ascent_position()
 	reason = _rover_reach_problem(there, rover_zone)
 	if reason != "":
 		return reason
 	var pose: Transform3D = ZoneDepth.arrival_pose(target_depth, going_down, false)
-	if (aquifer or mine or ice) and not going_down:
-		pose = Transform3D(Basis.IDENTITY, down_at + Vector3(0.0, 0.05, TunnelRock.CELL_M))  # beside the Aquifer's or Mine's hatch
+	if (aquifer or mine or ice) and not going_down and target_depth == 0:
+		pose = Transform3D(Basis.IDENTITY, hub_hatch + Vector3(0.0, 0.05, TunnelRock.CELL_M))  # beside the Aquifer's or Mine's hatch
 	_move_rover_to(target_depth, pose)
 	return ""
 
 
-## A loaded farm whose rover is below depth 3 of the Lava Tubes while the way there is shut
-## (an old or edited save: the lab level is low, or the lift at depth 3 is broken) has it
-## back up at depth 3's start: it loads, but the deep floors stay out of reach until the
-## gate is met [PLACEHOLDER].
+## A loaded farm whose rover is below depth 3 of the Lava Tubes or the Flooded Aquifer while
+## the way there is shut (an old or edited save: the lab level is low, the pump is gone, or
+## the lift at depth 3 is broken) has it back up at depth 3's start: it loads, but the deep
+## floors stay out of reach until the gate is met [PLACEHOLDER].
 func _hold_deep_rover() -> void:
-	if rover_zone != TUNNELS_ZONE or not ZoneDepth.is_deep(rover_depth) or lava_deep_problem() == "":
+	if not ZoneDepth.is_deep(rover_depth) or deep_problem(rover_zone) == "":
 		return
 	rover_depth = ZoneDepth.FIRST_DEEP - 1
 	rover_transforms.erase(TUNNEL_ROVER)  # settle_rover_depth puts it at the start
+
+
+## "" if the farm may go below depth 3 of `zone`, or what is missing in plain words (a zone
+## with no deep depths has no gate).
+func deep_problem(zone: String) -> String:
+	if zone == TUNNELS_ZONE:
+		return lava_deep_problem()
+	if zone == AquiferDepth.ZONE:
+		return aquifer_deep_problem()
+	return ""
+
+
+## "" if the farm may go below depth 3 of the Flooded Aquifer, or what is missing in plain
+## words: the lab level of the gate row AquiferDepth.DEEP_GATE, the farm's pump, and the lift
+## at depth 3 repaired. Nothing is charged by asking.
+func aquifer_deep_problem() -> String:
+	var missing: PackedStringArray = []
+	var level: String = lab_gate_problem(AquiferDepth.DEEP_GATE, "Depth 4 and below")
+	if level != "":
+		missing.append(level)
+	if not pump_owned:
+		missing.append("The farm has no pump.")
+	if not is_lift_repaired(AquiferDepth.ZONE, ZoneDepth.LIFT_EVERY):
+		missing.append("The lift at depth %d is not repaired." % ZoneDepth.LIFT_EVERY)
+	if missing.is_empty():
+		return ""
+	return "The way below depth %d is shut. %s" % [ZoneDepth.FIRST_DEEP - 1, " ".join(missing)]
 
 
 ## "" if the farm may go below depth 3 of the Lava Tubes, or what is missing in plain
@@ -5240,16 +5268,17 @@ func repaired_lift_depth(zone: String) -> int:
 ## stock hold the cost (ZoneDepth.lift_cost: more at the deep lift, taken once).
 func repair_lift(player_id: String = "") -> String:
 	var depth: int = depth_of(player_id) if player_id != "" else rover_depth
-	if player_id != "" and place_of(player_id) != TUNNELS_ZONE:
-		return "The lift is below the Lava Tubes."
-	if not ZoneDepth.is_lift_depth(depth) or rover_zone != TUNNELS_ZONE or rover_depth != depth:
+	var zone: String = rover_zone if rover_zone in [TUNNELS_ZONE, AquiferDepth.ZONE] else TUNNELS_ZONE
+	if player_id != "" and place_of(player_id) != zone:
+		return "The lift is below the Lava Tubes." if zone == TUNNELS_ZONE else "The lift is below the Flooded Aquifer."
+	if not ZoneDepth.is_lift_depth(depth) or rover_zone != zone or rover_depth != depth:
 		return "There is no lift to repair here."
-	if is_lift_repaired(TUNNELS_ZONE, depth):
+	if is_lift_repaired(zone, depth):
 		return "The lift is repaired already."
-	var reason: String = lava_deep_problem() if ZoneDepth.is_deep(depth) else ""
+	var reason: String = deep_problem(zone) if ZoneDepth.is_deep(depth) else ""
 	if reason != "":
 		return reason
-	reason = _rover_reach_problem(ZoneDepth.lift_position(depth))
+	reason = _rover_reach_problem(ZoneDepth.lift_position(depth), zone)
 	if reason != "":
 		return reason
 	var cost: Vector2i = ZoneDepth.lift_cost(depth)
@@ -5258,9 +5287,9 @@ func repair_lift(player_id: String = "") -> String:
 	add_credits(-cost.x)
 	crystal_ore -= cost.y
 	ore_changed.emit(crystal_ore)
-	var depths: Array = (lifts_repaired.get(TUNNELS_ZONE, []) as Array).duplicate()
+	var depths: Array = (lifts_repaired.get(zone, []) as Array).duplicate()
 	depths.append(depth)
-	lifts_repaired[TUNNELS_ZONE] = depths
+	lifts_repaired[zone] = depths
 	lifts_changed.emit()
 	post_phone("LIFT: repaired for good (depth %d). The hub's lift now comes here." % depth)
 	return ""
@@ -5276,24 +5305,24 @@ func use_lift(target_depth: int, player_id: String = "") -> String:
 	var reason: String = _rover_trip_problem(player_id)
 	if reason != "":
 		return reason
-	if rover_zone != TUNNELS_ZONE:
+	if rover_zone != TUNNELS_ZONE and rover_zone != AquiferDepth.ZONE:
 		return "There is no lift here."
 	var target: int = 0
 	if rover_depth == 0:
-		target = repaired_lift_depth(TUNNELS_ZONE)
+		target = repaired_lift_depth(rover_zone)
 		if target == 0:
 			return "The lift is broken. Repair it from its far end first."
 	elif not ZoneDepth.is_lift_depth(rover_depth):
 		return "There is no lift here."
-	elif not is_lift_repaired(TUNNELS_ZONE, rover_depth):
+	elif not is_lift_repaired(rover_zone, rover_depth):
 		return "The lift is broken."
 	if target != target_depth:
 		return "The rover has moved: look again."
 	if ZoneDepth.is_deep(target):
-		reason = lava_deep_problem()
+		reason = deep_problem(rover_zone)
 		if reason != "":
 			return reason
-	reason = _rover_reach_problem(ZoneDepth.lift_position(rover_depth))
+	reason = _rover_reach_problem(ZoneDepth.lift_position(rover_depth), rover_zone)
 	if reason != "":
 		return reason
 	_move_rover_to(target, ZoneDepth.arrival_pose(target, target > 0, true))
@@ -6422,8 +6451,8 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 		reason = "The rover is not down there."
 	if reason == "" and depth_of(player_id) != rover_depth:
 		reason = "Finds lie where the rover is."
-	if reason == "" and zone == ZoneDepth.ZONE and ZoneDepth.is_deep(rover_depth):
-		reason = lava_deep_problem()  # the deep floors pay only once the way there is open
+	if reason == "" and (zone == ZoneDepth.ZONE or aquifer) and ZoneDepth.is_deep(rover_depth):
+		reason = deep_problem(zone)  # the deep floors pay only once the way there is open
 	if reason == "":
 		reason = ZoneDepth.take_problem(find_id, today.get("finds", []), taken, place_of(player_id), depth_of(player_id), zone)
 	if reason == "" and mine:
@@ -6442,7 +6471,7 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 		return reason
 	var taken_find: Dictionary = ZoneDepth.find_in(today, find_id)
 	var kind: String = str(taken_find["kind"])
-	var pay: Dictionary = AquiferDepth.reward(kind) if aquifer else (MineDepth.reward(kind) if mine else (IceDepth.reward(kind) if ice else ZoneDepth.reward(kind, rover_depth)))
+	var pay: Dictionary = AquiferDepth.reward(kind, rover_depth) if aquifer else (MineDepth.reward(kind) if mine else (IceDepth.reward(kind) if ice else ZoneDepth.reward(kind, rover_depth)))
 	finds_taken = ZoneDepth.with_taken(finds_taken, zone, day, find_id)
 	if pay.has("crystal_ore"):
 		crystal_ore += int(pay["crystal_ore"])
@@ -6579,7 +6608,7 @@ func use_pump(pool_id: String, layout_day: int, player_id: String = "") -> Strin
 	var reason: String = AquiferDepth.pump_problem(today, pool_id, AquiferDepth.drained_today(pools_drained, day), pump_owned, at if at != null else Vector3(1.0e6, 0.0, 1.0e6))
 	if reason != "":
 		return reason
-	pools_drained = ZoneDepth.with_taken(pools_drained, AquiferDepth.ZONE, day, pool_id)
+	pools_drained = ZoneDepth.with_taken(pools_drained, AquiferDepth.ZONE, day, AquiferDepth.storage_id(rover_depth, pool_id))
 	pump_changed.emit()
 	return ""
 
@@ -6594,8 +6623,8 @@ func shut_valve(seal_id: String, layout_day: int, player_id: String = "") -> Str
 	var day: int = GameClock.get_day_index()
 	if layout_day != day:
 		return "That was yesterday's floor. Look again."
-	if rover_zone != AquiferDepth.ZONE or rover_depth != 1 or depth_of(who) != rover_depth or place_of(who) != AquiferDepth.ZONE:
-		return "Valves are at depth 1 of the Flooded Aquifer, where the rover is."
+	if rover_zone != AquiferDepth.ZONE or rover_depth < 1 or depth_of(who) != rover_depth or place_of(who) != AquiferDepth.ZONE:
+		return "Valves are below the Flooded Aquifer's hub, where the rover is."
 	valves_shut = ZoneDepth.prune(valves_shut, day)
 	var shut: Array = AquiferDepth.shut_today(valves_shut, day)
 	var today: Dictionary = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day), shut)
@@ -6603,7 +6632,7 @@ func shut_valve(seal_id: String, layout_day: int, player_id: String = "") -> Str
 	var reason: String = AquiferDepth.valve_problem(today, seal_id, shut, at if at != null else Vector3(1.0e6, 0.0, 1.0e6))
 	if reason != "":
 		return reason
-	valves_shut = ZoneDepth.with_taken(valves_shut, AquiferDepth.ZONE, day, seal_id)
+	valves_shut = ZoneDepth.with_taken(valves_shut, AquiferDepth.ZONE, day, AquiferDepth.storage_id(rover_depth, seal_id))
 	pump_changed.emit()
 	return ""
 

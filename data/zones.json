@@ -26,6 +26,7 @@
       "area": "underground",
       "band": [8, 24],
       "hazards": ["water_depth", "pressure_drop", "slow_wading"],
+      "deep_gate": "aquifer_deep",
       "finds": ["water_samples", "drowned_gear", "gauge_blocks"],
       "hub_scene": "res://scenes/flooded_aquifer.tscn",
       "entrance": "A sinkhole south of the plateau, reached by rover.",

@@ -2,6 +2,23 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: Aquifer depths 2 to 6 (feat/aquifer-deep)
+
+Slice 12. Every number and word below is a [PLACEHOLDER].
+
+- **Depths [PLACEHOLDER]:** five more floors (2 to 6), made by the same `ZoneDepth.stream` and `ZoneDepth.draw` hash as the Lava Tubes (farm seed, zone, depth, day). `AquiferDepth.MAX_DEPTH` is 6, as `ZoneDepth.max_depth_of` and `ZonePresence` report per zone (the Mine and Ice Caves stay at 1, the moons 0). Every depth but the last has a hatch (cell 11,13) and a WAY UP pad; depth 1 is byte for byte as it was. `change_depth` also got a fix: going up to the hub (depth 0) now lands the rover beside the hub hatch (8,16), not on the Lava hatch cell.
+- **Open depths:** 2 and 3 need nothing beyond what depth 1 needs. Depth 3 has the lift back to the hub (`LIFT_EVERY`), broken until `repair_lift`, the Lava pattern.
+- **Gate [PLACEHOLDER]:** depths 4 to 6 need lab level 14 (the existing `aquifer_deep` row of `lab_gates`, now `built: true`, and `deep_gate: aquifer_deep` on the Aquifer row of `data/zones.json`), AND the pump (`pump_owned`), AND the depth 3 lift repaired. `GameState.aquifer_deep_problem()` says what is missing and charges nothing; `deep_problem(zone)` picks it or the Lava one. It is checked in `change_depth` for any deep target in either direction among 4 to 6, in `use_lift` to a deep depth, in `repair_lift` at 6, and in `take_find` below 3. A loaded save with the rover at 4 to 6 and the gate shut puts it at depth 3's start (`_hold_deep_rover`, now zone-generic). `max_depth_of` is per zone.
+- **Lifts and costs [PLACEHOLDER]:** depth 3: 100 CR and 2 ore; depth 6: 200 CR and 4 ore (`ZoneDepth.lift_cost`, shared with the Lava Tubes). The lift at 6 needs the one at 3 first. `repair_lift` and `use_lift` are zone-aware; `lifts_repaired` already held `{zone: [depths]}`, so no migration.
+- **Hazards are keyed by depth:** `pools_drained` and `valves_shut` keep their `{zone: {day, ids}}` shape, but a pool or seal id is stored with `AquiferDepth.storage_id(depth, id)`: the plain id at depth 1 (old saves read as before) and `d<depth>_<id>` below. So draining a pool on depth 2 leaves depth 5 wet, and the old save shape and `CoopSession.PROTOCOL` need no change. The save check (`pools_drained` and `valves_shut` in `AquiferDepth`) accepts the ids of depths 1 to 6. Valves may be shut at any depth below the hub. **Seals stay one open seal a day at every depth [PLACEHOLDER].**
+- **Wet pack [PLACEHOLDER, unsure]:** `packs_wet` stays once per player per day across all depths. A second wet find on another depth the same day does not spoil a second ration. Ryan may want it per depth.
+- **Water is deeper and more common going down [PLACEHOLDER]:** `AquiferDepth.pool_choices(depth)` adds one more pair of deep depths to the hash's choice for each level below 1 (a passage pool is deep 50 % of the time at depth 1, 67 % at 2, 75 % at 3, up to 86 % at 6), and a deep pool is 0.1 m deeper per level (`DEEP_EXTRA_M_PER_LEVEL`). The first pool in a passage keeps its deep draw. Depth 1 is unchanged. A test over 24 seeds, 25 days and every depth shows every find still reachable once the pools are pumped and the seals shut.
+- **Finds pay more the deeper [PLACEHOLDER]:** `AquiferDepth.reward(kind, depth)`: per level below 1, credits +4 on water, +3 on brine, +6 on drowned gear and +10 on a case (`CREDITS_PER_LEVEL`), and a brine sample gives +1 ore every second level. Depths 4 to 6 add a sealed gauge-block case (`KINDS_DEEP`, 2 ore and 40 CR at depth 1 terms) to the kinds. `take_find` pays `reward(kind, rover_depth)`. No new item.
+- **Look [PLACEHOLDER]:** only `AquiferLook` and `TunnelLook` primitives, no new art and no new `OmniLight3D`. `FloodedAquifer.lamp_scale(depth)` dims the lamp 8 % a level (`LAMP_DIM_PER_LEVEL = 0.08`) to a floor of 50 % (`LAMP_FLOOR`), and a depth adds one mineral streak every second level below 1 (`(depth - 1) >> 1`), so each floor is slightly darker and wetter.
+- **Unchanged:** the 00:00 warning and 02:00 recall, `deepest_depth` (up to 6), the 06:00 reseed of every depth, FastTravel.
+- **Protocol:** stays 42. No new command and no new synced field.
+- **Tests:** `tests/test_aquifer_deep.gd` (24 cases) and `tests/test_aquifer_deep_coop.gd` (5 cases: a guest's gate and depth checks, the lifts at 3 and 6, the pump kept by depth, a real-session request, a late guest). Old tests that assumed depth 1 was the Aquifer's last, or that its depth 4 was out of range, now use 7 (`test_zone_presence.gd`, `test_flooded_aquifer.gd`, `test_lava_deep.gd`, `test_zone_warning.gd`).
+
 ## 2026-11-27: Deep Lava Tubes, depths 4 to 6 (feat/lava-deep)
 
 Slice 11. Every number and word below is a [PLACEHOLDER].

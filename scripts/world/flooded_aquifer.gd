@@ -10,6 +10,12 @@ const SIGN: String = "sign"
 const POOL: String = "pool"
 const SEAL: String = "seal"
 
+## Each depth below 1 is a little darker [PLACEHOLDER]: the cavern lamps lose this share of
+## their energy a level (down to LAMP_FLOOR of it), and every second level below 1 adds one
+## more mineral streak (wetter rock). No new lights.
+const LAMP_DIM_PER_LEVEL: float = 0.08
+const LAMP_FLOOR: float = 0.5
+
 ## Pool water & silt material parameters (sourced from AquiferLook) [PLACEHOLDER].
 const SHALLOW_ALPHA: float = AquiferLook.WATER_SHALLOW_ALPHA
 const DEEP_ALPHA: float = AquiferLook.WATER_DEEP_ALPHA
@@ -56,6 +62,8 @@ func _build_zone() -> void:
 			_draw_pool(pool, str(pool["id"]))
 		_rebuild_seals()
 		_build_depth_decor()
+		if ZoneDepth.has_way_down(_built_depth):
+			_depth_props.build_hatch(_built_depth)
 		GameState.finds_changed.connect(_on_finds_changed)
 		GameState.pump_changed.connect(_on_aquifer_changed)
 	else:
@@ -64,6 +72,10 @@ func _build_zone() -> void:
 		_draw_crate()
 		_draw_sign()
 		_build_hub_decor()
+	# The lift station: at the hub, and at the depths that have one (3 and 6). Broken until repaired.
+	if ZoneDepth.is_lift_depth(_built_depth) or _built_depth == 0:
+		_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(AquiferDepth.ZONE, _lift_depth()))
+		GameState.lifts_changed.connect(_on_lifts_changed)
 
 
 ## Hub dressing: dripping stalactite clusters, rusted pipe-green drainage runs,
@@ -100,8 +112,16 @@ func _build_depth_decor() -> void:
 	AquiferLook.add_mineral_streak(_decor, Vector3(-11.85, 0.0, 14.0), 1.5, 2.4, 90.0)
 	AquiferLook.add_mineral_streak(_decor, Vector3(-5.0, 0.0, -29.85), 1.8, 2.6, 0.0)
 	AquiferLook.add_mineral_streak(_decor, Vector3(2.0, 0.0, -29.85), 1.6, 2.4, 0.0)
+	for extra: int in (_built_depth - 1) >> 1:  # wetter rock deeper down
+		AquiferLook.add_mineral_streak(_decor, Vector3(-8.0 + 5.0 * extra, 0.0, -29.85), 1.4, 2.3, 0.0)
 	_add_cavern_light(Vector3(0.0, 2.4, 3.0), "TrunkLamp")
 	_add_cavern_light(Vector3(-1.5, 2.4, -22.5), "NorthChamberLamp")
+
+
+## How much of the full lamp energy a cavern lamp has at `depth`: all of it at the hub and
+## depth 1, less each level below (LAMP_DIM_PER_LEVEL), never under LAMP_FLOOR.
+static func lamp_scale(depth: int) -> float:
+	return maxf(LAMP_FLOOR, 1.0 - LAMP_DIM_PER_LEVEL * maxi(depth - 1, 0))
 
 
 func _add_cavern_light(at: Vector3, light_name: String) -> void:
@@ -109,7 +129,7 @@ func _add_cavern_light(at: Vector3, light_name: String) -> void:
 	lamp.name = light_name
 	lamp.position = at
 	lamp.light_color = AquiferLook.CAVERN_LIGHT_COLOR
-	lamp.light_energy = AquiferLook.CAVERN_LIGHT_ENERGY
+	lamp.light_energy = AquiferLook.CAVERN_LIGHT_ENERGY * lamp_scale(_built_depth)
 	lamp.omni_range = AquiferLook.CAVERN_LIGHT_RANGE_M
 	_decor.add_child(lamp)
 
@@ -210,7 +230,7 @@ func _rebuild_seals() -> void:
 	_built_shut = shut
 	for seal: Variant in ZoneDepth.local_layout.get("seals", []):
 		if seal is Dictionary:
-			seal["shut"] = str(seal["id"]) in shut
+			seal["shut"] = AquiferDepth.storage_id(_built_depth, str(seal["id"])) in shut
 			if not bool(seal["shut"]):
 				_draw_seal(seal)
 	_told_hub = ""
@@ -239,11 +259,17 @@ func _aquifer_near() -> Dictionary:
 	if not _below:
 		if AquiferDepth.near_hatch(at):
 			return { "kind": HATCH, "id": "" }
+		if ZoneDepth.near_lift(at, 0):
+			return _station_near()
 		if AquiferDepth.near_crate(at):
 			return { "kind": CRATE, "id": "" }
 		if AquiferDepth.near_sign(at):
 			return { "kind": SIGN, "id": "" }
 		return {}
+	if ZoneDepth.has_way_down(_built_depth) and ZoneDepth.near_descent(at, _built_depth):
+		return { "kind": HATCH, "id": "" }
+	if ZoneDepth.is_lift_depth(_built_depth) and ZoneDepth.near_lift(at, _built_depth):
+		return _station_near()
 	var found: Dictionary = _nearest_find()
 	var seal_near: Dictionary = _seal_near(at)
 	if not found.is_empty() and not AquiferDepth.prefer_seal(ZoneDepth.local_layout, str(found.get("id", "")), not seal_near.is_empty()):
@@ -273,7 +299,10 @@ func _tell_hub() -> void:
 	_told_hub = key
 	match _hub_near.get("kind", ""):
 		HATCH:
-			_hud.push_log("WAY DOWN: press " + Controls.prompt(&"interact") + " to go down.")
+			var shut: String = GameState.deep_problem(AquiferDepth.ZONE) if ZoneDepth.is_deep(_built_depth + 1) else ""
+			_hud.push_log("WAY DOWN: press " + Controls.prompt(&"interact") + " to go down." if shut == "" else "WAY DOWN: " + shut)
+		LIFT:
+			_hud.push_log(_lift_prompt())
 		FIND:
 			_hud.push_log("FIND: press " + Controls.prompt(&"interact") + " to take it.")
 		CRATE:
@@ -340,7 +369,7 @@ func _use_find(find_id: String) -> void:
 		_hud.push_log("FIND: " + reply)
 		return
 	var find: Dictionary = ZoneDepth.find_in(ZoneDepth.local_layout, find_id)
-	_hud.push_log("FIND: " + AquiferDepth.reward_text(str(find.get("kind", ""))))
+	_hud.push_log("FIND: " + AquiferDepth.reward_text(str(find.get("kind", "")), _built_depth))
 	if reply != "":
 		_hud.push_log("WET PACK: " + reply)
 
