@@ -84,9 +84,9 @@ func _draw_walls() -> void:
 	IceLook.add_ice_wall(_depth_props, IceDepth.sign_position() + Vector3(0.0, 0.0, 1.8), Vector2(5.0, 1.0), 2.2)
 
 
-## The notice board: the Lava hub's with frosted ice trim and Vance's notice for later [PLACEHOLDER].
+## The notice board: the Lava hub's with frosted ice trim and the Ice Caves' notices [PLACEHOLDER].
 func _draw_sign() -> void:
-	var board: Node3D = LavaHubProps.board_node("Vance: [later]")
+	var board: Node3D = LavaHubProps.board_node("NOTICE BOARD")
 	board.name = "NoticeSign"
 	board.position = IceDepth.sign_position()
 	_depth_props.add_child(board)
@@ -234,7 +234,9 @@ func _use_hub(target: Dictionary) -> void:
 		CRATE:
 			_use_crate()
 		SIGN:
-			_hud.push_log("NOTICE SIGN: Vance: [later]")
+			for line: String in NoticeBoard.lines(QuestEngine.quests(), GameState.quest_state,
+					GameState.player_quest_state.get(GameState.local_player_id, {}), "zone", IceDepth.ZONE):
+				_hud.push_log(line)
 		_:
 			super._use_hub(target)
 

@@ -327,6 +327,8 @@ var at_oirm: Dictionary = {}
 ## Every trip to OIRM: { standard_id, sent_day, return_day, courier }. Used to
 ## excuse units that fell due while their standard was away.
 var oirm_trips: Array[Dictionary] = []
+## Layered ice cores in the cold box waiting for an OIRM trip (saved, synced).
+var ice_cores_held: int = 0
 ## Unit id -> day a recall made its calibration suspect. A traceable
 ## recalibration clears it; Vance fines what is left at the audit.
 var suspect_units: Dictionary = {}
@@ -825,7 +827,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "ice_cores_held"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -900,6 +902,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return MineDepth.props_problem(data["mine_props"])
 	if data.has("cold_since") and IceDepth.cold_problem(data["cold_since"]) != "":
 		return IceDepth.cold_problem(data["cold_since"])
+	if data.has("ice_cores_held") and (int(data["ice_cores_held"]) < 0 or int(data["ice_cores_held"]) > ICE_CORES_CAP):
+		return "'ice_cores_held' is out of range."
 	if data.has("mine_gate_open") and not data["mine_gate_open"] is bool:
 		return "'mine_gate_open' is not a yes or no."
 	if data.has("pump_owned") and not data["pump_owned"] is bool:
@@ -1047,6 +1051,11 @@ func farm_dict_problem(data: Dictionary) -> String:
 		for entry: Dictionary in data[needs[0]]:
 			if not _has_fields(entry, needs[1], needs[2]):
 				return "'%s' has an entry with a field missing." % needs[0]
+	for trip: Dictionary in data["oirm_trips"]:
+		if trip.has("sample_kind") and not trip["sample_kind"] is String:
+			return "'oirm_trips' has a bad sample_kind."
+		if trip.has("returned") and not trip["returned"] is bool:
+			return "'oirm_trips' has a bad returned flag."
 	for record: Dictionary in data["cal_log"]:
 		if not record.get("as_found_in_tolerance") is bool or not record.get("traceable", true) is bool or not record.get("performed_by", "") is String or not record.get("standard_problem", "") is String:
 			return "'cal_log' has an entry with a field missing."
@@ -4573,6 +4582,8 @@ func _excused_units(day: int) -> Dictionary:
 			continue
 		for i: int in oirm_trips.size():
 			var trip: Dictionary = oirm_trips[i]
+			if is_sample_oirm_trip(trip):
+				continue
 			var back: int = _trip_back(i, day)
 			# Due after it left (the player could calibrate on the send day) and before it came back.
 			if trip["standard_id"] == sensor.calibrated_by and int(trip["sent_day"]) < due and due < back \
@@ -4593,11 +4604,13 @@ func _trip_back(index: int, day: int) -> int:
 
 
 func _trip_is_open(index: int) -> bool:
+	if is_sample_oirm_trip(oirm_trips[index]):
+		return false
 	var standard_id: String = oirm_trips[index]["standard_id"]
 	if not at_oirm.has(standard_id):
 		return false
 	for later: int in range(index + 1, oirm_trips.size()):
-		if oirm_trips[later]["standard_id"] == standard_id:
+		if not is_sample_oirm_trip(oirm_trips[later]) and oirm_trips[later]["standard_id"] == standard_id:
 			return false
 	return true
 
@@ -4644,6 +4657,7 @@ func _receive_oirm_returns(day: int) -> void:
 	for id: Variant in at_oirm.keys():
 		if int(at_oirm[id]) <= day:
 			oirm_calibrate(str(id), day)
+	_receive_ice_core_returns(day)
 
 
 ## OIRM's calibration of a returned standard: measured against a perfect
@@ -4658,7 +4672,7 @@ func oirm_calibrate(standard_id: String, day: int) -> Dictionary:
 	sensor.last_cal_day = day
 	# Close the trip on the day it actually came back, in case it was late.
 	for i: int in range(oirm_trips.size() - 1, -1, -1):
-		if oirm_trips[i]["standard_id"] == standard_id:
+		if not is_sample_oirm_trip(oirm_trips[i]) and oirm_trips[i]["standard_id"] == standard_id:
 			oirm_trips[i]["return_day"] = day
 			break
 	var cert: Dictionary = _issue_certificate(standard_id, day, zeroed["as_found"], zeroed["as_left"], false)
@@ -4673,6 +4687,111 @@ func oirm_calibrate(standard_id: String, day: int) -> Dictionary:
 		_recall_and_post(standard_id, zeroed["as_found"], int(previous.get("day", 0)))
 	oirm_changed.emit()
 	return cert
+
+
+# --- Ice core samples (OIRM) ---------------------------------------------------
+## Cold-box stock cap before an ice core pays its fallback credits instead [PLACEHOLDER].
+const ICE_CORES_CAP: int = 5
+## Sample fee for sending an ice core on the OIRM drop pod (courier adds surcharge) [PLACEHOLDER].
+const ICE_CORE_OIRM_FEE: int = 50
+## Credits and lab XP paid when an ice core returns certified from OIRM [PLACEHOLDER].
+const ICE_CORE_RETURN_CREDITS: int = 140
+const ICE_CORE_RETURN_LAB_XP: int = 80
+## Sample kind recorded on oirm_trips entries for ice cores (distinguishes samples from standards).
+const ICE_CORE_SAMPLE_KIND: String = "ice_core"
+## Action counters for Vance's quest A Core to Certify (no XP on their own).
+const ICE_CORE_TAKEN_COUNT: String = "take_ice_core"
+const ICE_CORE_CERTIFIED_COUNT: String = "ice_core_certified"
+const ICE_CORE_TAKEN_REPLY: String = "Took an ice core. It goes in the cold box for OIRM."
+
+
+## True when an oirm_trips entry is a sample (such as an ice core) rather than a reference standard.
+static func is_sample_oirm_trip(trip: Dictionary) -> bool:
+	return str(trip.get("sample_kind", "")) != "" or str(trip.get("standard_id", "")) == ""
+
+
+## Today's fee to send one ice core to OIRM: sample fee on the drop pod, or sample
+## fee plus the courier surcharge when no pod is on the pad [PLACEHOLDER].
+func ice_core_oirm_fee() -> int:
+	return ICE_CORE_OIRM_FEE + (0 if drop_pod_present else oirm_courier_surcharge())
+
+
+## Host helper for take_find on an Ice Caves "core": stores it in the cold box up to
+## ICE_CORES_CAP, or pays its fallback credits when the cold box is full.
+func _take_ice_core(pay: Dictionary, who: String) -> String:
+	if who != MANAGER_ID:
+		var took: Dictionary = (action_counts.get_or_add(who, {}) as Dictionary).get_or_add(ICE_CORE_TAKEN_COUNT, { "count": 0, "xp": 0 })
+		took["count"] = int(took["count"]) + 1
+	if ice_cores_held < ICE_CORES_CAP:
+		ice_cores_held += 1
+		oirm_changed.emit()
+		return ICE_CORE_TAKEN_REPLY
+	var fallback: int = int(pay.get("credits", 0))
+	if fallback > 0:
+		add_credits(fallback)
+	return "Cold box is full (%d/%d): sold the ice core for %s CR." % [ice_cores_held, ICE_CORES_CAP, SP811.integer(fallback)]
+
+
+## Host: sends one held ice core on the OIRM drop pod (or by courier when no pod is
+## on the pad). `player_id` comes from the connection (FarmCommands), never the
+## payload. Follows send_to_oirm's account gate, pod/courier timing and refusal lines.
+## Returns { "ok", "reason", "return_day", "courier", "fee" }.
+func send_ice_core(player_id: String = "") -> Dictionary:
+	if FarmCommands.guest:
+		return { "ok": false, "reason": "Only the host sends an ice core to OIRM." }
+	if _player(player_id) == MANAGER_ID:
+		return { "ok": false, "reason": "The manager does not send ice cores." }
+	if ice_cores_held <= 0:
+		return { "ok": false, "reason": "No ice cores in the cold box." }
+	if not has_oirm_account() and not lab_gate_open("oirm_account"):
+		return { "ok": false, "reason": lab_gate_problem("oirm_account", "An OIRM account") }
+	var courier: bool = not drop_pod_present
+	var fee: int = ice_core_oirm_fee()
+	if credits < fee:
+		return { "ok": false, "reason": "OIRM charges %s CR; balance %s CR." % [SP811.integer(fee), SP811.integer(credits)] }
+	ice_cores_held -= 1
+	add_credits(-fee)
+	var today: int = GameClock.get_day_index()
+	var return_day: int = today + oirm_courier_days() if courier else next_audit_day(today)
+	oirm_trips.append({
+		"standard_id": "",
+		"sample_kind": ICE_CORE_SAMPLE_KIND,
+		"sent_day": today,
+		"return_day": return_day,
+		"courier": courier,
+		"returned": false,
+	})
+	if courier:
+		post_phone("OIRM: Ice core collected by courier. Fee %s CR (%s CR + %s CR courier). Certified return on day %d." % [
+			SP811.integer(fee), SP811.integer(ICE_CORE_OIRM_FEE),
+			SP811.integer(oirm_courier_surcharge()), return_day])
+	else:
+		post_phone("OIRM: Ice core loaded on the drop pod. Fee %s CR. Certified return on the day %d pod." % [
+			SP811.integer(fee), return_day])
+	oirm_changed.emit()
+	return { "ok": true, "reason": "", "return_day": return_day, "courier": courier, "fee": fee }
+
+
+## Morning pass: certifies every ice core trip whose return_day has arrived.
+## Marks `returned = true` before paying, so a reload or second pass never pays twice.
+func _receive_ice_core_returns(day: int) -> void:
+	var certified: int = 0
+	for trip: Dictionary in oirm_trips:
+		if not is_sample_oirm_trip(trip) or str(trip.get("sample_kind", "")) != ICE_CORE_SAMPLE_KIND:
+			continue
+		if bool(trip.get("returned", false)) or int(trip.get("return_day", 0)) > day:
+			continue
+		trip["returned"] = true
+		trip["return_day"] = day
+		add_credits(ICE_CORE_RETURN_CREDITS)
+		give_lab_xp(ICE_CORE_RETURN_LAB_XP)
+		var done: Dictionary = (action_counts.get_or_add(local_player_id, {}) as Dictionary).get_or_add(ICE_CORE_CERTIFIED_COUNT, { "count": 0, "xp": 0 })
+		done["count"] = int(done["count"]) + 1
+		post_phone("OIRM: Ice core certified. Credited %s CR and %s lab XP." % [
+			SP811.integer(ICE_CORE_RETURN_CREDITS), SP811.integer(ICE_CORE_RETURN_LAB_XP)])
+		certified += 1
+	if certified > 0:
+		oirm_changed.emit()
 
 
 func _recall_and_post(standard_id: String, standard_error: float, since_day: int) -> void:
@@ -5522,6 +5641,9 @@ func _move_rover(zone: String, into_tunnels: bool, player_id: String) -> String:
 		_ore_at_entry = crystal_ore
 		if not zones_unlocked.has(zone):
 			zones_unlocked.append(zone)  # the first real visit opens it to the console
+		if zone == IceDepth.ZONE and who != MANAGER_ID:
+			var visited: Dictionary = (action_counts.get_or_add(who, {}) as Dictionary).get_or_add(REACHED_PREFIX + zone, { "count": 0, "xp": 0 })
+			visited["count"] = int(visited["count"]) + 1
 	rover_zone = zone if into_tunnels else ""
 	rover_lent = into_tunnels
 	if into_tunnels:
@@ -5573,6 +5695,9 @@ func fast_travel(zone_id: String, player_id: String = "") -> String:
 		rover_transforms[TUNNEL_ROVER] = TUNNEL_START
 		rover_epoch += 1
 	_set_place(player_id, zone_id, rover_depth)
+	if zone_id == IceDepth.ZONE and _player(player_id) != MANAGER_ID:
+		var visited_ft: Dictionary = (action_counts.get_or_add(_player(player_id), {}) as Dictionary).get_or_add(REACHED_PREFIX + zone_id, { "count": 0, "xp": 0 })
+		visited_ft["count"] = int(visited_ft["count"]) + 1
 	_trip_players[player_id] = true
 	_console_arrivals[player_id] = true
 	if plan != FastTravel.JOIN:
@@ -5977,6 +6102,8 @@ func parked_rover_transform(rover_id: String, fallback: Transform3D = Transform3
 ## bought, for its first calibration there.
 func has_oirm_account() -> bool:
 	for trip: Dictionary in oirm_trips:
+		if is_sample_oirm_trip(trip):
+			continue
 		var sensor: DriftingSensor = get_sensor(trip["standard_id"])
 		if sensor != null and sensor.tier >= 1:
 			return true
@@ -6651,12 +6778,15 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 	var kind: String = str(taken_find["kind"])
 	var pay: Dictionary = AquiferDepth.reward(kind, rover_depth) if aquifer else (MineDepth.reward(kind, rover_depth) if mine else (IceDepth.reward(kind) if ice else ZoneDepth.reward(kind, rover_depth)))
 	finds_taken = ZoneDepth.with_taken(finds_taken, zone, day, find_id)
-	if pay.has("crystal_ore"):
-		crystal_ore += int(pay["crystal_ore"])
-		ore_changed.emit(crystal_ore)
-	if pay.has("credits"):
-		add_credits(int(pay["credits"]))
 	var reply: String = ""
+	if ice and kind == "core":
+		reply = _take_ice_core(pay, _player(player_id))
+	else:
+		if pay.has("crystal_ore"):
+			crystal_ore += int(pay["crystal_ore"])
+			ore_changed.emit(crystal_ore)
+		if pay.has("credits"):
+			add_credits(int(pay["credits"]))
 	if mine and kind == MineDepth.CASE:
 		var who_case: String = _player(player_id)
 		var next_cell: Variant = MineDepth.next_block_cell(world_seed, found_blocks)
@@ -7234,6 +7364,8 @@ func _excused_until_audit(unit_id: String, day: int) -> bool:
 	var cadence: int = maxi(int(_schedule("cadence_days", 5.0)), 1)
 	for i: int in oirm_trips.size():
 		var trip: Dictionary = oirm_trips[i]
+		if is_sample_oirm_trip(trip):
+			continue
 		if trip["standard_id"] != sensor.calibrated_by:
 			continue
 		if int(trip["sent_day"]) >= due:
