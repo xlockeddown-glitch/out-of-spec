@@ -348,4 +348,4 @@ func test_an_old_save_with_digging_and_stone_on_a_road_loads_and_can_be_put_righ
 
 
 func test_the_protocol_is_38() -> String:
-	return "" if CoopSession.PROTOCOL == 39 else "The protocol is %d, not 39." % CoopSession.PROTOCOL
+	return "" if CoopSession.PROTOCOL == 40 else "The protocol is %d, not 40." % CoopSession.PROTOCOL

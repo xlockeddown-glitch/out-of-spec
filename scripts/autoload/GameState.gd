@@ -239,6 +239,10 @@ var camp_supplies: int = 0
 var _campers: Dictionary = {}
 ## The Aquifer's pools drained today: zone id -> { "day": int, "ids": [pool ids] }, like finds_taken.
 var pools_drained: Dictionary = {}
+## The Aquifer's open seals shut today: zone id -> { "day": int, "ids": [seal ids] }, like pools_drained.
+var valves_shut: Dictionary = {}
+## Host-side record of whose pack got wet wading today: player id -> day, saved so a reload does not spoil twice.
+var packs_wet: Dictionary = {}
 ## The Colony Mine's gate on the plateau road is open (Bram's key quest opens it), saved.
 var mine_gate_open: bool = false
 ## Shoring props the farm holds, bought at the Mine hub's crate (shared stock), saved.
@@ -790,7 +794,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -816,6 +820,8 @@ func farm_to_dict() -> Dictionary:
 	# A find taken on a past day is gone: it is not kept.
 	out["finds_taken"] = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	out["pools_drained"] = ZoneDepth.prune(pools_drained, GameClock.get_day_index())
+	out["valves_shut"] = ZoneDepth.prune(valves_shut, GameClock.get_day_index())
+	out["packs_wet"] = AquiferDepth.prune_packs_wet(packs_wet, GameClock.get_day_index())
 	out["rooms_shored"] = ZoneDepth.prune(rooms_shored, GameClock.get_day_index())
 	out["strays_caught"] = _strays_today()
 	out["cold_since"] = _cold_in_caves()  # the stamps of whoever is in the caves: the rest are stale
@@ -852,6 +858,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return ZoneDepth.taken_problem(data["finds_taken"])
 	if data.has("pools_drained") and AquiferDepth.drained_problem(data["pools_drained"]) != "":
 		return AquiferDepth.drained_problem(data["pools_drained"])
+	if data.has("valves_shut") and AquiferDepth.shut_problem(data["valves_shut"]) != "":
+		return AquiferDepth.shut_problem(data["valves_shut"])
+	if data.has("packs_wet") and AquiferDepth.packs_wet_problem(data["packs_wet"]) != "":
+		return AquiferDepth.packs_wet_problem(data["packs_wet"])
 	if data.has("rooms_shored") and MineDepth.shored_problem(data["rooms_shored"]) != "":
 		return MineDepth.shored_problem(data["rooms_shored"])
 	if data.has("mine_props") and MineDepth.props_problem(data["mine_props"]) != "":
@@ -1184,6 +1194,8 @@ func farm_from_dict(data: Dictionary) -> String:
 	put_farm(data)
 	finds_taken = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	pools_drained = ZoneDepth.prune(pools_drained, GameClock.get_day_index())
+	valves_shut = ZoneDepth.prune(valves_shut, GameClock.get_day_index())
+	packs_wet = AquiferDepth.prune_packs_wet(packs_wet, GameClock.get_day_index())
 	rooms_shored = ZoneDepth.prune(rooms_shored, GameClock.get_day_index())
 	settle_rover_depth(false)
 	sentinel_sighted = false
@@ -2181,6 +2193,7 @@ func _forget_a_guest(players: Array[String]) -> void:
 			xp_certificates_spent.erase(player_id)
 			one_use_held.erase(player_id)
 			player_loadouts.erase(player_id)
+			packs_wet.erase(player_id)
 			for entry: Variant in quest_state.values():
 				if entry is Dictionary and entry.get("players") is Array:
 					(entry["players"] as Array).erase(player_id)
@@ -6069,10 +6082,13 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 	var mine: bool = zone == MineDepth.ZONE
 	var ice: bool = zone == IceDepth.ZONE
 	finds_taken = ZoneDepth.prune(finds_taken, day)
+	pools_drained = ZoneDepth.prune(pools_drained, day)
+	valves_shut = ZoneDepth.prune(valves_shut, day)
+	packs_wet = AquiferDepth.prune_packs_wet(packs_wet, day)
 	rooms_shored = ZoneDepth.prune(rooms_shored, day)
 	var today: Dictionary = {}
 	if aquifer:
-		today = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day))
+		today = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day), AquiferDepth.shut_today(valves_shut, day))
 	elif mine:
 		today = MineDepth.layout(world_seed, rover_depth, day, MineDepth.shored_today(rooms_shored, day))
 	elif ice:
@@ -6089,16 +6105,20 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 		reason = ZoneDepth.take_problem(find_id, today.get("finds", []), taken, place_of(player_id), depth_of(player_id), zone)
 	if reason == "" and mine:
 		reason = MineDepth.blocked_problem(today, find_id)  # a rockfall buries its room until it is shored
+	var rover_at: Variant = null
 	if reason == "":
 		var find: Dictionary = ZoneDepth.find_in(today, find_id)
-		var at: Variant = _rover_pose_now(TUNNEL_ROVER)  # honours the told pose and the drive lease
-		reason = ZoneDepth.reach_problem(TunnelRock.at_in(today["grid"], find["cell"]), rover_zone, at != null, at if at != null else Vector3.ZERO, zone)
+		rover_at = _rover_pose_now(TUNNEL_ROVER)  # honours the told pose and the drive lease
+		reason = ZoneDepth.reach_problem(TunnelRock.at_in(today["grid"], find["cell"]), rover_zone, rover_at != null, rover_at if rover_at != null else Vector3.ZERO, zone)
 		if reason == "" and aquifer:
 			# Deep water is in the way as it is for the rover: a find past it waits for the pump.
-			reason = AquiferDepth.water_problem(today["grid"], AquiferDepth.cell_in(today["grid"], at), find["cell"])
+			reason = AquiferDepth.water_problem(today["grid"], AquiferDepth.cell_in(today["grid"], rover_at), find["cell"])
+		if reason == "" and aquifer:
+			reason = AquiferDepth.seal_problem(today, find_id)
 	if reason != "":
 		return reason
-	var kind: String = str(ZoneDepth.find_in(today, find_id)["kind"])
+	var taken_find: Dictionary = ZoneDepth.find_in(today, find_id)
+	var kind: String = str(taken_find["kind"])
 	var pay: Dictionary = AquiferDepth.reward(kind) if aquifer else (MineDepth.reward(kind) if mine else (IceDepth.reward(kind) if ice else ZoneDepth.reward(kind)))
 	finds_taken = ZoneDepth.with_taken(finds_taken, zone, day, find_id)
 	if pay.has("crystal_ore"):
@@ -6106,8 +6126,22 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 		ore_changed.emit(crystal_ore)
 	if pay.has("credits"):
 		add_credits(int(pay["credits"]))
+	var reply: String = ""
+	if aquifer:
+		var find_cell: Vector2i = taken_find["cell"]
+		var rover_cell: Vector2i = AquiferDepth.cell_in(today["grid"], rover_at)
+		if AquiferDepth.wades_to(today, today.get("start", ZoneDepth.START_CELL), find_cell) \
+				or AquiferDepth.wades_to(today, rover_cell, find_cell):
+			var who: String = _player(player_id)
+			if int(packs_wet.get(who, -1)) != day:
+				packs_wet[who] = day
+				var spoiled: bool = camp_supplies > 0
+				if spoiled:
+					camp_supplies = maxi(camp_supplies - AquiferDepth.RATIONS_SPOILED, 0)
+					camps_changed.emit()
+				reply = AquiferDepth.wet_pack_reply(spoiled)
 	finds_changed.emit()
-	return ""
+	return reply
 
 
 ## Host: Bram's key quest (or a test) opens the Colony Mine's gate for the farm. Only the
@@ -6203,12 +6237,37 @@ func use_pump(pool_id: String, layout_day: int, player_id: String = "") -> Strin
 	if rover_zone != AquiferDepth.ZONE or rover_depth < 1 or depth_of(player_id) != rover_depth or place_of(player_id) != AquiferDepth.ZONE:
 		return "Pools are below the Flooded Aquifer's hub, where the rover is."
 	pools_drained = ZoneDepth.prune(pools_drained, day)
-	var today: Dictionary = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day))
+	valves_shut = ZoneDepth.prune(valves_shut, day)
+	var today: Dictionary = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day), AquiferDepth.shut_today(valves_shut, day))
 	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
 	var reason: String = AquiferDepth.pump_problem(today, pool_id, AquiferDepth.drained_today(pools_drained, day), pump_owned, at if at != null else Vector3(1.0e6, 0.0, 1.0e6))
 	if reason != "":
 		return reason
 	pools_drained = ZoneDepth.with_taken(pools_drained, AquiferDepth.ZONE, day, pool_id)
+	pump_changed.emit()
+	return ""
+
+
+## Host: shuts `seal_id`'s valve for today, for the player at depth 1 of the Aquifer. Costs
+## nothing; returns "" or why not (AquiferDepth.valve_problem). `layout_day` is the day the
+## player's screen drew the seal for.
+func shut_valve(seal_id: String, layout_day: int, player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host shuts a valve."
+	var who: String = _player(player_id)
+	var day: int = GameClock.get_day_index()
+	if layout_day != day:
+		return "That was yesterday's floor. Look again."
+	if rover_zone != AquiferDepth.ZONE or rover_depth != 1 or depth_of(who) != rover_depth or place_of(who) != AquiferDepth.ZONE:
+		return "Valves are at depth 1 of the Flooded Aquifer, where the rover is."
+	valves_shut = ZoneDepth.prune(valves_shut, day)
+	var shut: Array = AquiferDepth.shut_today(valves_shut, day)
+	var today: Dictionary = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day), shut)
+	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+	var reason: String = AquiferDepth.valve_problem(today, seal_id, shut, at if at != null else Vector3(1.0e6, 0.0, 1.0e6))
+	if reason != "":
+		return reason
+	valves_shut = ZoneDepth.with_taken(valves_shut, AquiferDepth.ZONE, day, seal_id)
 	pump_changed.emit()
 	return ""
 

@@ -8,19 +8,23 @@ extends "res://scripts/basalt_tunnels.gd"
 const CRATE: String = "crate"
 const SIGN: String = "sign"
 const POOL: String = "pool"
+const SEAL: String = "seal"
 
 ## Pool water & silt material parameters [PLACEHOLDER].
 const SHALLOW_ALPHA: float = 0.68
 const DEEP_ALPHA: float = 0.88
+const SEAL_SHEET_ALPHA: float = 0.45
 const SHALLOW_ROUGHNESS: float = 0.25
 const DEEP_ROUGHNESS: float = 0.18
 const SILT_ROUGHNESS: float = 0.72
 const HUB_POOL_LIGHT_ENERGY: float = 0.6
 const HUB_POOL_LIGHT_RANGE_M: float = 8.0
 
-## The pools drained when this scene was built; the pump changing them builds it again.
+## The pools drained and seals shut when this scene was built; changing them updates it.
 var _built_drained: Array = []
+var _built_shut: Array = []
 var _water: Node3D
+var _seals: Node3D
 
 
 func _zone_id() -> String:
@@ -32,17 +36,23 @@ func _build_zone() -> void:
 	_built_depth = ZoneDepth.local_depth if _below else 0
 	_built_day = GameClock.get_day_index()
 	_built_drained = AquiferDepth.drained_today(GameState.pools_drained, _built_day)
+	_built_shut = AquiferDepth.shut_today(GameState.valves_shut, _built_day)
 	GameClock.day_started.connect(_on_new_day)
 	_depth_props = ZoneDepthProps.new()
 	_rover.get_parent().add_child(_depth_props)
 	_water = Node3D.new()
 	_water.name = "Water"
 	_rover.get_parent().add_child(_water)
+	_seals = Node3D.new()
+	_seals.name = "Seals"
+	_rover.get_parent().add_child(_seals)
 	if _below:
 		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
 		for pool: Dictionary in ZoneDepth.local_layout.get("pools", []):
 			_draw_pool(pool, str(pool["id"]))
+		_rebuild_seals()
 		GameState.finds_changed.connect(_on_finds_changed)
+		GameState.pump_changed.connect(_on_aquifer_changed)
 	else:
 		_depth_props.build_hatch()
 		_draw_pool({ "rect": AquiferDepth.HUB_POOL, "depth_m": AquiferDepth.DEEP_M[1], "drained": false }, "")
@@ -271,6 +281,105 @@ func _draw_sign() -> void:
 		board.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.34, 0.03, 0.34)), Vector3(x, 0.018, 0.0), frost_mat))
 
 
+## Draws an open seal at depth 1: a small valve wheel on a pipe stub at the doorway,
+## a thin water jet from the stub, and a shallow sheet of water on that room's floor.
+## Draws nothing once the seal is shut; visual primitives only, no colliders [PLACEHOLDER].
+func _draw_seal(seal: Dictionary) -> void:
+	if bool(seal.get("shut", false)) or _seals == null:
+		return
+	var id: String = str(seal["id"])
+	var room_index: int = int(seal["room"])
+	var at: Vector3 = AquiferDepth.seal_position(seal)
+	var room_box: Rect2 = AquiferDepth.room_metres(room_index).grow(-0.35)
+	var room_centre: Vector2 = room_box.get_center()
+
+	var root := Node3D.new()
+	root.name = "Seal_" + id
+	_seals.add_child(root)
+
+	# Shallow sheet of water across the open-seal room's floor.
+	var sheet_mat: StandardMaterial3D = TunnelLook.flat_mat_unique(TunnelLook.WATER_SHALLOW, SHALLOW_ROUGHNESS)
+	sheet_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	sheet_mat.albedo_color.a = SEAL_SHEET_ALPHA
+	var sheet: MeshInstance3D = TunnelLook.part(TunnelLook.box(Vector3(room_box.size.x, 0.025, room_box.size.y)),
+			Vector3(room_centre.x, 0.015, room_centre.y), sheet_mat)
+	sheet.name = "SealSheet_" + id
+	root.add_child(sheet)
+
+	# Pipe stub, flange, brass collar, and small valve wheel at the doorway cell.
+	var valve := Node3D.new()
+	valve.name = "Valve_" + id
+	valve.position = at
+	root.add_child(valve)
+
+	var dark_mat: Material = TunnelLook.flat_mat(TunnelLook.BASALT_DARK)
+	var steel_mat: Material = TunnelLook.flat_mat(TunnelLook.STEEL)
+	var brass_mat: Material = TunnelLook.flat_mat(TunnelLook.BRASS)
+	var wheel_mat: Material = TunnelLook.flat_mat(TunnelLook.BROKEN_RED)
+	var frost_mat: Material = TunnelLook.flat_mat(TunnelLook.FROST)
+
+	valve.add_child(TunnelLook.part(TunnelLook.cylinder(0.24, 0.08), Vector3(0.0, 0.04, 0.0), dark_mat))
+	valve.add_child(TunnelLook.part(TunnelLook.cylinder(0.11, 0.72), Vector3(0.0, 0.40, 0.0), steel_mat))
+	valve.add_child(TunnelLook.part(TunnelLook.cylinder(0.15, 0.10), Vector3(0.0, 0.62, 0.0), brass_mat))
+	valve.add_child(TunnelLook.part(TunnelLook.cylinder(0.04, 0.16), Vector3(0.0, 0.80, 0.0), brass_mat))
+
+	# Small valve wheel: central hub, crossed spokes, and rim segments.
+	var wheel := Node3D.new()
+	wheel.name = "ValveWheel"
+	wheel.position = Vector3(0.0, 0.88, 0.0)
+	wheel.rotation_degrees = Vector3(18.0, 0.0, 0.0)
+	valve.add_child(wheel)
+	wheel.add_child(TunnelLook.part(TunnelLook.cylinder(0.07, 0.06), Vector3.ZERO, brass_mat))
+	wheel.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.44, 0.04, 0.04)), Vector3.ZERO, wheel_mat))
+	wheel.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.04, 0.04, 0.44)), Vector3.ZERO, wheel_mat))
+	for off: float in [-0.21, 0.21]:
+		wheel.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.26, 0.045, 0.05)), Vector3(0.0, 0.0, off), wheel_mat))
+		wheel.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.05, 0.045, 0.26)), Vector3(off, 0.0, 0.0), wheel_mat))
+
+	# Side nozzle and thin water jet spraying toward the room's interior.
+	var inward := Vector2(room_centre.x - at.x, room_centre.y - at.z).normalized()
+	if inward.length_squared() < 0.01:
+		inward = Vector2(0.0, -1.0)
+	var yaw_deg: float = rad_to_deg(atan2(inward.x, inward.y))
+	var spray := Node3D.new()
+	spray.name = "WaterJet"
+	spray.position = Vector3(0.0, 0.48, 0.0)
+	spray.rotation_degrees = Vector3(0.0, yaw_deg, 0.0)
+	valve.add_child(spray)
+	spray.add_child(TunnelLook.part(TunnelLook.cylinder(0.065, 0.24), Vector3(0.0, 0.0, 0.14), brass_mat, Vector3(90.0, 0.0, 0.0)))
+	var jet_mat: StandardMaterial3D = TunnelLook.flat_mat_unique(TunnelLook.WATER_SHALLOW, SHALLOW_ROUGHNESS)
+	jet_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	jet_mat.albedo_color.a = SHALLOW_ALPHA
+	spray.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.09, 0.07, 1.25)), Vector3(0.0, -0.14, 0.82), jet_mat, Vector3(14.0, 0.0, 0.0)))
+	spray.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.28, 0.03, 0.34)), Vector3(0.0, -0.44, 1.42), frost_mat))
+
+	valve.add_child(TunnelLook.label("%s OPEN SEAL" % id.to_upper(), Vector3(0.0, 1.55, 0.0), TunnelLook.BROKEN_RED))
+
+
+## Updates the local seal flags from `GameState.valves_shut` and redraws open seals.
+func _rebuild_seals() -> void:
+	if _seals == null:
+		return
+	for child: Node in _seals.get_children():
+		_seals.remove_child(child)
+		child.free()
+	var shut: Array = AquiferDepth.shut_today(GameState.valves_shut, _built_day)
+	_built_shut = shut
+	for seal: Variant in ZoneDepth.local_layout.get("seals", []):
+		if seal is Dictionary:
+			seal["shut"] = str(seal["id"]) in shut
+			if not bool(seal["shut"]):
+				_draw_seal(seal)
+	_told_hub = ""
+
+
+func _on_aquifer_changed() -> void:
+	if _below and is_inside_tree():
+		var now: Array = AquiferDepth.shut_today(GameState.valves_shut, _built_day)
+		if now.size() != _built_shut.size() or now.any(func(id: Variant) -> bool: return not id in _built_shut):
+			_rebuild_seals()
+
+
 func _process(_delta: float) -> void:
 	_resync_depth()
 	_hud.set_clock(GameClock.format_now())
@@ -280,8 +389,8 @@ func _process(_delta: float) -> void:
 	_tell_hub()
 
 
-## The way down, the crate or the sign at the hub; below, the nearest find, else the
-## nearest pool still full: or {}.
+## The way down, the crate or the sign at the hub; below, the nearest find (unless its
+## room's open seal is also in reach), else the open seal, else the nearest full pool.
 func _aquifer_near() -> Dictionary:
 	var at: Vector3 = _rover.global_position
 	if not _below:
@@ -293,11 +402,24 @@ func _aquifer_near() -> Dictionary:
 			return { "kind": SIGN, "id": "" }
 		return {}
 	var found: Dictionary = _nearest_find()
-	if not found.is_empty():
+	var seal_near: Dictionary = _seal_near(at)
+	if not found.is_empty() and not AquiferDepth.prefer_seal(ZoneDepth.local_layout, str(found.get("id", "")), not seal_near.is_empty()):
 		return found
+	if not seal_near.is_empty():
+		return seal_near
 	for pool: Dictionary in ZoneDepth.local_layout.get("pools", []):
 		if not bool(pool["drained"]) and AquiferDepth.pool_gap_m(pool, at) <= AquiferDepth.PUMP_REACH_M:
 			return { "kind": POOL, "id": str(pool["id"]) }
+	return {}
+
+
+## The open seal within valve reach of `at`, or {}.
+func _seal_near(at: Vector3) -> Dictionary:
+	for seal: Dictionary in ZoneDepth.local_layout.get("seals", []):
+		if not bool(seal.get("shut", false)):
+			var there: Vector3 = AquiferDepth.seal_position(seal)
+			if Vector2(there.x - at.x, there.z - at.z).length() <= AquiferDepth.VALVE_REACH_M:
+				return { "kind": SEAL, "id": str(seal["id"]) }
 	return {}
 
 
@@ -319,6 +441,8 @@ func _tell_hub() -> void:
 			_hud.push_log("NOTICE SIGN: press " + Controls.prompt(&"interact") + " to read it.")
 		POOL:
 			_hud.push_log("POOL: press " + Controls.prompt(&"interact") + " to pump it dry for today.")
+		SEAL:
+			_hud.push_log("OPEN SEAL: press " + Controls.prompt(&"interact") + " to shut the valve.")
 
 
 func _use_hub(target: Dictionary) -> void:
@@ -329,6 +453,8 @@ func _use_hub(target: Dictionary) -> void:
 			_hud.push_log("NOTICE SIGN: Vance: [later]")
 		POOL:
 			_use_pump(str(target["id"]))
+		SEAL:
+			_use_valve(str(target["id"]))
 		_:
 			super._use_hub(target)
 
@@ -351,26 +477,39 @@ func _use_pump(pool_id: String) -> void:
 	_hud.push_log("PUMP: " + (problem if problem != "" else "%s drained for today." % pool_id.to_upper()))
 
 
+func _use_valve(seal_id: String) -> void:
+	var problem: String = await FarmCommands.request(&"shut_valve", [seal_id, int(ZoneDepth.local_layout.get("day", 0))])
+	if not is_inside_tree():
+		return
+	_told_hub = ""
+	_hud.push_log("VALVE: " + (problem if problem != "" else "%s shut for today." % seal_id.to_upper()))
+
+
 func _taken_today() -> Array:
 	return ZoneDepth.taken_today(GameState.finds_taken, AquiferDepth.ZONE, GameClock.get_day_index())
 
 
 func _use_find(find_id: String) -> void:
-	var problem: String = await FarmCommands.request(&"take_find", [find_id, int(ZoneDepth.local_layout.get("day", 0))])
+	var reply: String = await FarmCommands.request(&"take_find", [find_id, int(ZoneDepth.local_layout.get("day", 0))])
 	if not is_inside_tree():
 		return
-	if problem != "":
-		_hud.push_log("FIND: " + problem)
+	if reply != "" and not AquiferDepth.is_wet_pack_reply(reply):
+		_hud.push_log("FIND: " + reply)
 		return
 	var find: Dictionary = ZoneDepth.find_in(ZoneDepth.local_layout, find_id)
 	_hud.push_log("FIND: " + AquiferDepth.reward_text(str(find.get("kind", ""))))
+	if reply != "":
+		_hud.push_log("WET PACK: " + reply)
 
 
 ## The pump drained a pool (here or by a friend), so this depth is built again with the
-## rover where it is.
+## rover where it is; a shut valve redraws the seals in place.
 func _resync_depth() -> void:
 	super._resync_depth()
 	if _below and not SceneSwitcher.is_busy() and GameState.rover_zone == AquiferDepth.ZONE and _rover.away_text() == "" and not _moving:
+		var now_shut: Array = AquiferDepth.shut_today(GameState.valves_shut, _built_day)
+		if now_shut.size() != _built_shut.size() or now_shut.any(func(id: Variant) -> bool: return not id in _built_shut):
+			_rebuild_seals()
 		var now: Array = AquiferDepth.drained_today(GameState.pools_drained, _built_day)
 		if now.size() != _built_drained.size() or now.any(func(id: Variant) -> bool: return not id in _built_drained):
 			_moving = true
