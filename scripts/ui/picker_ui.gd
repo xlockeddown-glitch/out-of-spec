@@ -32,6 +32,9 @@ static func should_offer_for_guest(farm: Node = GameState, is_guest: bool = Farm
 	return is_guest and farm.local_player_id != "" and not farm.player_loadouts.has(farm.local_player_id)
 
 var _parts: Dictionary = {}
+var _coat_color: String = ""
+var _coat_row: HBoxContainer
+var _coat_label: Label
 var _name_field: LineEdit
 var _rename_button: Button
 var _keyboard: PadKeyboard
@@ -109,6 +112,7 @@ func _ready() -> void:
 	name_row.add_child(_rename_button)
 	for slot: StringName in Loadout.SLOTS:
 		_add_row(rows, slot)
+	_add_coat_row(rows)
 	_note = PlanBoardUI._label("", ScopeTheme.CARD_INK_MUTED, 18)
 	_note.name = &"Note"
 	rows.add_child(_note)
@@ -178,6 +182,42 @@ func _add_row(rows: VBoxContainer, slot: StringName) -> void:
 	_next_buttons[slot] = next
 
 
+func _add_coat_row(rows: VBoxContainer) -> void:
+	_coat_row = HBoxContainer.new()
+	_coat_row.name = &"Row_coat_color"
+	_coat_row.add_theme_constant_override(&"separation", 12)
+	rows.add_child(_coat_row)
+	var title: Label = PlanBoardUI._label("LAB COAT COLOR", ScopeTheme.CARD_INK, 20)
+	title.custom_minimum_size = Vector2(SLOT_WIDTH, 0)
+	title.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_coat_row.add_child(title)
+	var prev := Button.new()
+	prev.name = &"Prev_coat_color"
+	prev.text = "<"
+	prev.add_theme_font_size_override(&"font_size", 22)
+	prev.pressed.connect(cycle_coat_color.bind(-1))
+	_coat_row.add_child(prev)
+	_coat_label = PlanBoardUI._label("", ScopeTheme.CARD_INK, 22)
+	_coat_label.name = &"CoatColorLabel"
+	_coat_label.custom_minimum_size = Vector2(PART_WIDTH, 0)
+	_coat_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_coat_row.add_child(_coat_label)
+	var next := Button.new()
+	next.name = &"Next_coat_color"
+	next.text = ">"
+	next.add_theme_font_size_override(&"font_size", 22)
+	next.pressed.connect(cycle_coat_color.bind(1))
+	_coat_row.add_child(next)
+	_coat_row.visible = false
+
+
+func cycle_coat_color(step: int) -> void:
+	if _keyboard != null and _keyboard.visible:
+		return
+	_coat_color = Cosmetics.step_coat_color(_coat_color, step)
+	_show_parts()
+
+
 func _process(_delta: float) -> void:
 	if visible:
 		ScopeTheme.refresh_badge(_glyph)
@@ -211,6 +251,7 @@ func open() -> void:
 	RoverController.input_blocked = true
 	var own: Dictionary = GameState.loadout_of(GameState.local_player_id)
 	_parts = (own["parts"] as Dictionary).duplicate()
+	_coat_color = str(own.get("coat_color", ""))
 	_name_field.text = String(own["name"])
 	_note.text = ""
 	_show_parts()
@@ -301,6 +342,10 @@ func _show_parts() -> void:
 		_part_labels[slot].text = String(entry["name"])
 		var trade: String = String(entry["trade_off"])
 		_trade_labels[slot].text = trade if trade != "" else NO_TRADE_OFF
+	if _coat_row != null:
+		var unlocked: bool = Cosmetics.has_lab_coat_unlock(GameState, GameState.local_player_id)
+		_coat_row.visible = unlocked
+		_coat_label.text = Cosmetics.coat_color_name(_coat_color)
 	if _preview != null:
 		_preview.show_loadout(_parts)
 
@@ -312,6 +357,11 @@ func apply() -> String:
 	var answer: Variant = await FarmCommands.request(&"set_loadout", [_name_field.text, Loadout.encode(_parts)])
 	if answer is String:
 		reason = answer
+	if reason == "" and Cosmetics.has_lab_coat_unlock(GameState, GameState.local_player_id) \
+			and _coat_color != GameState.lab_coat_color(GameState.local_player_id):
+		var coat_answer: Variant = await FarmCommands.request(&"set_lab_coat_color", [_coat_color])
+		if coat_answer is String:
+			reason = coat_answer
 	if reason != "":
 		if is_instance_valid(_note):
 			_note.text = reason

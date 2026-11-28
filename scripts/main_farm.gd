@@ -280,6 +280,10 @@ func _ready() -> void:
 	landing.terminal_click.verb = VERB_TERMINAL
 	_robots_ui = RobotsUI.new()
 	_hud.get_parent().add_child(_robots_ui)
+	var robot_stand := RobotStand.new()
+	robot_stand.name = "RobotStand"
+	robot_stand.position = _bram_bay.position + Vector3(-2.4, 0.0, -3.2)
+	_bram_bay.get_parent().add_child(robot_stand)
 
 
 ## The hint line is centred, bigger and in Scope ink; the verb prompt floats over the target.

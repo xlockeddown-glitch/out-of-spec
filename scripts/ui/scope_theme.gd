@@ -12,6 +12,8 @@ extends RefCounted
 
 const TEAL: Color = Color("#38E1C6")
 const AMBER: Color = Color("#F5A623")
+## Gold border for certificates printed after lab level 99 [PLACEHOLDER].
+const GOLD: Color = Color("#D9A83B")
 const RED: Color = Color("#FF5A5F")
 const SHADOW: Color = Color("#1D222B")
 const GLASS_DEEP: Color = Color("#151921")

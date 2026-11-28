@@ -100,7 +100,7 @@ func test_fast_travel_is_listed_only_after_the_first_visit() -> String:
 func test_the_commands_are_on_the_list_and_the_protocol_moved() -> String:
 	if not &"move_rover_olympus" in FarmCommands.ACTIONS or not &"place_marker" in FarmCommands.ACTIONS:
 		return "move_rover_olympus or place_marker is not a farm command."
-	return "" if SessionScript.PROTOCOL == 52 else "The protocol is %d, not 52." % SessionScript.PROTOCOL
+	return "" if SessionScript.PROTOCOL == 53 else "The protocol is %d, not 53." % SessionScript.PROTOCOL
 
 
 # --- The depths ----------------------------------------------------------------------

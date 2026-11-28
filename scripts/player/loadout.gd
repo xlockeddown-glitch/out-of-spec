@@ -271,4 +271,6 @@ static func entry_problem(entry: Variant) -> String:
 	for key: Variant in parts:
 		if not (key is String or key is StringName) or not (parts[key] is String or parts[key] is StringName):
 			return "a loadout part that is not text"
+	if (entry as Dictionary).has("coat_color") and not Cosmetics.is_coat_color((entry as Dictionary)["coat_color"]):
+		return "a loadout with a bad coat_color"
 	return ""

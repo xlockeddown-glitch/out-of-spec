@@ -14,6 +14,9 @@ var _funds: Label
 var _rows: VBoxContainer
 var _result: Label
 var _close_button: Button
+var _keyboard: PadKeyboard
+var _keyboard_field: LineEdit = null
+var _keyboard_robot_id: String = ""
 ## The frame whose order button has been pressed once.
 var _armed_id: String = ""
 
@@ -52,19 +55,34 @@ func _ready() -> void:
 	column.add_child(_result)
 	_close_button = PlanBoardUI._button("CLOSE  (%s)" % Controls.key_label(&"ui_cancel"))
 	_close_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-	_close_button.pressed.connect(hide)
+	_close_button.pressed.connect(_close)
 	column.add_child(_close_button)
+	_keyboard = PadKeyboard.new()
+	_keyboard.text_changed.connect(_on_keyboard_text)
+	_keyboard.finished.connect(_on_keyboard_finished)
+	_keyboard.cancelled.connect(_on_keyboard_cancelled)
+	add_child(_keyboard)
 	GameState.robots_changed.connect(_on_robots_changed)
 	# The other player may calibrate a commissioning robot's sensor.
 	GameState.calibration_recorded.connect(_on_robots_changed.unbind(1))
 	hide()
 
 
+func _close() -> void:
+	if _keyboard != null and _keyboard.visible:
+		_keyboard.close()
+	_keyboard_field = null
+	_keyboard_robot_id = ""
+	hide()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible:
 		return
+	if _keyboard != null and _keyboard.visible:
+		return
 	if event.is_action_pressed(&"ui_cancel"):
-		hide()
+		_close()
 	# No key press reaches the farm or the scene swap behind the view.
 	if event is InputEventKey or event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		get_viewport().set_input_as_handled()
@@ -111,20 +129,115 @@ func _add_robot_rows(id: String) -> void:
 	match robot["state"]:
 		"assembling":
 			_rows.add_child(PlanBoardUI._label("%s: assembling, ready the morning of day %s" % [
-				robot["name"], SP811.integer(robot["done_day"])], TEXT, 20))
+				GameState.robot_display_name(id), SP811.integer(robot["done_day"])], TEXT, 20))
 		"released":
 			_add_interlock_rows(id)
 			_add_card_rows(id)
 		_:
-			_rows.add_child(PlanBoardUI._label("%s: commissioning" % robot["name"], AMBER, 20))
+			_rows.add_child(PlanBoardUI._label("%s: commissioning" % GameState.robot_display_name(id), AMBER, 20))
 			for sensor_id: String in GameState.robot_sensor_ids(id):
 				var problem: String = GameState.robot_sensor_problem(sensor_id)
 				_rows.add_child(PlanBoardUI._label("    %s: %s" % [GameState.instrument_name(sensor_id, true),
 					"ready" if problem == "" else problem], DIM if problem == "" else AMBER, 18))
-			var release: Button = PlanBoardUI._button("RELEASE %s" % robot["name"])
+			var release: Button = PlanBoardUI._button("RELEASE %s" % GameState.robot_display_name(id))
 			release.set_meta(&"row", id)
 			release.pressed.connect(_on_release_pressed.bind(id))
 			_rows.add_child(release)
+	if GameState.lab_gate_open(Cosmetics.GATE_ROBOT_PAINT):
+		_add_cosmetic_rows(id)
+
+
+func _add_cosmetic_rows(id: String) -> void:
+	var paint_id: String = GameState.robot_paint(id)
+	var plate: String = str(GameState.robots[id].get("nameplate", ""))
+	var next_paint: String = Cosmetics.next_robot_paint(paint_id)
+	var paint_btn: Button = PlanBoardUI._button("PAINT %s: %s -> %s" % [
+		GameState.robot_display_name(id), Cosmetics.robot_paint_name(paint_id), Cosmetics.robot_paint_name(next_paint)])
+	paint_btn.set_meta(&"row", id + " paint")
+	paint_btn.pressed.connect(_on_paint_pressed.bind(id))
+	_rows.add_child(paint_btn)
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override(&"separation", 8)
+	var field := LineEdit.new()
+	field.max_length = Cosmetics.MAX_NAMEPLATE
+	field.placeholder_text = "Nameplate (max 12)"
+	field.text = plate
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	field.gui_input.connect(_on_nameplate_field_input.bind(id, field))
+	bar.add_child(field)
+	var type_btn: Button = PlanBoardUI._button("TYPE")
+	type_btn.set_meta(&"row", id + " type")
+	type_btn.pressed.connect(open_nameplate_keyboard.bind(id, field))
+	bar.add_child(type_btn)
+	var save_btn: Button = PlanBoardUI._button("SET NAMEPLATE")
+	save_btn.set_meta(&"row", id + " plate")
+	save_btn.pressed.connect(_on_nameplate_pressed.bind(id, field))
+	bar.add_child(save_btn)
+	_rows.add_child(bar)
+
+
+## Opens the on-screen pad keyboard for a robot's nameplate LineEdit.
+func open_nameplate_keyboard(id: String, field: LineEdit) -> void:
+	if _keyboard == null or not visible or not is_instance_valid(field):
+		return
+	_keyboard_robot_id = id
+	_keyboard_field = field
+	_keyboard.open(field.text, Cosmetics.MAX_NAMEPLATE)
+
+
+func _on_nameplate_field_input(event: InputEvent, id: String, field: LineEdit) -> void:
+	if not visible or (_keyboard != null and _keyboard.visible):
+		return
+	if event is InputEventJoypadButton and (event as InputEventJoypadButton).pressed \
+			and (event as InputEventJoypadButton).button_index == JOY_BUTTON_A:
+		get_viewport().set_input_as_handled()
+		open_nameplate_keyboard(id, field)
+
+
+func _on_keyboard_text(value: String) -> void:
+	if is_instance_valid(_keyboard_field):
+		_keyboard_field.text = value
+
+
+func _on_keyboard_finished(value: String) -> void:
+	if is_instance_valid(_keyboard_field):
+		_keyboard_field.text = value
+	var rid: String = _keyboard_robot_id
+	_keyboard_field = null
+	_keyboard_robot_id = ""
+	if is_inside_tree() and visible and rid != "":
+		_focus_row(rid + " plate", rid + " ")
+
+
+func _on_keyboard_cancelled() -> void:
+	if is_instance_valid(_keyboard_field):
+		_keyboard_field.text = _keyboard.text()
+	var rid: String = _keyboard_robot_id
+	_keyboard_field = null
+	_keyboard_robot_id = ""
+	if is_inside_tree() and visible and rid != "":
+		_focus_row(rid + " plate", rid + " ")
+
+
+func _on_paint_pressed(id: String) -> void:
+	if _keyboard != null and _keyboard.visible:
+		return
+	_armed_id = ""
+	var next_paint: String = Cosmetics.next_robot_paint(GameState.robot_paint(id))
+	var plate: String = str(GameState.robots.get(id, {}).get("nameplate", ""))
+	_show_result(await FarmCommands.request(&"set_robot_cosmetic", [id, next_paint, plate]), "Paint updated.")
+	_refresh()
+	_focus_row(id + " paint", id + " ")
+
+
+func _on_nameplate_pressed(id: String, field: LineEdit) -> void:
+	if _keyboard != null and _keyboard.visible:
+		return
+	_armed_id = ""
+	var paint_id: String = GameState.robot_paint(id)
+	_show_result(await FarmCommands.request(&"set_robot_cosmetic", [id, paint_id, field.text]), "Nameplate updated.")
+	_refresh()
+	_focus_row(id + " plate", id + " ")
 
 
 ## A released robot's state and, with its interlock tripped, the button for it.
@@ -136,7 +249,7 @@ func _add_interlock_rows(id: String) -> void:
 		state = "INTERLOCK OVERRIDDEN" + (", %s out of tolerance" % bad if bad != "" else "")
 	elif bad != "":
 		state = "%s out of tolerance. Holding." % bad
-	_rows.add_child(PlanBoardUI._label("%s: %s" % [GameState.robots[id]["name"], state], TEAL if state == "released" else AMBER, 20))
+	_rows.add_child(PlanBoardUI._label("%s: %s" % [GameState.robot_display_name(id), state], TEAL if state == "released" else AMBER, 20))
 	if state == "released":
 		return
 	var row: String = id + " interlock"

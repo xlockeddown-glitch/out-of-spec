@@ -86,9 +86,9 @@
     { "id": "robot_3", "level": 65, "opens": "A third robot", "needs": "Robotics" },
     { "id": "board_5_jobs", "level": 65, "opens": "A fifth job on the board", "built": true },
     { "id": "robot_4", "level": 75, "opens": "A fourth robot", "needs": "Robotics" },
-    { "id": "robot_paint", "level": 85, "opens": "Robot paint", "built": false },
-    { "id": "halfway_plaque", "level": 92, "opens": "The plaque", "built": false },
-    { "id": "gold_border", "level": 99, "opens": "The gold border", "built": false }
+    { "id": "robot_paint", "level": 85, "opens": "Robot paint and nameplates", "built": true },
+    { "id": "halfway_plaque", "level": 92, "opens": "The HALFWAY THERE plaque", "built": true },
+    { "id": "gold_border", "level": 99, "opens": "Gold border on certificates and Odalys's mug", "built": true }
   ],
   "lab_xp_sources": [
     { "id": "lab_calibration", "xp": 25 },

@@ -623,6 +623,8 @@ var lab_xp: int = 0
 ## open whatever its lab level: what a save from before the gates had open
 ## (docs/design/quests_levels_story.md section 10, 5). Nothing in play adds one.
 var lab_gates_kept: Array[String] = []
+## True once Odalys has sent her mug at lab level 99 (once per farm; pays nothing).
+var odalys_mug_sent: bool = false
 ## Discipline -> the most spaces its lab area has had that the lab has its XP
 ## for (lab_area). A space cleared and fitted again gives none.
 var lab_areas_paid: Dictionary = {}
@@ -867,7 +869,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "olympus_markers", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "test_pod", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "olympus_markers", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "test_pod", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened", "odalys_mug_sent"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -1114,9 +1116,13 @@ func farm_dict_problem(data: Dictionary) -> String:
 	for record: Dictionary in data["cal_log"]:
 		if not record.get("as_found_in_tolerance") is bool or not record.get("traceable", true) is bool or not record.get("performed_by", "") is String or not record.get("standard_problem", "") is String:
 			return "'cal_log' has an entry with a field missing."
+		if record.has("cal_initials") and not record["cal_initials"] is String:
+			return "'cal_log' has a bad cal_initials."
 	for cert: Dictionary in data["certificate_log"]:
-		if not _optional_fields(cert, ["issuer"], []):
+		if not _optional_fields(cert, ["issuer", "cal_initials", "cert_title"], []):
 			return "'certificate_log' has a field of the wrong type."
+		if cert.has("gold_border") and not cert["gold_border"] is bool:
+			return "'certificate_log' has a bad gold_border."
 		# A maker's certificate has no as-found; an in-house one names its reference.
 		if not cert.has("as_found") or not (cert["as_found"] == null or cert["as_found"] is float or cert["as_found"] is int) or not cert.get("as_found_in_tolerance") is bool or (cert.has("reference_id") and not _has_fields(cert, ["reference_id", "reference_certificate"], [])):
 			return "'certificate_log' has an entry with a field missing."
@@ -1220,6 +1226,8 @@ static func _audit_problem(report: Dictionary) -> String:
 	for key: String in ["day", "total_fine", "phone_count"]:
 		if not (report.get(key, 0) is int or report.get(key, 0) is float):
 			return key
+	if report.has("gold_border") and not report["gold_border"] is bool:
+		return "gold_border"
 	for pair: Array in [["lines", "instrument_id"], ["interlocks", "robot_id"]]:
 		var entries: Variant = report.get(pair[0], [])
 		if not entries is Array:
@@ -1798,6 +1806,8 @@ func calibrate(instrument_id: String, performed_by: String = "", use_standard: b
 		# correcting for its error changes this result.
 		"suspect": false,
 	}
+	if robot_id == "" and performed_by != MANAGER_ID and Cosmetics.has_cal_initials_unlock(self, performed_by):
+		record["cal_initials"] = Cosmetics.player_initials(self, performed_by)
 	cal_log.append(record)
 	last_cal_records[instrument_id] = record
 	if sensor.role == "standard" and traceable:
@@ -1820,6 +1830,13 @@ func _certify_on_bench(record: Dictionary) -> void:
 	cert["k"] = CalUncertainty.coverage_factor()
 	cert["reference_id"] = record["standard_id"]
 	cert["reference_certificate"] = record["standard_certificate"]
+	if str(record.get("cal_initials", "")) != "":
+		cert["cal_initials"] = record["cal_initials"]
+	var by_player: String = str(record.get("performed_by", ""))
+	if str(record.get("programmed_by", "")) == "" and by_player != "" and by_player != MANAGER_ID:
+		var title: String = Cosmetics.skill_99_title(self, by_player)
+		if title != "":
+			cert["cert_title"] = title
 	record["certificate"] = cert["id"]
 	if not cert["as_found_in_tolerance"]:
 		_recall_and_post(id, record["as_found"], int(previous.get("day", 0)))
@@ -2532,6 +2549,75 @@ func lab_gates_opened_text(after: int, upto: int) -> String:
 	return "; ".join(parts)
 
 
+# --- Late-level cosmetics (slice 35; Cosmetics) ---------------------------------
+
+## Host: sets a robot's paint color and sanitized nameplate once lab gate
+## `robot_paint` (level 85) is open. Robots are farm-shared, so any player may
+## paint or name any robot (keep `player_id` name for FarmCommands).
+func set_robot_cosmetic(robot_id: String, paint_id: String, nameplate: String, player_id: String = "") -> String:
+	var gate: String = lab_gate_problem(Cosmetics.GATE_ROBOT_PAINT, "Robot paint and nameplates")
+	if gate != "":
+		return gate
+	if not robots.has(robot_id):
+		return "There is no such robot."
+	if not Cosmetics.is_robot_paint(paint_id):
+		return "Unknown robot paint."
+	var clean: String = Cosmetics.clean_nameplate(nameplate)
+	var robot: Dictionary = robots[robot_id]
+	if str(robot.get("paint", "")) == paint_id and str(robot.get("nameplate", "")) == clean:
+		return ""
+	robot["paint"] = paint_id
+	robot["nameplate"] = clean
+	robots_changed.emit()
+	return ""
+
+
+## A robot's nameplate when set, else its default name.
+func robot_display_name(robot_id: String) -> String:
+	var robot: Dictionary = robots.get(robot_id, {})
+	var plate: String = str(robot.get("nameplate", ""))
+	return plate if plate != "" else str(robot.get("name", robot_id))
+
+
+## A robot's paint id ("" for stock enamel).
+func robot_paint(robot_id: String) -> String:
+	return str(robots.get(robot_id, {}).get("paint", ""))
+
+
+## Host: sets `player_id`'s lab coat color once any personal skill reaches 50.
+func set_lab_coat_color(color_id: String, player_id: String = "") -> String:
+	player_id = _player(player_id)
+	if not Cosmetics.has_lab_coat_unlock(self, player_id):
+		return "Reach level %s in any skill to pick a lab coat color." % SP811.integer(Cosmetics.LAB_COAT_LEVEL)
+	if not Cosmetics.is_coat_color(color_id):
+		return "Unknown lab coat color."
+	if not player_loadouts.has(player_id) and player_loadouts.size() > MAX_KNOWN_GUESTS:
+		return "The farm knows too many players."
+	var current: Dictionary = loadout_of(player_id)
+	if str(current.get("coat_color", "")) == color_id:
+		return ""
+	var entry: Dictionary = { "name": current["name"], "parts": current["parts"] }
+	if color_id != "":
+		entry["coat_color"] = color_id
+	player_loadouts[player_id] = entry
+	loadouts_changed.emit()
+	return ""
+
+
+## The lab coat color id of `player_id` ("" when unset).
+func lab_coat_color(player_id: String = "") -> String:
+	return str(loadout_of(player_id).get("coat_color", ""))
+
+
+## Sends Odalys's mug once when the lab reaches level 99. Pays nothing.
+func _deliver_odalys_mug_if_due() -> void:
+	if FarmCommands.guest or odalys_mug_sent or not lab_gate_open(Cosmetics.GATE_GOLD_BORDER):
+		return
+	odalys_mug_sent = true
+	post_phone(Cosmetics.ODALYS_MUG_PHONE)
+	lab_xp_changed.emit()
+
+
 ## The gate of the next robot: robot_1 for the first, up to the last row there is.
 func robot_gate_id() -> String:
 	var number: int = robots.size() + 1
@@ -2664,6 +2750,7 @@ func give_lab_xp(amount: int) -> void:
 			if level > before and level <= lab_level() and not gate in lab_gates_kept and not _morning and _board_day >= 0:
 				refresh_job_board(GameClock.get_day_index())
 				break
+		_deliver_odalys_mug_if_due()
 
 
 ## Line for the skills view: "Lab level 2  (60 XP, 105 for level 3)  farm".
@@ -3012,7 +3099,9 @@ func _spend_one_use(reward_id: String, player_id: String = "") -> bool:
 func loadout_of(player_id: String = "") -> Dictionary:
 	var kept: Variant = player_loadouts.get(_player(player_id), {})
 	var name_text: Variant = (kept as Dictionary).get("name", "") if kept is Dictionary else ""
-	return { "name": Loadout.clean_name(name_text), "parts": Loadout.clean((kept as Dictionary).get("parts", {}) if kept is Dictionary else {}) }
+	var raw_coat: Variant = (kept as Dictionary).get("coat_color", "") if kept is Dictionary else ""
+	var coat: String = str(raw_coat) if Cosmetics.is_coat_color(raw_coat) else ""
+	return { "name": Loadout.clean_name(name_text), "parts": Loadout.clean((kept as Dictionary).get("parts", {}) if kept is Dictionary else {}), "coat_color": coat }
 
 
 ## Sets the character's name and parts for `player_id` only (a request carries no
@@ -3029,6 +3118,9 @@ func set_loadout(character_name: String, choice: String, player_id: String = "")
 	if not player_loadouts.has(player_id) and player_loadouts.size() > MAX_KNOWN_GUESTS:
 		return "The farm knows too many players."
 	var entry: Dictionary = { "name": Loadout.clean_name(character_name), "parts": parts }
+	var prev: Variant = player_loadouts.get(player_id, {})
+	if prev is Dictionary and str((prev as Dictionary).get("coat_color", "")) != "":
+		entry["coat_color"] = str((prev as Dictionary)["coat_color"])
 	if player_loadouts.get(player_id, {}) == entry:
 		return ""
 	player_loadouts[player_id] = entry
@@ -3243,6 +3335,10 @@ func _robots_dict_problem(saved: Dictionary) -> String:
 				return "Robot '%s' has a bad %s." % [id, key]
 		if typeof(robot.get("override_by", "")) != TYPE_STRING:
 			return "Robot '%s' has a bad override_by." % id
+		if robot.has("paint") and not Cosmetics.is_robot_paint(robot["paint"]):
+			return "Robot '%s' has a bad paint." % id
+		if robot.has("nameplate") and (typeof(robot["nameplate"]) != TYPE_STRING or Cosmetics.clean_nameplate(robot["nameplate"]) != robot["nameplate"]):
+			return "Robot '%s' has a bad nameplate." % id
 	return ""
 
 
@@ -4365,6 +4461,7 @@ func _sitter_tend() -> void:
 
 
 func _on_day_started(day: int) -> void:
+	_deliver_odalys_mug_if_due()
 	_warm_ice_campers()
 	_campers.clear()  # the night at a camp is over: they wake there, and the recall is theirs again
 	_cold_kept.clear()  # yesterday's cold never comes back, whatever the grace
@@ -4533,6 +4630,8 @@ func _run_audit(day: int) -> void:
 	_credibility_after_audit(report)
 	# Where it came among the phone's lines, so a guest sees the same order.
 	report["phone_count"] = phone_count
+	if lab_gate_open(Cosmetics.GATE_GOLD_BORDER):
+		report["gold_border"] = true
 	audit_log.append(report)
 	audit_completed.emit(report)
 
@@ -4659,6 +4758,8 @@ func _issue_certificate(standard_id: String, day: int, as_found: Variant, as_lef
 		"k": sensor.certificate_k,
 		"founding": founding,
 	}
+	if not founding and issuer == IN_HOUSE and lab_gate_open(Cosmetics.GATE_GOLD_BORDER):
+		cert["gold_border"] = true
 	_next_certificate_number += 1
 	certificates[standard_id] = cert
 	certificate_log.append(cert)

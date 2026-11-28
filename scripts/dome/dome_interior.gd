@@ -32,6 +32,9 @@ const TOAST_SECONDS_PER_CHAR: float = 0.04
 ## come from a fault the bench has no part in.
 @onready var _mug_ring: Node3D = %MugRing
 @onready var _mug_ring_click: Inspectable = %MugRingInspect
+## Odalys's mug on the bench (lab level 99, once only): reuses the mug-ring spot.
+var _odalys_mug: Node3D
+var _odalys_mug_click: Clickable
 
 @onready var _clock_label: Label = %ClockLabel
 @onready var _species_label: Label = %SpeciesLabel
@@ -126,17 +129,93 @@ func _ready() -> void:
 
 	var species: Dictionary = GameState.get_dome_species()
 	_species_label.text = "%s  (%s)" % [_field(species, "common_name", "Unknown"), _field(species, "scientific_name", "Unclassified")]
+	_build_odalys_mug()
 	_show_mug_ring()
+
+
+## Builds Odalys's ceramic mug on the bench at the mug-ring spot using primitives
+## and ScopeTheme constants only [PLACEHOLDER].
+func _build_odalys_mug() -> void:
+	_odalys_mug = Node3D.new()
+	_odalys_mug.name = "OdalysMug"
+	_odalys_mug.position = _mug_ring.position + Vector3(0.0, 0.055, 0.0)
+	_odalys_mug.visible = false
+	var cup := MeshInstance3D.new()
+	cup.name = "Cup"
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.045
+	cyl.bottom_radius = 0.042
+	cyl.height = 0.095
+	cup.mesh = cyl
+	var cup_mat := StandardMaterial3D.new()
+	cup_mat.albedo_color = ScopeTheme.ENAMEL_TOP
+	cup_mat.roughness = 0.45
+	cup.material_override = cup_mat
+	_odalys_mug.add_child(cup)
+	var handle := MeshInstance3D.new()
+	handle.name = "Handle"
+	var hbox := BoxMesh.new()
+	hbox.size = Vector3(0.03, 0.05, 0.015)
+	handle.mesh = hbox
+	handle.position = Vector3(0.05, 0.0, 0.0)
+	var handle_mat := StandardMaterial3D.new()
+	handle_mat.albedo_color = ScopeTheme.TERRA
+	handle_mat.roughness = 0.5
+	handle.material_override = handle_mat
+	_odalys_mug.add_child(handle)
+	var coffee := MeshInstance3D.new()
+	coffee.name = "Coffee"
+	var ccyl := CylinderMesh.new()
+	ccyl.top_radius = 0.038
+	ccyl.bottom_radius = 0.038
+	ccyl.height = 0.008
+	coffee.mesh = ccyl
+	coffee.position = Vector3(0.0, 0.045, 0.0)
+	var coffee_mat := StandardMaterial3D.new()
+	coffee_mat.albedo_color = ScopeTheme.SHADOW
+	coffee_mat.roughness = 0.3
+	coffee.material_override = coffee_mat
+	_odalys_mug.add_child(coffee)
+	_odalys_mug_click = Clickable.new()
+	_odalys_mug_click.name = "OdalysMugClick"
+	_odalys_mug_click.collision_layer = 8
+	_odalys_mug_click.collision_mask = 0
+	_odalys_mug_click.hint = Cosmetics.ODALYS_MUG_HINT
+	_odalys_mug_click.enabled = false
+	var shape := CollisionShape3D.new()
+	var hit := BoxShape3D.new()
+	hit.size = Vector3(0.14, 0.12, 0.12)
+	shape.shape = hit
+	_odalys_mug_click.add_child(shape)
+	_odalys_mug_click.clicked.connect(func() -> void: _toast(Cosmetics.ODALYS_MUG_INSPECT))
+	_odalys_mug.add_child(_odalys_mug_click)
+	add_child(_odalys_mug)
 
 
 ## The mug ring is on the bench, and can be inspected, once the audit's one-time
 ## warning has been used. A guest sees the host's farm, so the host's ring.
+## Odalys's mug sits on the same bench spot once lab level 99 delivers it.
 func _show_mug_ring() -> void:
+	var mug_sent: bool = GameState.odalys_mug_sent
+	var ring_active: bool = GameState.audit_grace_used and not mug_sent
 	_mug_ring.visible = GameState.audit_grace_used
-	if _mug_ring_click.enabled != _mug_ring.visible:
-		_mug_ring_click.enabled = _mug_ring.visible
+	_mug_ring_click.visible = ring_active
+	_mug_ring_click.monitorable = ring_active
+	_mug_ring_click.input_ray_pickable = ring_active
+	_mug_ring_click.collision_layer = 8 if ring_active else 0
+	if _mug_ring_click.enabled != ring_active:
+		_mug_ring_click.enabled = ring_active
 		if Clickable.hovered == _mug_ring_click:
 			Clickable.hovered = null
+	if _odalys_mug != null:
+		_odalys_mug.visible = mug_sent
+		_odalys_mug_click.monitorable = mug_sent
+		_odalys_mug_click.input_ray_pickable = mug_sent
+		_odalys_mug_click.collision_layer = 8 if mug_sent else 0
+		if _odalys_mug_click.enabled != mug_sent:
+			_odalys_mug_click.enabled = mug_sent
+			if Clickable.hovered == _odalys_mug_click:
+				Clickable.hovered = null
 
 
 func _process(delta: float) -> void:

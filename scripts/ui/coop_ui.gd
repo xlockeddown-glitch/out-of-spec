@@ -178,10 +178,14 @@ static func strip_text(players: Array[String], own_id: String, hosting: bool, to
 ## The host is first. With `show_places`, each line also says where that player is
 ## (`places`: player -> [place, depth], GameState.player_places), in the same
 ## capitals; a player not in it is on the farm.
-static func players_text(players: Array[String], own_id: String, places: Dictionary = {}, show_places: bool = false) -> String:
+static func players_text(players: Array[String], own_id: String, places: Dictionary = {}, show_places: bool = false, farm: Node = GameState) -> String:
 	var lines: PackedStringArray = []
 	for index: int in players.size():
 		var line: String = player_name(players[index])
+		if farm != null:
+			var title: String = Cosmetics.player_title(farm, players[index])
+			if title != "":
+				line += "  " + title.to_upper()
 		if index == 0:
 			line += "  HOST"
 		if players[index] == own_id:

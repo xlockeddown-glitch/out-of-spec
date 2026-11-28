@@ -16,6 +16,9 @@ extends Node3D
 signal inspected(text: String)
 
 const GATE_ID: String = "certificate_wall"
+const HALFWAY_GATE_ID: String = Cosmetics.GATE_HALFWAY_PLAQUE
+const HALFWAY_TITLE: String = "HALFWAY THERE"
+const HALFWAY_HINT: String = "HALFWAY THERE — Lab level 92"
 ## [PLACEHOLDER] Grid dimensions and cap: 4 columns by 3 rows (12 frames).
 const COLS: int = 4
 const ROWS: int = 3
@@ -24,6 +27,7 @@ const MAX_SHOWN: int = COLS * ROWS
 ## [PLACEHOLDER] Primitive mesh dimensions (meters).
 const BOARD_SIZE: Vector3 = Vector3(1.80, 1.15, 0.04)
 const PLAQUE_SIZE: Vector3 = Vector3(0.95, 0.26, 0.04)
+const HALFWAY_PLAQUE_SIZE: Vector3 = Vector3(0.88, 0.20, 0.035)
 const FRAME_SIZE: Vector3 = Vector3(0.32, 0.24, 0.03)
 const PAPER_SIZE: Vector3 = Vector3(0.26, 0.18, 0.02)
 const SEAL_SIZE: Vector3 = Vector3(0.05, 0.05, 0.015)
@@ -38,12 +42,15 @@ const GROUP_ITEM: StringName = &"certificate_item"
 var _farm: Node = null
 var _built_once: bool = false
 var _was_unlocked: bool = false
+var _was_halfway: bool = false
 var _shown: Array[Dictionary] = []
 var _total_earned: int = 0
 
 var _mat_board: StandardMaterial3D
 var _mat_plaque: StandardMaterial3D
+var _mat_halfway: StandardMaterial3D
 var _mat_frame: StandardMaterial3D
+var _mat_gold_frame: StandardMaterial3D
 var _mat_paper: StandardMaterial3D
 var _mat_audit_seal: StandardMaterial3D
 var _mat_quest_seal: StandardMaterial3D
@@ -95,6 +102,7 @@ static func earned_from(farm: Node) -> Array[Dictionary]:
 				"kind": "audit",
 				"title": "Clean Audit",
 				"day": day,
+				"gold_border": bool(r.get("gold_border", false)),
 				"_order": 0,
 				"_index": i,
 			})
@@ -121,18 +129,22 @@ static func earned_from(farm: Node) -> Array[Dictionary]:
 			"kind": "lab_quest",
 			"title": str(quest.get("title", qid)),
 			"day": done_day,
+			"gold_border": bool(entry.get("gold_border", false)),
 			"_order": 1,
 			"_index": i,
 		})
 	entries.sort_custom(_sort_oldest_first)
 	var out: Array[Dictionary] = []
 	for item: Dictionary in entries:
-		out.append({
+		var row_out: Dictionary = {
 			"id": str(item["id"]),
 			"kind": str(item["kind"]),
 			"title": str(item["title"]),
 			"day": int(item["day"]),
-		})
+		}
+		if bool(item.get("gold_border", false)):
+			row_out["gold_border"] = true
+		out.append(row_out)
 	return out
 
 
@@ -166,6 +178,7 @@ func refresh() -> void:
 	_ensure_materials()
 	var farm: Node = _state()
 	var unlocked: bool = farm.lab_gate_open(GATE_ID)
+	var halfway: bool = unlocked and farm.lab_gate_open(HALFWAY_GATE_ID)
 	var earned: Array[Dictionary] = []
 	if unlocked:
 		earned = earned_from(farm)
@@ -175,10 +188,11 @@ func refresh() -> void:
 		visible_certs.assign(earned.slice(extra))
 	else:
 		visible_certs = earned
-	if _built_once and unlocked == _was_unlocked and _total_earned == earned.size() and visible_certs == _shown:
+	if _built_once and unlocked == _was_unlocked and halfway == _was_halfway and _total_earned == earned.size() and visible_certs == _shown:
 		return
 	_built_once = true
 	_was_unlocked = unlocked
+	_was_halfway = halfway
 	_total_earned = earned.size()
 	_shown = visible_certs
 	_clear_wall()
@@ -187,6 +201,8 @@ func refresh() -> void:
 		_add_plaque(locked_text(farm), "CERTIFICATE WALL")
 		return
 	_add_board()
+	if halfway:
+		_add_halfway_plaque()
 	if visible_certs.is_empty():
 		_add_plaque("Certificate wall: no certificates yet", "CERTIFICATES")
 		return
@@ -247,7 +263,9 @@ func _ensure_materials() -> void:
 		return
 	_mat_board = _make_material(ScopeTheme.SHADOW, 0.85)
 	_mat_plaque = _make_material(ScopeTheme.ENAMEL_INSET, 0.65)
+	_mat_halfway = _make_material(ScopeTheme.AMBER, 0.45)
 	_mat_frame = _make_material(ScopeTheme.TERRA_DARK, 0.75)
+	_mat_gold_frame = _make_material(ScopeTheme.GOLD, 0.35)
 	_mat_paper = _make_material(ScopeTheme.ENAMEL_TOP, 0.9)
 	_mat_audit_seal = _make_material(ScopeTheme.TEAL, 0.5)
 	_mat_quest_seal = _make_material(ScopeTheme.AMBER, 0.5)
@@ -325,10 +343,11 @@ func _add_certificate(cert: Dictionary, at: Vector3, extra: int) -> void:
 	item.add_to_group(GROUP_ITEM)
 
 	var frame := MeshInstance3D.new()
+	frame.name = "Frame"
 	var frame_box := BoxMesh.new()
 	frame_box.size = FRAME_SIZE
 	frame.mesh = frame_box
-	frame.material_override = _mat_frame
+	frame.material_override = _mat_gold_frame if bool(cert.get("gold_border", false)) else _mat_frame
 	item.add_child(frame)
 
 	var paper := MeshInstance3D.new()
@@ -372,3 +391,38 @@ func _add_more_note(extra: int) -> void:
 	note.position = Vector3(BOARD_SIZE.x / 2.0 - 0.22, -BOARD_SIZE.y / 2.0 - 0.08, BOARD_SIZE.z / 2.0 + 0.01)
 	note.add_to_group(GROUP_ITEM)
 	add_child(note)
+
+
+## The lab-92 "HALFWAY THERE" plaque mounted above the board.
+func _add_halfway_plaque() -> void:
+	var plaque := Node3D.new()
+	plaque.name = "HalfwayPlaque"
+	plaque.position = Vector3(0.0, BOARD_SIZE.y / 2.0 + HALFWAY_PLAQUE_SIZE.y / 2.0 + 0.04, BOARD_SIZE.z / 2.0 + HALFWAY_PLAQUE_SIZE.z / 2.0)
+	plaque.add_to_group(GROUP_PLAQUE)
+	var mesh := MeshInstance3D.new()
+	mesh.name = "Backing"
+	var box := BoxMesh.new()
+	box.size = HALFWAY_PLAQUE_SIZE
+	mesh.mesh = box
+	mesh.material_override = _mat_halfway
+	plaque.add_child(mesh)
+	var label := Label3D.new()
+	label.name = "Label"
+	label.text = HALFWAY_TITLE
+	label.pixel_size = 0.003
+	label.font_size = 28
+	label.modulate = ScopeTheme.CARD_INK
+	label.position = Vector3(0.0, 0.0, HALFWAY_PLAQUE_SIZE.z / 2.0 + 0.005)
+	plaque.add_child(label)
+	var click := Clickable.new()
+	click.collision_layer = 8
+	click.collision_mask = 0
+	click.hint = HALFWAY_HINT
+	var shape := CollisionShape3D.new()
+	var hit := BoxShape3D.new()
+	hit.size = HALFWAY_PLAQUE_SIZE
+	shape.shape = hit
+	click.add_child(shape)
+	click.clicked.connect(func() -> void: inspected.emit(HALFWAY_HINT))
+	plaque.add_child(click)
+	add_child(plaque)

@@ -32,6 +32,9 @@ var _walked_m: float = 0.0
 ## The picker's parts, and the boxes they add (Loadout). The defaults add none.
 var _parts: Dictionary = Loadout.default_parts()
 var _dressing: Array[MeshInstance3D] = []
+var _coat_color_id: String = ""
+var _coat_root: Node3D = null
+var _name_tag: Label3D = null
 
 
 func _init() -> void:
@@ -113,6 +116,69 @@ func loadout() -> Dictionary:
 
 func suit() -> Color:
 	return _suit
+
+
+## Applies a personal lab coat color (Cosmetics.COAT_COLORS, unlocked at any skill 50).
+## Built as an open-front coat (back panel + left/right panels) leaving a 1.2-voxel
+## vertical chest stripe of the suit color visible so co-op players stay distinct,
+## while keeping the DARK back pack visible behind the back panel.
+## Empty string clears the custom coat mesh.
+func set_coat_color(color_id: String) -> void:
+	var clean: String = color_id if Cosmetics.is_coat_color(color_id) else ""
+	if clean == _coat_color_id:
+		return
+	_coat_color_id = clean
+	if _coat_root != null:
+		if _coat_root.get_parent() != null:
+			_coat_root.get_parent().remove_child(_coat_root)
+		_coat_root.free()
+		_coat_root = null
+	if clean == "":
+		return
+	var tint: Color = Cosmetics.coat_color(clean)
+	_coat_root = Node3D.new()
+	_coat_root.name = "LabCoatColor"
+	# Back panel behind the torso (+Z), stopping at z = 0.95 so the DARK pack (0.75..1.75) stays visible.
+	var back: MeshInstance3D = _made(Vector3(0.0, 3.9, 0.775), Vector3(3.0, 3.25, 0.35), tint)
+	back.name = "BackPanel"
+	_coat_root.add_child(back)
+	# Left and right side/front panels leaving x in [-0.6, +0.6] (1.2 voxels) open on the chest.
+	var left: MeshInstance3D = _made(Vector3(-1.05, 3.9, 0.0), Vector3(0.9, 3.25, 1.9), tint)
+	left.name = "LeftPanel"
+	_coat_root.add_child(left)
+	var right: MeshInstance3D = _made(Vector3(1.05, 3.9, 0.0), Vector3(0.9, 3.25, 1.9), tint)
+	right.name = "RightPanel"
+	_coat_root.add_child(right)
+	add_child(_coat_root)
+
+
+func coat_color() -> String:
+	return _coat_color_id
+
+
+## Sets the floating co-op name tag above the character (name + total-level title).
+## Empty string hides it.
+func set_name_tag(text: String) -> void:
+	if text == "":
+		if _name_tag != null:
+			_name_tag.visible = false
+		return
+	if _name_tag == null:
+		_name_tag = Label3D.new()
+		_name_tag.name = "NameTag"
+		_name_tag.pixel_size = 0.004
+		_name_tag.font_size = 28
+		_name_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_name_tag.modulate = ScopeTheme.INK
+		_name_tag.position = Vector3(0.0, 9.6, 0.0) * VOXEL_M
+		add_child(_name_tag)
+	if _name_tag.text != text:
+		_name_tag.text = text
+	_name_tag.visible = true
+
+
+func name_tag_text() -> String:
+	return _name_tag.text if _name_tag != null and _name_tag.visible else ""
 
 
 ## The suit for a player, from the roster as every screen has it (the host first,
