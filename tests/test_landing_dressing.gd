@@ -414,7 +414,7 @@ func test_a_guest_far_from_the_terminal_is_told_to_walk_there() -> String:
 	var commands: Node = CommandsScript.new()
 	commands.state = gs
 	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(0.0, 0.5, 30.0))
-	var told: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.PHOBOS, 1])
+	var told: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.PHOBOS, [GUEST]])
 	var charged: int = 500 - gs.credits
 	commands.free()
 	_done(gs)
@@ -427,7 +427,7 @@ func test_more_people_than_are_present_is_refused() -> String:
 	var gs: GameStateScript = _state()
 	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
 	var here: int = gs.players_present().size()
-	var told: String = gs.book_shuttle(Shuttle.PHOBOS, here + 1)
+	var told: String = gs.book_shuttle(Shuttle.PHOBOS, ["a", "b", "c"].slice(0, here + 1))
 	var charged: int = 500 - gs.credits
 	_done(gs)
 	if told != Shuttle.text("crowd_text") % SP811.integer(here) or charged != 0:
@@ -441,7 +441,7 @@ func test_a_guest_at_the_terminal_books_deimos_and_pays_one_fare() -> String:
 	commands.state = gs
 	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
 	CoopWalkers.stand(HOST, Vector3(0.0, 0.0, 30.0))  # the host is off at the farm, not in the party
-	var told: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.DEIMOS, 1])
+	var told: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.DEIMOS, [GUEST]])
 	var charged: int = 500 - gs.credits
 	CoopWalkers.out.erase(HOST)
 	commands.free()
@@ -472,8 +472,8 @@ func test_a_walker_at_the_terminal_may_book_with_the_rover_far_away() -> String:
 	_rover_at(gs, Vector3(0.0, 0.5, 20.0))
 	_walk_to(GUEST, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
 	var stand: Variant = gs.standing_at(GUEST)
-	var told: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
-	var rover_rider: String = gs.book_shuttle(Shuttle.DEIMOS, 1, HOST)
+	var told: String = gs.book_shuttle(Shuttle.DEIMOS, [GUEST], GUEST)
+	var rover_rider: String = gs.book_shuttle(Shuttle.DEIMOS, [HOST], HOST)
 	CoopWalkers.out.erase(GUEST)
 	var charged: int = 500 - gs.credits
 	_done(gs)
@@ -490,9 +490,9 @@ func test_a_walker_far_from_the_terminal_is_refused_with_the_rover_beside_it() -
 	var gs: GameStateScript = _state()
 	_rover_at(gs, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
 	_walk_to(GUEST, Vector3(0.0, 0.5, 20.0))
-	var told: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
+	var told: String = gs.book_shuttle(Shuttle.DEIMOS, [GUEST], GUEST)
 	var charged: int = 500 - gs.credits
-	var rider: String = gs.book_shuttle(Shuttle.DEIMOS, 1, HOST)
+	var rider: String = gs.book_shuttle(Shuttle.DEIMOS, [HOST], HOST)
 	CoopWalkers.out.erase(GUEST)
 	_done(gs)
 	if told != Shuttle.text("far_text") or charged != 0:
@@ -510,7 +510,7 @@ func test_the_host_allows_a_little_more_than_the_reach_and_no_more() -> String:
 		var apart: float = case[0]
 		_walk_to(GUEST, Vector3(Shuttle.TERMINAL_AT.x - apart, 0.5, Shuttle.TERMINAL_AT.y))
 		var near: bool = Shuttle.terminal_near(gs.standing_at(GUEST))
-		var booked_past: bool = gs.book_shuttle(Shuttle.PHOBOS, 1, GUEST) != Shuttle.text("far_text")
+		var booked_past: bool = gs.book_shuttle(Shuttle.PHOBOS, [GUEST], GUEST) != Shuttle.text("far_text")
 		if booked_past != (case[1] or case[2]):
 			problems.append("%.2f m: the host's answer is wrong (allowed %s)" % [apart, booked_past])
 		if near != case[1]:

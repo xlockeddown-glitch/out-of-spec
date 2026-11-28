@@ -3815,26 +3815,38 @@ func grant_shuttle_license() -> void:
 
 
 ## Who would fly if `player_id` booked now: the booker, then every other player here
-## who is on the farm, within reach of the terminal (with the host's slack) and not on a
-## trip. The host books with it; the terminal's panel shows it (a guest's copy has the
-## synced places, trips and poses). Booker first, the rest in session order.
+## who is on the farm, not on a trip, and at the terminal: on foot within reach of it
+## (with the host's slack), or the farm rover's driver with the rover there. A player with
+## no pose yet, or a rider who is not driving, is left out. The host books with it; the
+## terminal's panel shows it (a guest's copy has the synced places, trips, poses and
+## driver). Booker first, the rest in session order.
 func shuttle_party(player_id: String = "") -> Array[String]:
 	var id: String = _player(player_id)
 	var party: Array[String] = [id]
 	for other: String in players_present():
 		if other == id or shuttle_trips.has(other) or place_of(other) != ZonePresence.FARM:
 			continue
-		if Shuttle.terminal_near(standing_at(other), Shuttle.HOST_SLACK_M):
+		if _at_terminal_for_party(other):
 			party.append(other)
 	return party
+
+
+func _at_terminal_for_party(player_id: String) -> bool:
+	if CoopWalkers.is_out(player_id):
+		return Shuttle.terminal_near(CoopWalkers.spot(CoopWalkers.out[player_id]), Shuttle.HOST_SLACK_M)
+	var rovers: Node = rovers_node if rovers_node != null else CoopRovers
+	if rovers.driver(ROVER) == player_id and not rover_is_away(ROVER):
+		return Shuttle.terminal_near(_rover_pose_now(ROVER), Shuttle.HOST_SLACK_M)
+	return false
 
 
 ## Books a day trip to `moon` for `people` from the pad's terminal. Runs on the
 ## host's clock. Before anything else it checks the sender stands at the terminal
 ## (on foot there, or in the rover there) and that `people` are all here to go
-## (players_present()); then that `people` is the party the host works out
-## (shuttle_party: the sender and everyone else on the farm at the terminal and not on a
-## trip), so nobody is flown who did not expect to be; then Shuttle.trip_problem's
+## (players_present()); then that `party_ids` (player ids, the sender first: what the
+## terminal showed) is exactly the party the host works out (shuttle_party: the sender
+## and everyone else on the farm at the terminal and not on a trip), so nobody is flown
+## who did not expect to be, and a swap is caught as well as a count; then Shuttle.trip_problem's
 ## reasons, with the wallet checked against the whole party's fare. A refusal takes no
 ## fare. Phobos and Deimos have a hub (a moon with none is refused). Booked means the
 ## fare for each person paid from the shared wallet, and for every passenger: a trip
@@ -3848,16 +3860,25 @@ func shuttle_party(player_id: String = "") -> Array[String]:
 ## books is woken by the act (FarmCommands). With friends in, the day cannot end until
 ## the travellers are home: the trip ends by its clock or the 02:00 recall at the
 ## latest, so the wait is bounded. Returns "" when booked, else why not.
-func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
+func book_shuttle(moon: String, party_ids: Array, player_id: String = "") -> String:
 	var id: String = _player(player_id)
 	var at: Variant = standing_at(id)
 	if place_of(id) != ZonePresence.FARM or not Shuttle.terminal_near(at, Shuttle.HOST_SLACK_M):
 		return Shuttle.text("far_text")
-	if people > players_present().size():
+	for named: Variant in party_ids:
+		if typeof(named) != TYPE_STRING:
+			return Shuttle.text("party_changed_text")
+	if party_ids.size() < 1 or party_ids.size() > Shuttle.party_most():
+		return Shuttle.text("bad_party_text") % SP811.integer(Shuttle.party_most())
+	if party_ids.size() > players_present().size():
 		return Shuttle.text("crowd_text") % SP811.integer(players_present().size())
 	var party: Array[String] = shuttle_party(id)
-	if party.size() != people:
+	var people: int = party.size()
+	if party_ids.size() != people or party_ids[0] != id:
 		return Shuttle.text("party_changed_text")
+	for flyer: String in party:
+		if not flyer in party_ids:
+			return Shuttle.text("party_changed_text")
 	var hub_ready: bool = Shuttle.is_moon(moon) and ZoneData.is_playable(StringName(moon))
 	var reason: String = Shuttle.trip_problem(moon, lab_level(), shuttle_licensed, credits, people, GameClock.elapsed_days, hub_ready)
 	if reason != "":
@@ -3877,6 +3898,7 @@ func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
 		# among the walkers there.
 		CoopWalkers.out.erase(flyer)
 		rovers.release(flyer)
+		_beds().get_up(flyer)
 	shuttle_trips_changed.emit()
 	post_phone(Shuttle.text("booked_text") % [Shuttle.moon_name(moon), Shuttle.clock_text(GameClock.elapsed_days),
 		SP811.integer(party.size()), SP811.integer(total), Shuttle.clock_text(ends_at)])

@@ -61,7 +61,7 @@ func test_booking_phobos_takes_the_fare_once_records_the_trip_and_lands_on_the_m
 	var problems: Array[String] = []
 	var heard: Array[int] = [0]
 	gs.shuttle_trips_changed.connect(func() -> void: heard[0] += 1)
-	var answer: String = gs.book_shuttle(Shuttle.PHOBOS, 1)
+	var answer: String = gs.book_shuttle(Shuttle.PHOBOS, [gs.local_player_id])
 	if answer != "":
 		problems.append("A licensed booking in the window is refused: '%s'" % answer)
 	if gs.credits != 500 - Shuttle.fare():
@@ -73,7 +73,7 @@ func test_booking_phobos_takes_the_fare_once_records_the_trip_and_lands_on_the_m
 		problems.append("The traveller's place is not Phobos: %s" % gs.place_of(HOST))
 	if heard[0] != 1 or _lines(gs, "Day trip to Phobos") != 1:
 		problems.append("The trip is told once, to the screens and the phone: %d, %d lines." % [heard[0], _lines(gs, "Day trip to Phobos")])
-	var again: String = gs.book_shuttle(Shuttle.PHOBOS, 1)
+	var again: String = gs.book_shuttle(Shuttle.PHOBOS, [gs.local_player_id])
 	if again == "" or gs.credits != 500 - Shuttle.fare():
 		problems.append("A second booking from Phobos is refused and charges nothing: '%s', %d CR" % [again, gs.credits])
 	_done(gs)
@@ -84,7 +84,7 @@ func test_booking_from_the_rover_leaves_the_rover_parked_on_the_farm() -> String
 	var gs: GameStateScript = _state(500)
 	var before: Transform3D = gs.rover_transforms[gs.ROVER]
 	var problems: Array[String] = []
-	if gs.book_shuttle(Shuttle.PHOBOS, 1) != "":
+	if gs.book_shuttle(Shuttle.PHOBOS, [gs.local_player_id]) != "":
 		problems.append("Booking from the rover failed.")
 	if gs.rover_transforms[gs.ROVER] != before or gs.rover_is_away(gs.ROVER):
 		problems.append("The farm rover must stay where it is.")
@@ -111,17 +111,19 @@ func test_every_refusal_charges_nothing_and_leaves_no_trip() -> String:
 		var gs: GameStateScript = cases[label]
 		var wallet: int = gs.credits
 		GameClock.elapsed_days = 0.0 if label == "outside a window" else 3.0 * HOUR  # 06:00 is before the first window
-		var answer: String = gs.book_shuttle(Shuttle.PHOBOS, 1)
+		var answer: String = gs.book_shuttle(Shuttle.PHOBOS, [gs.local_player_id])
 		if answer == "" or gs.credits != wallet or not gs.shuttle_trips.is_empty() or gs.place_of(HOST) != ZonePresence.FARM:
 			problems.append("%s: '%s', %d CR, trips %s, place %s" % [label, answer, gs.credits, gs.shuttle_trips, gs.place_of(HOST)])
 	var crowd: GameStateScript = _state(500)
-	var two: String = crowd.book_shuttle(Shuttle.PHOBOS, 2)
+	var two: String = crowd.book_shuttle(Shuttle.PHOBOS, [HOST, GUEST])
 	if two == "" or crowd.credits != 500 or not crowd.shuttle_trips.is_empty():
 		problems.append("Two people: '%s', %d CR" % [two, crowd.credits])
 	# Two present and both at the pad: a count of one is the wrong party, not the crowd one.
 	var held: Array[String] = CoopSession.players.duplicate()
 	CoopSession.players.assign([HOST, GUEST])
-	var party: String = crowd.book_shuttle(Shuttle.PHOBOS, 1)
+	CoopWalkers.stand(GUEST, Vector3(Shuttle.TERMINAL_AT.x, 0.0, Shuttle.TERMINAL_AT.y))
+	var party: String = crowd.book_shuttle(Shuttle.PHOBOS, [crowd.local_player_id])
+	CoopWalkers.out.erase(GUEST)
 	CoopSession.players.assign(held)
 	if party != Shuttle.text("party_changed_text") or crowd.credits != 500 or not crowd.shuttle_trips.is_empty():
 		problems.append("A count of one with both here: '%s', %d CR" % [party, crowd.credits])
@@ -153,7 +155,7 @@ func test_the_console_brings_the_traveller_home_free_and_on_foot_at_the_pad() ->
 	var gs: GameStateScript = _state(500)
 	var commands: Node = _commands(gs)
 	var problems: Array[String] = []
-	if gs.book_shuttle(Shuttle.PHOBOS, 1) != "":
+	if gs.book_shuttle(Shuttle.PHOBOS, [gs.local_player_id]) != "":
 		problems.append("Booking failed.")
 	var wallet: int = gs.credits
 	var heard: Array[int] = [0]
@@ -178,7 +180,7 @@ func test_the_console_brings_the_traveller_home_free_and_on_foot_at_the_pad() ->
 func test_the_end_of_the_trip_brings_the_traveller_home_free() -> String:
 	var gs: GameStateScript = _state(500)
 	var problems: Array[String] = []
-	if gs.book_shuttle(Shuttle.PHOBOS, 1) != "":
+	if gs.book_shuttle(Shuttle.PHOBOS, [gs.local_player_id]) != "":
 		problems.append("Booking failed.")
 	var wallet: int = gs.credits
 	GameClock.elapsed_days += (Shuttle.trip_hours() - 0.5) * HOUR
@@ -202,7 +204,7 @@ func test_a_guest_is_booked_and_brought_home_by_the_host_and_stands_at_the_pad()
 	gs.player_places[GUEST] = [ZonePresence.FARM, 0]
 	CoopWalkers.stand(GUEST, Vector3(Shuttle.TERMINAL_AT.x, 0.0, Shuttle.TERMINAL_AT.y))
 	CoopWalkers.stand(HOST, Vector3(0.0, 0.0, 30.0))  # the host is off at the farm, not in the party
-	var booked: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.PHOBOS, 1])
+	var booked: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.PHOBOS, [GUEST]])
 	if booked != "" or gs.place_of(GUEST) != Shuttle.PHOBOS or not gs.shuttle_trips.has(GUEST) or gs.credits != 500 - Shuttle.fare():
 		problems.append("A guest's booking: '%s', %s, %d CR" % [booked, gs.place_of(GUEST), gs.credits])
 	if gs.place_of(HOST) != ZonePresence.FARM:
@@ -287,7 +289,7 @@ func test_a_guest_who_drops_on_phobos_ends_the_trip_and_nothing_is_charged() -> 
 func test_the_trip_is_saved_an_old_save_has_none_and_a_past_end_comes_home() -> String:
 	var gs: GameStateScript = _state(500)
 	var problems: Array[String] = []
-	if gs.book_shuttle(Shuttle.PHOBOS, 1) != "":
+	if gs.book_shuttle(Shuttle.PHOBOS, [gs.local_player_id]) != "":
 		problems.append("Booking failed.")
 	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
 	if not data.has("shuttle_trips") or not (data["shuttle_trips"] as Dictionary).has(HOST):
@@ -342,7 +344,7 @@ func test_a_guest_sees_the_trip_and_its_end() -> String:
 	if _until(func() -> bool: return ready[0]):
 		problem = ""
 		FarmCommands.guest = false
-		var answer: String = state.book_shuttle(Shuttle.PHOBOS, 1)
+		var answer: String = state.book_shuttle(Shuttle.PHOBOS, [state.local_player_id])
 		FarmCommands.guest = true
 		var told: Array[int] = [0]
 		guest.commands.state.shuttle_trips_changed.connect(func() -> void: told[0] += 1)
@@ -633,7 +635,7 @@ func test_a_booking_that_goes_through_opens_the_moons_hub_and_a_refusal_or_a_gon
 	_guest_off()
 	if ZoneData.hub_scene(&"phobos") != SceneSwitcher.PHOBOS_SCENE:
 		problems.append("The booking uses the moon's hub scene from the zone data.")
-	if asked.size() != 3 or asked[0] != [&"book_shuttle", [Shuttle.PHOBOS, 1]]:
+	if asked.size() != 3 or asked[0] != [&"book_shuttle", [Shuttle.PHOBOS, [GameState.local_player_id]]]:
 		problems.append("The panel asks the host to book: %s" % [asked])
 	return "\n".join(problems)
 

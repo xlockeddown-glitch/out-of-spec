@@ -126,6 +126,11 @@ const HINT_FONT_SIZE: int = 30
 const HINT_CLEAR_PX: float = 90.0
 
 
+func _exit_tree() -> void:
+	# A request for a walker's pose that the freed scene was waiting on never lands.
+	CoopWalkers.asking = false
+
+
 func _ready() -> void:
 	_build_sinkhole()
 	_build_mine_gate()

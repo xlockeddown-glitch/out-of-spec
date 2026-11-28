@@ -38,7 +38,7 @@ func test_every_action_is_a_typed_function() -> String:
 			bad.append(action)
 			continue
 		for arg: Dictionary in method["args"]:
-			if not arg["type"] in [TYPE_STRING, TYPE_STRING_NAME, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_VECTOR3I]:
+			if not arg["type"] in [TYPE_STRING, TYPE_STRING_NAME, TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_VECTOR3I, TYPE_ARRAY]:
 				bad.append("%s %s" % [action, arg["name"]])
 	_free(commands)
 	return "" if bad.is_empty() else "Not plain, typed actions: " + ", ".join(bad)

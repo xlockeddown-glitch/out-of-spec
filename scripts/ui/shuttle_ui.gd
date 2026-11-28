@@ -18,6 +18,8 @@ var _status: Label
 var _close_button: Button
 var _focus_before: Control
 var _busy: bool = false
+## The party the panel last drew (player ids, this player first): what Book sends.
+var _party_ids: Array[String] = []
 var _watch: float = 0.0
 ## Where a booked screen goes; only tests set it (the real swap would change the scene).
 var change_scene: Callable = Callable()
@@ -136,21 +138,28 @@ func _on_license_changed() -> void:
 
 
 func _refresh() -> void:
+	_party_ids = GameState.shuttle_party(GameState.local_player_id)
 	for child: Node in _lines.get_children():
 		_lines.remove_child(child)
 		child.queue_free()
-	for line: String in lines(GameClock.elapsed_days, GameState.shuttle_licensed, others_flying()):
+	var others: Array[String] = []
+	for id: String in _party_ids:
+		if id != GameState.local_player_id:
+			others.append(CoopUI.player_name(id))
+	for line: String in lines(GameClock.elapsed_days, GameState.shuttle_licensed, others):
 		var label: Label = PlanBoardUI._label(line, TEXT, 20)
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_lines.add_child(label)
 
 
-## Asks the host for a seat; the reason it refuses with is shown as it came.
+## Asks the host for a seat for exactly the party the panel last drew (their ids, this
+## player first), so a walk-up or walk-off since is a refusal, not a surprise fare;
+## the reason it refuses with is shown as it came.
 func _on_book(moon: String) -> void:
 	if _busy:
 		return
 	_busy = true
-	var problem: String = await FarmCommands.request(&"book_shuttle", [moon, others_flying().size() + 1])
+	var problem: String = await FarmCommands.request(&"book_shuttle", [moon, _party_ids.duplicate()])
 	_busy = false
 	if not is_inside_tree():
 		return

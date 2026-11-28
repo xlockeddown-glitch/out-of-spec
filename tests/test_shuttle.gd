@@ -197,13 +197,13 @@ func test_book_shuttle_refuses_the_unlicensed_and_lets_an_open_deimos_booking_th
 	_park_at_terminal(gs)
 	var problems: Array[String] = []
 	GameClock.elapsed_days = _h(3.0)
-	var unlicensed: String = gs.book_shuttle(Shuttle.PHOBOS, 1)
+	var unlicensed: String = gs.book_shuttle(Shuttle.PHOBOS, [gs.local_player_id])
 	if unlicensed == "" or gs.credits != 500:
 		problems.append("An unlicensed booking: '%s', %d CR" % [unlicensed, gs.credits])
 	gs.shuttle_licensed = true
 	if _lines(gs, "booked") != 0:
 		problems.append("A refused booking must not be told as a booking.")
-	var deimos: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
+	var deimos: String = gs.book_shuttle(Shuttle.DEIMOS, [gs.local_player_id])
 	if deimos != "" or gs.credits != 500 - Shuttle.fare():
 		problems.append("Deimos has a hub now, so an open, paid booking goes through: '%s', %d CR" % [deimos, gs.credits])
 	_done(gs)
@@ -216,28 +216,36 @@ func test_book_shuttle_from_a_guest_books_and_pays_each_their_own_fare() -> Stri
 	var commands: Node = CommandsScript.new()
 	commands.state = gs
 	var problems: Array[String] = []
-	if not &"book_shuttle" in CommandsScript.ACTIONS or commands.problem(&"book_shuttle", [Shuttle.PHOBOS, 1]) != "":
+	if not &"book_shuttle" in CommandsScript.ACTIONS or commands.problem(&"book_shuttle", [Shuttle.PHOBOS, [HOST]]) != "":
 		problems.append("book_shuttle must be a farm command that takes a moon and a party.")
-	if commands.problem(&"book_shuttle", []) == "" or commands.problem(&"book_shuttle", [3, 1]) == "":
+	if commands.problem(&"book_shuttle", []) == "" or commands.problem(&"book_shuttle", [3, [HOST]]) == "" or commands.problem(&"book_shuttle", [Shuttle.PHOBOS, 1]) == "":
 		problems.append("A booking with no moon, or a number for the moon, must be refused.")
 	if commands.problem(&"book_shuttle", [Shuttle.PHOBOS]) == "":
 		problems.append("A booking with the party left out must be refused as the wrong argument count.")
 	GameClock.elapsed_days = _h(3.0)
-	var guest: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.PHOBOS, 1])
+	var guest: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.PHOBOS, [GUEST]])
 	if not guest is String or guest == "" or gs.credits != 500:
 		problems.append("A guest's unlicensed booking: '%s', %d CR" % [guest, gs.credits])
 	gs.shuttle_licensed = true
 	CoopWalkers.stand(HOST, Vector3(0.0, 0.0, 30.0))  # the host is off at the farm, not in the party
-	var licensed: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.DEIMOS, 1])
+	var licensed: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.DEIMOS, [GUEST]])
 	CoopWalkers.out.erase(HOST)
 	if licensed != "" or gs.credits != 500 - Shuttle.fare():
 		problems.append("A licensed guest books Deimos and pays the fare once: '%s', %d CR" % [licensed, gs.credits])
-	var host: Variant = commands.execute(HOST, &"book_shuttle", [Shuttle.DEIMOS, 1])
+	var host: Variant = commands.execute(HOST, &"book_shuttle", [Shuttle.DEIMOS, [HOST]])
 	if host != "" or gs.credits != 500 - 2 * Shuttle.fare():
 		problems.append("The host books Deimos too, each paying their own fare: '%s', %d CR" % [host, gs.credits])
 	commands.free()
 	_done(gs)
 	return "\n".join(problems)
+
+
+## `count` made-up player ids, the way a booking names a party.
+func _ids(count: int) -> Array:
+	var ids: Array = []
+	for i: int in count:
+		ids.append("p%d" % i)
+	return ids
 
 
 func test_book_shuttle_checks_where_and_how_many_before_the_fare() -> String:
@@ -247,20 +255,20 @@ func test_book_shuttle_checks_where_and_how_many_before_the_fare() -> String:
 	GameClock.elapsed_days = _h(3.0)
 	# No pose at all, then the rover far from the terminal: walk there.
 	var walk: String = Shuttle.text("far_text")
-	var nowhere: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
+	var nowhere: String = gs.book_shuttle(Shuttle.DEIMOS, [gs.local_player_id])
 	if nowhere != walk:
 		problems.append("A player with no position is told to walk to the terminal: '%s'" % nowhere)
 	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(0.0, 0.5, 20.0))
-	var guest_far: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
+	var guest_far: String = gs.book_shuttle(Shuttle.DEIMOS, [GUEST], GUEST)
 	if guest_far != walk or gs.credits != 500:
 		problems.append("A guest far from the terminal gets the walk reason: '%s', %d CR" % [guest_far, gs.credits])
 	# At the terminal: more people than are here is refused; one is refused for the hub.
 	_park_at_terminal(gs)
-	var crowd: String = gs.book_shuttle(Shuttle.DEIMOS, gs.players_present().size() + 1)
+	var crowd: String = gs.book_shuttle(Shuttle.DEIMOS, _ids(gs.players_present().size() + 1))
 	if crowd != Shuttle.text("crowd_text") % SP811.integer(gs.players_present().size()) or gs.credits != 500:
 		problems.append("More people than are present is refused: '%s', %d CR" % [crowd, gs.credits])
 	CoopWalkers.stand(HOST, Vector3(0.0, 0.0, 30.0))  # the host is off at the farm, not in the party
-	var at_terminal: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
+	var at_terminal: String = gs.book_shuttle(Shuttle.DEIMOS, [GUEST], GUEST)
 	CoopWalkers.out.erase(HOST)
 	if at_terminal != "" or gs.credits != 500 - Shuttle.fare():
 		problems.append("A guest at the terminal books Deimos, one fare: '%s', %d CR" % [at_terminal, gs.credits])
@@ -268,14 +276,14 @@ func test_book_shuttle_checks_where_and_how_many_before_the_fare() -> String:
 	gs.credits = 500
 	# Away from the farm's own place the terminal is out of reach too.
 	gs.player_places[GUEST] = [ZonePresence.DOME, 0]
-	var elsewhere: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
+	var elsewhere: String = gs.book_shuttle(Shuttle.DEIMOS, [GUEST], GUEST)
 	if elsewhere != walk:
 		problems.append("A player in another place is not at the terminal: '%s'" % elsewhere)
 	# The rover away (in the tunnels) leaves no one at the terminal.
 	gs.player_places.erase(GUEST)
 	gs.rover_zone = "lava_tubes"
 	gs.rover_lent = true
-	if gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST) != walk:
+	if gs.book_shuttle(Shuttle.DEIMOS, [GUEST], GUEST) != walk:
 		problems.append("With the rover away, the player in it is not at the terminal.")
 	_done(gs)
 	return "\n".join(problems)

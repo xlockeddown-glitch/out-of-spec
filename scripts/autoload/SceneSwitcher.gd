@@ -103,11 +103,47 @@ func swap_blocked(path: String, scene_path: String) -> bool:
 ## farm or the dome, it goes to the moon's hub. The other way (a hub with no trip) is the
 ## hub's own doing, which asks the host first. Returns the scene it set out for, or "".
 func reconcile_trip() -> String:
-	var current: Node = get_tree().current_scene
-	var to: String = Shuttle.hub_to_join(GameState.shuttle_trips.get(GameState.local_player_id), current.scene_file_path if current != null else "")
+	var to: String = _trip_hub()
 	if to != "":
-		go_to(to)
+		_follow_trip(to)
 	return to
+
+
+## The scene path the screen is at now; a test can set `fake_scene_path` to stand in for it.
+var fake_scene_path: String = ""
+## A test sets this to see where a trip would swap to instead of swapping.
+var swap_hook: Callable
+
+
+func _scene_path_now() -> String:
+	if fake_scene_path != "":
+		return fake_scene_path
+	var current: Node = get_tree().current_scene
+	return current.scene_file_path if current != null else ""
+
+
+## The hub this player's trip says to be at, or "" when none applies now: not on a trip,
+## not at the farm or dome (the title scene and every zone are left alone), or the trip
+## is gone because the player left the session.
+func _trip_hub() -> String:
+	return Shuttle.hub_to_join(GameState.shuttle_trips.get(GameState.local_player_id), _scene_path_now())
+
+
+## Goes to the trip's hub, after a swap in progress; then asks again, since the trip can
+## have ended or the screen gone elsewhere (the title, a left session) while it waited.
+func _follow_trip(to: String) -> void:
+	var waited: bool = false
+	while _busy:
+		waited = true
+		await scene_swapped
+	if waited:
+		to = _trip_hub()
+	if to == "" or _scene_path_now() == to:
+		return
+	if swap_hook.is_valid():
+		swap_hook.call(to)
+	else:
+		swap_to(to)
 
 
 ## Like swap_to, but after a swap in progress instead of not at all; nothing if that swap

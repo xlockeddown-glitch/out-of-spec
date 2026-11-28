@@ -160,11 +160,11 @@ func _on_go(place: Dictionary) -> void:
 	_refresh_sitter()
 	var problem: String = await FarmCommands.request(&"fast_travel", [id])
 	if not is_inside_tree():
-		FastTravel.pending = false
+		_clear_pending()
 		return
 	if problem != "":
 		_going = false
-		FastTravel.pending = false
+		_clear_pending()
 		_status.text = problem
 		_refresh_sitter()
 		return
@@ -173,11 +173,11 @@ func _on_go(place: Dictionary) -> void:
 	while GameState.rover_zone != id and waited < WAIT_S:
 		await get_tree().create_timer(0.1).timeout
 		if not is_inside_tree():
-			FastTravel.pending = false
+			_clear_pending()
 			return
 		waited += 0.1
 	_going = false
-	FastTravel.pending = false
+	_clear_pending()
 	_refresh_sitter()
 	if GameState.rover_zone != id:
 		_status.text = FastTravel.text("no_zone")
@@ -232,3 +232,9 @@ func _on_book_sitter() -> void:
 	_warned = ""
 	_status.text = problem
 	_refresh_sitter()
+
+
+## The console trip has its answer: a hub swap the wait held back (a party's flight, SceneSwitcher.reconcile_trip) goes now.
+func _clear_pending() -> void:
+	FastTravel.pending = false
+	SceneSwitcher.reconcile_trip()

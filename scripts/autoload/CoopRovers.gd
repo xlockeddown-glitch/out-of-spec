@@ -211,6 +211,10 @@ func _on_driven(player_id: String, rover_id: String, pose: Array, now: int = Tim
 		return
 	if not driver(rover_id) in ["", player_id] or not together() or CoopWalkers.is_out(player_id):
 		return
+	# On a day trip a player is off the farm: a late drive packet must not lease its rover.
+	var trips: Variant = farm.get("shuttle_trips")
+	if trips is Dictionary and (trips as Dictionary).has(player_id):
+		return
 	# Only one in the rover's zone drives it: a guest carried out at 02:00 may still have
 	# a drive in flight.
 	if rover_id == farm.TUNNEL_ROVER and farm.place_of(player_id) != farm.rover_zone:
