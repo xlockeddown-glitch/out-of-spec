@@ -9,8 +9,8 @@ func test_under_the_band_the_tunnels_warn() -> String:
 	for part: String in ["Recommended lab level 5", "You are level 3", "Go anyway?"]:
 		if not text.contains(part):
 			return "The warning lacks '%s': %s" % [part, text]
-	if not text.contains(ZoneData.WARNING_SOFT):
-		return "The tunnels have no hard gate yet, so the soft line: %s" % text
+	if not text.contains("Deeper levels need a lab level of 10.") or text.contains(ZoneData.WARNING_SOFT):
+		return "The tunnels' deep gate (lab level 10) is named, not the soft line: %s" % text
 	return ""
 
 
@@ -96,6 +96,10 @@ func test_the_zone_rows_are_in_order_and_gate_nothing() -> String:
 			# Built by zones step 18: it gates the expedition booking.
 			if not row.get("built", false) or row.get("beat", false):
 				problem = "expedition_permit must be built and no beat."
+		elif id == "lava_tubes_deep":
+			# Built by zones step 11: it gates depth 4 and below of the Lava Tubes.
+			if not row.get("built", false) or row.get("beat", false) or gs.lab_gate_level(id) != 10:
+				problem = "lava_tubes_deep must be built, level 10 and no beat."
 		elif row.get("built", true) or row.get("beat", false):
 			problem = "%s must be built:false and no beat." % id
 		elif gs.lab_gate_level(id) != 0 or not gs.lab_gate_open(id):

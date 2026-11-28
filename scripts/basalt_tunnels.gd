@@ -80,7 +80,7 @@ func _ready() -> void:
 	GameState.credits_changed.connect(_hud.set_credits)
 	GameState.ore_changed.connect(_hud.set_ore)
 	GameState.credibility_changed.connect(_on_credibility_changed)
-	GameState.lab_xp_changed.connect(_on_credibility_changed.bind(0))
+	GameState.lab_xp_changed.connect(_on_lab_xp_changed)
 	GameState.jobs_changed.connect(_refresh_jobs_hud)
 	GameState.upgrades_changed.connect(_refresh_jobs_hud)
 	GameState.oirm_changed.connect(_refresh_jobs_hud)
@@ -122,6 +122,7 @@ func _build_zone() -> void:
 		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
 		_vents = ZoneHazards.vents_for(GameState.world_seed, ZoneDepth.ZONE, _built_depth, _built_day)
 		_depth_props.build_vents(_vents)
+		_depth_props.build_rockfall(ZoneDepth.local_layout)
 		if ZoneDepth.has_way_down(_built_depth):
 			_depth_props.build_hatch(_built_depth)
 		GameState.finds_changed.connect(_on_finds_changed)
@@ -270,7 +271,8 @@ func _tell_hub() -> void:
 		LavaHub.SPOT:
 			_hud.push_log("BEACON SPOT: press " + Controls.prompt(&"interact") + " to set a beacon down.")
 		HATCH:
-			_hud.push_log("WAY DOWN: press " + Controls.prompt(&"interact") + " to go down.")
+			var shut: String = GameState.lava_deep_problem() if ZoneDepth.is_deep(_built_depth + 1) else ""
+			_hud.push_log("WAY DOWN: press " + Controls.prompt(&"interact") + " to go down." if shut == "" else "WAY DOWN: " + shut)
 		LIFT:
 			_hud.push_log(_lift_prompt())
 		FIND:
@@ -375,7 +377,7 @@ func _use_find(find_id: String) -> void:
 		_hud.push_log("FIND: " + problem)
 		return
 	var find: Dictionary = ZoneDepth.find_in(ZoneDepth.local_layout, find_id)
-	_hud.push_log("FIND: " + ZoneDepth.reward_text(str(find.get("kind", ""))))
+	_hud.push_log("FIND: " + ZoneDepth.reward_text(str(find.get("kind", "")), _built_depth))
 
 
 ## The depth whose lift this screen shows: the hub's (0) goes to the deepest repaired
@@ -429,10 +431,13 @@ func _use_camp() -> void:
 func _lift_prompt() -> String:
 	var repaired: bool = GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth())
 	if repaired:
+		var shut: String = GameState.lava_deep_problem() if _built_depth == 0 and ZoneDepth.is_deep(_lift_depth()) else ""
+		if shut != "":
+			return "LIFT: " + shut
 		return "LIFT: press " + Controls.prompt(&"interact") + " to ride it %s." % ("up to the hub" if _built_depth > 0 else "down to depth %d" % _lift_depth())
 	if _built_depth > 0:
-		return "LIFT: broken. Press " + Controls.prompt(&"interact") + " to repair it. %s" % ZoneDepth.repair_cost_text()
-	return "LIFT: broken. It is repaired from its far end, at depth %d." % ZoneDepth.MAX_DEPTH
+		return "LIFT: broken. Press " + Controls.prompt(&"interact") + " to repair it. %s" % ZoneDepth.repair_cost_text(_built_depth)
+	return "LIFT: broken. It is repaired from its far end, at depth %d." % ZoneDepth.LIFT_EVERY
 
 
 ## E at a lift: repair it where it is broken (below), or ride it. The host decides.
@@ -636,6 +641,12 @@ func _on_dig_rejected(reason: String) -> void:
 
 func _on_fill_rejected(reason: String) -> void:
 	_hud.push_log("FILL FAILED: %s" % reason)
+
+
+## A new lab level can open the way down or the hub lift: the prompt is read again.
+func _on_lab_xp_changed() -> void:
+	_told_hub = ""
+	_on_credibility_changed(0)
 
 
 func _on_credibility_changed(_points: int) -> void:

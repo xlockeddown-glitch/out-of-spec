@@ -1,7 +1,8 @@
 class_name ZoneDepth
 extends RefCounted
 ## The depth generator (docs/design/zones.md section 13, build steps 6 and 9):
-## depths 1 to 3 of the Lava Tubes, each laid out from the integer hash of (farm seed, zone,
+## depths 1 to 6 of the Lava Tubes (4 to 6 are the deep ones, behind a lab-level gate and
+## a repaired lift, build step 11), each laid out from the integer hash of (farm seed, zone,
 ## depth, day), so the same day always gives the same tunnels and a new day gives
 ## new ones. A few hand-made room pieces are chosen and joined by the hash (section
 ## 3.2), and a handful of finds (ore, minerals, samples) lie in them. Pure rules and
@@ -16,8 +17,13 @@ const ZONE: String = "lava_tubes"
 const DEPTH: int = 1
 ## The deepest this generator makes [PLACEHOLDER], and how often a lift station comes
 ## (every third depth: the one at MAX_DEPTH is the lift to the hub).
-const MAX_DEPTH: int = 3
+const MAX_DEPTH: int = 6
 const LIFT_EVERY: int = 3
+## The first deep depth [PLACEHOLDER]: depth 3's hatch leads to it only past the gate
+## (GameState.lava_deep_problem). The depths above it are the original three.
+const FIRST_DEEP: int = 4
+## The gate row of data/skills.json that holds the lab level for the deep depths.
+const DEEP_GATE: String = "lava_tubes_deep"
 const WIDTH: int = 24
 const HEIGHT: int = 22
 ## The hub cell the way down is in, and the cell the rover starts at below.
@@ -62,6 +68,23 @@ const PLANS: Dictionary = {
 		"carves": [Rect2i(8, 15, 7, 4), Rect2i(10, 13, 3, 8), Rect2i(11, 4, 2, 10)],
 		"passages": [[30, 4, 6, 8, 2, 0, 1, 3], [31, 12, 6, 7, 2, 0, 1, 3], [32, 13, 15, 5, 2, 0, 1, 3]],
 	},
+	# The deep depths (4 to 6): each room has two ways to the trunk, so a rockfall across
+	# one passage leaves the other (the layout checks it, _rockfall).
+	4: {
+		"slots": [Vector2i(1, 9), Vector2i(16, 9), Vector2i(9, 1)],
+		"carves": [Rect2i(8, 15, 7, 4), Rect2i(10, 13, 3, 8), Rect2i(11, 4, 2, 10)],
+		"passages": [[30, 7, 9, 5, 2, 0, 1, 2], [31, 7, 12, 5, 2, 0, 1, 2], [32, 12, 9, 5, 2, 0, 1, 2], [33, 12, 12, 5, 2, 0, 1, 2]],
+	},
+	5: {
+		"slots": [Vector2i(1, 3), Vector2i(16, 3), Vector2i(16, 12)],
+		"carves": [Rect2i(8, 15, 7, 4), Rect2i(10, 13, 3, 8), Rect2i(11, 3, 2, 11)],
+		"passages": [[30, 7, 3, 5, 2, 0, 1, 2], [31, 7, 6, 5, 2, 0, 1, 2], [32, 12, 3, 5, 2, 0, 1, 2], [33, 12, 6, 5, 2, 0, 1, 2], [34, 12, 12, 5, 2, 0, 1, 2], [35, 14, 15, 3, 2, 0, 1, 2]],
+	},
+	6: {
+		"slots": [Vector2i(2, 10), Vector2i(15, 10), Vector2i(15, 2)],
+		"carves": [Rect2i(8, 15, 7, 4), Rect2i(10, 13, 3, 8), Rect2i(11, 3, 2, 11)],
+		"passages": [[30, 7, 10, 5, 2, 0, 1, 2], [31, 7, 13, 5, 2, 0, 1, 2], [32, 12, 10, 4, 2, 0, 1, 2], [33, 12, 13, 4, 2, 0, 1, 2], [34, 12, 3, 4, 2, 0, 1, 2], [35, 17, 6, 2, 5, 1, 0, 3]],
+	},
 }
 ## The hand-made room pieces: # rock, . floor. Each is ROOM_SIZE; the hash picks one
 ## for each slot and whether it is turned about.
@@ -78,11 +101,20 @@ const REWARDS: Dictionary = {
 	"mineral": { "credits": 12 },
 	"sample": { "crystal_ore": 1, "credits": 4 },
 }
+## What the deep depths add to a find's pay [PLACEHOLDER]: per level below depth 3, a
+## crystal ore on an ore find, 8 credits on a mineral, and on a sample a crystal ore every
+## second level and 4 credits.
+const DEEP_ORE_PER_LEVEL: int = 1
+const DEEP_CREDITS_PER_LEVEL: int = 8
+const DEEP_SAMPLE_CREDITS_PER_LEVEL: int = 4
 const NAMES: Dictionary = { "ore": "crystal ore", "mineral": "a mineral", "sample": "a rock sample" }
 ## What repairing a broken lift costs, from the farm's shared wallet and stock
 ## [PLACEHOLDER]. Taken once: the repair is for good.
 const LIFT_COST_CREDITS: int = 100
 const LIFT_COST_ORE: int = 2
+## The deep lift (depth 6) costs twice as much [PLACEHOLDER].
+const DEEP_LIFT_COST_CREDITS: int = 200
+const DEEP_LIFT_COST_ORE: int = 4
 ## Finds in each room, and on the landing.
 const PER_ROOM: int = 2
 const ON_LANDING: int = 1
@@ -163,15 +195,126 @@ static func layout(world_seed: int, zone: String, depth: int, day: int) -> Dicti
 	for area: Rect2i in plan["carves"]:
 		_carve(cells, area)
 	# The rooms are joined to the trunk by passages whose place the hash picks.
+	var passage_rects: Array[Rect2i] = []
 	for passage: Array in plan["passages"]:
 		var step: int = draw(base, int(passage[0]), int(passage[7]))
-		_carve(cells, Rect2i(int(passage[1]) + int(passage[5]) * step, int(passage[2]) + int(passage[6]) * step, int(passage[3]), int(passage[4])))
+		var carved := Rect2i(int(passage[1]) + int(passage[5]) * step, int(passage[2]) + int(passage[6]) * step, int(passage[3]), int(passage[4]))
+		passage_rects.append(carved)
+		_carve(cells, carved)
+	# The deep depths: one rockfall a day across a side passage.
+	var fall: Dictionary = {}
+	if depth >= FIRST_DEEP:
+		fall = _rockfall(base, cells, rooms, plan, passage_rects)
+		for blocked: Vector2i in fall.get("cells", []):
+			_put(cells, blocked, "#")
 	var grid := PackedStringArray()
 	for row: Array in cells:
 		grid.append("".join(row))
-	var out: Dictionary = { "depth": depth, "day": day, "grid": grid, "start": START_CELL, "rooms": rooms, "finds": [] }
-	out["finds"] = _finds(base, grid, rooms, depth)
+	var out: Dictionary = { "depth": depth, "day": day, "grid": grid, "start": START_CELL, "rooms": rooms, "finds": [], "fall": fall }
+	out["finds"] = _finds(base, grid, rooms, depth, fall.get("beside", START_CELL))
 	return out
+
+
+## The loose basalt of a deep depth, { "cells" (the blocked cells, rock now), "beside" (a
+## floor cell next to them, where the rubble is shown) }, or {} if none could be dropped.
+## It falls across one of the side passages (not in a room, the trunk or the landing) and
+## is simply blocked [PLACEHOLDER]: no wear, no way through. The hash picks where to look
+## first, and a fall that would cut any floor off from the start (so the way up, the
+## hatch or a find) is passed over for the next one.
+static func _rockfall(base: int, cells: Array, rooms: Array[Rect2i], plan: Dictionary, passages: Array[Rect2i]) -> Dictionary:
+	var fixed: Array[Rect2i] = rooms.duplicate()
+	for area: Rect2i in plan["carves"]:
+		fixed.append(area)
+	var options: Array = []
+	for rect: Rect2i in passages:
+		var across: bool = rect.size.x >= rect.size.y
+		for step: int in (rect.size.x if across else rect.size.y):
+			var line: Array[Vector2i] = []
+			for along: int in (rect.size.y if across else rect.size.x):
+				line.append(Vector2i(rect.position.x + step, rect.position.y + along) if across else Vector2i(rect.position.x + along, rect.position.y + step))
+			var free: bool = true
+			for cell: Vector2i in line:
+				for area: Rect2i in fixed:
+					free = free and not area.has_point(cell)
+			if free and not line in options:
+				options.append(line)
+	if options.is_empty():
+		return {}
+	var whole: Array[Vector2i] = _flood(cells, START_CELL, [])
+	var first: int = draw(base, 60, options.size())
+	# First choice: a line that cuts nothing off. Failing that (a side passage that is a
+	# dead end in a room's rock), one that cuts off only bare passage: no room, landing,
+	# hatch or lift cell, so no find and no way is lost with it [PLACEHOLDER].
+	for strict: bool in [true, false]:
+		for offset: int in options.size():
+			var line: Array = options[(first + offset) % options.size()]
+			var reached: Array[Vector2i] = _flood(cells, START_CELL, line)
+			var lost: Array[Vector2i] = []
+			for cell: Vector2i in whole:
+				if not cell in line and not cell in reached:
+					lost.append(cell)
+			if strict and not lost.is_empty():
+				continue
+			if not strict and not _only_passage(lost, rooms, plan):
+				continue
+			return { "cells": line, "beside": _beside(cells, line, reached, rooms, plan) }
+	return {}
+
+
+## True if none of `lost` is in a room, a carve (the landing, the trunk), or a cell a way
+## down or a lift is at.
+static func _only_passage(lost: Array[Vector2i], rooms: Array[Rect2i], plan: Dictionary) -> bool:
+	for cell: Vector2i in lost:
+		for area: Rect2i in rooms:
+			if area.has_point(cell):
+				return false
+		for area: Rect2i in plan["carves"]:
+			if area.has_point(cell):
+				return false
+		if cell in [HATCH_CELL, LIFT_CELL, UP_CELL, START_CELL]:
+			return false
+	return true
+
+
+## The floor cells reached from `from` with `blocked` cells counted as rock.
+static func _flood(cells: Array, from: Vector2i, blocked: Array) -> Array[Vector2i]:
+	var seen: Dictionary = {}
+	var todo: Array[Vector2i] = [from]
+	while not todo.is_empty():
+		var cell: Vector2i = todo.pop_back()
+		if seen.has(cell) or cell in blocked or cell.y < 0 or cell.y >= HEIGHT or cell.x < 0 or cell.x >= WIDTH or cells[cell.y][cell.x] != ".":
+			continue
+		seen[cell] = true
+		for side: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			todo.append(cell + side)
+	var out: Array[Vector2i] = []
+	for cell: Vector2i in seen:
+		out.append(cell)
+	return out
+
+
+## A floor cell next to the blocked line on the side the rover comes from: one the
+## flood from the start reaches (`reached`, with the line blocked), outside the rooms and
+## the carves where one is. The pile is shown there, so it is never behind the rock.
+static func _beside(cells: Array, line: Array, reached: Array[Vector2i], rooms: Array[Rect2i], plan: Dictionary) -> Vector2i:
+	var near: Array[Vector2i] = []
+	for cell: Vector2i in line:
+		for side: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var next: Vector2i = cell + side
+			if next in reached and not next in line and not next in near:
+				near.append(next)
+	var open: Array[Vector2i] = []
+	for cell: Vector2i in near:
+		var held: bool = cell in [START_CELL, HATCH_CELL, LIFT_CELL, UP_CELL]
+		for area: Rect2i in rooms:
+			held = held or area.has_point(cell)
+		for area: Rect2i in plan["carves"]:
+			held = held or area.has_point(cell)
+		if not held:
+			open.append(cell)
+	if not open.is_empty():
+		return open[0]
+	return near[0] if not near.is_empty() else (line[0] as Vector2i)
 
 
 static func _put(cells: Array, cell: Vector2i, tile: String) -> void:
@@ -196,9 +339,10 @@ static func _floor_cells(grid: PackedStringArray, area: Rect2i) -> Array[Vector2
 
 ## The finds: PER_ROOM in each room and ON_LANDING on the landing, never on the
 ## start, never two on one cell. Ids are "d<depth>_f<number>" in this order.
-static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], depth: int) -> Array:
+static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], depth: int, rubble: Vector2i = START_CELL) -> Array:
 	var finds: Array = []
-	var used: Array[Vector2i] = [START_CELL]
+	# Nor on the cell the rubble is shown at.
+	var used: Array[Vector2i] = [START_CELL, rubble]
 	# Nor on a way down or a lift, nor the cell a rover comes out at beside one.
 	for cell: Vector2i in _kept_clear(depth):
 		used.append(cell)
@@ -386,8 +530,21 @@ static func is_lift_depth(depth: int) -> bool:
 	return depth >= DEPTH and depth <= MAX_DEPTH and depth % LIFT_EVERY == 0
 
 
-static func repair_cost_text() -> String:
-	return "The repair costs %d credits and %d crystal ore." % [LIFT_COST_CREDITS, LIFT_COST_ORE]
+## What repairing the lift at `depth` costs: x credits, y crystal ore.
+static func lift_cost(depth: int) -> Vector2i:
+	if depth >= FIRST_DEEP:
+		return Vector2i(DEEP_LIFT_COST_CREDITS, DEEP_LIFT_COST_ORE)
+	return Vector2i(LIFT_COST_CREDITS, LIFT_COST_ORE)
+
+
+static func repair_cost_text(depth: int = LIFT_EVERY) -> String:
+	var cost: Vector2i = lift_cost(depth)
+	return "The repair costs %d credits and %d crystal ore." % [cost.x, cost.y]
+
+
+## True if `depth` is one of the deep ones, behind the gate.
+static func is_deep(depth: int) -> bool:
+	return depth >= FIRST_DEEP and depth <= MAX_DEPTH
 
 
 ## The depths with a lift station, shallowest first.
@@ -484,14 +641,25 @@ static func _rover_not_in_text(want: String) -> String:
 	return "The rover is not in the Lava Tubes." if want == ZONE else "The rover is not in the Flooded Aquifer."
 
 
-## What a find pays: { "crystal_ore": n, "credits": n }, only what it has.
-static func reward(kind: String) -> Dictionary:
-	return (REWARDS.get(kind, {}) as Dictionary).duplicate()
+## What a find pays at `depth` (0: the base pay): { "crystal_ore": n, "credits": n },
+## only what it has. The deep depths pay more for each level below depth 3.
+static func reward(kind: String, depth: int = 0) -> Dictionary:
+	var pay: Dictionary = (REWARDS.get(kind, {}) as Dictionary).duplicate()
+	var levels: int = depth - FIRST_DEEP + 1 if is_deep(depth) else 0
+	if levels > 0:
+		if kind == "ore":
+			pay["crystal_ore"] = int(pay.get("crystal_ore", 0)) + DEEP_ORE_PER_LEVEL * levels
+		elif kind == "mineral":
+			pay["credits"] = int(pay.get("credits", 0)) + DEEP_CREDITS_PER_LEVEL * levels
+		elif kind == "sample":
+			pay["crystal_ore"] = int(pay.get("crystal_ore", 0)) + ((levels + 1) >> 1)
+			pay["credits"] = int(pay.get("credits", 0)) + DEEP_SAMPLE_CREDITS_PER_LEVEL * levels
+	return pay
 
 
-static func reward_text(kind: String) -> String:
+static func reward_text(kind: String, depth: int = 0) -> String:
 	var parts: PackedStringArray = []
-	var pay: Dictionary = reward(kind)
+	var pay: Dictionary = reward(kind, depth)
 	if pay.has("crystal_ore"):
 		parts.append("%d crystal ore" % int(pay["crystal_ore"]))
 	if pay.has("credits"):
@@ -548,7 +716,7 @@ static func taken_problem(taken: Variant) -> String:
 			return "'finds_taken' has ids that are not a list."
 		var seen: Array[String] = []
 		for id: Variant in ids:
-			if not id is String or not _is_find_id(id):
+			if not id is String or not _is_find_id(id, zone):
 				return "'finds_taken' has an id that is not a find's."
 			if id in seen:
 				return "'finds_taken' has an id twice."
@@ -556,9 +724,9 @@ static func taken_problem(taken: Variant) -> String:
 	return ""
 
 
-static func _is_find_id(text: String) -> bool:
-	# Only the canonical spelling: d01_f00 or d1_f+1 are not ids.
-	for depth: int in range(DEPTH, MAX_DEPTH + 1):
+static func _is_find_id(text: String, zone: String = ZONE) -> bool:
+	# Only the canonical spelling: d01_f00 or d1_f+1 are not ids. Only depths the zone has.
+	for depth: int in range(DEPTH, max_depth_of(zone) + 1):
 		for index: int in find_count(depth):
 			if text == find_id(index, depth):
 				return true
@@ -578,15 +746,19 @@ static func lifts_problem(lifts: Variant) -> String:
 			return "'lifts_repaired' has an entry that is not a known zone's list."
 		var seen: Array[int] = []
 		for depth: Variant in depths:
-			if not depth is int or not is_lift_depth(depth):
+			if not depth is int or not is_lift_depth(depth) or depth > max_depth_of(zone):
 				return "'lifts_repaired' has a depth with no lift."
 			if depth in seen:
 				return "'lifts_repaired' has a depth twice."
 			seen.append(depth)
+		# The lift at 6 is repaired from the way the lift at 3 opens.
+		for depth: int in seen:
+			if depth > LIFT_EVERY and not (depth - LIFT_EVERY) in seen:
+				return "'lifts_repaired' has a lift whose lift above is not repaired."
 	return ""
 
 
-## Why a saved `deepest_depth` can't be, or "": zone id -> a depth from 1 to MAX_DEPTH.
+## Why a saved `deepest_depth` can't be, or "": zone id -> a depth from 1 to the zone's own most.
 static func deepest_problem(deepest: Variant) -> String:
 	if not deepest is Dictionary:
 		return "'deepest_depth' is not a dictionary."
@@ -594,7 +766,7 @@ static func deepest_problem(deepest: Variant) -> String:
 		var depth: Variant = deepest[zone]
 		if not zone is String or not StringName(zone) in ZoneData.ids():
 			return "'deepest_depth' has an entry that is not a known zone's."
-		if not depth is int or depth < DEPTH or depth > MAX_DEPTH:
+		if not depth is int or depth < DEPTH or depth > max_depth_of(zone):
 			return "'deepest_depth' has a depth out of range."
 	return ""
 

@@ -365,10 +365,12 @@ func test_the_protocol_moved_with_the_take_command_and_field() -> String:
 
 
 func test_presence_reports_the_depths_and_no_deeper() -> String:
-	if ZonePresence.MAX_DEPTH != 3:
+	if ZonePresence.MAX_DEPTH != 6:
 		return "MAX_DEPTH is %d." % ZonePresence.MAX_DEPTH
-	if ZonePresence.place_problem("lava_tubes", 3) != "" or ZonePresence.place_problem("lava_tubes", 4) == "":
-		return "Depth 3 should be accepted and depth 4 refused."
+	if ZonePresence.place_problem("lava_tubes", 6) != "" or ZonePresence.place_problem("lava_tubes", 7) == "":
+		return "Depth 6 should be accepted and depth 7 refused."
+	if ZonePresence.place_problem("ice_caves", 4) == "":
+		return "Another zone took the Lava Tubes' depths."
 	if ZonePresence.place_problem("farm", 1) == "":
 		return "A depth on the farm was accepted."
 	var was: int = ZoneDepth.local_depth
@@ -615,7 +617,7 @@ func test_a_save_names_only_real_zones_and_real_find_ids() -> String:
 	var bad_records: Array = [
 		{ "not_a_zone": { "day": 1, "ids": [] } },
 		{ "lava_tubes": { "day": 1, "ids": ["d1_f99"] } },
-		{ "lava_tubes": { "day": 1, "ids": ["d4_f0"] } },
+		{ "lava_tubes": { "day": 1, "ids": ["d7_f0"] } },
 		{ "lava_tubes": { "day": 1, "ids": ["d1_f+1"] } },
 		{ "lava_tubes": { "day": 1, "ids": ["d1_f-0"] } },
 	]
