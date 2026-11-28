@@ -371,8 +371,8 @@ func test_the_mine_commands_are_on_the_list_and_run_through_the_commander() -> S
 	for action: StringName in [&"buy_mine_props", &"shore_room", &"move_rover_mine"]:
 		if not action in FarmCommands.ACTIONS:
 			return "%s is not a command." % action
-	if CoopSession.PROTOCOL != 48:
-		return "The protocol is %d, not 48." % CoopSession.PROTOCOL
+	if CoopSession.PROTOCOL != 49:
+		return "The protocol is %d, not 49." % CoopSession.PROTOCOL
 	var gs: GameStateScript = _state()
 	gs.crystal_ore = 5
 	_rover_at(gs, 0, MineDepth.crate_position())

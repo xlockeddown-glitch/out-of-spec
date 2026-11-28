@@ -196,7 +196,7 @@ func test_the_four_asks_are_shipped() -> String:
 	for id: Variant in QuestEngine.player_quests():
 		if QuestEngine.is_daily_id(str(id)) or str(id) in ASKS:
 			problems.append("%s is a daily ask among the quests that travel." % id)
-	if SessionScript.PROTOCOL != 48:
+	if SessionScript.PROTOCOL != 49:
 		problems.append("Daily asks change nothing in what is sent: the protocol stays 18.")
 	return "\n".join(problems)
 

@@ -471,7 +471,7 @@ func test_a_guest_who_drops_while_camped_is_forgotten() -> String:
 
 
 func test_the_protocol_is_38() -> String:
-	return "" if CoopSession.PROTOCOL == 48 else "PROTOCOL is %d, not 48." % CoopSession.PROTOCOL
+	return "" if CoopSession.PROTOCOL == 49 else "PROTOCOL is %d, not 49." % CoopSession.PROTOCOL
 
 
 # --- The quest --------------------------------------------------------------------------

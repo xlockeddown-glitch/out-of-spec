@@ -416,6 +416,17 @@
       "rewards": { "lab_xp": 300, "xp_certificate": 50, "phone": "npcs/vance/quests/a_core_to_certify_done" }
     },
     {
+      "id": "test_pod", "kind": "story", "giver": "kestrel", "title": "The Test Pod", "scope": "farm", "zone": "ice_caves",
+      "gates": {},
+      "offer": { "when": "counter", "counter": "reached_ice_caves", "at_least": 1 },
+      "offer_line": "npcs/kestrel/quests/test_pod_offer",
+      "steps": [
+        { "id": "open", "text": "Open the heated test pod in the Ice Caves, or buy a standard from Kestrel.",
+          "check": "counter", "counter": "test_pod:*" }
+      ],
+      "rewards": { "quest_points": 1, "phone": "npcs/kestrel/quests/test_pod_done" }
+    },
+    {
       "id": "the_sump_sample", "kind": "lab", "giver": "vance", "title": "The Sump Sample", "scope": "farm", "zone": "flooded_aquifer", "camp": "flooded_aquifer",
       "gates": { "lab_level": 8 },
       "offer": { "when": "counter", "counter": "reached_flooded_aquifer", "at_least": 1 },
