@@ -268,12 +268,12 @@ func _aquifer_near() -> Dictionary:
 		return {}
 	if ZoneDepth.has_way_down(_built_depth) and ZoneDepth.near_descent(at, _built_depth):
 		return { "kind": HATCH, "id": "" }
-	if ZoneDepth.is_lift_depth(_built_depth) and ZoneDepth.near_lift(at, _built_depth):
-		return _station_near()
 	var found: Dictionary = _nearest_find()
 	var seal_near: Dictionary = _seal_near(at)
 	if not found.is_empty() and not AquiferDepth.prefer_seal(ZoneDepth.local_layout, str(found.get("id", "")), not seal_near.is_empty()):
-		return found
+		return found  # a find beside the lift wins over the lift, as in the Lava scene
+	if ZoneDepth.is_lift_depth(_built_depth) and ZoneDepth.near_lift(at, _built_depth):
+		return _station_near()
 	if not seal_near.is_empty():
 		return seal_near
 	for pool: Dictionary in ZoneDepth.local_layout.get("pools", []):

@@ -72,7 +72,7 @@ func test_depth_one_is_the_same_for_the_same_seed_and_day_and_new_the_next_day()
 	if AquiferDepth.layout(SEED + 1, 1, 5)["finds"] == a["finds"] and AquiferDepth.layout(SEED + 2, 1, 5)["finds"] == a["finds"]:
 		return "Another seed made the same floor."
 	if not AquiferDepth.layout(SEED, 0, 5).is_empty() or not AquiferDepth.layout(SEED, 7, 5).is_empty():
-		return "Only depth 1 exists: there is no depth 0 floor and no depth 7."
+		return "Depths 1 to 6 exist: there is no depth 0 floor and no depth 7."
 	if a["finds"].size() != AquiferDepth.find_count():
 		return "The floor has %d finds, not %d." % [a["finds"].size(), AquiferDepth.find_count()]
 	return ""

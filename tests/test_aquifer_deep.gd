@@ -52,6 +52,11 @@ func _free_find(depth: int, day: int) -> Dictionary:
 	return {}
 
 
+## A take that went through: "" or the wet-pack line a wading find also answers with.
+func _took(reply: String) -> bool:
+	return reply == "" or AquiferDepth.is_wet_pack_reply(reply)
+
+
 # --- The rows and the ranges -----------------------------------------------------------
 
 func test_the_zone_has_six_depths_and_the_gate_row_is_built_at_level_fourteen() -> String:
@@ -122,13 +127,14 @@ func test_depths_four_to_six_need_the_level_the_pump_and_the_lift_and_nothing_is
 func test_the_gate_holds_among_the_deep_depths_and_the_way_up_is_never_shut() -> String:
 	var problems: Array[String] = []
 	var gs: GameStateScript = _state()
-	_rover_at(gs, 5, ZoneDepth.descent_position(5))
 	gs.lab_xp = gs.xp_for_level(GATE_LEVEL - 1)
-	for target: int in [4, 6]:
+	# Each move is parked where its own reach check passes, so only the gate can refuse it.
+	for move: Array in [[5, 6, ZoneDepth.descent_position(5)], [5, 4, ZoneDepth.ascent_position()], [4, 5, ZoneDepth.descent_position(4)], [6, 5, ZoneDepth.ascent_position()]]:
+		_rover_at(gs, int(move[0]), move[2])
 		var epoch: int = gs.rover_epoch
-		var why: String = gs.change_depth(target)
-		if why == "" or gs.rover_depth != 5 or gs.rover_epoch != epoch:
-			problems.append("Depth 5 to %d went with the gate shut: '%s'." % [target, why])
+		var why: String = gs.change_depth(int(move[1]))
+		if not why.contains("is shut") or gs.rover_depth != int(move[0]) or gs.rover_epoch != epoch:
+			problems.append("Depth %d to %d did not stop at the gate: '%s'." % [move[0], move[1], why])
 	_rover_at(gs, 4, ZoneDepth.ascent_position())
 	if gs.change_depth(3) != "" or gs.rover_depth != 3:
 		problems.append("The rover could not leave the deep with the gate shut.")
@@ -337,6 +343,37 @@ func test_a_valve_shut_on_depth_two_leaves_the_other_depths_open() -> String:
 	return "\n".join(problems)
 
 
+func test_the_pump_and_the_valve_are_refused_deep_down_with_the_gate_shut() -> String:
+	var problems: Array[String] = []
+	var day: int = _today()
+	for depth: int in DEEP:
+		var data: Dictionary = AquiferDepth.layout(SEED, depth, day)
+		var centre: Vector2 = AquiferDepth.pool_metres(AquiferDepth.pool_in(data, "p0")).get_center()
+		var seal: Dictionary = data["seals"][0]
+		for broken: String in ["lab", "pump", "lift", "none"]:
+			var gs: GameStateScript = _state(GATE_LEVEL - 1 if broken == "lab" else GATE_LEVEL, broken != "pump", broken != "lift")
+			var shut: bool = broken != "none"
+			_rover_at(gs, depth, Vector3(centre.x, 0.0, centre.y))
+			var pumped: String = gs.use_pump("p0", day, HOST)
+			_rover_at(gs, depth, AquiferDepth.seal_position(seal))
+			var valved: String = gs.shut_valve(str(seal["id"]), day, HOST)
+			if shut:
+				if pumped == "" or not "is shut" in pumped:
+					problems.append("Depth %d: the pump was not refused with %s missing (%s)." % [depth, broken, pumped])
+				if valved == "" or not "is shut" in valved:
+					problems.append("Depth %d: the valve was not refused with %s missing (%s)." % [depth, broken, valved])
+				if not AquiferDepth.drained_today(gs.pools_drained, day).is_empty() or not AquiferDepth.shut_today(gs.valves_shut, day).is_empty():
+					problems.append("Depth %d: a refused pump or valve was recorded with %s missing." % [depth, broken])
+			else:
+				if pumped != "" or valved != "":
+					problems.append("Depth %d: the pump or the valve was refused with the gate open (%s, %s)." % [depth, pumped, valved])
+				if AquiferDepth.drained_today(gs.pools_drained, day) != [AquiferDepth.storage_id(depth, "p0")]:
+					problems.append("Depth %d: the open pump is stored as %s." % [depth, AquiferDepth.drained_today(gs.pools_drained, day)])
+			gs.free()
+	return "
+".join(problems.slice(0, 4))
+
+
 func test_the_seal_is_one_a_day_at_every_depth() -> String:
 	for depth: int in range(1, 7):
 		for day: int in range(1, 20):
@@ -348,37 +385,55 @@ func test_the_seal_is_one_a_day_at_every_depth() -> String:
 
 func test_the_pack_gets_wet_once_a_day_whatever_the_depth() -> String:
 	var problems: Array[String] = []
-	var day: int = _today()
 	var gs: GameStateScript = _state()
 	gs.camp_supplies = 3
 	gs.pools_drained = {}
-	# Find, in today's layouts, two depths with a find that is reached by wading.
+	# Look over the next days for one with a find reached by wading at both depths 2 and 3.
+	var day: int = _today()
 	var wet: Array = []
-	for depth: int in [2, 3]:
-		var data: Dictionary = AquiferDepth.layout(SEED, depth, day)
-		for find: Dictionary in data["finds"]:
-			if AquiferDepth.seal_problem(data, str(find["id"])) == "" \
-					and AquiferDepth.wades_to(data, data["start"], find["cell"]):
-				wet.append([depth, find, data])
-				break
-	if wet.size() < 2:
-		return ""  # the hash draws no two wading finds today; the once-a-day rule is pinned in test_flooded_aquifer
-	for entry: Array in wet:
+	for offset: int in 200:
+		wet.clear()
+		for depth: int in [2, 3]:
+			var data: Dictionary = AquiferDepth.layout(SEED, depth, day + offset)
+			for find: Dictionary in data["finds"]:
+				if AquiferDepth.seal_problem(data, str(find["id"])) == "" 						and AquiferDepth.wades_to(data, data["start"], find["cell"]):
+					wet.append([depth, find, data])
+					break
+		if wet.size() == 2:
+			day += offset
+			break
+	if wet.size() != 2:
+		gs.free()
+		return "No day in 200 had a wading find at both depth 2 and 3 to test with."
+	var saved_day: float = GameClock.elapsed_days
+	GameClock.elapsed_days = float(day - 1)
+	for index: int in 2:
+		var entry: Array = wet[index]
 		var data: Dictionary = entry[2]
 		var find: Dictionary = entry[1]
 		_rover_at(gs, entry[0], TunnelRock.at_in(data["grid"], find["cell"]))
 		var reply: String = gs.take_find(str(find["id"]), day, HOST)
-		if entry == wet[0] and reply != AquiferDepth.wet_pack_reply(true):
+		if index == 0 and reply != AquiferDepth.wet_pack_reply(true):
 			problems.append("The first wading find did not wet the pack: '%s'." % reply)
-		if entry == wet[1] and reply != "":
+		if index == 1 and reply != "":
 			problems.append("The second wading find, at another depth, wet the pack again: '%s'." % reply)
 	if gs.camp_supplies != 2:
 		problems.append("%d rations are left; one should have spoiled." % gs.camp_supplies)
+	GameClock.elapsed_days = saved_day
 	gs.free()
-	return "\n".join(problems)
+	return "
+".join(problems)
 
 
 # --- Saves ------------------------------------------------------------------------------
+
+## True if a fresh farm takes `data` (and frees itself).
+func _loads(data: Dictionary) -> bool:
+	var fresh: GameStateScript = _state(1, false, false)
+	var ok: bool = fresh.farm_from_dict(data) == ""
+	fresh.free()
+	return ok
+
 
 func test_an_old_save_with_depth_one_ids_and_no_deep_keys_loads() -> String:
 	var problems: Array[String] = []
@@ -387,8 +442,7 @@ func test_an_old_save_with_depth_one_ids_and_no_deep_keys_loads() -> String:
 	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
 	for key: String in ["lifts_repaired", "deepest_depth", "pools_drained", "valves_shut", "packs_wet"]:
 		data.erase(key)
-	var bare: GameStateScript = _state(1, false, false)
-	if bare.farm_from_dict(data) != "":
+	if not _loads(data):
 		problems.append("A save with none of the per-depth keys was refused.")
 	data["pools_drained"] = { ZONE: { "day": day, "ids": ["p0"] } }
 	data["valves_shut"] = { ZONE: { "day": day, "ids": ["s1"] } }
@@ -398,31 +452,41 @@ func test_an_old_save_with_depth_one_ids_and_no_deep_keys_loads() -> String:
 		problems.append("A save with depth 1's plain ids was refused.")
 	if AquiferDepth.drained_today(old.pools_drained, day) != ["p0"]:
 		problems.append("Depth 1's pool did not load: %s." % [old.pools_drained])
+	if AquiferDepth.shut_today(old.valves_shut, day) != ["s1"]:
+		problems.append("Depth 1's valve did not load: %s." % [old.valves_shut])
 	if not bool(AquiferDepth.pool_in(AquiferDepth.layout(SEED, 1, day, AquiferDepth.drained_today(old.pools_drained, day)), "p0")["drained"]):
 		problems.append("Depth 1's p0 is not drained after loading.")
+	old.free()
 	# New ids load, and ones that are no depth's do not.
 	data["pools_drained"] = { ZONE: { "day": day, "ids": ["p0", "d3_p1", "d6_p2"] } }
+	data["valves_shut"] = { ZONE: { "day": day, "ids": ["s1", "d3_s1", "d6_s2"] } }
 	data["deepest_depth"] = { ZONE: 6 }
-	var deep: GameStateScript = _state(1, false, false)
-	if deep.farm_from_dict(data) != "":
-		problems.append("A save with deep pool ids was refused.")
+	if not _loads(data):
+		problems.append("A save with deep pool and valve ids was refused.")
+	data["valves_shut"] = {}
 	for bad: String in ["d7_p0", "d1_p0", "d2_p9", "p9"]:
 		data["pools_drained"] = { ZONE: { "day": day, "ids": [bad] } }
-		if _state(1, false, false).farm_from_dict(data) == "":
+		if _loads(data):
 			problems.append("A save with the pool id '%s' was accepted." % bad)
 	data["pools_drained"] = {}
+	for bad: String in ["d7_s0", "d1_s0", "d2_s9", "s9"]:
+		data["valves_shut"] = { ZONE: { "day": day, "ids": [bad] } }
+		if _loads(data):
+			problems.append("A save with the valve id '%s' was accepted." % bad)
+	data["valves_shut"] = {}
 	data["deepest_depth"] = { ZONE: 7 }
-	if _state(1, false, false).farm_from_dict(data) == "":
+	if _loads(data):
 		problems.append("A save with the Aquifer's deepest depth at 7 was accepted.")
 	data["deepest_depth"] = { ZONE: 6 }
 	data["lifts_repaired"] = { ZONE: [3, 6] }
-	if _state(1, false, false).farm_from_dict(data) != "":
+	if not _loads(data):
 		problems.append("A save with lifts at 3 and 6 was refused.")
 	data["lifts_repaired"] = { ZONE: [2] }
-	if _state(1, false, false).farm_from_dict(data) == "":
+	if _loads(data):
 		problems.append("A save with a lift at depth 2 was accepted.")
 	gs.free()
-	return "\n".join(problems)
+	return "
+".join(problems)
 
 
 func test_a_deep_rover_loaded_with_the_gate_shut_is_put_back_at_depth_three() -> String:
@@ -548,7 +612,7 @@ func test_a_deep_find_does_not_pay_with_the_gate_shut() -> String:
 	var find3: Dictionary = _free_find(3, day)
 	var data3: Dictionary = AquiferDepth.layout(SEED, 3, day)
 	_rover_at(gs3, 3, TunnelRock.at_in(data3["grid"], find3["cell"]))
-	if gs3.take_find(str(find3["id"]), day, HOST) != "":
+	if not _took(gs3.take_find(str(find3["id"]), day, HOST)):
 		problems.append("Depth 3's find was refused for a new farm.")
 	gs3.free()
 	return "\n".join(problems)
@@ -556,8 +620,23 @@ func test_a_deep_find_does_not_pay_with_the_gate_shut() -> String:
 
 # --- The layouts -----------------------------------------------------------------------
 
+## The whole of depth 1's layout (grid, finds with cells and kinds, pools, seals) for three seeds
+## on four days, as `str(layout).hash()`. The values were taken from origin/main's
+## aquifer_depth.gd before this slice, and match the new code's output: depth 1 is unchanged.
+const DEPTH_ONE_HASHES: Dictionary = {
+	"424242 1": 968252876, "424242 7": 2667721792, "424242 100": 1341184961, "424242 333": 2501604597,
+	"1 1": 3030292956, "1 7": 7265224, "1 100": 2700237243, "1 333": 3313434451,
+	"99 1": 1136317712, "99 7": 2123255002, "99 100": 2438048273, "99 333": 2706317371,
+}
+
+
 func test_depth_one_is_as_it_was() -> String:
 	var problems: Array[String] = []
+	for key: String in DEPTH_ONE_HASHES:
+		var parts: PackedStringArray = key.split(" ")
+		var data: Dictionary = AquiferDepth.layout(int(parts[0]), 1, int(parts[1]))
+		if str(data).hash() != int(DEPTH_ONE_HASHES[key]):
+			problems.append("Depth 1's layout for seed %s day %s is not the one main made." % [parts[0], parts[1]])
 	for day: int in [1, 7, 100]:
 		var data: Dictionary = AquiferDepth.layout(SEED, 1, day)
 		for index: int in data["finds"].size():
@@ -570,7 +649,8 @@ func test_depth_one_is_as_it_was() -> String:
 				problems.append("Depth 1 has a pool %s m deep." % pool["depth_m"])
 	if AquiferDepth.pool_choices(1).size() != AquiferDepth.DEEP_M.size() + AquiferDepth.SHALLOW_M.size():
 		problems.append("Depth 1's pool choices changed.")
-	return "\n".join(problems.slice(0, 4))
+	return "
+".join(problems.slice(0, 4))
 
 
 func test_water_is_deeper_and_more_common_going_down() -> String:
@@ -641,6 +721,30 @@ func test_each_depth_is_its_own_daily_floor() -> String:
 
 # --- The look ---------------------------------------------------------------------------
 
+func _lights(node: Node) -> int:
+	var n: int = 1 if node is Light3D else 0
+	for child: Node in node.get_children():
+		n += _lights(child)
+	return n
+
+
+## The scene built at `depth` of today: { "lights": its lights outside the rock, "trunk": the
+## energy of its TrunkLamp }.
+func _scene_at(depth: int) -> Dictionary:
+	var root: Window = (Engine.get_main_loop() as SceneTree).root
+	GameState.rover_zone = ZONE
+	GameState.rover_depth = depth
+	GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
+	var scene: Node = (load("res://scenes/flooded_aquifer.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	var rock: Node = scene.get_node("WorldView/WorldViewport/World/Rock")
+	var trunk: Light3D = scene.find_child("TrunkLamp", true, false) as Light3D
+	var out: Dictionary = { "lights": _lights(scene) - _lights(rock), "trunk": trunk.light_energy if trunk != null else -1.0 }
+	root.remove_child(scene)
+	scene.free()
+	return out
+
+
 func test_each_depth_is_a_little_darker_with_no_new_lights() -> String:
 	var problems: Array[String] = []
 	if FloodedAquifer.lamp_scale(0) != 1.0 or FloodedAquifer.lamp_scale(1) != 1.0:
@@ -653,7 +757,38 @@ func test_each_depth_is_a_little_darker_with_no_new_lights() -> String:
 		if scale < FloodedAquifer.LAMP_FLOOR:
 			problems.append("Depth %d is darker than the floor (%.2f)." % [depth, scale])
 		last = scale
-	return "\n".join(problems)
+	# The built scenes: the same lights at every depth, a dimmer trunk lamp below.
+	var saved_zone: String = GameState.rover_zone
+	var saved_depth: int = GameState.rover_depth
+	var saved_transforms: Dictionary = GameState.rover_transforms.duplicate(true)
+	var saved_seed: int = GameState.world_seed
+	var saved_lent: bool = GameState.rover_lent
+	var saved_local: Array = [ZoneDepth.local_zone, ZoneDepth.local_depth, ZoneDepth.local_layout.duplicate(true), ZoneDepth.arrive_at, ZoneDepth.arrive_pending]
+	GameState.world_seed = SEED
+	GameState.rover_lent = true
+	var one: Dictionary = _scene_at(1)
+	var previous: float = float(one["trunk"])
+	if previous <= 0.0:
+		problems.append("Depth 1 has no TrunkLamp.")
+	for depth: int in [2, 4, 6]:
+		var built: Dictionary = _scene_at(depth)
+		if int(built["lights"]) != int(one["lights"]):
+			problems.append("Depth %d has %d lights outside the rock, depth 1 has %d." % [depth, built["lights"], one["lights"]])
+		if float(built["trunk"]) >= previous:
+			problems.append("Depth %d's trunk lamp (%.2f) is no dimmer than the one above (%.2f)." % [depth, built["trunk"], previous])
+		previous = float(built["trunk"])
+	GameState.rover_zone = saved_zone
+	GameState.rover_depth = saved_depth
+	GameState.rover_transforms = saved_transforms
+	GameState.world_seed = saved_seed
+	GameState.rover_lent = saved_lent
+	ZoneDepth.local_zone = str(saved_local[0])
+	ZoneDepth.local_depth = int(saved_local[1])
+	ZoneDepth.local_layout = saved_local[2]
+	ZoneDepth.arrive_at = saved_local[3]
+	ZoneDepth.arrive_pending = bool(saved_local[4])
+	return "
+".join(problems)
 
 
 # --- Nothing new on the wire ------------------------------------------------------------

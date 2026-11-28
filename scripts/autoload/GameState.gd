@@ -6601,6 +6601,10 @@ func use_pump(pool_id: String, layout_day: int, player_id: String = "") -> Strin
 		return "That was yesterday's floor. Look again."
 	if rover_zone != AquiferDepth.ZONE or rover_depth < 1 or depth_of(player_id) != rover_depth or place_of(player_id) != AquiferDepth.ZONE:
 		return "Pools are below the Flooded Aquifer's hub, where the rover is."
+	if ZoneDepth.is_deep(rover_depth):  # the deep floors work only once the way there is open
+		var shut_reason: String = aquifer_deep_problem()
+		if shut_reason != "":
+			return shut_reason
 	pools_drained = ZoneDepth.prune(pools_drained, day)
 	valves_shut = ZoneDepth.prune(valves_shut, day)
 	var today: Dictionary = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day), AquiferDepth.shut_today(valves_shut, day))
@@ -6625,6 +6629,10 @@ func shut_valve(seal_id: String, layout_day: int, player_id: String = "") -> Str
 		return "That was yesterday's floor. Look again."
 	if rover_zone != AquiferDepth.ZONE or rover_depth < 1 or depth_of(who) != rover_depth or place_of(who) != AquiferDepth.ZONE:
 		return "Valves are below the Flooded Aquifer's hub, where the rover is."
+	if ZoneDepth.is_deep(rover_depth):  # the deep floors work only once the way there is open
+		var shut_reason: String = aquifer_deep_problem()
+		if shut_reason != "":
+			return shut_reason
 	valves_shut = ZoneDepth.prune(valves_shut, day)
 	var shut: Array = AquiferDepth.shut_today(valves_shut, day)
 	var today: Dictionary = AquiferDepth.layout(world_seed, rover_depth, day, AquiferDepth.drained_today(pools_drained, day), shut)
