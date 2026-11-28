@@ -278,12 +278,17 @@ func _tell_hub() -> void:
 		FIND:
 			_hud.push_log("FIND: press " + Controls.prompt(&"interact") + " to take it.")
 		CAMP:
-			if CoopBeds.in_bed.has(GameState.local_player_id):
-				_hud.push_log("CAMP: you are asleep. Press %s to get up." % Controls.prompt(&"interact"))
-			elif GameState.camp_supplies > 0:
-				_hud.push_log("CAMP: press %s to sleep the night here (%d of supplies held)." % [Controls.prompt(&"interact"), GameState.camp_supplies])
-			else:
-				_hud.push_log("CAMP: press %s to buy a night's supplies (%d credits)." % [Controls.prompt(&"interact"), Camp.SUPPLY_COST_CREDITS])
+			_tell_camp()
+
+
+## The camp's prompt (the zones that draw their own hub prompts call it too).
+func _tell_camp() -> void:
+	if CoopBeds.in_bed.has(GameState.local_player_id):
+		_hud.push_log("CAMP: you are asleep. Press %s to get up." % Controls.prompt(&"interact"))
+	elif GameState.camp_supplies > 0:
+		_hud.push_log("CAMP: press %s to sleep the night here (%d of supplies held)." % [Controls.prompt(&"interact"), GameState.camp_supplies])
+	else:
+		_hud.push_log("CAMP: press %s to buy a night's supplies (%d credits)." % [Controls.prompt(&"interact"), Camp.SUPPLY_COST_CREDITS])
 
 
 func _use_hub(target: Dictionary) -> void:

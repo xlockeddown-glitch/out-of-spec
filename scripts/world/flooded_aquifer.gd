@@ -72,6 +72,7 @@ func _build_zone() -> void:
 		_draw_crate()
 		_draw_sign()
 		_build_hub_decor()
+		_rover.get_parent().add_child(CampProps.new(AquiferDepth.ZONE))
 	# The lift station: at the hub, and at the depths that have one (3 and 6). Broken until repaired.
 	if ZoneDepth.is_lift_depth(_built_depth) or _built_depth == 0:
 		_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(AquiferDepth.ZONE, _lift_depth()))
@@ -265,7 +266,7 @@ func _aquifer_near() -> Dictionary:
 			return { "kind": CRATE, "id": "" }
 		if AquiferDepth.near_sign(at):
 			return { "kind": SIGN, "id": "" }
-		return {}
+		return _camp_near()
 	if ZoneDepth.has_way_down(_built_depth) and ZoneDepth.near_descent(at, _built_depth):
 		return { "kind": HATCH, "id": "" }
 	var found: Dictionary = _nearest_find()
@@ -311,6 +312,8 @@ func _tell_hub() -> void:
 				Controls.prompt(&"interact"), "check it" if GameState.pump_owned else "buy it"])
 		SIGN:
 			_hud.push_log("NOTICE SIGN: press " + Controls.prompt(&"interact") + " to read it.")
+		CAMP:
+			_tell_camp()
 		POOL:
 			_hud.push_log("POOL: press " + Controls.prompt(&"interact") + " to pump it dry for today.")
 		SEAL:
@@ -322,7 +325,9 @@ func _use_hub(target: Dictionary) -> void:
 		CRATE:
 			_use_crate()
 		SIGN:
-			_hud.push_log("NOTICE SIGN: Vance: [later]")
+			for line: String in NoticeBoard.lines(QuestEngine.quests(), GameState.quest_state,
+					GameState.player_quest_state.get(GameState.local_player_id, {}), "zone", AquiferDepth.ZONE):
+				_hud.push_log(line)
 		POOL:
 			_use_pump(str(target["id"]))
 		SEAL:
