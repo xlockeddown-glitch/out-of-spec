@@ -202,8 +202,12 @@ func _check_l3_closed(gs: GameStateScript) -> String:
 	gs.update_quests()
 	var standard: String = gs.contract_standard_id()
 	gs.owned_standards[standard] = GameClock.get_day_index()
-	# Before reaching Trusted, the contract is not offered yet, so a command look closes nothing
-	# and a morning look closes L3 unpaid.
+	# Reaching Trusted while owning the standard marks the contract waived (so the second
+	# contract can open), and L3 still closes unpaid.
+	gs.change_credibility(40 - gs.credibility)
+	if gs.credibility_band() != "Trusted" or gs.contract_state != "waived":
+		return "A Trusted lab that owns the standard marks the contract waived: '%s'" % gs.contract_state
+	# A command's look closes nothing; the morning's does.
 	var none: Array[String] = []
 	gs.update_quests(none, false)
 	if gs.quest_state.has(L3):
@@ -213,11 +217,6 @@ func _check_l3_closed(gs: GameStateScript) -> String:
 	gs.update_quests()
 	if not _is_done(gs, L3) or gs.lab_xp != before or gs.phone_log.size() != lines:
 		return "L3 is done, with nothing paid or said: %s" % [gs.phone_log.slice(lines)]
-	# Reaching Trusted later marks the contract fulfilled (so the second contract can open)
-	# without re-opening or paying L3.
-	gs.change_credibility(40 - gs.credibility)
-	if gs.credibility_band() != "Trusted" or gs.contract_state != "fulfilled":
-		return "A Trusted lab that owns the standard marks the contract fulfilled: '%s'" % gs.contract_state
 	gs.update_quests()
 	if gs.lab_xp != before or gs.farm_dict_problem(gs.farm_to_dict()) != "":
 		return "A closed quest stays closed, and saves."

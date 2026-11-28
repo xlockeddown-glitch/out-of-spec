@@ -712,22 +712,6 @@ static func with_taken(taken: Dictionary, zone: String, day: int, find_id_text: 
 	return out
 
 
-## The record with `remove_ids` removed from `zone` on `day`; records of past days
-## are dropped as it goes. A copy.
-static func without_taken(taken: Dictionary, zone: String, day: int, remove_ids: Array) -> Dictionary:
-	var out: Dictionary = prune(taken, day)
-	var ids: Array = taken_today(out, zone, day)
-	var kept: Array = []
-	for id: Variant in ids:
-		if not id in remove_ids:
-			kept.append(id)
-	if kept.is_empty():
-		out.erase(zone)
-	else:
-		out[zone] = { "day": day, "ids": kept }
-	return out
-
-
 ## The record with only today's entries: a past day is over, and a day that has not
 ## come is not believed. A copy.
 static func prune(taken: Dictionary, day: int) -> Dictionary:

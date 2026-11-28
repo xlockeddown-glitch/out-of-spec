@@ -558,7 +558,9 @@ var credibility: int = 0
 ## Highest band index reached so far, so a band is announced once.
 var _best_band: int = 0
 ## First OIRM contract: "" (not offered), "active" (counting the run),
-## "complete" (its standard is for sale) or "fulfilled" (bought).
+## "complete" (its standard is for sale), "fulfilled" (bought) or "waived" (the standard was
+## already owned when the contract would have been offered: no run, no L3 reward, but the
+## second contract can still open).
 var contract_state: String = ""
 var contract_run: int = 0
 
@@ -5718,8 +5720,8 @@ func _track_cold(player_id: String, was_place: String) -> void:
 
 ## Host: checks every player currently in the Olympus Mons caves for heat overload (100 %).
 ## Because take_find() pays rewards immediately (matching all other zones), an overload takes
-## back the credits and crystal ore from that trip's finds and removes those find ids from
-## finds_taken. Fires at most once per trip (_olympus_overloaded); guests do nothing.
+## back the credits and crystal ore from that trip's finds. The finds stay taken: they are lost
+## for the day, not put back to be taken again. Fires at most once per trip (_olympus_overloaded); guests do nothing.
 func check_olympus_heat() -> void:
 	if FarmCommands.guest:
 		return
@@ -5744,7 +5746,6 @@ func _overload_olympus_player(who: String, day: int) -> void:
 	if not raw_finds is Array or (raw_finds as Array).is_empty():
 		return
 	var lost_count: int = 0
-	var lost_today_ids: Array = []
 	var lost_ore: int = 0
 	var lost_credits: int = 0
 	for entry: Variant in (raw_finds as Array):
@@ -5752,15 +5753,10 @@ func _overload_olympus_player(who: String, day: int) -> void:
 			continue
 		var item: Dictionary = entry as Dictionary
 		lost_count += 1
-		if int(item.get("day", -1)) == day:
-			lost_today_ids.append(str(item.get("id", "")))
 		lost_ore += int(item.get("crystal_ore", 0))
 		lost_credits += int(item.get("credits", 0))
 	if lost_count == 0:
 		return
-	if not lost_today_ids.is_empty():
-		finds_taken = ZoneDepth.without_taken(finds_taken, OlympusDepth.ZONE, day, lost_today_ids)
-		finds_changed.emit()
 	if lost_ore > 0:
 		var take_ore: int = mini(lost_ore, crystal_ore)
 		if take_ore > 0:
@@ -8588,7 +8584,7 @@ func _offer_first_contract() -> void:
 	if sensor == null:
 		return
 	if owned_standards.has(standard):
-		contract_state = "fulfilled"
+		contract_state = "waived"
 		credibility_changed.emit(credibility)
 		post_phone("OIRM CONTRACT closed: the %s is already on the colony." % instrument_name(standard))
 		return

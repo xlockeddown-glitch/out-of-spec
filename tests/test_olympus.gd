@@ -273,6 +273,8 @@ func test_heat_overload_loses_trip_finds_and_rewards() -> String:
 			return "Second find was refused."
 		if ZoneDepth.taken_today(gs.finds_taken, ZONE, day).size() != 2:
 			problems.append("Expected 2 taken finds before overload.")
+		if gs.credits <= credits_before and gs.crystal_ore <= ore_before:
+			problems.append("The two finds paid nothing, so the takeback is not tested.")
 		# Guest calling check_olympus_heat() must do nothing.
 		var overload_hours: float = OlympusDepth.HEAT_MAX / OlympusDepth.HEAT_PER_HOUR + 0.5
 		GameClock.elapsed_days = start + overload_hours * HOUR
@@ -281,10 +283,13 @@ func test_heat_overload_loses_trip_finds_and_rewards() -> String:
 		FarmCommands.guest = false
 		if ZoneDepth.taken_today(gs.finds_taken, ZONE, day).size() != 2:
 			problems.append("Guest must not drop Olympus finds on heat overload.")
-		# Host overload drops the trip's finds, takes back their rewards, and posts one phone line.
+		# Host overload takes back the trip's rewards and posts one phone line; the finds stay
+		# taken (lost for the day), so they cannot be taken again.
 		gs.check_olympus_heat()
-		if not ZoneDepth.taken_today(gs.finds_taken, ZONE, day).is_empty():
-			problems.append("Trip finds were not removed on heat overload: %s" % [ZoneDepth.taken_today(gs.finds_taken, ZONE, day)])
+		if ZoneDepth.taken_today(gs.finds_taken, ZONE, day).size() != 2:
+			problems.append("Lost finds must stay taken: %s" % [ZoneDepth.taken_today(gs.finds_taken, ZONE, day)])
+		if gs.take_find(str(f0["id"]), day, HOST) == "":
+			problems.append("A find lost to heat was taken again.")
 		if gs.credits != credits_before or gs.crystal_ore != ore_before:
 			problems.append("Rewards were not taken back on heat overload: credits %d/%d, ore %d/%d." % [
 				gs.credits, credits_before, gs.crystal_ore, ore_before])
