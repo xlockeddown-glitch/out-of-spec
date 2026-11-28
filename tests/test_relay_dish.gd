@@ -275,9 +275,12 @@ func _check_lag_cut(gs: GameStateScript) -> String:
 		return "Swapping to another species must make link stutter: '%s'" % gs.gossamer_status_text()
 	if not is_equal_approx(gs.get_relay_lag_multiplier(), 0.30):
 		return "Swapped Cobalt Sentinel must stay 0.30 (no extra cut), got %s." % gs.get_relay_lag_multiplier()
-	# Re-seat whole Silk-Spinner (returned to stock on swap) -> link up again (0.32).
+	if gs.can_slot_spool():
+		return "Whole Silk-Spinner (0.32) must not replace Cobalt Sentinel (0.30) after completion."
+	# Damage the seated Sentinel so the whole Silk-Spinner in stock can replace it -> link up again (0.32).
+	gs.slotted_spool_damaged = true
 	if not gs.can_slot_spool() or not gs.slot_spool_into_relay(HOST):
-		return "Whole Silk-Spinner in stock must be re-seatable to restore Gossamer link."
+		return "Whole Silk-Spinner in stock must replace a damaged spool to restore Gossamer link."
 	if not gs.gossamer_link_up() or not is_equal_approx(gs.get_relay_lag_multiplier(), 0.32):
 		return "Re-seating whole Silk-Spinner must restore 0.32 lag multiplier, got %s." % gs.get_relay_lag_multiplier()
 	# Damage the seated spool -> link stutters, base damaged cut only (0.70).
@@ -286,6 +289,57 @@ func _check_lag_cut(gs: GameStateScript) -> String:
 		return "Damaged Silk-Spinner must make link stutter: '%s'" % gs.gossamer_status_text()
 	if not is_equal_approx(gs.get_relay_lag_multiplier(), 0.70):
 		return "Damaged Silk-Spinner must be 0.70 (no extra cut), got %s." % gs.get_relay_lag_multiplier()
+	return ""
+
+
+func test_swap_rule_is_stable_and_never_loops() -> String:
+	return _run(_check_swap_stability)
+
+
+func _check_swap_stability(gs: GameStateScript) -> String:
+	# 1. Quest not offered: Silk-Spinner in stock does not replace seated Curlyhair (old rule unchanged).
+	gs._add_spool(CURLYHAIR, false)
+	if not gs.slot_spool_into_relay(HOST):
+		return "Setup: Curlyhair must slot into empty relay."
+	gs._add_spool(SILK_SPINNER, false)
+	if gs.can_slot_spool():
+		return "Before quest is offered, Silk-Spinner must not replace seated Curlyhair."
+	# 2. Quest offered, seat_silk not done: Silk-Spinner can replace Curlyhair to do step a.
+	_at_level(gs, 48)
+	gs.update_quests()
+	if not gs.can_slot_spool() or not gs.slot_spool_into_relay(HOST):
+		return "With quest open and seat_silk pending, Silk-Spinner must replace Curlyhair."
+	var none: Array[String] = []
+	gs.update_quests(none, false)
+	if not ("seat_silk" in gs.quest_state[QUEST_ID]["steps_done"]):
+		return "Setup: seat_silk must be done after seating whole Silk-Spinner."
+	# Before quest is done, with Silk-Spinner (0.40) seated and Curlyhair (0.38) in stock:
+	# at most one swap is possible (to Curlyhair), and then can_slot_spool() is false.
+	var swaps_before: int = 0
+	while gs.can_slot_spool() and swaps_before < 4:
+		gs.slot_spool_into_relay(HOST)
+		swaps_before += 1
+	if swaps_before > 1 or gs.can_slot_spool():
+		return "Before quest done, expected at most 1 swap then stable, got %d swaps (can_slot=%s)." % [
+			swaps_before, gs.can_slot_spool()]
+	if gs.slotted_spool_species != CURLYHAIR:
+		return "Before quest done, single swap should seat Curlyhair (0.38 < 0.40), got %s." % gs.slotted_spool_species
+	# 3. Complete the quest: Silk-Spinner (0.32) now beats Curlyhair (0.38) in one swap, then stable.
+	gs.cal_log.append(_cal_row())
+	gs.update_quests(none, false)
+	if not QuestEngine.is_done(gs, QUEST_ID):
+		return "Setup: quest must complete (seat_silk stayed done)."
+	var swaps_after: int = 0
+	while gs.can_slot_spool() and swaps_after < 4:
+		gs.slot_spool_into_relay(HOST)
+		swaps_after += 1
+	if swaps_after != 1 or gs.can_slot_spool():
+		return "After quest done, Silk-Spinner (0.32) should replace Curlyhair (0.38) once then stop, got %d swaps." % swaps_after
+	if gs.slotted_spool_species != SILK_SPINNER or not gs.gossamer_link_up():
+		return "After quest done, Silk-Spinner must stay seated with link up."
+	# With Silk-Spinner seated and Curlyhair in stock after completion, no further swap is possible.
+	if gs.can_slot_spool():
+		return "After quest done, Curlyhair in stock must not replace seated Silk-Spinner."
 	return ""
 
 
