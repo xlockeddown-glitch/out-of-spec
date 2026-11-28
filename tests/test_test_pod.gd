@@ -194,8 +194,8 @@ func test_registration_protocol_and_guest_loopback_cannot_spoof_a_player() -> St
 		return "open_test_pod must not be allowed on a moon."
 	if FarmCommands.problem(&"open_test_pod", []) != "" or FarmCommands.problem(&"open_test_pod", ["player_1"]) == "":
 		return "open_test_pod takes no client arguments: a guest cannot name another player."
-	if CoopSession.PROTOCOL != 50:
-		return "PROTOCOL must be 50, got %d." % CoopSession.PROTOCOL
+	if CoopSession.PROTOCOL != 52:
+		return "PROTOCOL must be 52, got %d." % CoopSession.PROTOCOL
 	var held: float = GameClock.elapsed_days
 	GameClock.elapsed_days = 5.2
 	var host: Node = _host()

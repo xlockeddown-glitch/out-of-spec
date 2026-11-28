@@ -2,6 +2,20 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-28: Olympus Mons caves hub, depths and hazards (feat/olympus)
+
+Slice 31, the second far site. Every number, size, colour choice, and line of text below is a [PLACEHOLDER].
+
+   - **Hub and look.** `OlympusHub` (tunnels-scene frame, as `VallesHub`): one huge lava-tube hall (22 by 11 cells, 66 m wide), a see-through shaft of skylight with a warm lamp at its foot, four huge breakdown blocks (visual only), the way down and a notice board. Palette constants only (`OlympusLook`), primitives, no art files. The pad on the farm map is `OLYMPUS_PAD` (52, 0, 76) on the south edge, clear of every other pad; unverified in game. Entrance text: "A long climb up the shield volcano's flank to a collapsed skylight."
+   - **Depths by seed.** `MAX_DEPTH` 2, two huge halls and the trunk each, mostly empty, 2 finds per hall. Finds `mineral` (a vein sample: 1 crystal_ore and 10 credits) and `ore` (2 crystal_ore and 4 credits) through the existing `take_find` (host-checked, guest-gated, player id from the connection, once per find per day). Each mineral find is cut from one of 6 vein kinds. Each depth has its own skylight cell.
+   - **Heat.** The shared exposure clock (`cold_since`, grace, `_cold_kept`) is generalised as `ZoneExposure`, one lookup per zone for Ice cold, Valles thin air and Olympus heat; Valles and Ice behave as before. Heat: 10 % per game hour, warning at 70 %, spent at 100 % (no more finds, return to the farm), grace 0.75 h; grace never carries between Ice, Valles and Olympus. No new saved field for it.
+   - **Scale and getting lost.** One marker per player per depth per day, left with the `place_stone` key below (host command `place_marker`, saved and synced as `olympus_markers`, pruned to today). Only once a player has a marker on the depth does the field phone show "BACK TO SKYLIGHT: <heading>, <metres>". Nothing else shows the way.
+   - **Long drive.** The first trip costs 3 h on the host and reuses the late-drive refusal; fast travel and later trips are free.
+   - **Gate.** Soft only, the `zones.json` warning below lab level 55. No hard gate.
+   - **Quest.** "Three Veins" (lab, giver Bram, level 55): bring 3 distinct mineral vein kinds, 450 lab_xp. Counts farm-wide and only while open: `_note_valles_band` is generalised as `_note_distinct`, which Valles also uses.
+   - **Co-op and save.** New command `move_rover_olympus` and `place_marker` and a synced field, so PROTOCOL goes 50 to 52 (51 left to feat/cosmetics). An old save loads (no `olympus_markers` key).
+   - **Tests.** `tests/test_olympus.gd`. `tests/test_zone_presence.gd` no longer uses `olympus_caves` as its unbuilt zone. Protocol pins moved to 52.
+
 ## 2026-11-28: Valles Marineris hub, depths and hazards (feat/valles)
 
 Slice 30, the first far site. Every number, size, colour choice, and line of text below is a [PLACEHOLDER].

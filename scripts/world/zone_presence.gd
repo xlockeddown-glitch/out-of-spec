@@ -59,7 +59,7 @@ static func for_scene(path: String) -> Array:
 		return [DOME, 0]
 	for id: StringName in ZoneData.ids():
 		if path != "" and ZoneData.hub_scene(id) == path:
-			return [String(id), ZoneDepth.local_depth if String(id) in [ZoneDepth.ZONE, AquiferDepth.ZONE, MineDepth.ZONE, IceDepth.ZONE, VallesDepth.ZONE] else 0]
+			return [String(id), ZoneDepth.local_depth if String(id) in [ZoneDepth.ZONE, AquiferDepth.ZONE, MineDepth.ZONE, IceDepth.ZONE, VallesDepth.ZONE, OlympusDepth.ZONE] else 0]
 	return []
 
 
