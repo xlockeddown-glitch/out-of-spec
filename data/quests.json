@@ -416,6 +416,17 @@
       "rewards": { "lab_xp": 300, "xp_certificate": 50, "phone": "npcs/vance/quests/a_core_to_certify_done" }
     },
     {
+      "id": "test_pod", "kind": "story", "giver": "kestrel", "title": "The Test Pod", "scope": "farm", "zone": "ice_caves",
+      "gates": {},
+      "offer": { "when": "counter", "counter": "reached_ice_caves", "at_least": 1 },
+      "offer_line": "npcs/kestrel/quests/test_pod_offer",
+      "steps": [
+        { "id": "open", "text": "Open the heated test pod in the Ice Caves, or buy a standard from Kestrel.",
+          "check": "counter", "counter": "test_pod:*" }
+      ],
+      "rewards": { "quest_points": 1, "phone": "npcs/kestrel/quests/test_pod_done" }
+    },
+    {
       "id": "the_sump_sample", "kind": "lab", "giver": "vance", "title": "The Sump Sample", "scope": "farm", "zone": "flooded_aquifer", "camp": "flooded_aquifer",
       "gates": { "lab_level": 8 },
       "offer": { "when": "counter", "counter": "reached_flooded_aquifer", "at_least": 1 },
@@ -439,6 +450,36 @@
           "check": "counter", "counter": "camp_night_ice_caves" }
       ],
       "rewards": { "xp_certificate": 30, "phone": "npcs/orin/quests/a_night_on_the_ice_done" }
+    },
+    {
+      "id": "gossamer_link",
+      "kind": "lab",
+      "giver": "odalys",
+      "title": "The Gossamer Link",
+      "scope": "farm",
+      "gates": { "lab_gate": "relay_dish" },
+      "offer": { "when": "always" },
+      "offer_line": "npcs/odalys/quests/gossamer_link_offer",
+      "steps": [
+        { "id": "seat_silk", "text": "Seat a whole Orbital Silk-Spinner spool in the relay dish.",
+          "check": "relay_spool", "species": "orbital_silk_spinner" },
+        { "id": "calibrate_dish", "text": "Complete 1 traceable, on-time calibration of the relay dish azimuth.",
+          "check": "count", "log": "cal_log",
+          "where": { "instrument_id": "relay_dish_azimuth", "traceable": true, "on_time": true },
+          "at_least": 1 }
+      ],
+      "rewards": { "credits": 500, "lab_xp": 1000, "phone": "npcs/odalys/quests/gossamer_link_done" }
+    },
+    {
+      "id": "layer_by_layer", "kind": "lab", "giver": "vance", "title": "Layer by Layer", "scope": "farm", "zone": "valles_marineris",
+      "gates": { "lab_level": 50 },
+      "offer": { "when": "counter", "counter": "reached_valles_marineris", "at_least": 1 },
+      "offer_line": "npcs/vance/quests/layer_by_layer_offer",
+      "steps": [
+        { "id": "bands", "text": "Take layered cores from three different bands of the Valles Marineris walls.",
+          "check": "counter", "counter": "valles_new_band", "at_least": 3 }
+      ],
+      "rewards": { "lab_xp": 400, "phone": "npcs/vance/quests/layer_by_layer_done" }
     }
   ],
   "keepsakes": [

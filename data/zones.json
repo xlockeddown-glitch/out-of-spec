@@ -89,8 +89,8 @@
       "band": [50, 62],
       "hazards": ["wind", "long_drives", "thin_air"],
       "finds": ["sediment_samples", "minerals"],
-      "hub_scene": "",
-      "entrance": "Not designed yet (a long drive; section 11).",
+      "hub_scene": "res://scenes/valles_marineris.tscn",
+      "entrance": "A long drive east along the canyon road.",
       "tarantula_hook": "",
       "notes": "Sketched only; no story beat above level 60."
     },

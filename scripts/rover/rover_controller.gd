@@ -501,6 +501,7 @@ func _drive(delta: float) -> void:
 	var here := Vector2(global_position.x, global_position.z)
 	if Terrain.water_depth_m(here) > 0.0 or PitWater.is_wading(here) or AquiferDepth.wading_at(here):
 		top_speed *= minf(1.0, Terrain.WATER_SPEED * _factors[&"wade"])
+	top_speed *= VallesDepth.wind_factor_at(here)  # gusts on Valles open floor [PLACEHOLDER]
 	var target_speed: float = _applied_throttle * top_speed
 	var rate: float = acceleration_mps2 * _factors[&"accel"] if absf(target_speed) > absf(_speed_mps) else braking_mps2 * _factors[&"brake"]
 	_speed_mps = move_toward(_speed_mps, target_speed, rate * delta)

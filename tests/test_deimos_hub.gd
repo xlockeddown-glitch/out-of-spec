@@ -198,8 +198,8 @@ func test_the_hub_scene_builds_with_its_console_board_cache_and_pod_signs() -> S
 			problems.append("The hub is Deimos and says so.")
 		if Inspectable.inspect_text(hub.cache_click.prop_id) == "" or Inspectable.inspect_text(hub.cache_click.prop_id).contains("[later]"):
 			problems.append("%s has a live inspect line without [later]." % hub.cache_click.prop_id)
-		if not Inspectable.inspect_text(hub.pod_click.prop_id).contains("[later]"):
-			problems.append("%s has an inspect line marked [later]." % hub.pod_click.prop_id)
+		if Inspectable.inspect_text(hub.pod_click.prop_id) == "" or Inspectable.inspect_text(hub.pod_click.prop_id).contains("[later]") or not Inspectable.inspect_text(hub.pod_click.prop_id).contains("Ice Caves") and not Inspectable.inspect_text(hub.pod_click.prop_id).contains("polar ice"):
+			problems.append("%s must point at the working pod under the polar ice, with no [later]." % hub.pod_click.prop_id)
 		var board: String = hub._board_text()
 		if not board.contains(Shuttle.window_line(Shuttle.DEIMOS, GameClock.elapsed_days)):
 			problems.append("The board says where the shuttle window stands: %s" % board)

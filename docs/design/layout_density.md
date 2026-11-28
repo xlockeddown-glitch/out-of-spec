@@ -73,7 +73,7 @@ Today every depth is the same 24 by 22 grid with three rooms. Proposal: **each z
 | **Polar Ice Caves** | **1 to 2 Open** | **Wide caverns** with tall ceilings, few walls, long sight lines; slick open floors (slice 14) | A few ice columns, fallen ice blocks, frozen probes | Most of it; the white-out (slice 14) hides it in its place | A broad ice hall at the ramp foot, with layered walls (NEW, replaces the Lava grid) |
 | **Phobos** | 3 Broken | Built hub; low gravity (slice 17) | Service crates, cable, regolith piles | The landing apron | Odalys's desk (built) |
 | **Deimos** | 2 Scattered | Built hub, quieter and older | Abandoned kit, a few pods | Wide dusty floor | Kestrel's camp (built) |
-| **Valles Marineris** (later, slice 30) | 1 Open floor, 4 at the walls | A canyon: open floor, cluttered talus at the foot of each wall | Talus, fallen layers | The canyon floor | The canyon wall itself |
+| **Valles Marineris** (built, slice 30; layout and look are [PLACEHOLDER]) | 1 Open floor, 4 at the walls | A canyon: open floor, cluttered talus at the foot of each wall | Talus, fallen layers | The canyon floor | The canyon wall itself |
 | **Olympus Mons caves** (later, slice 31) | 2 Scattered, at scale | Lava tubes at a larger scale: huge, mostly empty | Huge breakdown blocks, few and far | Big skylit halls | A skylight shaft |
 
 **The Mine and the Ice Caves are the clearest pair.** Packed against open, and both reuse the Lava hub today, so they get their own hubs first (§8).

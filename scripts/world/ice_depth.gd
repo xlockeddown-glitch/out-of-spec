@@ -21,6 +21,11 @@ const MAX_DEPTH: int = 1
 const HATCH_CELL := Vector2i(8, 16)
 const CRATE_CELL := Vector2i(12, 18)
 const SIGN_CELL := Vector2i(8, 18)
+## The terraform test pod, in the west corner of the hub's big room, clear of the finds, the camp
+## and the notice board (feat/test-pod) [PLACEHOLDER].
+const POD_CELL := Vector2i(5, 12)
+## What inspecting the sealed pod shows [PLACEHOLDER].
+const POD_LINE: String = "A sealed terraform trial pod, still warm and wet inside. A panel says one opening a day."
 ## Cold gained per game hour, in percent [PLACEHOLDER]; a full day is 24 hours.
 const COLD_PER_HOUR: float = 10.0
 ## Past this much cold the instruments drift [PLACEHOLDER].
@@ -63,6 +68,14 @@ static func crate_position() -> Vector3:
 
 static func sign_position() -> Vector3:
 	return TunnelRock.at_in(TunnelRock.MAP, SIGN_CELL)
+
+
+static func pod_position() -> Vector3:
+	return TunnelRock.at_in(TunnelRock.MAP, POD_CELL)
+
+
+static func near_pod(at: Vector3) -> bool:
+	return _near(pod_position(), at)
 
 
 static func near_hatch(at: Vector3) -> bool:

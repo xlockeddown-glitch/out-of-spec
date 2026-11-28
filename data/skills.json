@@ -79,7 +79,7 @@
     { "id": "large_lab", "level": 45, "opens": "Large lab" },
     { "id": "accredited_jobs", "level": 45, "opens": "Accredited jobs", "needs": "Accredited credibility", "band": "Accredited" },
     { "id": "deimos_deep", "level": 45, "opens": "Deimos deep stores", "built": false },
-    { "id": "relay_dish", "level": 48, "opens": "The relay dish", "built": false, "beat": true },
+    { "id": "relay_dish", "level": 48, "opens": "The relay dish", "needs": "Orbital Silk-Spinner reticle silk", "built": true, "beat": true },
     { "id": "master_audit", "level": 52, "opens": "The master audit", "built": false, "beat": true },
     { "id": "intrinsic_silk_contract", "level": 56, "opens": "The intrinsic silk contract", "built": false, "beat": true },
     { "id": "larder", "level": 60, "opens": "The Larder", "built": false, "beat": true },

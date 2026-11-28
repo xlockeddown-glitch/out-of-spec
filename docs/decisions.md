@@ -2,6 +2,18 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-28: Valles Marineris hub, depths and hazards (feat/valles)
+
+Slice 30, the first far site. Every number, size, colour choice, and line of text below is a [PLACEHOLDER].
+
+   - **Hub and look.** `VallesHub` (tunnels-scene frame, as `IceCaves`): an open floor between two banded canyon walls, talus at the wall feet, the way down and a notice board. Palette constants only (`VallesLook`), primitives, no art files. The pad on the farm map is `VALLES_PAD` (76, 0, 16), unverified in game.
+   - **Depths by seed.** `MAX_DEPTH` 2. Finds `sediment_samples` (14 credits) and `minerals` (1 crystal_ore and 8 credits) through the existing `take_find`.
+   - **Hazards.** Wind: a gust 35 % of the time slows the open floor by 30 % (factor 0.7); the talus is sheltered. Thin air: the cold stamp (`cold_since`) is reused, so no new saved field; 8 %/h times 1.5, warning at 75 %, 1 h grace, then no finds. Long drives: the first drive costs 2 h on the host; fast travel and later drives are free.
+   - **Gate.** Soft only, a warning below level 50. No `valles_deep` lab-level row: the existing deep gates need real code, so it is skipped.
+   - **Quest.** "Layer by Layer" (lab, giver Vance, level 50): reach 3 distinct wall bands, 400 lab_xp. One-shot, since the engine has no repeat support.
+   - **Co-op and save.** New command `move_rover_valles`, so PROTOCOL goes 48 to 50 (49 skipped). Save and sync reuse existing fields; an old save loads.
+   - **Tests.** `tests/test_zone_presence.gd` used `valles_marineris` as its unbuilt zone; it now uses `olympus_caves`. 29 test files had their protocol pins moved to 50.
+
 ## 2026-11-28: Phobos deep, depth 1 under the service tunnel (feat/phobos-deep)
 
 Slice 23. Every number, size, colour choice, and line of text below is a [PLACEHOLDER].
@@ -2808,6 +2820,39 @@ Slice 28: the second OIRM contract at lab level 35 (`docs/design/quests_levels_s
 - **[PLACEHOLDER]:** the lab level 35 gate, the count of 8 calibrations, the 900 lab XP and 400 CR rewards, and the OIRM offer/done phone lines.
 - **Known limit [question for Ryan]:** a farm that bought the HB-700 before the first contract was offered never gets the first contract (`_offer_first_contract` skips an owned standard), so `contract_state` stays `""` and the second contract is never offered. Left as is for now (`tests/test_kestrel.gd` expects `""`); one fix would be to set `contract_state` to `"fulfilled"` in that case.
 - **Tests:** `tests/test_second_contract.gd`.
+
+## 2026-11-28: The relay dish and the Gossamer link (feat/relay-dish)
+
+Slice 29: the relay dish lab gate (level 48) and The Gossamer Link lab quest (`docs/design/quests_levels_story.md` §3.4, §5.7, step 9; `docs/story/story.md` §3 Act III, §7).
+
+- **Gate (`data/skills.json`):** flipped the `relay_dish` row in `lab_gates` (level 48 [PLACEHOLDER], `beat: true`) to `built: true` with `needs: "Orbital Silk-Spinner reticle silk"`.
+- **Lab quest (`data/quests.json`, `scripts/quests/quest_engine.gd`):** added `gossamer_link` (`kind: "lab"`, `giver: "odalys"`, `scope: "farm"`, `gates: { "lab_gate": "relay_dish" }`, `offer: { "when": "always" }`), offered in the morning once lab level 48 is reached.
+  - Step 1 (`seat_silk`): added the smallest new `QuestEngine` check, `relay_spool` (validating `species` in `data_problem`, reading `GameState.has_relay_spool(species_id)`), which holds only while `relay_slotted and not slotted_spool_damaged and slotted_spool_species == species_id` (`"orbital_silk_spinner"`). None of the existing checks (`flag`, `counter`, `stat_at_least`, `count`) inspect both the seated species and its undamaged state. Step 1 records the seat once (it stays done in `steps_done` even if the spool is later removed or damaged); the Gossamer link effect itself requires a whole Silk-Spinner spool to stay seated.
+  - Step 2 (`calibrate_dish`): `count` on `cal_log` with `where: { "instrument_id": "relay_dish_azimuth", "traceable": true, "on_time": true }`, `at_least: 1` [PLACEHOLDER], counting only calibrations after the quest was offered (and after step 1 opens step 2).
+  - Rewards [PLACEHOLDER]: 1000 lab XP and 500 CR to the shared wallet (no quest points); Odalys offer and done phone lines in `data/dialogue_dispatches.json` under `npcs/odalys/quests/gossamer_link_offer` and `gossamer_link_done` [PLACEHOLDER].
+- **Link effect and status (`scripts/autoload/GameState.gd`, `scripts/ui/field_phone_hud.gd`, `scripts/main_farm.gd`, `scripts/basalt_tunnels.gd`, `scripts/dome/dome_interior.gd`):** derived entirely from `quest_state` (`QuestEngine.is_done(self, "gossamer_link")`) plus the existing relay fields (`relay_slotted`, `slotted_spool_species`, `slotted_spool_damaged`) with no new saved or synced field.
+  - While `gossamer_link` is done AND a whole `orbital_silk_spinner` spool is seated (`gossamer_link_up()`), `get_relay_lag_multiplier()` stacks an extra 20 % cut [PLACEHOLDER] multiplicatively (`* 0.80`, clamped to `[0.0, 1.0]`). Before the quest is done, all existing relay lag multipliers are unchanged.
+  - If the spool is swapped out or damaged, the extra cut stops and `gossamer_status_text()` reports `"Gossamer link: stuttering"` (amber on the field phone via `gossamer_up: bool`); when a whole Silk-Spinner spool is seated again, the cut returns and status reads `"Gossamer link: up"` (teal).
+  - **Swap rule:** `_wants_gossamer_spool()` allows seating a whole `orbital_silk_spinner` spool from stock only while `gossamer_link` is open (offered, not done) and its `seat_silk` step is not done yet. Otherwise, `can_slot_spool()` and `_is_taken_before()` compare the resulting relay lag multiplier via `_lag_mult_for(species, damaged)` (which includes the Gossamer 20 % cut once `gossamer_link` is done) and allow a whole-for-whole swap only when the resulting multiplier is strictly lower. Before the quest is offered the old rule is unchanged; once done, Silk-Spinner (0.32) beats Curlyhair (0.38) and loses only to Cobalt Sentinel (0.30), so swaps are strictly monotonic and cannot loop.
+- **Left out:** the Loom / multi-rover remote control panel (`story.md` §3: "From the control panel you run rovers and benches you aren't standing at") is not built in this slice.
+- **Co-op, save & protocol:** host-run; guests and late joiners see progress, the lag cut, and the phone status through `quest_state` and the existing relay fields in the farm snapshot. Old saves past level 48 load cleanly and receive the offer next morning; nothing pays twice. No new command, no new saved field, no new synced field: **`CoopSession.PROTOCOL` stays 48**.
+- **[PLACEHOLDER]:** lab level 48 gate, calibration count of 1, 1000 lab XP and 500 CR rewards, 20 % extra multiplicative lag cut, Odalys offer/done lines, and `"Gossamer link: up"` / `"Gossamer link: stuttering"` status wording.
+- **Tests:** `tests/test_relay_dish.gd` (and `"relay_spool"` added to `known` in `tests/test_quests.gd`).
+
+## The terraform test pod and The Test Pod (2026-11-28, feat/test-pod)
+
+The last moon-tarantula hook: a sealed, heated test pod under the polar ice gives the Rime Carapace Spinner.
+
+- **Where:** the Ice Caves hub (not depth 1), cell (5, 12), the west corner of the big room, clear of the hatch, crate, sign, camp, the frozen probe and the drill rack [PLACEHOLDER]. Built from primitives and existing `IceLook` palette constants (steel skids, hull cylinder with two sphere ends, frost cap, port frame, glacier-cyan port, heater-glow strip, a small light and a "TEST POD" label); no collision, no art files [PLACEHOLDER dimensions and look].
+- **Inspect line:** "A sealed terraform trial pod, still warm and wet inside. A panel says one opening a day." [PLACEHOLDER]. Opening toast: "The pod unseals with a breath of warm air." [PLACEHOLDER].
+- **`open_test_pod`:** host-run, guest-gated, player id taken from the connection (`FarmCommands.PLAYER_ARGUMENTS`), in `FarmCommands.ACTIONS` and `BELOW_ONLY` (not `ON_A_MOON`), and refused unless that player is in the Ice Caves. It opens once a day for the whole farm [PLACEHOLDER]. If the farm does not hold the Spinner it is given through `catch_species` with the `enclosure_origins` entry "A heated terraform test pod under the polar ice" [PLACEHOLDER] and a phone post. If it is held, a one-time per-farm fallback of 30 CR [PLACEHOLDER] is paid, then the empty line "Empty but for a warm film of condensation." [PLACEHOLDER], as the Deimos cache does.
+- **State:** `test_pod` (`{ day, opened, fallback_paid }` or `{}`), in `SAVED_LATER`, pruned to today on save and load, validated like the cache, synced by `test_pod_changed` (`FarmSync.SHOWN_BY`). Old saves without the key load clean. `CoopSession.PROTOCOL` bumped 48 -> 49 once; every test pin updated.
+- **The Test Pod (story quest):** giver Kestrel, kind story, scope farm, zone `ice_caves`, 1 quest point [PLACEHOLDER], offered once the farm has reached the Ice Caves (`reached_ice_caves >= 1`). Quest and phone lines are [PLACEHOLDER], placed after `a_core_to_certify` in `data/quests.json` (so Vance's core quest stays first on the Ice Caves notice board) and under Kestrel's quests in `data/dialogue_dispatches.json`, away from the `feat/second-contract` spots.
+- **Non-zone way (decision 10):** buying a standard from Kestrel. `buy_from_kestrel` bumps a per-player counter `test_pod:kestrel`; the quest step reads the wildcard `test_pod:*`, which also sums `test_pod:open`. Chosen because it needs no engine change and does not count Bram's purchases (unlike `buy_standard`). Ryan decides later whether to keep it.
+- **Deimos hub sign:** `data/props.json` `deimos_test_pod` text now says it is an empty frame and that Kestrel says the working one is under the polar ice [PLACEHOLDER]. No Deimos code touched.
+- **Tests:** `tests/test_test_pod.gd`.
+- **Review follow-ups (feat/test-pod):** the Spinner joins `NO_DOME_TANK` (the dome has no tank for it yet, so it neither molts nor gives silk); `open_test_pod` also refuses below the hub ("The test pod is in the hub." [PLACEHOLDER]); the pod line says "Opened today." once used.
+- **Question for Ryan (the non-zone way can close for good):** Kestrel sells only two standards, an owned standard cannot be bought again, and the quest counts from acceptance. A farm that bought both from Kestrel before reaching the Ice Caves therefore has no non-zone way left to finish The Test Pod; it must open the pod. Keep it, or pick another non-zone way?
 
 ## 2026-11-28: Late-level cosmetics and titles (feat/cosmetics)
 

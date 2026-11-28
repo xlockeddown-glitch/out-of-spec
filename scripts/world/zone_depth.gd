@@ -404,6 +404,8 @@ static func _layout_of(zone: String, depth: int, world_seed: int, day: int) -> D
 		return MineDepth.layout_today(world_seed, depth, day)
 	if zone == IceDepth.ZONE:
 		return IceDepth.layout(world_seed, depth, day)
+	if zone == VallesDepth.ZONE:
+		return VallesDepth.layout(world_seed, depth, day)
 	return layout(world_seed, ZONE, depth, day)
 
 
@@ -415,6 +417,8 @@ static func max_depth_of(zone: String) -> int:
 		return MineDepth.MAX_DEPTH
 	if zone == IceDepth.ZONE:
 		return IceDepth.MAX_DEPTH
+	if zone == VallesDepth.ZONE:
+		return VallesDepth.MAX_DEPTH
 	return AquiferDepth.MAX_DEPTH if zone == AquiferDepth.ZONE else 0
 
 
@@ -424,6 +428,8 @@ static func grid_for(depth: int, world_seed: int, day: int, zone: String = ZONE)
 		var data: Dictionary = _layout_of(zone, depth, world_seed, day)
 		if not data.is_empty():
 			return data["grid"]
+	if zone == VallesDepth.ZONE:
+		return VallesDepth.hub_grid()
 	return AquiferDepth.hub_grid() if zone == AquiferDepth.ZONE else TunnelRock.MAP
 
 
@@ -634,6 +640,8 @@ static func _finds_lie_text(zone: String) -> String:
 		return "Finds lie in the Colony Mine, below the hub."
 	if zone == IceDepth.ZONE:
 		return "Finds lie in the Ice Caves, below the hub."
+	if zone == VallesDepth.ZONE:
+		return "Finds lie in Valles Marineris, further down the canyon."
 	return "Finds lie in the Lava Tubes, below the hub." if zone == ZONE else "Finds lie in the Flooded Aquifer, below the hub."
 
 
@@ -642,6 +650,8 @@ static func _rover_not_in_text(want: String) -> String:
 		return "The rover is not in the Colony Mine."
 	if want == IceDepth.ZONE:
 		return "The rover is not in the Ice Caves."
+	if want == VallesDepth.ZONE:
+		return "The rover is not in Valles Marineris."
 	return "The rover is not in the Lava Tubes." if want == ZONE else "The rover is not in the Flooded Aquifer."
 
 

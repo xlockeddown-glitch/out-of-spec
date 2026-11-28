@@ -112,6 +112,8 @@ static func grid() -> PackedStringArray:
 		return ZoneDepth.local_layout["grid"]
 	if ZoneDepth.local_zone == AquiferDepth.ZONE:
 		return AquiferDepth.hub_grid()
+	if ZoneDepth.local_zone == VallesDepth.ZONE:
+		return VallesDepth.hub_grid()
 	return MAP
 
 
