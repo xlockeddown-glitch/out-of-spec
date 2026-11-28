@@ -248,7 +248,9 @@
         "a_core_to_certify_offer": "[PLACEHOLDER] You have been down into the ice. The layered cores there are worth more than scrap if OIRM puts a stamp on them. Pull one, put it in the cold box, and send it up on the pod.",
         "a_core_to_certify_done": "[PLACEHOLDER] Core certified and logged. The stratigraphy is clean and the chain of custody holds. Here is the lab credit and a certificate for your own ledger.",
         "the_sump_sample_offer": "[PLACEHOLDER] The water under the Aquifer hub is a sample OIRM would like logged properly, and that takes a night. There is a camp by the pool now. Bring supplies, park the rover beside it, sleep there, and take one find from the depths while you are down. Mind your pack; wet rations spoil.",
-        "the_sump_sample_done": "[PLACEHOLDER] A night by the sump and a find from below. The log is in order. Here is the lab credit."
+        "the_sump_sample_done": "[PLACEHOLDER] A night by the sump and a find from below. The log is in order. Here is the lab credit.",
+        "layer_by_layer_offer": "[PLACEHOLDER] The Valles Marineris walls are a book of layers, and OIRM wants three pages of it. Take layered cores from three different bands of the wall and bring the count back. Mind the wind on the open floor and the thin air; the talus at the wall feet is out of the gusts.",
+        "layer_by_layer_done": "[PLACEHOLDER] Three bands, three cores, and the layers line up. Here is the lab credit."
       }
     },
     "oirm": {

@@ -444,8 +444,8 @@ func test_the_booking_is_saved_and_an_old_save_has_none() -> String:
 		junk["lab_sitter"] = bad
 		if gs.farm_dict_problem(junk) == "":
 			problems.append("A bad lab_sitter was accepted: %s" % [bad])
-	if CoopSession.PROTOCOL != 48:
-		problems.append("The protocol is %d, not 48." % CoopSession.PROTOCOL)
+	if CoopSession.PROTOCOL != 50:
+		problems.append("The protocol is %d, not 50." % CoopSession.PROTOCOL)
 	back.free()
 	old.free()
 	_done(gs)

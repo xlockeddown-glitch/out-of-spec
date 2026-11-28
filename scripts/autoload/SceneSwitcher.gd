@@ -11,6 +11,7 @@ const TUNNELS_SCENE: String = "res://scenes/basalt_tunnels.tscn"
 const AQUIFER_SCENE: String = "res://scenes/flooded_aquifer.tscn"
 const MINE_SCENE: String = "res://scenes/colony_mine.tscn"
 const ICE_SCENE: String = "res://scenes/ice_caves.tscn"
+const VALLES_SCENE: String = "res://scenes/valles_marineris.tscn"
 const PHOBOS_SCENE: String = "res://scenes/phobos_hub.tscn"
 const DEIMOS_SCENE: String = "res://scenes/deimos_hub.tscn"
 const FADE_SECONDS: float = 0.1  # each way; ~0.2 s total per the Week 2 board
@@ -64,7 +65,7 @@ func exit_path() -> String:
 ## True if `path` is the hub scene of a zone the farm's rover goes into (the Lava
 ## Tubes' tunnels, the Flooded Aquifer): one that shows a depth below it.
 static func is_zone_scene(path: String) -> bool:
-	return path == TUNNELS_SCENE or path == AQUIFER_SCENE or path == MINE_SCENE or path == ICE_SCENE
+	return path == TUNNELS_SCENE or path == AQUIFER_SCENE or path == MINE_SCENE or path == ICE_SCENE or path == VALLES_SCENE
 
 
 ## The hub scene of the zone the rover is in: the Aquifer's, else the tunnels'.
@@ -73,6 +74,8 @@ static func scene_for_zone(zone: String) -> String:
 		return MINE_SCENE
 	if zone == IceDepth.ZONE:
 		return ICE_SCENE
+	if zone == VallesDepth.ZONE:
+		return VALLES_SCENE
 	return AQUIFER_SCENE if zone == AquiferDepth.ZONE else TUNNELS_SCENE
 
 
@@ -82,6 +85,8 @@ static func _zone_of_scene(path: String) -> String:
 		return AquiferDepth.ZONE
 	if path == ICE_SCENE:
 		return IceDepth.ZONE
+	if path == VALLES_SCENE:
+		return VallesDepth.ZONE
 	return MineDepth.ZONE if path == MINE_SCENE else ZoneDepth.ZONE
 
 

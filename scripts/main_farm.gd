@@ -68,6 +68,7 @@ var _mine_gate_panels: Node3D
 var _mine_gate_label: Label3D
 ## The Polar Ice Caves' ramp at the north edge (built in _ready): open to all, the warning is soft.
 var _ice_pad: ParkingPad
+var _valles_pad: ParkingPad
 ## The farm notice board and the pad by it (NoticeBoard), built in _ready.
 var _notice_pad: ParkingPad
 
@@ -97,6 +98,7 @@ const TUNNELS_ZONE: StringName = &"lava_tubes"
 const AQUIFER_ZONE: StringName = &"flooded_aquifer"
 const MINE_ZONE: StringName = &"colony_mine"
 const ICE_ZONE: StringName = &"ice_caves"
+const VALLES_ZONE: StringName = &"valles_marineris"
 
 ## This player asked to move the rover; the host said yes.
 var _moving: bool = false
@@ -114,6 +116,7 @@ const VERB_TUNNEL: String = "Enter tunnels"
 const VERB_SINKHOLE: String = "Enter sinkhole"
 const VERB_MINE_GATE: String = "Enter mine"
 const VERB_ICE_RAMP: String = "Enter ice caves"
+const VERB_VALLES_ROAD: String = "Take the canyon road"
 const VERB_TRADE: String = "Trade with Bram"
 const VERB_TERMINAL: String = "Open terminal"
 const VERB_ROVER: String = "Get in rover"
@@ -135,6 +138,7 @@ func _ready() -> void:
 	_build_sinkhole()
 	_build_mine_gate()
 	_build_ice_ramp()
+	_build_valles_road()
 	_build_notice_board()
 	_setup_hint_and_prompt()
 	_rover.uplink_changed.connect(_on_uplink_changed)
@@ -211,6 +215,8 @@ func _ready() -> void:
 	GameState.mine_changed.connect(_refresh_mine_gate)
 	_ice_pad.rover_entered.connect(func() -> void: _hud.push_log("ICE RAMP: press " + Controls.prompt(&"interact") + " to go in."))
 	_ice_pad.rover_exited.connect(func() -> void: _tunnel_warned_day = -1)
+	_valles_pad.rover_entered.connect(func() -> void: _hud.push_log("CANYON ROAD: press " + Controls.prompt(&"interact") + " to drive to Valles Marineris."))
+	_valles_pad.rover_exited.connect(func() -> void: _tunnel_warned_day = -1)
 	_notice_pad.rover_entered.connect(func() -> void: _hud.push_log("FARM NOTICE BOARD: press " + Controls.prompt(&"interact") + " to read it."))
 	_hud.trade_pressed.connect(_try_trade)
 	_hud.wheel_service_pressed.connect(_try_wheel_service)
@@ -277,6 +283,7 @@ func _setup_hint_and_prompt() -> void:
 	_aquifer_pad.verb = VERB_SINKHOLE
 	_mine_pad.verb = VERB_MINE_GATE
 	_ice_pad.verb = VERB_ICE_RAMP
+	_valles_pad.verb = VERB_VALLES_ROAD
 	_bram_bay.verb = VERB_TRADE
 	_notice_pad.verb = VERB_NOTICE
 	_verb_prompt = VerbPrompt.new()
@@ -310,6 +317,8 @@ func verb_target() -> Dictionary:
 		pad = _mine_pad if _tunnel_open() and GameState.mine_gate_open else null
 	elif _ice_pad != null and _ice_pad.rover_inside:
 		pad = _ice_pad if _tunnel_open() else null
+	elif _valles_pad != null and _valles_pad.rover_inside:
+		pad = _valles_pad if _tunnel_open() else null
 	elif _bram_bay.rover_inside:
 		pad = _bram_bay if not GameState.has_wide_treads else null
 	if pad == null:
@@ -805,6 +814,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"interact") and _ice_pad.rover_inside:
 		get_viewport().set_input_as_handled()
 		_enter_zone(ICE_ZONE)
+	elif event.is_action_pressed(&"interact") and _valles_pad.rover_inside:
+		get_viewport().set_input_as_handled()
+		_enter_zone(VALLES_ZONE)
 	elif event.is_action_pressed(&"interact") and _bram_bay.rover_inside:
 		get_viewport().set_input_as_handled()
 		_try_trade()
@@ -1323,7 +1335,7 @@ func _enter_zone(zone: StringName) -> void:
 	# rescue hour, or someone else drives): the player then sees only that refusal.
 	var refused: bool = TunnelRecall.closed(GameClock.elapsed_days) or not CoopRovers.driver(GameState.rover_here()) in ["", GameState.local_player_id]
 	var warning: String = "" if refused else ZoneData.warning_text(zone, GameState.lab_level())
-	var label: String = "SINKHOLE" if zone == AQUIFER_ZONE else ("MINE GATE" if zone == MINE_ZONE else ("ICE RAMP" if zone == ICE_ZONE else "TUNNEL MOUTH"))
+	var label: String = "SINKHOLE" if zone == AQUIFER_ZONE else ("MINE GATE" if zone == MINE_ZONE else ("ICE RAMP" if zone == ICE_ZONE else ("CANYON ROAD" if zone == VALLES_ZONE else "TUNNEL MOUTH")))
 	# A sealed gate says so and nothing else happens (no warning, no command).
 	if zone == MINE_ZONE and not GameState.mine_gate_open:
 		_hud.push_log(label + ": " + MineDepth.GATE_SEALED_TEXT)
@@ -1333,8 +1345,10 @@ func _enter_zone(zone: StringName) -> void:
 		_hud.push_log("%s: %s Press %s again to go in, or drive off the pad to stay." % [label, warning, Controls.prompt(&"interact")])
 		return
 	_tunnel_warned_day = -1
+	if zone == VALLES_ZONE and not GameState.zones_unlocked.has(String(zone)):
+		_hud.push_log(label + ": " + VallesDepth.first_drive_text())  # the long drive, said once
 	_moving = true
-	var problem: String = await FarmCommands.request(&"move_rover_aquifer" if zone == AQUIFER_ZONE else (&"move_rover_mine" if zone == MINE_ZONE else (&"move_rover_ice" if zone == ICE_ZONE else &"move_rover")), [true])
+	var problem: String = await FarmCommands.request(&"move_rover_aquifer" if zone == AQUIFER_ZONE else (&"move_rover_mine" if zone == MINE_ZONE else (&"move_rover_ice" if zone == ICE_ZONE else (&"move_rover_valles" if zone == VALLES_ZONE else &"move_rover"))), [true])
 	if not is_inside_tree():
 		return
 	if problem != "":
@@ -1476,6 +1490,31 @@ func _build_ice_ramp() -> void:
 	shape.position = Vector3(0.0, 1.5, 0.0)
 	_ice_pad.add_child(shape)
 	world.add_child(_ice_pad)
+
+
+## Valles Marineris' canyon road at the map's east edge [PLACEHOLDER spot: GameState.VALLES_PAD]: two
+## banded posts of the canyon's rock and the pad the rover parks on. No key (soft gate).
+func _build_valles_road() -> void:
+	var world: Node3D = $WorldView/WorldViewport/World
+	var road := Node3D.new()
+	road.name = "CanyonRoad"
+	road.position = GameState.VALLES_PAD
+	for side: float in [-1.0, 1.0]:
+		VallesLook.add_banded_post(road, Vector3(side * 2.4, 0.0, 0.0), 3.0)
+	road.add_child(TunnelLook.label("VALLES MARINERIS", Vector3(0.0, 3.6, 0.0), VallesLook.BAND_PALE))
+	world.add_child(road)
+	_valles_pad = ParkingPad.new()
+	_valles_pad.name = "CanyonRoadPad"
+	_valles_pad.collision_layer = 0
+	_valles_pad.collision_mask = 2
+	_valles_pad.position = GameState.VALLES_PAD + GameState.ICE_TRIGGER_OFFSET
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = GameState.ICE_TRIGGER_SIZE
+	shape.shape = box
+	shape.position = Vector3(0.0, 1.5, 0.0)
+	_valles_pad.add_child(shape)
+	world.add_child(_valles_pad)
 
 
 ## Shows the gate shut or open from the farm's `mine_gate_open`.

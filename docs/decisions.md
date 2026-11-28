@@ -2,6 +2,18 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-28: Valles Marineris hub, depths and hazards (feat/valles)
+
+Slice 30, the first far site. Every number, size, colour choice, and line of text below is a [PLACEHOLDER].
+
+   - **Hub and look.** `VallesHub` (tunnels-scene frame, as `IceCaves`): an open floor between two banded canyon walls, talus at the wall feet, the way down and a notice board. Palette constants only (`VallesLook`), primitives, no art files. The pad on the farm map is `VALLES_PAD` (76, 0, 16), unverified in game.
+   - **Depths by seed.** `MAX_DEPTH` 2. Finds `sediment_samples` (14 credits) and `minerals` (1 crystal_ore and 8 credits) through the existing `take_find`.
+   - **Hazards.** Wind: a gust 35 % of the time slows the open floor by 30 % (factor 0.7); the talus is sheltered. Thin air: the cold stamp (`cold_since`) is reused, so no new saved field; 8 %/h times 1.5, warning at 75 %, 1 h grace, then no finds. Long drives: the first drive costs 2 h on the host; fast travel and later drives are free.
+   - **Gate.** Soft only, a warning below level 50. No `valles_deep` lab-level row: the existing deep gates need real code, so it is skipped.
+   - **Quest.** "Layer by Layer" (lab, giver Vance, level 50): reach 3 distinct wall bands, 400 lab_xp. One-shot, since the engine has no repeat support.
+   - **Co-op and save.** New command `move_rover_valles`, so PROTOCOL goes 48 to 50 (49 skipped). Save and sync reuse existing fields; an old save loads.
+   - **Tests.** `tests/test_zone_presence.gd` used `valles_marineris` as its unbuilt zone; it now uses `olympus_caves`. 29 test files had their protocol pins moved to 50.
+
 ## 2026-11-28: Phobos deep, depth 1 under the service tunnel (feat/phobos-deep)
 
 Slice 23. Every number, size, colour choice, and line of text below is a [PLACEHOLDER].
