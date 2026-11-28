@@ -440,8 +440,10 @@ func test_a_guest_at_the_terminal_books_deimos_and_pays_one_fare() -> String:
 	var commands: Node = CommandsScript.new()
 	commands.state = gs
 	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
+	CoopWalkers.stand(HOST, Vector3(0.0, 0.0, 30.0))  # the host is off at the farm, not in the party
 	var told: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.DEIMOS, 1])
 	var charged: int = 500 - gs.credits
+	CoopWalkers.out.erase(HOST)
 	commands.free()
 	_done(gs)
 	if told != "" or charged != Shuttle.fare():

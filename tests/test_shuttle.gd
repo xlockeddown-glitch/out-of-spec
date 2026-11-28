@@ -227,7 +227,9 @@ func test_book_shuttle_from_a_guest_books_and_pays_each_their_own_fare() -> Stri
 	if not guest is String or guest == "" or gs.credits != 500:
 		problems.append("A guest's unlicensed booking: '%s', %d CR" % [guest, gs.credits])
 	gs.shuttle_licensed = true
+	CoopWalkers.stand(HOST, Vector3(0.0, 0.0, 30.0))  # the host is off at the farm, not in the party
 	var licensed: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.DEIMOS, 1])
+	CoopWalkers.out.erase(HOST)
 	if licensed != "" or gs.credits != 500 - Shuttle.fare():
 		problems.append("A licensed guest books Deimos and pays the fare once: '%s', %d CR" % [licensed, gs.credits])
 	var host: Variant = commands.execute(HOST, &"book_shuttle", [Shuttle.DEIMOS, 1])
@@ -257,7 +259,9 @@ func test_book_shuttle_checks_where_and_how_many_before_the_fare() -> String:
 	var crowd: String = gs.book_shuttle(Shuttle.DEIMOS, gs.players_present().size() + 1)
 	if crowd != Shuttle.text("crowd_text") % SP811.integer(gs.players_present().size()) or gs.credits != 500:
 		problems.append("More people than are present is refused: '%s', %d CR" % [crowd, gs.credits])
+	CoopWalkers.stand(HOST, Vector3(0.0, 0.0, 30.0))  # the host is off at the farm, not in the party
 	var at_terminal: String = gs.book_shuttle(Shuttle.DEIMOS, 1, GUEST)
+	CoopWalkers.out.erase(HOST)
 	if at_terminal != "" or gs.credits != 500 - Shuttle.fare():
 		problems.append("A guest at the terminal books Deimos, one fare: '%s', %d CR" % [at_terminal, gs.credits])
 	gs.shuttle_trips.erase(GUEST)
@@ -310,8 +314,8 @@ func test_the_license_is_saved_and_an_old_save_loads_unlicensed() -> String:
 	junk["shuttle_licensed"] = 1
 	if gs.farm_dict_problem(junk) == "":
 		problems.append("A license that is no bool was accepted.")
-	if CoopSession.PROTOCOL != 40:
-		problems.append("The protocol is %d, not 40." % CoopSession.PROTOCOL)
+	if CoopSession.PROTOCOL != 41:
+		problems.append("The protocol is %d, not 41." % CoopSession.PROTOCOL)
 	back.free()
 	old.free()
 	_done(gs)
@@ -422,7 +426,7 @@ func test_the_shuttle_numbers_exist_and_are_sane() -> String:
 		problems.append("Ryan's numbers: a day trip is 40 CR, the license is lab 20 (%d, %d)." % [Shuttle.fare(), Shuttle.license_level()])
 	if Shuttle.party_most() < 1 or Shuttle.trip_hours() <= 0.0 or Shuttle.trip_hours() >= 24.0:
 		problems.append("The party and the trip's length are out of range.")
-	for key: String in ["not_yet_text", "exam_first_text", "granted_text", "booked_text", "moon_down_text", "short_text", "recall_text", "no_hub_text", "bad_party_text", "no_moon_text", "phobos_open_text", "phobos_next_text", "deimos_open_text", "deimos_next_text", "one_seat_text", "not_away_text", "home_text", "trip_over_text", "by_shuttle_text", "home_by_console_text", "deimos_hub_title", "deimos_hint_board", "deimos_board_notice", "deimos_board_window", "hub_hint_console", "hub_hint_board", "hub_hint_hatch", "hub_board_log", "hub_hatch_text", "hub_console_line", "hub_low_gravity", "hub_too_far", "hub_title"]:
+	for key: String in ["not_yet_text", "exam_first_text", "granted_text", "booked_text", "party_changed_text", "terminal_party", "terminal_party_alone", "terminal_total", "moon_down_text", "short_text", "recall_text", "no_hub_text", "bad_party_text", "no_moon_text", "phobos_open_text", "phobos_next_text", "deimos_open_text", "deimos_next_text", "not_away_text", "home_text", "trip_over_text", "by_shuttle_text", "home_by_console_text", "deimos_hub_title", "deimos_hint_board", "deimos_board_notice", "deimos_board_window", "hub_hint_console", "hub_hint_board", "hub_hint_hatch", "hub_board_log", "hub_hatch_text", "hub_console_line", "hub_low_gravity", "hub_too_far", "hub_title"]:
 		if Shuttle.text(key) == "":
 			problems.append("'%s' has no words." % key)
 	for moon: String in Shuttle.MOONS:

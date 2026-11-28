@@ -132,6 +132,7 @@ func test_a_guest_is_booked_and_sent_home_by_the_host_for_deimos() -> String:
 	var problems: Array[String] = []
 	gs.player_places[GUEST] = [ZonePresence.FARM, 0]
 	CoopWalkers.stand(GUEST, Vector3(Shuttle.TERMINAL_AT.x, 0.0, Shuttle.TERMINAL_AT.y))
+	CoopWalkers.stand(HOST, Vector3(0.0, 0.0, 30.0))  # the host is off at the farm, not in the party
 	var booked: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.DEIMOS, 1])
 	if booked != "" or gs.place_of(GUEST) != Shuttle.DEIMOS or gs.credits != 500 - Shuttle.fare():
 		problems.append("A guest's booking: '%s', %s, %d CR" % [booked, gs.place_of(GUEST), gs.credits])

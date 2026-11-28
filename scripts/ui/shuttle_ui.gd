@@ -2,32 +2,40 @@ class_name ShuttleUI
 extends Control
 ## The landing pad terminal's panel (biomes.md section 6 step 12): one launch
 ## window line for each moon, the fare, whether the farm holds the shuttle license
-## and a Book button for each moon. A press sends `book_shuttle` for one person and
-## shows the reason it came back with. A booking that goes through (Phobos or Deimos) takes
+## the party that would fly (everyone on the farm at the terminal, GameState.shuttle_party)
+## with the total fare, and a Book button for each moon. A press sends `book_shuttle` with
+## that party's size and shows the reason it came back with. A booking that goes through (Phobos or Deimos) takes
 ## this screen to the moon's hub at once. It looks like FastTravelUI. Esc closes it.
 
 const TEAL: Color = SkillsUI.TEAL
 const TEXT: Color = SkillsUI.TEXT
 const DIM: Color = SkillsUI.DIM
-## People on a booking made here [PLACEHOLDER].
-const PARTY: int = 1
+## How often the open panel looks at who is at the terminal, in seconds.
+const WATCH_S: float = 0.5
 
 var _lines: VBoxContainer
 var _status: Label
 var _close_button: Button
 var _focus_before: Control
 var _busy: bool = false
+var _watch: float = 0.0
 ## Where a booked screen goes; only tests set it (the real swap would change the scene).
 var change_scene: Callable = Callable()
 
 
 ## The panel's lines for a farm at `elapsed_days`: a window line for each moon, the
-## fare, then the license line. Tests and the panel both use this.
-static func lines(elapsed_days: float, licensed: bool) -> Array[String]:
+## fare, the party (`others`: the names of the other people who would fly) with the
+## total fare, then the license line. Tests and the panel both use this.
+static func lines(elapsed_days: float, licensed: bool, others: Array[String] = []) -> Array[String]:
 	var out: Array[String] = []
 	for moon: String in Shuttle.MOONS:
 		out.append(Shuttle.window_line(moon, elapsed_days))
 	out.append(Shuttle.text("terminal_fare") % SP811.integer(Shuttle.fare()))
+	if others.is_empty():
+		out.append(Shuttle.text("terminal_party_alone"))
+	else:
+		out.append(Shuttle.text("terminal_party") % [SP811.integer(others.size() + 1), " and ".join(others)])
+	out.append(Shuttle.text("terminal_total") % SP811.integer(Shuttle.fare() * (others.size() + 1)))
 	out.append(Shuttle.text("terminal_licensed") if licensed else Shuttle.text("terminal_unlicensed"))
 	return out
 
@@ -81,6 +89,16 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+## The names of the other people who would fly if this player booked now, as the game
+## shows them elsewhere (CoopUI.player_name).
+static func others_flying() -> Array[String]:
+	var out: Array[String] = []
+	for id: String in GameState.shuttle_party(GameState.local_player_id):
+		if id != GameState.local_player_id:
+			out.append(CoopUI.player_name(id))
+	return out
+
+
 func open() -> void:
 	if QuestsUI.other_panel_open(get_tree(), self):
 		return
@@ -101,6 +119,16 @@ func close() -> void:
 		_close_button.release_focus()
 
 
+## Who is at the terminal changes as people walk: look again while the panel is open.
+func _process(delta: float) -> void:
+	if not visible:
+		return
+	_watch += delta
+	if _watch >= WATCH_S:
+		_watch = 0.0
+		_refresh()
+
+
 ## A teammate's exam can give the license while the panel is open.
 func _on_license_changed() -> void:
 	if visible:
@@ -111,7 +139,7 @@ func _refresh() -> void:
 	for child: Node in _lines.get_children():
 		_lines.remove_child(child)
 		child.queue_free()
-	for line: String in lines(GameClock.elapsed_days, GameState.shuttle_licensed):
+	for line: String in lines(GameClock.elapsed_days, GameState.shuttle_licensed, others_flying()):
 		var label: Label = PlanBoardUI._label(line, TEXT, 20)
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_lines.add_child(label)
@@ -122,7 +150,7 @@ func _on_book(moon: String) -> void:
 	if _busy:
 		return
 	_busy = true
-	var problem: String = await FarmCommands.request(&"book_shuttle", [moon, PARTY])
+	var problem: String = await FarmCommands.request(&"book_shuttle", [moon, others_flying().size() + 1])
 	_busy = false
 	if not is_inside_tree():
 		return

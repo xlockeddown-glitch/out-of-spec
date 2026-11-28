@@ -97,13 +97,12 @@ func swap_blocked(path: String, scene_path: String) -> bool:
 	return path != TITLE_SCENE and trip_holds_dome(scene_path)
 
 
-## A guest's screen follows the host's word on its trip (the synced shuttle_trips), not
-## the answer to its booking, which can be lost: on a trip but still at the farm or the
-## dome, it goes to the moon's hub. The other way (a hub with no trip) is the hub's own
-## doing, which asks the host first. Returns the scene it set out for, or "".
+## A screen follows the word on its player's trip (a guest's synced shuttle_trips, the
+## host's own), not the answer to its booking, which can be lost, and not only its own
+## booking: someone else's can fly this player too (a party). On a trip but still at the
+## farm or the dome, it goes to the moon's hub. The other way (a hub with no trip) is the
+## hub's own doing, which asks the host first. Returns the scene it set out for, or "".
 func reconcile_trip() -> String:
-	if not FarmCommands.guest:
-		return ""
 	var current: Node = get_tree().current_scene
 	var to: String = Shuttle.hub_to_join(GameState.shuttle_trips.get(GameState.local_player_id), current.scene_file_path if current != null else "")
 	if to != "":

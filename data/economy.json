@@ -111,7 +111,7 @@
     "deimos": { "open_hours": 60, "shut_hours": 60, "offset_hours": 0 },
     "not_yet_text": "You are lab level %s. The shuttle license is Vance's exam, offered at lab level %s.",
     "granted_text": "The shuttle license is the farm's. Day trips cost %s CR a person.",
-    "booked_text": "Day trip to %s: left at %s, %s CR from the shared wallet. The shuttle brings you home by %s, or earlier from the return console.",
+    "booked_text": "Day trip to %s: left at %s, %s going, %s CR from the shared wallet. The shuttle brings each of you home by %s, or earlier from the return console.",
     "exam_first_text": "Vance's shuttle exam is open at the bench. Pass it for the license.",
     "moon_down_text": "%s",
     "short_text": "A day trip to %s costs %s CR (%s CR a person, %s going). The farm has %s CR.",
@@ -119,7 +119,7 @@
     "no_hub_text": "The shuttle does not fly to %s yet: it has no landing there.",
     "bad_party_text": "A day trip carries 1 to %s people.",
     "no_moon_text": "That is not a moon the shuttle flies to.",
-    "one_seat_text": "One seat a booking for now: parties come later.",
+    "party_changed_text": "The party changed. Look at the terminal again.",
     "not_away_text": "You are not on a day trip.",
     "home_text": "The return shuttle brought you home from %s. No charge.",
     "trip_over_text": "The day trip to %s is over. The shuttle brought you home. No charge.",
@@ -143,8 +143,11 @@
     "far_text": "Walk to the shuttle terminal at the landing pad.",
     "crowd_text": "Only %s here to go. Book for no more than that.",
     "terminal_title": "Shuttle terminal",
-    "terminal_hint": "Launch windows and day trips. One seat a booking.",
+    "terminal_hint": "Launch windows and day trips. Everyone standing here goes.",
     "terminal_fare": "Fare: %s CR a person.",
+    "terminal_party_alone": "Party: 1 (you)",
+    "terminal_party": "Party: %s (you and %s)",
+    "terminal_total": "Total fare: %s CR from the shared wallet.",
     "terminal_licensed": "The farm holds the shuttle license.",
     "terminal_unlicensed": "Pass Vance's exam at the bench to get a license.",
     "terminal_book": "Book %s",
@@ -153,7 +156,7 @@
     "phobos_next_text": "Phobos: next window %s, in %s.",
     "deimos_open_text": "Deimos: up, closes in %s.",
     "deimos_next_text": "Deimos: down, up again in %s (day %s, %s).",
-    "_note": "Zones doc section 8.2, build step 16, the rules half (Ryan, 2026-11-26: a day trip is about 40 CR a person; the shuttle license is lab level 20). Launch windows are a pure function of the game clock, nothing stored or sent. Hours are game hours counted from 06:00 of day 1. Phobos: a window opens every period_hours (11, so about two a day and drifting through the day) and stays open open_hours; offset_hours is when the first one opens. Deimos: open open_hours (60 h, 2.5 days), then shut shut_hours (60 h), from offset_hours. trip_hours is how long a day trip takes, there and back; one that would end after recall_hour (the 02:00 tunnel recall) is refused. party_most is the most people on one booking. The pad and its terminal are the next PR (biomes step 12); Phobos has its hub now (zones step 17, first half): a booking leaves at once for six hours, one seat for now, home free from the hub's console or when the trip ends; Deimos is refused with no_hub_text until its hub. Every number and every word here is [PLACEHOLDER]."
+    "_note": "Zones doc section 8.2, build step 16, the rules half (Ryan, 2026-11-26: a day trip is about 40 CR a person; the shuttle license is lab level 20). Launch windows are a pure function of the game clock, nothing stored or sent. Hours are game hours counted from 06:00 of day 1. Phobos: a window opens every period_hours (11, so about two a day and drifting through the day) and stays open open_hours; offset_hours is when the first one opens. Deimos: open open_hours (60 h, 2.5 days), then shut shut_hours (60 h), from offset_hours. trip_hours is how long a day trip takes, there and back; one that would end after recall_hour (the 02:00 tunnel recall) is refused. party_most is the most people on one booking. The pad and its terminal are the next PR (biomes step 12); Phobos has its hub now (zones step 17, first half): a booking leaves at once for six hours, a party of everyone at the pad's terminal (shuttle parties), home free from the hub's console or when the trip ends; Deimos is refused with no_hub_text until its hub. Every number and every word here is [PLACEHOLDER]."
   },
   "_note": "Starting balance [PLACEHOLDER]. Crops sold to Lin add credits; audit fines, OIRM fees and purchases take them away."
 }

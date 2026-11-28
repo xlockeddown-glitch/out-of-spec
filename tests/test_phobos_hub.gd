@@ -118,13 +118,13 @@ func test_every_refusal_charges_nothing_and_leaves_no_trip() -> String:
 	var two: String = crowd.book_shuttle(Shuttle.PHOBOS, 2)
 	if two == "" or crowd.credits != 500 or not crowd.shuttle_trips.is_empty():
 		problems.append("Two people: '%s', %d CR" % [two, crowd.credits])
-	# Two present: a party of two gets the one-seat reason, not the crowd one.
+	# Two present and both at the pad: a count of one is the wrong party, not the crowd one.
 	var held: Array[String] = CoopSession.players.duplicate()
 	CoopSession.players.assign([HOST, GUEST])
-	var party: String = crowd.book_shuttle(Shuttle.PHOBOS, 2)
+	var party: String = crowd.book_shuttle(Shuttle.PHOBOS, 1)
 	CoopSession.players.assign(held)
-	if party != Shuttle.text("one_seat_text") or crowd.credits != 500 or not crowd.shuttle_trips.is_empty():
-		problems.append("A party of two with both here: '%s', %d CR" % [party, crowd.credits])
+	if party != Shuttle.text("party_changed_text") or crowd.credits != 500 or not crowd.shuttle_trips.is_empty():
+		problems.append("A count of one with both here: '%s', %d CR" % [party, crowd.credits])
 	for gs: GameStateScript in cases.values():
 		_done(gs)
 	_done(crowd)
@@ -201,6 +201,7 @@ func test_a_guest_is_booked_and_brought_home_by_the_host_and_stands_at_the_pad()
 	var problems: Array[String] = []
 	gs.player_places[GUEST] = [ZonePresence.FARM, 0]
 	CoopWalkers.stand(GUEST, Vector3(Shuttle.TERMINAL_AT.x, 0.0, Shuttle.TERMINAL_AT.y))
+	CoopWalkers.stand(HOST, Vector3(0.0, 0.0, 30.0))  # the host is off at the farm, not in the party
 	var booked: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.PHOBOS, 1])
 	if booked != "" or gs.place_of(GUEST) != Shuttle.PHOBOS or not gs.shuttle_trips.has(GUEST) or gs.credits != 500 - Shuttle.fare():
 		problems.append("A guest's booking: '%s', %s, %d CR" % [booked, gs.place_of(GUEST), gs.credits])
@@ -390,8 +391,8 @@ func test_shuttle_home_is_a_host_command_allowed_on_foot_in_phobos_only() -> Str
 	var till: Variant = commands.execute(HOST, &"till", [Vector3i(1, 0, 1)])
 	if till != false:
 		problems.append("A traveller on Phobos cannot till the farm.")
-	if CoopSession.PROTOCOL != 40:
-		problems.append("The protocol is %d, not 40." % CoopSession.PROTOCOL)
+	if CoopSession.PROTOCOL != 41:
+		problems.append("The protocol is %d, not 41." % CoopSession.PROTOCOL)
 	if not FarmSync.SHOWN_BY.has(&"shuttle_trips_changed"):
 		problems.append("The trips are shown to a guest.")
 	commands.free()
@@ -599,7 +600,7 @@ func test_a_guest_still_on_the_farm_with_a_trip_goes_to_the_moons_hub() -> Strin
 	if not GameState.shuttle_trips_changed.is_connected(SceneSwitcher.reconcile_trip) or SceneSwitcher.scene_swapped.get_connections().is_empty():
 		problems.append("The reconciler runs on a trip change and on a scene swap.")
 	if SceneSwitcher.reconcile_trip() != "":
-		problems.append("Only a guest's screen is reconciled; the host's own trip is its own.")
+		problems.append("With no scene running, nothing is reconciled.")
 	return "\n".join(problems)
 
 
@@ -632,7 +633,7 @@ func test_a_booking_that_goes_through_opens_the_moons_hub_and_a_refusal_or_a_gon
 	_guest_off()
 	if ZoneData.hub_scene(&"phobos") != SceneSwitcher.PHOBOS_SCENE:
 		problems.append("The booking uses the moon's hub scene from the zone data.")
-	if asked.size() != 3 or asked[0] != [&"book_shuttle", [Shuttle.PHOBOS, ShuttleUI.PARTY]]:
+	if asked.size() != 3 or asked[0] != [&"book_shuttle", [Shuttle.PHOBOS, 1]]:
 		problems.append("The panel asks the host to book: %s" % [asked])
 	return "\n".join(problems)
 
