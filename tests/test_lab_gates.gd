@@ -396,7 +396,7 @@ func test_an_old_save_keeps_the_next_lab_and_the_first_trip() -> String:
 func test_every_gate_id_the_game_uses_is_a_row() -> String:
 	var gs: GameStateScript = _state()
 	var have: Array[String] = gs.all_lab_gate_ids()
-	var used: Array[String] = ["oirm_account", "job_board", "accredited_jobs", "robot_1"]
+	var used: Array[String] = ["oirm_account", "job_board", "accredited_jobs", "robot_1", "certificate_wall"]
 	for id: String in gs.all_standard_ids():
 		var tier: int = (gs.sensors[id] as DriftingSensor).tier
 		if tier >= 1:

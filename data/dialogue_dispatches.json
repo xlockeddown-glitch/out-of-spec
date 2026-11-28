@@ -242,7 +242,9 @@
         "shuttle_exam_offer": "[PLACEHOLDER] The shuttle takes people whose paperwork holds up. One clean calibration at the bench, traceable and on time, by your own hand, and the farm gets its license.",
         "shuttle_exam_done": "[PLACEHOLDER] Traceable and on time. The license is the farm's; mind the recall hour on the way back.",
         "on_the_dot_offer": "[PLACEHOLDER] Anyone can calibrate. I want to see five instruments calibrated on the day they are due, by your own hand, and none of them a day late.",
-        "on_the_dot_done": "[PLACEHOLDER] Five on the day. Here is something to keep time by. Do not be late for the next one."
+        "on_the_dot_done": "[PLACEHOLDER] Five on the day. Here is something to keep time by. Do not be late for the next one.",
+        "deimos_survey_offer": "[PLACEHOLDER] OIRM wants a survey of Deimos, and a survey takes nights. Your permit is in order. Book an expedition at the pad, sleep two nights at the outpost camp, and come home when the shuttle brings you. Leave early and it does not count.",
+        "deimos_survey_done": "[PLACEHOLDER] Two nights logged and you came home on the shuttle's own schedule. The survey is filed. The permit stands."
       }
     },
     "oirm": {

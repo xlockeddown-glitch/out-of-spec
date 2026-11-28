@@ -358,6 +358,21 @@
           "check": "counter", "counter": "catch_stray", "ever": true }
       ],
       "rewards": { "xp_husbandry": 100, "phone": "npcs/odalys/quests/strays_done" }
+    },
+    {
+      "id": "deimos_survey", "kind": "personal", "giver": "vance", "title": "Deimos Survey", "scope": "player", "camp": "deimos",
+      "gates": { "lab_gate": "expedition_permit" },
+      "offer": { "when": "always" },
+      "offer_line": "npcs/vance/quests/deimos_survey_offer",
+      "steps": [
+        { "id": "book", "text": "Book an expedition to Deimos at the pad terminal.",
+          "check": "counter", "counter": "expedition_booked" },
+        { "id": "nights", "text": "Spend 2 nights at the Deimos camp: turn in there each night.",
+          "check": "counter", "counter": "expedition_night", "at_least": 2 },
+        { "id": "home", "text": "Come home when the expedition ends. Leaving early does not count.",
+          "check": "counter", "counter": "expedition_done" }
+      ],
+      "rewards": { "xp_certificate": 40, "phone": "npcs/vance/quests/deimos_survey_done" }
     }
   ],
   "keepsakes": [

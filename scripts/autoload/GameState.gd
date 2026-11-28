@@ -166,6 +166,11 @@ const STATION_LINE: String = "Station stock, caught in a Phobos service tunnel"
 ## prefix of a count of arriving on a moon ("reached_phobos"): both with no XP.
 const STRAY_COUNT: String = "catch_stray"
 const REACHED_PREFIX: String = "reached_"
+## The expedition's counters (action_counts) and quest id (zones step 18): a booking, and
+## a trip that ran to its planned end (never one cut short at the console).
+const EXPEDITION_BOOKED: String = "expedition_booked"
+const EXPEDITION_DONE: String = "expedition_done"
+const EXPEDITION_QUEST: String = "deimos_survey"
 ## What shoring a rockfall and opening a colonist's case in the Colony Mine count under
 ## in action_counts (Old Props and The Colonist's Set read them, with no XP).
 const SHORE_COUNT: String = MineDepth.SHORE_COUNT
@@ -809,7 +814,7 @@ const NOT_SAVED: Array[String] = [
 	"_pad_problems",
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
-	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers", "_cold_kept",
+	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_expedition_warned_day", "_expedition_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers", "_cold_kept",
 	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip",
 ]
 
@@ -1216,6 +1221,8 @@ func farm_from_dict(data: Dictionary) -> String:
 	_recall_rescued_day = 0
 	_guest_warned_day.clear()
 	_guest_rescued_day.clear()
+	_expedition_warned_day.clear()
+	_expedition_rescued_day.clear()
 	_console_arrivals.clear()
 	_trip_players.clear()
 	_campers.clear()
@@ -1696,6 +1703,10 @@ const NO_TIME_TONIGHT: String = "This would run past 06:00, and the day waits un
 ## With friends in: "" or why not. See CoopBeds.
 func go_to_bed(player_id: String = "") -> String:
 	var id: String = _player(player_id)
+	# On a moon: only an expedition's camp is a bed (zones step 18).
+	var on_moon: String = _moon_place_of(id)
+	if on_moon != "":
+		return _go_to_moon_camp_bed(id, on_moon)
 	# Somewhere in a zone: only an open camp's hub is a bed (zones doc 6.2 and 12.4).
 	var camp_zone: String = _zone_place_of(id)
 	if camp_zone != "":
@@ -1714,6 +1725,14 @@ func go_to_bed(player_id: String = "") -> String:
 func get_up(player_id: String = "") -> String:
 	_beds().get_up(_player(player_id))
 	return ""
+
+
+## The moon the player is on, or "".
+func _moon_place_of(player_id: String) -> String:
+	if not player_places.has(player_id):
+		return ""
+	var place: String = place_of(player_id)
+	return place if Shuttle.is_moon(place) else ""
 
 
 ## The zone the player is in (not the farm, the dome or a moon), or "".
@@ -1764,6 +1783,14 @@ func _go_to_camp_bed(player_id: String, zone: String) -> String:
 	var why: String = camp_problem(player_id, zone, paid)
 	if why != "":
 		return why
+	return _camp_night(player_id, Camp.NIGHT_COUNT, paid)
+
+
+## Host: one night at a camp for `player_id`: uses a night's supplies (not again if they
+## paid for tonight already), counts it under `count_key` for the quests, and puts them to
+## bed. A refusal from the beds takes the night back. `forced` is the 02:00 recall's
+## auto-bed: the caller puts them to bed, so no bed is asked for here.
+func _camp_night(player_id: String, count_key: String, paid: bool, forced: bool = false) -> String:
 	if player_id in _beds().in_bed:
 		return "You are in bed already."
 	var counted: bool = player_id != MANAGER_ID and not paid
@@ -1771,19 +1798,46 @@ func _go_to_camp_bed(player_id: String, zone: String) -> String:
 		camp_supplies -= 1
 		_campers[player_id] = true
 	if counted:
-		var done: Dictionary = (action_counts.get_or_add(player_id, {}) as Dictionary).get_or_add(Camp.NIGHT_COUNT, { "count": 0, "xp": 0 })
+		var done: Dictionary = (action_counts.get_or_add(player_id, {}) as Dictionary).get_or_add(count_key, { "count": 0, "xp": 0 })
 		done["count"] = int(done["count"]) + 1
 	camps_changed.emit()
+	if forced:
+		return ""
 	var refused: String = _beds().go_to_bed(player_id)
 	if refused != "":
 		if not paid:
 			camp_supplies += 1  # the night did not happen
 			_campers.erase(player_id)
 		if counted:
-			var undone: Dictionary = (action_counts[player_id] as Dictionary)[Camp.NIGHT_COUNT]
+			var undone: Dictionary = (action_counts[player_id] as Dictionary)[count_key]
 			undone["count"] = int(undone["count"]) - 1
 		camps_changed.emit()
 	return refused
+
+
+## Host: the traveller on `moon` goes to bed at its camp: the same night as the Lava
+## Tubes camp (one shared supply, counted for the quests as EXPEDITION_NIGHT_COUNT, no
+## fee), but only on an expedition and at an open camp. The host cannot know where a
+## moon walker stands, so the reach to the camp is checked by the hub on the walker's own
+## screen, as the console's is (DeimosHub).
+func _go_to_moon_camp_bed(player_id: String, moon: String) -> String:
+	if FarmCommands.guest:
+		return "Only the host's farm can end the day."
+	if GameClock.paused:
+		return "The clock is paused."
+	var paid: bool = _campers.has(player_id)
+	if paid and player_id in _beds().in_bed:
+		return ""
+	var why: String = Camp.moon_sleep_problem(moon, camps_open.has(moon), Shuttle.is_expedition(shuttle_trips.get(player_id, {})), maxi(camp_supplies, 1 if paid else 0))
+	if why != "":
+		return why
+	if player_id in _beds().in_bed:
+		return "You are in bed already."
+	if not paid and player_id != MANAGER_ID:
+		# The job's next step is open before the night is counted (a count is kept from
+		# the step opening).
+		update_quests([], false)
+	return _camp_night(player_id, Camp.EXPEDITION_NIGHT_COUNT, paid)
 
 
 ## `scene_path` is the hub, at its first depth, of a zone whose camp the farm has opened:
@@ -1903,6 +1957,7 @@ func _on_time_advanced(delta_days: float) -> void:
 		drop_pod_changed.emit(false)
 		post_phone("AUD-1T: Departing. Please remain compliant in our absence.")
 	_end_due_trips()
+	_tick_expeditions()
 	_tick_recall()
 
 
@@ -3863,6 +3918,28 @@ func _at_terminal_for_party(player_id: String) -> bool:
 ## latest, so the wait is bounded. Returns "" when booked, else why not.
 func book_shuttle(moon: String, party_ids: Array, player_id: String = "") -> String:
 	var id: String = _player(player_id)
+	var problem: String = _booking_problem(id, party_ids)
+	if problem != "":
+		return problem
+	var party: Array[String] = shuttle_party(id)
+	var hub_ready: bool = Shuttle.is_moon(moon) and ZoneData.is_playable(StringName(moon))
+	var reason: String = Shuttle.trip_problem(moon, lab_level(), shuttle_licensed, credits, party.size(), GameClock.elapsed_days, hub_ready)
+	if reason != "":
+		return reason
+	var total: int = Shuttle.fare() * party.size()
+	add_credits(-total)
+	var ends_at: float = Shuttle.trip_end(GameClock.elapsed_days)
+	_fly_party(party, moon, ends_at, false)
+	post_phone(Shuttle.text("booked_text") % [Shuttle.moon_name(moon), Shuttle.clock_text(GameClock.elapsed_days),
+		SP811.integer(party.size()), SP811.integer(total), Shuttle.clock_text(ends_at)])
+	return ""
+
+
+## Host: "" or why the sender `id` and the `party_ids` they named can't book at the terminal
+## (the checks the day trip and the expedition share, in their order): the sender at the
+## terminal, a list of ids, a party of the right size, everyone here, and the list is the
+## party shuttle_party works out.
+func _booking_problem(id: String, party_ids: Array) -> String:
 	var at: Variant = standing_at(id)
 	if place_of(id) != ZonePresence.FARM or not Shuttle.terminal_near(at, Shuttle.HOST_SLACK_M):
 		return Shuttle.text("far_text")
@@ -3874,35 +3951,94 @@ func book_shuttle(moon: String, party_ids: Array, player_id: String = "") -> Str
 	if party_ids.size() > players_present().size():
 		return Shuttle.text("crowd_text") % SP811.integer(players_present().size())
 	var party: Array[String] = shuttle_party(id)
-	var people: int = party.size()
-	if party_ids.size() != people or party_ids[0] != id:
+	if party_ids.size() != party.size() or party_ids[0] != id:
 		return Shuttle.text("party_changed_text")
 	for flyer: String in party:
 		if not flyer in party_ids:
 			return Shuttle.text("party_changed_text")
-	var hub_ready: bool = Shuttle.is_moon(moon) and ZoneData.is_playable(StringName(moon))
-	var reason: String = Shuttle.trip_problem(moon, lab_level(), shuttle_licensed, credits, people, GameClock.elapsed_days, hub_ready)
-	if reason != "":
-		return reason
-	var total: int = Shuttle.fare() * party.size()
-	add_credits(-total)
-	var ends_at: float = Shuttle.trip_end(GameClock.elapsed_days)
+	return ""
+
+
+## Host: writes a trip for each of `party` (one end time, `expedition` set for an
+## expedition), counts the reach (the Manager has none), makes the moon their place and
+## takes them off the farm's ground: out of the rover (it stays parked where it is), not
+## among the walkers, out of bed.
+func _fly_party(party: Array[String], moon: String, ends_at: float, expedition: bool) -> void:
 	var rovers: Node = rovers_node if rovers_node != null else CoopRovers
 	for flyer: String in party:
-		shuttle_trips[flyer] = { "moon": moon, "ends_at": ends_at }
+		var trip: Dictionary = { "moon": moon, "ends_at": ends_at }
+		if expedition:
+			trip["expedition"] = true
+		shuttle_trips[flyer] = trip
 		if flyer != MANAGER_ID:
-			var reached: Dictionary = (action_counts.get_or_add(flyer, {}) as Dictionary).get_or_add(REACHED_PREFIX + moon, { "count": 0, "xp": 0 })
+			var counts: Dictionary = action_counts.get_or_add(flyer, {}) as Dictionary
+			var reached: Dictionary = counts.get_or_add(REACHED_PREFIX + moon, { "count": 0, "xp": 0 })
 			reached["count"] = int(reached["count"]) + 1
+			if expedition:
+				var booked: Dictionary = counts.get_or_add(EXPEDITION_BOOKED, { "count": 0, "xp": 0 })
+				booked["count"] = int(booked["count"]) + 1
 		_set_place(flyer, moon, 0)
 		_trip_players.erase(flyer)
-		# Off the farm's ground: out of the rover (it stays parked where it is) and not
-		# among the walkers there.
 		CoopWalkers.out.erase(flyer)
 		rovers.release(flyer)
 		_beds().get_up(flyer)
+		_campers.erase(flyer)
 	shuttle_trips_changed.emit()
-	post_phone(Shuttle.text("booked_text") % [Shuttle.moon_name(moon), Shuttle.clock_text(GameClock.elapsed_days),
-		SP811.integer(party.size()), SP811.integer(total), Shuttle.clock_text(ends_at)])
+
+
+## Whether `player_id` has taken the expedition quest (it is in their own list, done or not:
+## a repeat trip stays open once the job is done) [PLACEHOLDER].
+func expedition_quest_taken(player_id: String) -> bool:
+	var own: Variant = player_quest_state.get(player_id, {})
+	return own is Dictionary and (own as Dictionary).has(EXPEDITION_QUEST)
+
+
+## What an expedition would cost the party at the terminal now ({ fare, needed, buy,
+## supplies, total }, Shuttle.expedition_cost): the host books with it, and the terminal's
+## panel shows it (a guest's copy has the synced camp supplies).
+func expedition_cost(people: int) -> Dictionary:
+	return Shuttle.expedition_cost(people, camp_supplies)
+
+
+## Books an expedition to `moon` (Deimos) for the party at the pad's terminal. Runs on
+## the host's clock. It has the day trip's party rules (_booking_problem), then
+## Shuttle.expedition_problem's reasons in their order (no permit, quest not taken, the
+## window shutting before the return, the wallet short). `shown_total` is the total the
+## terminal showed: if the host works out another (the party, the supplies held or
+## the price moved) nothing is booked, so the price is never a surprise. Booked means
+## the fare for each person plus the supplies short of a night each (bought now, and
+## added to the shared camp supplies) paid once from the shared wallet, and a trip for
+## each passenger that ends at 06:00 after the last night (Shuttle.expedition_end), not
+## at the day's end. A refusal charges nothing. Returns "" when booked, else why not.
+func book_expedition(moon: String, party_ids: Array, shown_total: int, player_id: String = "") -> String:
+	var id: String = _player(player_id)
+	var problem: String = _booking_problem(id, party_ids)
+	if problem != "":
+		return problem
+	var party: Array[String] = shuttle_party(id)
+	var hub_ready: bool = Shuttle.is_moon(moon) and ZoneData.is_playable(StringName(moon))
+	var permit: String = "expedition_permit"
+	# The camp is open whenever the quest is held, a brought, finished one too (the update
+	# that opens it has not necessarily run since it was taken): never a booking to a shut camp.
+	if expedition_quest_taken(id):
+		open_camp(moon)
+	var reason: String = Shuttle.expedition_problem(moon, lab_level(), shuttle_licensed, credits, party.size(), GameClock.elapsed_days,
+		hub_ready, lab_gate_level(permit), lab_gate_open(permit), expedition_quest_taken(id), camp_supplies)
+	if reason != "":
+		return reason
+	var cost: Dictionary = expedition_cost(party.size())
+	if shown_total != int(cost["total"]):
+		return Shuttle.text("expedition_changed_text") % SP811.integer(int(cost["total"]))
+	add_credits(-int(cost["total"]))
+	camp_supplies += int(cost["buy"])
+	var ends_at: float = Shuttle.expedition_end(GameClock.elapsed_days)
+	_fly_party(party, moon, ends_at, true)
+	camps_changed.emit()
+	post_phone(Shuttle.text("expedition_booked_text") % [Shuttle.moon_name(moon), Shuttle.clock_text(GameClock.elapsed_days),
+		SP811.integer(party.size()), SP811.integer(Shuttle.expedition_nights()), SP811.integer(int(cost["total"])),
+		SP811.integer(floori(ends_at) + 1), Shuttle.clock_text(ends_at)])
+	# The quest's next step opens now, so a night's count is never behind it.
+	update_quests([], false)
 	return ""
 
 
@@ -3913,7 +4049,8 @@ func shuttle_home(player_id: String = "") -> String:
 	var id: String = _player(player_id)
 	if not shuttle_trips.has(id) or not Shuttle.is_moon(place_of(id)):
 		return Shuttle.text("not_away_text")
-	_return_traveller(id, Shuttle.text("home_text"))
+	var left_early: bool = Shuttle.is_expedition(shuttle_trips[id])
+	_return_traveller(id, Shuttle.text("expedition_abandoned_text" if left_early else "home_text"))
 	return ""
 
 
@@ -3926,7 +4063,12 @@ func _end_due_trips() -> void:
 		return
 	var closed: bool = TunnelRecall.closed(GameClock.elapsed_days)
 	for id: String in shuttle_trips.keys():
-		if closed or GameClock.elapsed_days >= float(shuttle_trips[id]["ends_at"]):
+		if Shuttle.is_expedition(shuttle_trips[id]):
+			# An expedition is not sent home at the day's end or the recall hour: it
+			# runs to its planned morning, and ends there free (zones step 18).
+			if GameClock.elapsed_days >= float(shuttle_trips[id]["ends_at"]) - Shuttle.EPSILON_H / 24.0:
+				_return_traveller(id, Shuttle.text("expedition_over_text"), true)
+		elif closed or GameClock.elapsed_days >= float(shuttle_trips[id]["ends_at"]):
 			_return_traveller(id, Shuttle.text("trip_over_text"))
 
 
@@ -3934,13 +4076,21 @@ func _end_due_trips() -> void:
 ## the farm and they stand on foot beside the pad's terminal, a phone line says so, and
 ## their screen goes back to the farm (the hub sees its trip end: PhobosHub, which DeimosHub extends). A
 ## guest is told by the farm they have.
-func _return_traveller(player_id: String, line: String) -> void:
+func _return_traveller(player_id: String, line: String, completed: bool = false) -> void:
 	var moon: String = str(shuttle_trips.get(player_id, {}).get("moon", ""))
+	# An expedition run to its planned end counts for the quest (the Manager has none);
+	# coming home early, or by the 02:00 flight, does not.
+	if completed and player_id != MANAGER_ID and Shuttle.is_expedition(shuttle_trips.get(player_id, {})):
+		var done: Dictionary = (action_counts.get_or_add(player_id, {}) as Dictionary).get_or_add(EXPEDITION_DONE, { "count": 0, "xp": 0 })
+		done["count"] = int(done["count"]) + 1
 	shuttle_trips.erase(player_id)
+	_beds().get_up(player_id)  # up from the camp's bed, if they slept there
+	_campers.erase(player_id)
 	_set_place(player_id, ZonePresence.FARM, 0)
 	_stand_at_pad(player_id)
 	shuttle_trips_changed.emit()
-	post_phone(line % Shuttle.moon_name(moon) if moon != "" else line % "the moon")
+	var named: String = Shuttle.moon_name(moon) if moon != "" else "the moon"
+	post_phone(line % named if "%s" in line else line)
 
 
 ## Host: puts a returned traveller on foot at the landing pad. With the farm rover away
@@ -3979,12 +4129,13 @@ func _settle_trips_on_load() -> void:
 	for id: String in shuttle_trips.keys():
 		if id != local_player_id:
 			shuttle_trips.erase(id)
-		elif TunnelRecall.closed(GameClock.elapsed_days) or GameClock.elapsed_days >= float(shuttle_trips[id]["ends_at"]):
+		elif (not Shuttle.is_expedition(shuttle_trips[id]) and TunnelRecall.closed(GameClock.elapsed_days)) 				or GameClock.elapsed_days >= float(shuttle_trips[id]["ends_at"]) - Shuttle.EPSILON_H / 24.0:
 			var moon: String = str(shuttle_trips[id]["moon"])
+			var planned: bool = Shuttle.is_expedition(shuttle_trips[id])
 			shuttle_trips.erase(id)
 			# No walker is stood: farm_loaded (below, in farm_from_dict) has CoopWalkers
 			# forget everyone, so the host opens at the farm in the rover, as on any load.
-			post_phone(Shuttle.text("trip_over_text") % Shuttle.moon_name(moon))
+			post_phone(Shuttle.text("expedition_over_text" if planned else "trip_over_text") % Shuttle.moon_name(moon))
 		else:
 			_set_place(id, str(shuttle_trips[id]["moon"]), 0)
 
@@ -5376,6 +5527,10 @@ func _release_field_rover() -> void:
 ## The day the warning, and the rescue, were last given for. Not saved: a farm
 ## that loads in the tunnels late in the night is warned, or rescued, once more.
 var _recall_warned_day: int = 0
+## The day each expedition traveller (player -> day) was last warned, and last put to bed or
+## flown home, marked only when it happened to them. Not saved, like the tunnels' days.
+var _expedition_warned_day: Dictionary = {}
+var _expedition_rescued_day: Dictionary = {}
 var _recall_rescued_day: int = 0
 ## The same for each guest (player -> day), for the guests the host sees below.
 var _guest_warned_day: Dictionary = {}
@@ -5425,6 +5580,69 @@ func _guests_below() -> Array[String]:
 ## Host: warns each player in the tunnels at the warning hour and has them
 ## carried out at the rescue hour, once each a day (the host's own, and each guest's
 ## own, so one rescue never uses up another's). Guests never run this.
+## Host: the recall for an expedition's travellers (zones step 18), once a day like the
+## tunnels' [PLACEHOLDER]. Asleep at the camp, nothing: not warned, not rescued, not sent
+## home. Awake, at 00:00 they are told to go to the camp; at 02:00 they are put to bed
+## there with a night's supplies if the camp is open and one is held, else flown home
+## with the normal rescue fee (TunnelRecall.cost, credits only) and put to bed on the farm.
+func _tick_expeditions() -> void:
+	if FarmCommands.guest or shuttle_trips.is_empty():
+		return
+	var day: int = GameClock.get_day_index()
+	var warned: bool = false
+	var due: Array[String] = []
+	var ids: Array = shuttle_trips.keys()
+	ids.sort()
+	for id: String in ids:
+		if not Shuttle.is_expedition(shuttle_trips[id]) or not Shuttle.is_moon(place_of(id)) or is_camping(id):
+			continue  # not away on one, or asleep at the camp: nothing for them
+		match TunnelRecall.phase(GameClock.elapsed_days, int(_expedition_warned_day.get(id, 0)), int(_expedition_rescued_day.get(id, 0))):
+			TunnelRecall.WARN:
+				_expedition_warned_day[id] = day
+				warned = true
+			TunnelRecall.RESCUE:
+				due.append(id)  # their day is used up in _expedition_recall, when it happens to them
+	if warned:
+		post_phone(Shuttle.text("expedition_warn_text"))  # one shared line, as the phone is shared
+	if due.is_empty():
+		return
+	if recall_beds != null:
+		_expedition_recall(due)
+	else:
+		_expedition_recall.call_deferred(due)  # not inside the clock's own signal
+
+
+## Host: the 02:00 step for the awake expedition travellers `ids` (see _tick_expeditions).
+## All the bookkeeping first, then every bed, so the last into bed ends the day with the
+## others already counted (as _carry_out does). One who turned in at the camp earlier tonight
+## and got up (a paid night, `_campers`) is put back to bed free: no second supply, no second
+## night counted, no fee. A traveller's day is used up only when they are put to bed or flown
+## home, so one who slept through the hour is recalled if they get up after it.
+func _expedition_recall(ids: Array[String]) -> void:
+	var to_bed: Array[String] = []
+	for id: String in ids:
+		var trip: Variant = shuttle_trips.get(id)
+		if not Shuttle.is_expedition(trip) or is_camping(id) or id in _beds().in_bed:
+			continue  # home, asleep or in bed in the moment since the hour
+		var moon: String = str((trip as Dictionary)["moon"])
+		_expedition_warned_day[id] = GameClock.get_day_index()
+		_expedition_rescued_day[id] = GameClock.get_day_index()
+		if _campers.has(id):
+			post_phone(Shuttle.text("expedition_bedded_text"))  # tonight is paid already
+		elif camps_open.has(moon) and camp_supplies >= 1 and Camp.is_moon_camp(moon):
+			update_quests([], false)  # the job's next step opens before the night is counted
+			_camp_night(id, Camp.EXPEDITION_NIGHT_COUNT, false, true)
+			post_phone(Shuttle.text("expedition_camped_text"))
+		else:
+			var fee: int = int(TunnelRecall.cost(credits, 0)["credits"])
+			if fee > 0:
+				add_credits(-fee)
+			_return_traveller(id, Shuttle.text("expedition_flown_text") % [Shuttle.moon_name(moon), SP811.integer(fee)])
+		to_bed.append(id)
+	for id: String in to_bed:
+		_beds().recall_to_bed(id)
+
+
 func _tick_recall() -> void:
 	# Rover not in the tunnels: the player walks out with E as today [ASSUMPTION].
 	if FarmCommands.guest or not rover_in_tunnels:
