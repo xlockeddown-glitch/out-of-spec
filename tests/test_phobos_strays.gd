@@ -111,7 +111,7 @@ func test_it_is_a_farm_command_a_moon_player_may_use() -> String:
 		return "catch_stray must be a command, and one a player on a moon may use."
 	if FarmCommands.problem(&"catch_stray", [1, 5]) != "" or FarmCommands.problem(&"catch_stray", []) == "":
 		return "catch_stray takes the stray and the day."
-	if CoopSession.PROTOCOL != 40:
+	if CoopSession.PROTOCOL != 41:
 		return "A new command raises the protocol to 40."
 	return ""
 
@@ -268,7 +268,7 @@ func test_arriving_on_a_moon_is_counted_with_no_xp() -> String:
 	gs.shuttle_licensed = true
 	gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, Vector3(Shuttle.TERMINAL_AT.x, 0.5, Shuttle.TERMINAL_AT.y))
 	GameClock.elapsed_days = 3.0 * HOUR
-	var why: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
+	var why: String = gs.book_shuttle(Shuttle.DEIMOS, [gs.local_player_id])
 	var problem: String = ""
 	var xp_kept: int = gs.action_xp("reached_deimos", HOST)
 	if why != "" or _count(gs, HOST, "reached_deimos") != 1 or xp_kept != 0:

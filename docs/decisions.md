@@ -2,6 +2,19 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-27: Shuttle parties (feat/shuttle-party)
+
+More than one seat on a moon trip. The fare is per person (zones.md section 8.2), so the booking is now for a party.
+
+- **Who flies:** `GameState.shuttle_party(booker)` is the booker plus every other player in `players_present()` who is on the farm, within `Shuttle.terminal_near` (with `HOST_SLACK_M`) and not on a trip. The host works it out; the client only says how many it expects. A player in the rover at the terminal counts (the rover's pose is theirs).
+- **Booking (review round):** `book_shuttle(moon, party_ids, player_id)` takes the player ids the panel last drew (booker first), not a count: a swap (one leaves, one arrives) is refused as well as a change of size. A bad shape is a refusal, never an error. Refusals in order: far, shape, size (`bad_party_text`), crowd, then `party_changed_text` unless the ids are exactly `shuttle_party`. Others count only if on foot near the terminal or the farm rover's driver with the rover there (a guest with no pose, or a rover rider, is left out). Every flyer is got out of bed. A player on a trip cannot lease the rover (`CoopRovers._on_driven`). `SceneSwitcher` asks again after a swap wait and again when a fast-travel wait clears; `CoopWalkers.asking` is cleared when the farm scene is freed.
+- **Booking:** `book_shuttle(moon, people)` keeps its refusals in order (far, crowd) and then refuses a count that differs from the party with `party_changed_text` ("The party changed. Look at the terminal again." [PLACEHOLDER]), so nobody flies unasked. Then `trip_problem` (the wallet against `fare * party`; `party_most` 4 [PLACEHOLDER] still caps it). Booked: `fare * party` from the shared wallet; each passenger gets their own `shuttle_trips` entry (same moon and `ends_at`), their own `reached_<moon>` count (never the Manager), the moon as their place, and is out of the rover and off the walkers. One phone line names the party and the total (`booked_text`, reworded [PLACEHOLDER]). `one_seat_text` is gone.
+- **Screens:** the booker's screen goes to the hub on the answer, as before. Anyone else follows the synced trip through `SceneSwitcher.reconcile_trip`, which used to run for guests only; it now runs for the host too (a guest can book and fly the host). Coming home is still per player (`shuttle_home`, or the trip's end).
+- **Terminal:** `ShuttleUI` shows "Party: 2 (you and PLAYER 2)" [PLACEHOLDER] and the total fare, looks again every 0.5 s while open (`WATCH_S`), and sends the party's size. The `PARTY` constant is gone. Names are `CoopUI.player_name`.
+- **Protocol:** 40 to 41, since a guest can now be moved to a moon by someone else's booking and an older guest would stay on the farm.
+- **Tests:** `tests/test_shuttle_party.gd` is new (8). Older tests that had a guest book with the host's rover parked at the pad now put the host elsewhere (the host would have joined the party); the "one seat" refusal test became a "party changed" one; every protocol pin says 41.
+- **[PLACEHOLDER]s:** `party_changed_text`, `terminal_party`, `terminal_party_alone`, `terminal_total`, the new `booked_text` and `terminal_hint`, the 0.5 s refresh, and (unchanged) `party_most` 4 and the 40 CR fare.
+
 ## 2026-11-27: Phobos strays and the Strays quest (feat/phobos-strays)
 
 Phobos part 2: a stray in the service tunnel can be caught, Odalys's `strays` quest is built on it, and the caught spider is marked as station stock.

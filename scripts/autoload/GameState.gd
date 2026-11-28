@@ -3814,49 +3814,94 @@ func grant_shuttle_license() -> void:
 	post_phone(Shuttle.text("granted_text") % SP811.integer(Shuttle.fare()))
 
 
+## Who would fly if `player_id` booked now: the booker, then every other player here
+## who is on the farm, not on a trip, and at the terminal: on foot within reach of it
+## (with the host's slack), or the farm rover's driver with the rover there. A player with
+## no pose yet, or a rider who is not driving, is left out. The host books with it; the
+## terminal's panel shows it (a guest's copy has the synced places, trips, poses and
+## driver). Booker first, the rest in session order.
+func shuttle_party(player_id: String = "") -> Array[String]:
+	var id: String = _player(player_id)
+	var party: Array[String] = [id]
+	for other: String in players_present():
+		if other == id or shuttle_trips.has(other) or place_of(other) != ZonePresence.FARM:
+			continue
+		if _at_terminal_for_party(other):
+			party.append(other)
+	return party
+
+
+func _at_terminal_for_party(player_id: String) -> bool:
+	if CoopWalkers.is_out(player_id):
+		return Shuttle.terminal_near(CoopWalkers.spot(CoopWalkers.out[player_id]), Shuttle.HOST_SLACK_M)
+	var rovers: Node = rovers_node if rovers_node != null else CoopRovers
+	if rovers.driver(ROVER) == player_id and not rover_is_away(ROVER):
+		return Shuttle.terminal_near(_rover_pose_now(ROVER), Shuttle.HOST_SLACK_M)
+	return false
+
+
 ## Books a day trip to `moon` for `people` from the pad's terminal. Runs on the
 ## host's clock. Before anything else it checks the sender stands at the terminal
 ## (on foot there, or in the rover there) and that `people` are all here to go
-## (players_present()); then Shuttle.trip_problem's reasons. A refusal takes no
-## fare. Phobos and Deimos have a hub (a moon with none is refused). Only the
-## sender flies for now (people must be 1) [PLACEHOLDER: parties come later]. Booked
-## means paid once from the shared wallet, the trip recorded (shuttle_trips) and the
-## sender at the moon's hub: their place is the moon's and they are no longer on foot on
-## the farm, or driving its rover. The farm rover stays where it is: a player who
-## books from inside it is out of it (the lease is let go), and walks home to the pad
-## on the way back. The sender's screen changes to the hub when the answer comes
-## (ShuttleUI). A player in bed who books is woken by the act (FarmCommands). With friends
-## in, the day cannot end until the traveller is home: the trip ends by its clock or the
-## 02:00 recall at the latest, so the wait is bounded. Returns "" when booked, else why not.
-func book_shuttle(moon: String, people: int, player_id: String = "") -> String:
+## (players_present()); then that `party_ids` (player ids, the sender first: what the
+## terminal showed) is exactly the party the host works out (shuttle_party: the sender
+## and everyone else on the farm at the terminal and not on a trip), so nobody is flown
+## who did not expect to be, and a swap is caught as well as a count; then Shuttle.trip_problem's
+## reasons, with the wallet checked against the whole party's fare. A refusal takes no
+## fare. Phobos and Deimos have a hub (a moon with none is refused). Booked means the
+## fare for each person paid from the shared wallet, and for every passenger: a trip
+## recorded (shuttle_trips, one end time), a count of reaching the moon (the Manager
+## has none), their place the moon's, and no longer on foot on the farm or driving its
+## rover. The farm rover stays where it is: a passenger who was in it is out of it (the
+## lease is let go), and walks home to the pad on the way back. Each screen goes to the
+## hub (the sender's when the answer comes, ShuttleUI; the others' on the synced trip,
+## SceneSwitcher.reconcile_trip). One phone line names the party and the fare. Each
+## passenger comes home alone (shuttle_home) or when the trip ends. A player in bed who
+## books is woken by the act (FarmCommands). With friends in, the day cannot end until
+## the travellers are home: the trip ends by its clock or the 02:00 recall at the
+## latest, so the wait is bounded. Returns "" when booked, else why not.
+func book_shuttle(moon: String, party_ids: Array, player_id: String = "") -> String:
 	var id: String = _player(player_id)
 	var at: Variant = standing_at(id)
 	if place_of(id) != ZonePresence.FARM or not Shuttle.terminal_near(at, Shuttle.HOST_SLACK_M):
 		return Shuttle.text("far_text")
-	if people > players_present().size():
+	for named: Variant in party_ids:
+		if typeof(named) != TYPE_STRING:
+			return Shuttle.text("party_changed_text")
+	if party_ids.size() < 1 or party_ids.size() > Shuttle.party_most():
+		return Shuttle.text("bad_party_text") % SP811.integer(Shuttle.party_most())
+	if party_ids.size() > players_present().size():
 		return Shuttle.text("crowd_text") % SP811.integer(players_present().size())
+	var party: Array[String] = shuttle_party(id)
+	var people: int = party.size()
+	if party_ids.size() != people or party_ids[0] != id:
+		return Shuttle.text("party_changed_text")
+	for flyer: String in party:
+		if not flyer in party_ids:
+			return Shuttle.text("party_changed_text")
 	var hub_ready: bool = Shuttle.is_moon(moon) and ZoneData.is_playable(StringName(moon))
 	var reason: String = Shuttle.trip_problem(moon, lab_level(), shuttle_licensed, credits, people, GameClock.elapsed_days, hub_ready)
 	if reason != "":
 		return reason
-	if people != 1:
-		return Shuttle.text("one_seat_text")
-	add_credits(-Shuttle.fare())
+	var total: int = Shuttle.fare() * party.size()
+	add_credits(-total)
 	var ends_at: float = Shuttle.trip_end(GameClock.elapsed_days)
-	shuttle_trips[id] = { "moon": moon, "ends_at": ends_at }
-	if id != MANAGER_ID:
-		var reached: Dictionary = (action_counts.get_or_add(id, {}) as Dictionary).get_or_add(REACHED_PREFIX + moon, { "count": 0, "xp": 0 })
-		reached["count"] = int(reached["count"]) + 1
-	_set_place(id, moon, 0)
-	_trip_players.erase(id)
-	# Off the farm's ground: out of the rover (it stays parked where it is) and not
-	# among the walkers there.
-	CoopWalkers.out.erase(id)
 	var rovers: Node = rovers_node if rovers_node != null else CoopRovers
-	rovers.release(id)
+	for flyer: String in party:
+		shuttle_trips[flyer] = { "moon": moon, "ends_at": ends_at }
+		if flyer != MANAGER_ID:
+			var reached: Dictionary = (action_counts.get_or_add(flyer, {}) as Dictionary).get_or_add(REACHED_PREFIX + moon, { "count": 0, "xp": 0 })
+			reached["count"] = int(reached["count"]) + 1
+		_set_place(flyer, moon, 0)
+		_trip_players.erase(flyer)
+		# Off the farm's ground: out of the rover (it stays parked where it is) and not
+		# among the walkers there.
+		CoopWalkers.out.erase(flyer)
+		rovers.release(flyer)
+		_beds().get_up(flyer)
 	shuttle_trips_changed.emit()
 	post_phone(Shuttle.text("booked_text") % [Shuttle.moon_name(moon), Shuttle.clock_text(GameClock.elapsed_days),
-		SP811.integer(Shuttle.fare()), Shuttle.clock_text(ends_at)])
+		SP811.integer(party.size()), SP811.integer(total), Shuttle.clock_text(ends_at)])
 	return ""
 
 

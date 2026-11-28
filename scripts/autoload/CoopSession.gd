@@ -32,7 +32,7 @@ signal walkers_told(poses: Dictionary)
 signal recalled(step: String)
 
 ## Raise it whenever two versions could disagree about the farm or the messages.
-const PROTOCOL: int = 40
+const PROTOCOL: int = 41
 const DEFAULT_PORT: int = 24711
 const MAX_PLAYERS: int = 4
 
@@ -316,6 +316,30 @@ func _poll_host() -> void:
 			_drop(from)
 
 
+## True if a guest's command `arguments` are plain: a few booleans, numbers (finite),
+## short texts and grid cells, or a short list of short texts (a shuttle party's
+## player ids, at most MAX_PLAYERS; typed Array[String] or not). Nothing nested deeper.
+static func plain_arguments(arguments: Array) -> bool:
+	if arguments.size() > MAX_ARGUMENTS or arguments.is_typed():
+		return false
+	for argument: Variant in arguments:
+		if argument is Array:
+			var list: Array = argument
+			if (list.is_typed() and list.get_typed_builtin() != TYPE_STRING) or list.size() > MAX_PLAYERS:
+				return false
+			for item: Variant in argument:
+				if not item is String or (item as String).length() > MAX_TEXT:
+					return false
+			continue
+		if not typeof(argument) in [TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR3I]:
+			return false
+		if argument is float and not is_finite(argument):
+			return false
+		if (argument is String or argument is StringName) and str(argument).length() > MAX_TEXT:
+			return false
+	return true
+
+
 ## False if the peer must go.
 func _host_read(from: int, packet: PackedByteArray, now: int, reliable: bool) -> bool:
 	var link: Dictionary = _links[from]
@@ -354,15 +378,8 @@ func _host_read(from: int, packet: PackedByteArray, now: int, reliable: bool) ->
 		return false
 	var action: String = message[2]
 	var arguments: Array = message[3]
-	if action.length() > MAX_TEXT or arguments.size() > MAX_ARGUMENTS or arguments.is_typed():
+	if action.length() > MAX_TEXT or not plain_arguments(arguments):
 		return false
-	for argument: Variant in arguments:
-		if not typeof(argument) in [TYPE_BOOL, TYPE_INT, TYPE_FLOAT, TYPE_STRING, TYPE_STRING_NAME, TYPE_VECTOR3I]:
-			return false
-		if argument is float and not is_finite(argument):
-			return false
-		if (argument is String or argument is StringName) and str(argument).length() > MAX_TEXT:
-			return false
 	var answer: Variant = _farm_commands().execute(link["player"], StringName(action), arguments)
 	# What the command changed must reach the guest before the answer does.
 	if _links.has(from):

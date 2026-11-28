@@ -42,7 +42,7 @@ func test_booking_deimos_while_open_lands_at_the_hub_and_the_fare_is_paid_once()
 	var problems: Array[String] = []
 	if not Shuttle.is_open(Shuttle.DEIMOS, GameClock.elapsed_days):
 		problems.append("Deimos should be up at 09:00 of day 1.")
-	var answer: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
+	var answer: String = gs.book_shuttle(Shuttle.DEIMOS, [gs.local_player_id])
 	if answer != "":
 		problems.append("A licensed booking in the spell is refused: '%s'" % answer)
 	if gs.credits != 500 - Shuttle.fare():
@@ -52,7 +52,7 @@ func test_booking_deimos_while_open_lands_at_the_hub_and_the_fare_is_paid_once()
 		problems.append("The trip is not recorded with its end: %s" % [gs.shuttle_trips])
 	if gs.place_of(HOST) != Shuttle.DEIMOS or not ZonePresence.is_place(gs.place_of(HOST)):
 		problems.append("The traveller's place is not Deimos: %s" % gs.place_of(HOST))
-	var again: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
+	var again: String = gs.book_shuttle(Shuttle.DEIMOS, [gs.local_player_id])
 	if again == "" or gs.credits != 500 - Shuttle.fare():
 		problems.append("A second booking from Deimos is refused and charges nothing: '%s', %d CR" % [again, gs.credits])
 	_done(gs)
@@ -65,7 +65,7 @@ func test_booking_deimos_while_shut_is_refused_with_the_reason_and_charges_nothi
 	GameClock.elapsed_days = 70.0 * HOUR  # past the 60 h spell, inside the 60 h shut time
 	if Shuttle.is_open(Shuttle.DEIMOS, GameClock.elapsed_days):
 		problems.append("Deimos should be down at 70 h.")
-	var answer: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
+	var answer: String = gs.book_shuttle(Shuttle.DEIMOS, [gs.local_player_id])
 	var reason: String = Shuttle.text("moon_down_text") % Shuttle.window_line(Shuttle.DEIMOS, GameClock.elapsed_days)
 	if answer != reason:
 		problems.append("A shut Deimos is refused with the window line: '%s'" % answer)
@@ -79,7 +79,7 @@ func test_the_console_and_the_trips_end_bring_a_deimos_traveller_home_free() -> 
 	var gs: GameStateScript = _state(500)
 	var commands: Node = _commands(gs)
 	var problems: Array[String] = []
-	if gs.book_shuttle(Shuttle.DEIMOS, 1) != "":
+	if gs.book_shuttle(Shuttle.DEIMOS, [gs.local_player_id]) != "":
 		problems.append("Booking failed.")
 	var wallet: int = gs.credits
 	var home: Variant = commands.execute(HOST, &"shuttle_home", [])
@@ -88,7 +88,7 @@ func test_the_console_and_the_trips_end_bring_a_deimos_traveller_home_free() -> 
 	if not CoopWalkers.is_out(HOST) or not Shuttle.terminal_near(CoopWalkers.spot(CoopWalkers.out[HOST]), 0.0):
 		problems.append("The traveller stands on foot by the terminal.")
 	CoopWalkers.out.erase(HOST)
-	if gs.book_shuttle(Shuttle.DEIMOS, 1) != "":
+	if gs.book_shuttle(Shuttle.DEIMOS, [gs.local_player_id]) != "":
 		problems.append("A second booking failed.")
 	wallet = gs.credits
 	GameClock.elapsed_days += (Shuttle.trip_hours() - 0.5) * HOUR
@@ -132,7 +132,8 @@ func test_a_guest_is_booked_and_sent_home_by_the_host_for_deimos() -> String:
 	var problems: Array[String] = []
 	gs.player_places[GUEST] = [ZonePresence.FARM, 0]
 	CoopWalkers.stand(GUEST, Vector3(Shuttle.TERMINAL_AT.x, 0.0, Shuttle.TERMINAL_AT.y))
-	var booked: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.DEIMOS, 1])
+	CoopWalkers.stand(HOST, Vector3(0.0, 0.0, 30.0))  # the host is off at the farm, not in the party
+	var booked: Variant = commands.execute(GUEST, &"book_shuttle", [Shuttle.DEIMOS, [GUEST]])
 	if booked != "" or gs.place_of(GUEST) != Shuttle.DEIMOS or gs.credits != 500 - Shuttle.fare():
 		problems.append("A guest's booking: '%s', %s, %d CR" % [booked, gs.place_of(GUEST), gs.credits])
 	if gs.place_of(HOST) != ZonePresence.FARM:
@@ -149,7 +150,7 @@ func test_a_guest_is_booked_and_sent_home_by_the_host_for_deimos() -> String:
 func test_a_deimos_trip_is_saved_and_an_old_save_still_loads() -> String:
 	var gs: GameStateScript = _state(500)
 	var problems: Array[String] = []
-	if gs.book_shuttle(Shuttle.DEIMOS, 1) != "":
+	if gs.book_shuttle(Shuttle.DEIMOS, [gs.local_player_id]) != "":
 		problems.append("Booking failed.")
 	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
 	if gs.farm_dict_problem(data) != "":
@@ -219,7 +220,7 @@ func test_booking_just_inside_the_close_goes_and_at_the_close_is_refused() -> St
 	if inside.contains(Shuttle.text("moon_down_text").substr(0, 8)) and Shuttle.is_open(Shuttle.DEIMOS, GameClock.elapsed_days):
 		problems.append("Just inside the close is not refused for the window: '%s'" % inside)
 	GameClock.elapsed_days = 60.0 * HOUR
-	var at_close: String = gs.book_shuttle(Shuttle.DEIMOS, 1)
+	var at_close: String = gs.book_shuttle(Shuttle.DEIMOS, [gs.local_player_id])
 	if Shuttle.is_open(Shuttle.DEIMOS, GameClock.elapsed_days) or at_close != Shuttle.text("moon_down_text") % Shuttle.window_line(Shuttle.DEIMOS, GameClock.elapsed_days) or gs.credits != 500:
 		problems.append("At 60 h the window is shut and the booking refused for it: '%s', %d CR" % [at_close, gs.credits])
 	_done(gs)

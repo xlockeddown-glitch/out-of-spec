@@ -211,6 +211,19 @@ func test_a_friend_who_comes_later_is_told_where_it_is_now() -> String:
 	return _end_with("" if theirs.place(ID) == _at(42.0) else "Told %s" % theirs.place(ID))
 
 
+func test_a_guest_on_a_shuttle_trip_cannot_lease_the_rover_with_a_late_drive() -> String:
+	var all: Array = _pair()
+	var state: Node = all[0].commands.state
+	var mine: Node = all[2]
+	state.shuttle_trips["player_2"] = { "moon": "phobos", "ends_at": 1.0e9 }
+	mine._on_driven("player_2", ID, _pose(1.0), 1000)
+	if mine.driver(ID) != "" or state.rover_transforms[ID] != _at(0.0):
+		return _end_with("A flown guest must not drive the rover: driver '%s'" % mine.driver(ID))
+	state.shuttle_trips.erase("player_2")
+	mine._on_driven("player_2", ID, _pose(1.0), 1100)
+	return _end_with("" if mine.driver(ID) == "player_2" else "Home again, the guest drives as before")
+
+
 func test_a_pose_that_is_not_real_is_refused_and_the_guest_stays() -> String:
 	var all: Array = _pair()
 	var state: Node = all[0].commands.state
