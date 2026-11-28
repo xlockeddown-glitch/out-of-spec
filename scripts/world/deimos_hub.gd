@@ -25,6 +25,8 @@ const DEIMOS_SPOTS: Dictionary[String, Vector3] = {
 
 var cache_click: Inspectable
 var pod_click: Inspectable
+## The expedition camp's click target (zones step 18): no collision body, layer 8 only.
+var camp_click: Clickable
 
 
 func _moon() -> String:
@@ -114,6 +116,46 @@ func _build_world() -> void:
 	board_click.clicked.connect(_on_board)
 	cache_click.inspected.connect(_toast)
 	pod_click.inspected.connect(_toast)
+	# The expedition camp (Camp.MOON_SPOTS): the camp props show once a quest opens it.
+	add_child(CampProps.new(DEIMOS))
+	camp_click = _clickable(Clickable.new(), Camp.position(DEIMOS) + Vector3(0.0, 0.6, 0.0), Vector3(4.0, 1.4, 3.0), "")
+	camp_click.name = "CampClick"
+	camp_click.clicked.connect(_on_camp)
+	GameState.camps_changed.connect(_refresh_camp_hint)
+	_refresh_camp_hint()
+
+
+func _process(delta: float) -> void:
+	_refresh_camp_hint()
+	super(delta)
+
+
+## The camp's hover hint: said only once the camp is open (while it is shut the spot is
+## bare floor), and "get up" while the local player is in bed.
+func _refresh_camp_hint() -> void:
+	if camp_click == null:
+		return
+	if not GameState.camps_open.has(DEIMOS):
+		camp_click.hint = Shuttle.text("camp_shut_hint")
+	else:
+		camp_click.hint = Shuttle.text("camp_hint_up" if CoopBeds.in_bed.has(GameState.local_player_id) else "camp_hint")
+
+
+## A click on the camp: turn in for the night, or get up. The host cannot know where a
+## moon walker stands, so the walker's reach is checked here, as the console's is. The
+## host decides the rest (an expedition, an open camp, a night's supplies).
+func _on_camp() -> void:
+	if _busy or not GameState.camps_open.has(DEIMOS):
+		return
+	if not Camp.near(DEIMOS, walker.global_position):
+		_toast(Shuttle.text("camp_far_text"))
+		return
+	var asleep: bool = CoopBeds.in_bed.has(GameState.local_player_id)
+	_busy = true
+	var problem: String = await FarmCommands.request(&"get_up" if asleep else &"go_to_bed", [])
+	_busy = false
+	if is_inside_tree():
+		_toast(problem if problem != "" else Shuttle.text("camp_up_text" if asleep else "camp_in_text"))
 
 
 ## A cylinder drum of `radius` and `height` (`sides` round; solid stops the walker).

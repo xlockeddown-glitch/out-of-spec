@@ -11,6 +11,21 @@ extends RefCounted
 const CELLS: Dictionary[String, Vector2i] = {
 	"lava_tubes": Vector2i(16, 12),
 }
+## A moon's camp spot, on its hub's deck (x, y, z) [PLACEHOLDER]: Deimos' expedition camp
+## (zones step 18). Clear of the console, board, cache, pod, hab, shuttle, craters and the
+## walker's arrival point; it is walked to on foot, not driven to. It has no cell.
+const MOON_SPOTS: Dictionary[String, Vector3] = {
+	"deimos": Vector3(6.0, 0.0, 8.0),
+}
+## A walker is this near a moon camp (m) to use it [PLACEHOLDER]. The host cannot know a
+## moon walker's position, so the hub checks this on the screen, as it does the console.
+const MOON_REACH_M: float = 5.0
+## The most nights of supplies a saved farm may hold [PLACEHOLDER]: an expedition's party
+## stocks nights for everyone at booking, so it is above MAX_SUPPLIES (the camp hub's cap).
+const HELD_MOST: int = 24
+## The count a night at an expedition camp adds, for the expedition quest (not NIGHT_COUNT,
+## so a moon night never counts for Two Sunsets).
+const EXPEDITION_NIGHT_COUNT: String = "expedition_night"
 ## One night's supplies [PLACEHOLDER].
 const SUPPLY_COST_CREDITS: int = 30
 ## The most nights of supplies the farm holds [PLACEHOLDER].
@@ -24,7 +39,12 @@ const NIGHT_COUNT: String = "camp_night"
 
 
 static func has_camp(zone: String) -> bool:
-	return CELLS.has(zone)
+	return CELLS.has(zone) or MOON_SPOTS.has(zone)
+
+
+## True for a camp on a moon's deck (reached on foot, no rover).
+static func is_moon_camp(zone: String) -> bool:
+	return MOON_SPOTS.has(zone)
 
 
 ## The zones that have a camp, in a fixed order.
@@ -42,6 +62,8 @@ static func cell(zone: String) -> Vector2i:
 
 ## The middle of the camp's cell on its zone's hub, or the origin for a zone with none.
 static func position(zone: String) -> Vector3:
+	if MOON_SPOTS.has(zone):
+		return MOON_SPOTS[zone]
 	if not has_camp(zone):
 		return Vector3.ZERO
 	return TunnelRock.at_in(ZoneDepth.grid_for(0, 0, 0, zone), cell(zone))
@@ -53,7 +75,8 @@ static func near(zone: String, at: Vector3, slack: float = 0.0) -> bool:
 	if not has_camp(zone):
 		return false
 	var there: Vector3 = position(zone)
-	return Vector2(there.x - at.x, there.z - at.z).length() <= REACH_M + slack
+	var reach: float = MOON_REACH_M if is_moon_camp(zone) else REACH_M
+	return Vector2(there.x - at.x, there.z - at.z).length() <= reach + slack
 
 
 ## Why the farm can't buy a night's supplies, or "". `here` is the buyer's place and
@@ -89,6 +112,20 @@ static func sleep_problem(zone: String, open: bool, depth: int, rover_here: bool
 	return ""
 
 
+## Why a traveller can't sleep at a moon's camp tonight, or "". `holds_trip` whether they are
+## on an expedition, `supplies` the farm's nights held (a night already paid for counts as one).
+static func moon_sleep_problem(zone: String, open: bool, holds_trip: bool, supplies: int) -> String:
+	if not is_moon_camp(zone):
+		return "There is no camp here."
+	if not holds_trip:
+		return "The camp is for an expedition: book one at the pad terminal."
+	if not open:
+		return "The camp is shut: a quest opens it."
+	if supplies < 1:
+		return "No supplies for the night. An expedition is booked with its nights of supplies."
+	return ""
+
+
 ## Why a saved `camps_open` can't stand, or "".
 static func open_problem(value: Variant) -> String:
 	if not value is Array:
@@ -105,6 +142,6 @@ static func open_problem(value: Variant) -> String:
 
 ## Why a saved supply count can't stand, or "".
 static func supplies_problem(value: Variant) -> String:
-	if not value is int or value < 0 or value > MAX_SUPPLIES:
-		return "'camp_supplies' is not between 0 and %d." % MAX_SUPPLIES
+	if not value is int or value < 0 or value > HELD_MOST:
+		return "'camp_supplies' is not between 0 and %d." % HELD_MOST
 	return ""
