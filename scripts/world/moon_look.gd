@@ -70,7 +70,64 @@ const TUNNEL_WARM_LIGHT := Color(1.0, 0.78, 0.56)
 const TUNNEL_LIGHT_ENERGY: float = 1.15
 const TUNNEL_LIGHT_RANGE_M: float = 15.0
 
+## Second-pass look constants: starfield, Mars horizon glow, pad edge lights,
+## station/hab cables & crates, regolith scatter, Deimos camp perimeter, and
+## Phobos service tunnel mouth dressing [PLACEHOLDER].
+const STAR_WHITE: Color = ScopeTheme.INK
+const STAR_WARM: Color = ScopeTheme.ENAMEL_TOP
+const STAR_COOL: Color = ScopeTheme.INK_MUTED
+const STAR_COUNT_PHOBOS: int = 84
+const STAR_COUNT_DEIMOS: int = 96
+const STAR_SEED_PHOBOS: int = 4101
+const STAR_SEED_DEIMOS: int = 4202
+const STAR_RADIUS_MIN_M: float = 98.0
+const STAR_RADIUS_MAX_M: float = 128.0
+const STAR_SIZE_MIN_M: float = 0.24
+const STAR_SIZE_MAX_M: float = 0.52
+
+const MARS_GLOW_PHOBOS := Color(0.42, 0.17, 0.11)
+const MARS_GLOW_DEIMOS := Color(0.32, 0.16, 0.12)
+const MARS_GLOW_ALPHA_PHOBOS: float = 0.22
+const MARS_GLOW_ALPHA_DEIMOS: float = 0.16
+
+const PAD_EDGE_LIGHT_ENERGY: float = 0.85
+const PAD_EDGE_AMBER: Color = ScopeTheme.AMBER
+const PAD_EDGE_TEAL: Color = ScopeTheme.TEAL
+
+const CABLE_SHEATH: Color = ScopeTheme.SHADOW
+const CABLE_STRIPE: Color = ScopeTheme.AMBER
+const CRATE_PHOBOS := Color(0.30, 0.33, 0.38)
+const CRATE_PHOBOS_TRIM: Color = ScopeTheme.TERRA_DARK
+const CRATE_DEIMOS: Color = ScopeTheme.ENAMEL_INSET
+const CRATE_DEIMOS_TRIM: Color = ScopeTheme.TERRA
+
+const DRIFT_PHOBOS := Color(0.17, 0.18, 0.20)
+const DRIFT_PHOBOS_LIGHT := Color(0.24, 0.25, 0.28)
+const DRIFT_DEIMOS := Color(0.49, 0.45, 0.39)
+const DRIFT_DEIMOS_LIGHT := Color(0.58, 0.53, 0.46)
+const SCATTER_SEED_PHOBOS: int = 5101
+const SCATTER_SEED_DEIMOS: int = 5202
+const SCATTER_DRIFTS_PHOBOS: int = 12
+const SCATTER_ROCKS_PHOBOS: int = 18
+const SCATTER_DRIFTS_DEIMOS: int = 14
+const SCATTER_ROCKS_DEIMOS: int = 12
+const SCATTER_MIN_RADIUS_M: float = 7.5
+const SCATTER_MAX_RADIUS_M: float = 31.5
+const SPOT_CLEARANCE_M: float = 4.2
+
+const CAMP_PATCH_COLOR := Color(0.47, 0.42, 0.36)
+const CAMP_PATCH_RIM := Color(0.56, 0.50, 0.43)
+const CAMP_STAKE_COLOR: Color = ScopeTheme.INK_DIM
+const CAMP_WINDBREAK_FRAME: Color = ScopeTheme.SHADOW
+const CAMP_WINDBREAK_PANEL: Color = ScopeTheme.ENAMEL_LIP
+const CAMP_WINDBREAK_STRIPE: Color = ScopeTheme.TERRA
+
+const MOUTH_CAUTION: Color = ScopeTheme.AMBER
+const MOUTH_VENT_GLOW: Color = ScopeTheme.AMBER
+const MOUTH_PIPE_WARM: Color = ScopeTheme.TERRA
+
 static var _unshaded_cache: Dictionary = {}
+static var _unshaded_alpha_cache: Dictionary = {}
 
 
 ## Deterministic integer hash from coordinates and moon salt (no global RNG) [PLACEHOLDER].
@@ -446,3 +503,339 @@ static func add_pod_detail(parent: Node3D, at: Vector3) -> Node3D:
 	trim.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.04, 0.08, 0.24)), Vector3(0.0, 0.16, 1.50), warm_glow))
 	trim.add_child(TunnelLook.part(TunnelLook.sphere(0.11), Vector3(0.0, 1.88, -0.65), teal_glow))
 	return trim
+
+
+## Cached translucent unshaded material for faint sky/horizon glow [PLACEHOLDER].
+static func unshaded_alpha_mat(color: Color, alpha: float) -> StandardMaterial3D:
+	var key: String = "%s|%.3f" % [color.to_html(false), alpha]
+	if _unshaded_alpha_cache.has(key):
+		return _unshaded_alpha_cache[key] as StandardMaterial3D
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(color.r, color.g, color.b, alpha)
+	material.roughness = 1.0
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	_unshaded_alpha_cache[key] = material
+	return material
+
+
+## Deterministic unshaded starfield built from a local seeded RNG (zero collision, zero lights) [PLACEHOLDER].
+static func add_starfield(parent: Node3D, seed_value: int, count: int) -> Node3D:
+	var sky := Node3D.new()
+	sky.name = "Starfield"
+	parent.add_child(sky)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var white_mat: Material = unshaded_mat(STAR_WHITE)
+	var warm_mat: Material = unshaded_mat(STAR_WARM)
+	var cool_mat: Material = unshaded_mat(STAR_COOL)
+	for i: int in count:
+		var theta: float = rng.randf_range(0.0, TAU)
+		var elev: float = rng.randf_range(0.14, 1.38)
+		var dist: float = rng.randf_range(STAR_RADIUS_MIN_M, STAR_RADIUS_MAX_M)
+		var size_m: float = rng.randf_range(STAR_SIZE_MIN_M, STAR_SIZE_MAX_M)
+		var pick: int = rng.randi() % 5
+		var mat: Material = warm_mat if pick == 0 else (cool_mat if pick == 1 else white_mat)
+		var pos := Vector3(cos(elev) * cos(theta) * dist, sin(elev) * dist, cos(elev) * sin(theta) * dist)
+		sky.add_child(TunnelLook.part(TunnelLook.box(Vector3(size_m, size_m, size_m)), pos, mat))
+	return sky
+
+
+## Faint translucent unshaded Mars glow halo and horizon haze on the Mars side (zero collision, zero lights) [PLACEHOLDER].
+static func add_mars_horizon_glow(parent: Node3D, mars_at: Vector3, mars_radius: float, glow_col: Color, alpha: float) -> Node3D:
+	var group := Node3D.new()
+	group.name = "MarsHorizonGlow"
+	parent.add_child(group)
+	var dir_flat := Vector3(mars_at.x, 0.0, mars_at.z)
+	if dir_flat.length_squared() < 0.01:
+		dir_flat = Vector3(0.0, 0.0, -1.0)
+	dir_flat = dir_flat.normalized()
+	var halo_mesh := SphereMesh.new()
+	halo_mesh.radius = mars_radius * 1.28
+	halo_mesh.height = mars_radius * 2.56
+	halo_mesh.radial_segments = 24
+	halo_mesh.rings = 12
+	var halo_pos: Vector3 = mars_at + dir_flat * (mars_radius * 0.14)
+	group.add_child(TunnelLook.part(halo_mesh, halo_pos, unshaded_alpha_mat(glow_col, alpha)))
+	# Soft low horizon band behind the deck rim on the Mars side.
+	var yaw_deg: float = rad_to_deg(atan2(dir_flat.x, dir_flat.z))
+	var band_pos: Vector3 = dir_flat * 76.0 + Vector3(0.0, 2.5, 0.0)
+	group.add_child(TunnelLook.part(
+		TunnelLook.box(Vector3(mars_radius * 2.4, 9.0, 0.4)),
+		band_pos,
+		unshaded_alpha_mat(glow_col, alpha * 0.65),
+		Vector3(0.0, yaw_deg, 0.0)
+	))
+	return group
+
+
+## Small emissive pad edge lights around the lander pad rim (zero collision, no OmniLight3D) [PLACEHOLDER].
+static func add_pad_edge_lights(parent: Node3D, at: Vector3, hex_style: bool) -> Node3D:
+	var group := Node3D.new()
+	group.name = "PadEdgeLights"
+	group.position = Vector3(at.x, 0.0, at.z)
+	parent.add_child(group)
+	var sides: int = 6 if hex_style else 8
+	var housing_mat: Material = TunnelLook.flat_mat(DARK_METAL)
+	var amber_glow: Material = TunnelLook.glow_mat(PAD_EDGE_AMBER, PAD_EDGE_LIGHT_ENERGY)
+	var teal_glow: Material = TunnelLook.glow_mat(PAD_EDGE_TEAL, PAD_EDGE_LIGHT_ENERGY)
+	for i: int in sides:
+		var a: float = TAU * (float(i) + 0.5) / float(sides)
+		var r: float = 7.95
+		var px: float = cos(a) * r
+		var pz: float = sin(a) * r
+		var rot := Vector3(0.0, -rad_to_deg(a) + 90.0, 0.0)
+		var glow_mat: Material = amber_glow if i % 2 == 0 else teal_glow
+		group.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.42, 0.08, 0.22)), Vector3(px, 0.09, pz), housing_mat, rot))
+		group.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.30, 0.05, 0.12)), Vector3(px, 0.145, pz), glow_mat, rot))
+	return group
+
+
+## Cable runs and cargo crates tucked beside the station (Phobos) or hab (Deimos),
+## clear of every walkable spot and click target (zero collision, zero lights) [PLACEHOLDER].
+static func add_utility_props(parent: Node3D, is_deimos: bool) -> Node3D:
+	var group := Node3D.new()
+	group.name = "UtilityProps"
+	parent.add_child(group)
+	var cable_mat: Material = TunnelLook.flat_mat(CABLE_SHEATH)
+	var stripe_mat: Material = TunnelLook.flat_mat(CABLE_STRIPE)
+	var steel_mat: Material = TunnelLook.flat_mat(STEEL)
+	var crate_mat: Material = TunnelLook.flat_mat(CRATE_DEIMOS if is_deimos else CRATE_PHOBOS)
+	var trim_mat: Material = TunnelLook.flat_mat(CRATE_DEIMOS_TRIM if is_deimos else CRATE_PHOBOS_TRIM)
+	if not is_deimos:
+		# Flat cable trunks along Phobos Station's front base (clear of StationDoor, Board, HookSign).
+		_add_cable_run(group, Vector3(-4.2, 0.0, -10.22), 8.2, 0.0, cable_mat, stripe_mat)
+		_add_cable_run(group, Vector3(5.9, 0.0, -10.22), 4.0, 0.0, cable_mat, stripe_mat)
+		_add_cable_run(group, Vector3(-9.5, 0.0, -8.3), 4.8, 90.0, cable_mat, stripe_mat)
+		# Cargo crate stack beside Station's west flank and compact crate on the east flank.
+		_add_crate_stack(group, Vector3(-9.9, 0.0, -11.6), crate_mat, trim_mat, steel_mat, 10.0)
+		_add_crate_single(group, Vector3(13.8, 0.0, -12.8), Vector3(1.05, 0.72, 0.85), crate_mat, trim_mat, -14.0)
+	else:
+		# Flat cable run along Deimos Hab's west flank (clear of Board, Cache, Pod, Camp).
+		_add_cable_run(group, Vector3(-1.8, 0.0, -15.2), 3.4, 90.0, cable_mat, stripe_mat)
+		_add_cable_run(group, Vector3(9.6, 0.0, -14.0), 2.4, 90.0, cable_mat, stripe_mat)
+		# Outpost supply crates tucked on the west and east flanks of the Hab drum.
+		_add_crate_stack(group, Vector3(-1.5, 0.0, -16.8), crate_mat, trim_mat, steel_mat, -12.0)
+		_add_crate_single(group, Vector3(9.7, 0.0, -15.6), Vector3(1.0, 0.68, 0.82), crate_mat, trim_mat, 16.0)
+	return group
+
+
+static func _add_cable_run(parent: Node3D, at: Vector3, length_m: float, yaw_deg: float, sheath_mat: Material, stripe_mat: Material) -> void:
+	var run := Node3D.new()
+	run.position = at
+	run.rotation_degrees = Vector3(0.0, yaw_deg, 0.0)
+	parent.add_child(run)
+	run.add_child(TunnelLook.part(TunnelLook.box(Vector3(length_m, 0.05, 0.22)), Vector3(0.0, 0.025, 0.0), sheath_mat))
+	run.add_child(TunnelLook.part(TunnelLook.box(Vector3(length_m - 0.16, 0.03, 0.07)), Vector3(0.0, 0.055, -0.04), sheath_mat))
+	var ties: int = maxi(int(floor(length_m / 1.8)), 2)
+	for i: int in ties:
+		var t: float = float(i) / float(maxi(ties - 1, 1)) - 0.5
+		run.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.14, 0.065, 0.26)), Vector3(t * (length_m - 0.5), 0.035, 0.0), stripe_mat))
+
+
+static func _add_crate_stack(parent: Node3D, at: Vector3, body_mat: Material, trim_mat: Material, steel_mat: Material, yaw_deg: float) -> void:
+	var stack := Node3D.new()
+	stack.position = at
+	stack.rotation_degrees = Vector3(0.0, yaw_deg, 0.0)
+	parent.add_child(stack)
+	_add_crate_single(stack, Vector3(0.0, 0.0, 0.0), Vector3(1.15, 0.78, 0.90), body_mat, trim_mat, 0.0)
+	_add_crate_single(stack, Vector3(0.06, 0.78, -0.04), Vector3(0.84, 0.56, 0.68), body_mat, steel_mat, 14.0)
+
+
+static func _add_crate_single(parent: Node3D, at: Vector3, size: Vector3, body_mat: Material, trim_mat: Material, yaw_deg: float) -> void:
+	var crate := Node3D.new()
+	crate.position = at
+	crate.rotation_degrees = Vector3(0.0, yaw_deg, 0.0)
+	parent.add_child(crate)
+	crate.add_child(TunnelLook.part(TunnelLook.box(size), Vector3(0.0, size.y * 0.5, 0.0), body_mat))
+	crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(size.x + 0.06, 0.08, size.z + 0.06)), Vector3(0.0, size.y * 0.78, 0.0), trim_mat))
+	crate.add_child(TunnelLook.part(TunnelLook.box(Vector3(size.x + 0.04, 0.08, size.z + 0.04)), Vector3(0.0, 0.06, 0.0), trim_mat))
+
+
+## Deterministic regolith drifts and small rocks scattered clear of every walkable
+## spot, arrival point, pad, station/hab, and camp (zero collision, zero lights) [PLACEHOLDER].
+static func add_regolith_scatter(
+	parent: Node3D,
+	seed_value: int,
+	drift_count: int,
+	rock_count: int,
+	drift_col: Color,
+	drift_light_col: Color,
+	rock_col: Color,
+	rim_col: Color,
+	keep_clear: Array[Vector3],
+	is_deimos: bool,
+	clearance_m: float = SPOT_CLEARANCE_M
+) -> Node3D:
+	var group := Node3D.new()
+	group.name = "RegolithScatter"
+	parent.add_child(group)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value
+	var drift_mat: Material = TunnelLook.flat_mat(drift_col)
+	var drift_light_mat: Material = TunnelLook.flat_mat(drift_light_col)
+	var rock_mat: Material = TunnelLook.flat_mat(rock_col)
+	var rim_mat: Material = TunnelLook.flat_mat(rim_col)
+
+	var placed_drifts: int = 0
+	for _attempt: int in drift_count * 12:
+		if placed_drifts >= drift_count:
+			break
+		var pos: Vector3 = _pick_scatter_pos(rng)
+		if not _is_scatter_clear(pos, keep_clear, is_deimos, clearance_m):
+			continue
+		var w: float = rng.randf_range(1.5, 3.0)
+		var d: float = rng.randf_range(0.95, 1.85)
+		var h: float = rng.randf_range(0.04, 0.07)
+		var yaw: float = rng.randf_range(-180.0, 180.0)
+		var mat_a: Material = drift_mat if placed_drifts % 2 == 0 else drift_light_mat
+		var mat_b: Material = drift_light_mat if placed_drifts % 2 == 0 else drift_mat
+		group.add_child(TunnelLook.part(TunnelLook.box(Vector3(w, h, d)), Vector3(pos.x, h * 0.5, pos.z), mat_a, Vector3(0.0, yaw, 0.0)))
+		group.add_child(TunnelLook.part(TunnelLook.box(Vector3(w * 0.54, h * 0.75, d * 0.56)),
+				Vector3(pos.x + 0.14, h * 0.95, pos.z - 0.10), mat_b, Vector3(0.0, yaw + 16.0, 0.0)))
+		placed_drifts += 1
+
+	var placed_rocks: int = 0
+	for _attempt: int in rock_count * 12:
+		if placed_rocks >= rock_count:
+			break
+		var pos: Vector3 = _pick_scatter_pos(rng)
+		if not _is_scatter_clear(pos, keep_clear, is_deimos, clearance_m):
+			continue
+		var w: float = rng.randf_range(0.28, 0.62)
+		var h: float = rng.randf_range(0.16, 0.38)
+		var d: float = rng.randf_range(0.24, 0.54)
+		var yaw: float = rng.randf_range(-180.0, 180.0)
+		var mat: Material = rock_mat if placed_rocks % 3 != 0 else rim_mat
+		group.add_child(TunnelLook.part(TunnelLook.box(Vector3(w, h, d)), Vector3(pos.x, h * 0.5, pos.z), mat, Vector3(0.0, yaw, 0.0)))
+		if placed_rocks % 2 == 0:
+			group.add_child(TunnelLook.part(TunnelLook.box(Vector3(w * 0.52, h * 0.58, d * 0.50)),
+					Vector3(pos.x + w * 0.45, h * 0.28, pos.z - d * 0.25), rim_mat, Vector3(4.0, yaw + 24.0, -3.0)))
+		placed_rocks += 1
+	return group
+
+
+static func _pick_scatter_pos(rng: RandomNumberGenerator) -> Vector3:
+	var angle: float = rng.randf_range(0.0, TAU)
+	var dist: float = rng.randf_range(SCATTER_MIN_RADIUS_M, SCATTER_MAX_RADIUS_M)
+	return Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
+
+
+static func _is_scatter_clear(pos: Vector3, keep_clear: Array[Vector3], is_deimos: bool, clearance_m: float) -> bool:
+	# Keep off the lander pad and shuttle footprint (-14, 0, 1).
+	if Vector2(pos.x + 14.0, pos.z - 1.0).length() < 10.2:
+		return false
+	# Keep clear of Station (Phobos) or Hab (Deimos) and their utility flanks.
+	if not is_deimos:
+		if pos.x >= -12.0 and pos.x <= 15.6 and pos.z >= -19.2 and pos.z <= -9.0:
+			return false
+	else:
+		if Vector2(pos.x - 4.0, pos.z + 15.0).length() < 7.6:
+			return false
+	for spot: Vector3 in keep_clear:
+		if Vector2(pos.x - spot.x, pos.z - spot.z).length() < clearance_m:
+			return false
+	return true
+
+
+## Deimos expedition camp ground patch, perimeter stakes, and low windbreak around
+## `camp_at`, placed outside CampProps and CampClick footprints (zero collision, zero lights) [PLACEHOLDER].
+static func add_deimos_camp_dressing(parent: Node3D, camp_at: Vector3) -> Node3D:
+	var root := Node3D.new()
+	root.name = "CampDressing"
+	root.position = camp_at
+	parent.add_child(root)
+
+	# Flush dust-ground patch sitting flat on the deck beneath the camp area.
+	var patch := Node3D.new()
+	patch.name = "CampDustPatch"
+	root.add_child(patch)
+	patch.add_child(TunnelLook.part(drum_mesh(3.6, 0.014, 12), Vector3(0.0, 0.007, 0.0), TunnelLook.flat_mat(CAMP_PATCH_COLOR)))
+	patch.add_child(TunnelLook.part(drum_mesh(2.9, 0.012, 12), Vector3(0.1, 0.011, -0.05), TunnelLook.flat_mat(CAMP_PATCH_RIM)))
+
+	# Corner stakes and L-shaped low windbreak strictly outside CampProps & CampClick (|x| <= 2.2, |z| <= 1.5).
+	var perimeter := Node3D.new()
+	perimeter.name = "CampPerimeter"
+	root.add_child(perimeter)
+	var stake_mat: Material = TunnelLook.flat_mat(CAMP_STAKE_COLOR)
+	var frame_mat: Material = TunnelLook.flat_mat(CAMP_WINDBREAK_FRAME)
+	var panel_mat: Material = TunnelLook.flat_mat(CAMP_WINDBREAK_PANEL)
+	var stripe_mat: Material = TunnelLook.flat_mat(CAMP_WINDBREAK_STRIPE)
+
+	for corner: Vector3 in [
+		Vector3(-2.65, 0.0, -2.05),
+		Vector3(2.75, 0.0, -2.05),
+		Vector3(-2.65, 0.0, 2.05),
+		Vector3(2.75, 0.0, 2.05),
+	]:
+		perimeter.add_child(TunnelLook.part(TunnelLook.cylinder(0.04, 0.48), corner + Vector3(0.0, 0.24, 0.0), stake_mat))
+		perimeter.add_child(TunnelLook.part(TunnelLook.cylinder(0.06, 0.05), corner + Vector3(0.0, 0.44, 0.0), stripe_mat))
+
+	# North low windbreak wall at z = -2.25, x in [-2.3, 1.9].
+	perimeter.add_child(TunnelLook.part(TunnelLook.box(Vector3(4.2, 0.68, 0.12)), Vector3(-0.2, 0.40, -2.25), panel_mat))
+	perimeter.add_child(TunnelLook.part(TunnelLook.box(Vector3(4.26, 0.09, 0.14)), Vector3(-0.2, 0.56, -2.25), stripe_mat))
+	for px: float in [-2.25, -0.2, 1.85]:
+		perimeter.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.10, 0.80, 0.16)), Vector3(px, 0.40, -2.25), frame_mat))
+
+	# West low windbreak wing at x = -2.55, z in [-2.25, -0.25].
+	perimeter.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.12, 0.62, 2.0)), Vector3(-2.55, 0.37, -1.25), panel_mat))
+	perimeter.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.14, 0.08, 2.04)), Vector3(-2.55, 0.52, -1.25), stripe_mat))
+	for pz: float in [-2.20, -0.30]:
+		perimeter.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.16, 0.74, 0.10)), Vector3(-2.55, 0.37, pz), frame_mat))
+	return root
+
+
+## Surface dressing at Phobos's service tunnel mouth (around Hatch, clear of the
+## west ladder arrival spot and Hatch click box; zero collision, zero lights) [PLACEHOLDER].
+static func add_tunnel_mouth_dressing(parent: Node3D, hatch_at: Vector3) -> Node3D:
+	var root := Node3D.new()
+	root.name = "TunnelMouthDetail"
+	root.position = hatch_at
+	parent.add_child(root)
+	var dark_mat: Material = TunnelLook.flat_mat(DARK_METAL)
+	var steel_mat: Material = TunnelLook.flat_mat(STEEL)
+	var caution_mat: Material = TunnelLook.flat_mat(MOUTH_CAUTION)
+	var warm_pipe_mat: Material = TunnelLook.flat_mat(MOUTH_PIPE_WARM)
+	var glow_mat: Material = TunnelLook.glow_mat(MOUTH_VENT_GLOW, 0.7)
+
+	# Flush caution threshold bars along the north and east collar edges.
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(2.6, 0.03, 0.16)), Vector3(0.0, 0.02, -1.48), caution_mat))
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.16, 0.03, 2.6)), Vector3(1.48, 0.02, 0.0), caution_mat))
+	# Low corner bollards on the east side of the hatch.
+	for bz: float in [-1.45, 1.45]:
+		root.add_child(TunnelLook.part(TunnelLook.cylinder(0.09, 0.58), Vector3(1.68, 0.29, bz), dark_mat))
+		root.add_child(TunnelLook.part(TunnelLook.cylinder(0.10, 0.10), Vector3(1.68, 0.50, bz), caution_mat))
+	# Compact warm-conduit vent stack & insulated pipe elbow on the north-east corner.
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.68, 0.92, 0.56)), Vector3(1.85, 0.46, -1.15), steel_mat))
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.46, 0.34, 0.08)), Vector3(1.85, 0.56, -0.84), glow_mat))
+	root.add_child(TunnelLook.part(TunnelLook.cylinder(0.11, 0.72), Vector3(1.85, 0.36, -1.68), warm_pipe_mat))
+	root.add_child(TunnelLook.part(TunnelLook.cylinder(0.11, 0.52), Vector3(1.85, 0.68, -1.42), warm_pipe_mat, Vector3(90.0, 0.0, 0.0)))
+	# Short flat conduit cable heading north toward the station east flank.
+	_add_cable_run(root, Vector3(1.85, 0.0, -3.1), 2.8, 90.0, dark_mat, caution_mat)
+	return root
+
+
+## Look-only dressing at the top/ladder mouth inside PhobosServiceTunnel
+## (zero collision, zero lights) [PLACEHOLDER].
+static func add_service_tunnel_mouth_detail(parent: Node3D, ladder_at: Vector3, wall_height_m: float) -> Node3D:
+	var root := Node3D.new()
+	root.name = "TunnelMouthDetail"
+	root.position = ladder_at
+	parent.add_child(root)
+	var dark_mat: Material = TunnelLook.flat_mat(DARK_METAL)
+	var steel_mat: Material = TunnelLook.flat_mat(STEEL)
+	var caution_mat: Material = TunnelLook.flat_mat(MOUTH_CAUTION)
+	var warm_pipe_mat: Material = TunnelLook.flat_mat(MOUTH_PIPE_WARM)
+	var beacon_glow: Material = TunnelLook.glow_mat(MOUTH_VENT_GLOW, 0.8)
+
+	# Overhead hatch shaft coaming collar & amber status box above the ladder.
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.65, 0.22, 1.35)), Vector3(0.0, wall_height_m - 0.11, 0.20), dark_mat))
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.72, 0.08, 1.42)), Vector3(0.0, wall_height_m - 0.24, 0.20), caution_mat))
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.24, 0.14, 0.12)), Vector3(0.66, wall_height_m - 0.42, -0.42), beacon_glow))
+	# Caution floor rim + compact tool box & conduit riser tucked west of the ladder.
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.62, 0.03, 0.12)), Vector3(0.0, 0.02, 1.02), caution_mat))
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.64, 0.46, 0.50)), Vector3(-1.45, 0.23, 0.15), steel_mat))
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.68, 0.07, 0.54)), Vector3(-1.45, 0.46, 0.15), caution_mat))
+	root.add_child(TunnelLook.part(TunnelLook.cylinder(0.09, wall_height_m - 0.4), Vector3(-1.15, (wall_height_m - 0.4) * 0.5, -0.45), warm_pipe_mat))
+	return root

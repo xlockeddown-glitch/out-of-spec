@@ -189,6 +189,7 @@ func _build_world() -> void:
 	_build_shell()
 	_build_pipes_and_vents()
 	_build_signage()
+	MoonLook.add_service_tunnel_mouth_detail(self, LADDER_AT, WALL_HEIGHT_M)
 	ladder_click = _build_ladder()
 	ladder_click.clicked.connect(_on_ladder)
 	_build_strays(GameClock.get_day_index())
