@@ -418,7 +418,7 @@
       "offer": { "when": "counter", "counter": "reached_ice_caves", "at_least": 1 },
       "offer_line": "npcs/orin/quests/a_night_on_the_ice_offer",
       "steps": [
-        { "id": "night", "text": "Warm your pack with a heater cartridge, park the rover at the Polar Ice Caves camp and go to bed there.",
+        { "id": "night", "text": "Park the rover at the Polar Ice Caves camp and go to bed there. If your pack is past half cold, buy a heater cartridge at the hub crate first.",
           "check": "counter", "counter": "camp_night_ice_caves" }
       ],
       "rewards": { "xp_certificate": 30, "phone": "npcs/orin/quests/a_night_on_the_ice_done" }

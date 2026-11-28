@@ -372,3 +372,131 @@ func test_the_new_camps_save_and_an_old_save_loads() -> String:
 
 func test_the_protocol_is_unchanged_by_the_new_camps() -> String:
 	return "" if CoopSession.PROTOCOL == 45 else "No command or synced field is new: the protocol stays 45, not %d" % CoopSession.PROTOCOL
+
+
+# --- The counters and a whole run -------------------------------------------------------
+
+func _at_noon(body: Callable) -> String:
+	var held: float = GameClock.elapsed_days
+	GameClock.elapsed_days = TunnelRecall.at_hour(1, 12.0)
+	var out: Variant = body.call()
+	GameClock.elapsed_days = held
+	return out if out is String else "The test stopped early or did not return a String."
+
+
+## Takes the first Aquifer find the host's rule lets through, with the rover at depth 1.
+## Returns the reply of the last try ("" for a taken find) and `found` says whether one was tried.
+func _take_one(gs: GameStateScript) -> String:
+	var day: int = GameClock.get_day_index()
+	var data: Dictionary = AquiferDepth.layout(424242, 1, day)
+	var reply: String = "no find"
+	gs.rover_zone = AQUIFER
+	gs.rover_lent = true
+	gs.rover_depth = 1
+	gs.player_places[HOST] = [AQUIFER, 1]
+	for find: Dictionary in data["finds"]:
+		gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, TunnelRock.at_in(data["grid"], find["cell"]))
+		reply = gs.take_find(str(find["id"]), day, HOST)
+		if not ZoneDepth.taken_today(gs.finds_taken, AQUIFER, day).is_empty():
+			return ""  # taken (a wet pack's reply is still a taken find)
+	return reply
+
+
+func test_driving_to_the_aquifer_counts_the_visit_once() -> String:
+	var gs: GameStateScript = _state(AQUIFER)
+	var problems: Array[String] = []
+	_at_noon(func() -> String:
+		gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.AQUIFER_PAD)
+		var why: String = gs.move_rover_aquifer(true, HOST)
+		if why != "":
+			problems.append("Driving in was refused: '%s'" % why)
+		if _count(gs, HOST, "reached_flooded_aquifer") != 1:
+			problems.append("One drive counts one visit: %d" % _count(gs, HOST, "reached_flooded_aquifer"))
+		return "")
+	gs.free()
+	return "
+".join(problems)
+
+
+func test_fast_travelling_to_the_aquifer_counts_the_visit_once() -> String:
+	var gs: GameStateScript = _state(AQUIFER)
+	gs.player_places[HOST] = [ZonePresence.DOME, 0]
+	var problems: Array[String] = []
+	_at_noon(func() -> String:
+		var why: String = gs.fast_travel(AQUIFER, HOST)
+		if why != "":
+			problems.append("The console refused: '%s'" % why)
+		if _count(gs, HOST, "reached_flooded_aquifer") != 1:
+			problems.append("One trip counts one visit: %d" % _count(gs, HOST, "reached_flooded_aquifer"))
+		return "")
+	gs.free()
+	return "
+".join(problems)
+
+
+func test_an_aquifer_take_counts_a_find_and_a_refused_take_counts_none() -> String:
+	var gs: GameStateScript = _state(AQUIFER)
+	var problems: Array[String] = []
+	_at_noon(func() -> String:
+		var day: int = GameClock.get_day_index()
+		gs.rover_zone = AQUIFER
+		gs.rover_lent = true
+		gs.rover_depth = 1
+		gs.player_places[HOST] = [AQUIFER, 1]
+		if gs.take_find("d1_f0", day + 1, HOST) == "":
+			problems.append("Yesterday's floor is refused")
+		if _count(gs, HOST, GameStateScript.AQUIFER_FIND_COUNT) != 0:
+			problems.append("A refused take counts none")
+		if _take_one(gs) != "":
+			problems.append("No Aquifer find could be taken today")
+		elif _count(gs, HOST, GameStateScript.AQUIFER_FIND_COUNT) != 1:
+			problems.append("A taken find counts one: %d" % _count(gs, HOST, GameStateScript.AQUIFER_FIND_COUNT))
+		return "")
+	gs.free()
+	return "
+".join(problems)
+
+
+func test_the_sump_sample_runs_from_the_visit_to_the_end() -> String:
+	return _camp_farm(AQUIFER, false, func(gs: GameStateScript, _beds: Node, _clock: Node) -> String:
+		var problems: Array[String] = []
+		gs.lab_xp = gs.xp_for_level(12)
+		_at_noon(func() -> String:
+			QuestEngine.update(gs, [HOST] as Array[String])
+			if gs.quest_state.has("the_sump_sample") or gs.camps_open.has(AQUIFER):
+				problems.append("Not offered before a visit")
+			gs.rover_transforms[gs.ROVER] = Transform3D(Basis.IDENTITY, gs.AQUIFER_PAD)
+			if gs.move_rover_aquifer(true, HOST) != "":
+				problems.append("Driving in")
+			QuestEngine.update(gs, [HOST] as Array[String])
+			if not gs.camps_open.has(AQUIFER):
+				problems.append("The visit offers the quest and opens the camp")
+			if _take_one(gs) != "":
+				problems.append("A find was taken")
+			_hub(gs, AQUIFER, [HOST], Camp.position(AQUIFER), true, 1)
+			if gs.go_to_bed(HOST) != "":
+				problems.append("The night at the camp")
+			QuestEngine.update(gs, [HOST] as Array[String])
+			if not QuestEngine.is_done(gs, "the_sump_sample", HOST):
+				problems.append("A visit, a find and a night finish the quest")
+			return "")
+		return "
+".join(problems))
+
+
+func test_a_camper_who_paid_tonight_is_not_asked_for_the_heater_again() -> String:
+	return _camp_farm(ICE, true, func(gs: GameStateScript, beds: Node, _clock: Node) -> String:
+		_hub(gs, ICE, [HOST], Camp.position(ICE), true, 2)
+		var now: float = GameClock.elapsed_days
+		gs.cold_since[HOST] = now
+		var problems: Array[String] = []
+		if gs.go_to_bed(HOST) != "":
+			problems.append("The first night, warm")
+		beds.get_up(HOST)
+		gs.cold_since[HOST] = now - 1.0
+		if gs.go_to_bed(HOST) != "":
+			problems.append("Lying down again after paying is not refused for cold")
+		if gs.camp_supplies != 1 or _count(gs, HOST, Camp.night_key(ICE)) != 1:
+			problems.append("No second supply and no second night: %d left, %d counted" % [gs.camp_supplies, _count(gs, HOST, Camp.night_key(ICE))])
+		return "
+".join(problems))

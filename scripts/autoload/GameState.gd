@@ -1828,7 +1828,9 @@ func camp_problem(player_id: String, zone: String, paid: bool = false) -> String
 	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
 	var near: bool = at != null and Camp.near(zone, at, Camp.HOST_REACH_SLACK_M)
 	var why: String = Camp.sleep_problem(zone, camps_open.has(zone), depth_of(player_id), rover_zone == zone and rover_depth == 0, near, maxi(camp_supplies, 1 if paid else 0))
-	return why if why != "" else Camp.cold_problem(zone, cold_of(player_id))
+	if why != "" or paid:
+		return why  # a night paid for tonight is not asked for the heater again
+	return Camp.cold_problem(zone, cold_of(player_id))
 
 
 ## Host: the player goes to bed at the open camp of `zone`. Uses one night's supplies and

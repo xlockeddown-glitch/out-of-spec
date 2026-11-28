@@ -48,7 +48,7 @@ const NIGHT_COUNT: String = "camp_night"
 ## The count a night at `zone`'s camp adds. The Lava Tubes keep NIGHT_COUNT (Two Sunsets reads
 ## it); every other zone counts its own, so a night in one zone never counts for another's quest.
 static func night_key(zone: String) -> String:
-	return NIGHT_COUNT if zone == "lava_tubes" else NIGHT_COUNT + "_" + zone
+	return NIGHT_COUNT if zone == ZoneDepth.ZONE else NIGHT_COUNT + "_" + zone
 
 
 ## A night at the Ice Caves camp needs the heater the cold rule already uses: the player's
