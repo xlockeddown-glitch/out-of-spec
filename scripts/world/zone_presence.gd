@@ -10,8 +10,6 @@ const DOME: String = "dome"
 ## The deepest a report may say [PLACEHOLDER]: the deepest ZoneDepth generates (the Lava
 ## Tubes'; every other zone has its own, _max_depth).
 const MAX_DEPTH: int = ZoneDepth.MAX_DEPTH
-## What a place with no depths of its own may say: the original three.
-const OTHER_MAX_DEPTH: int = 3
 ## The place of someone the host has not heard from: everyone starts on the farm.
 const DEFAULT_PLACE: String = FARM
 const NOT_YOURS: String = "A place is reported by the player who is there."
@@ -23,14 +21,10 @@ static func is_place(place: String) -> bool:
 	return place == FARM or place == DOME or (place != "" and ZoneData.is_playable(StringName(place)))
 
 
+## The most depth `place` has: its own zone's (0 for the farm, the dome and every zone
+## with no depths, the moons among them).
 static func _max_depth(place: String) -> int:
-	if place == AquiferDepth.ZONE:
-		return AquiferDepth.MAX_DEPTH
-	if place == IceDepth.ZONE:
-		return IceDepth.MAX_DEPTH
-	if place == MineDepth.ZONE:
-		return MineDepth.MAX_DEPTH
-	return MAX_DEPTH if place == ZoneDepth.ZONE else OTHER_MAX_DEPTH
+	return ZoneDepth.max_depth_of(place)
 
 
 ## Why [place, depth] cannot be: the one rule for the host's command and for a

@@ -1205,6 +1205,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	if problem != "":
 		return problem
 	put_farm(data)
+	_hold_deep_rover()
 	finds_taken = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	pools_drained = ZoneDepth.prune(pools_drained, GameClock.get_day_index())
 	valves_shut = ZoneDepth.prune(valves_shut, GameClock.get_day_index())
@@ -5132,7 +5133,7 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 	if target_depth < 0 or target_depth > ZoneDepth.max_depth_of(rover_zone) or absi(target_depth - rover_depth) != 1:
 		return "There is no way there from here."
 	var going_down: bool = target_depth > rover_depth
-	if going_down and rover_zone == TUNNELS_ZONE and ZoneDepth.is_deep(target_depth):
+	if rover_zone == TUNNELS_ZONE and ZoneDepth.is_deep(target_depth):  # down into them or between them
 		reason = lava_deep_problem()
 		if reason != "":
 			return reason
@@ -5146,6 +5147,17 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 		pose = Transform3D(Basis.IDENTITY, down_at + Vector3(0.0, 0.05, TunnelRock.CELL_M))  # beside the Aquifer's or Mine's hatch
 	_move_rover_to(target_depth, pose)
 	return ""
+
+
+## A loaded farm whose rover is below depth 3 of the Lava Tubes while the way there is shut
+## (an old or edited save: the lab level is low, or the lift at depth 3 is broken) has it
+## back up at depth 3's start: it loads, but the deep floors stay out of reach until the
+## gate is met [PLACEHOLDER].
+func _hold_deep_rover() -> void:
+	if rover_zone != TUNNELS_ZONE or not ZoneDepth.is_deep(rover_depth) or lava_deep_problem() == "":
+		return
+	rover_depth = ZoneDepth.FIRST_DEEP - 1
+	rover_transforms.erase(TUNNEL_ROVER)  # settle_rover_depth puts it at the start
 
 
 ## "" if the farm may go below depth 3 of the Lava Tubes, or what is missing in plain
@@ -5234,7 +5246,10 @@ func repair_lift(player_id: String = "") -> String:
 		return "There is no lift to repair here."
 	if is_lift_repaired(TUNNELS_ZONE, depth):
 		return "The lift is repaired already."
-	var reason: String = _rover_reach_problem(ZoneDepth.lift_position(depth))
+	var reason: String = lava_deep_problem() if ZoneDepth.is_deep(depth) else ""
+	if reason != "":
+		return reason
+	reason = _rover_reach_problem(ZoneDepth.lift_position(depth))
 	if reason != "":
 		return reason
 	var cost: Vector2i = ZoneDepth.lift_cost(depth)
@@ -6407,6 +6422,8 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 		reason = "The rover is not down there."
 	if reason == "" and depth_of(player_id) != rover_depth:
 		reason = "Finds lie where the rover is."
+	if reason == "" and zone == ZoneDepth.ZONE and ZoneDepth.is_deep(rover_depth):
+		reason = lava_deep_problem()  # the deep floors pay only once the way there is open
 	if reason == "":
 		reason = ZoneDepth.take_problem(find_id, today.get("finds", []), taken, place_of(player_id), depth_of(player_id), zone)
 	if reason == "" and mine:

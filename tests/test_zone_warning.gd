@@ -9,8 +9,8 @@ func test_under_the_band_the_tunnels_warn() -> String:
 	for part: String in ["Recommended lab level 5", "You are level 3", "Go anyway?"]:
 		if not text.contains(part):
 			return "The warning lacks '%s': %s" % [part, text]
-	if not text.contains(ZoneData.WARNING_SOFT):
-		return "The tunnels have no hard gate yet, so the soft line: %s" % text
+	if not text.contains("Deeper levels need a lab level of 10.") or text.contains(ZoneData.WARNING_SOFT):
+		return "The tunnels' deep gate (lab level 10) is named, not the soft line: %s" % text
 	return ""
 
 

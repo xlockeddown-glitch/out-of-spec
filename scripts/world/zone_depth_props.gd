@@ -82,7 +82,6 @@ func build_lift(depth: int, repaired: bool) -> void:
 		lift.add_child(TunnelLook.label("LIFT: BROKEN", Vector3(0.0, 3.3, -1.0)))
 
 
-## Below: a marker for each of the layout's finds not in `taken`.
 ## The day's rockfall of a deep depth: a big rubble pile in the floor cell beside the blocked
 ## passage, pushed up against the fallen rock. Nothing when the layout has none.
 func build_rockfall(layout_data: Dictionary) -> void:
@@ -102,6 +101,7 @@ func build_rockfall(layout_data: Dictionary) -> void:
 	pile.add_child(TunnelLook.label("LOOSE BASALT", Vector3(0.0, 1.6, 0.0)))
 
 
+## Below: a marker for each of the layout's finds not in `taken`.
 func build_finds(layout_data: Dictionary, taken: Array) -> void:
 	for find: Dictionary in layout_data.get("finds", []):
 		var node := Node3D.new()

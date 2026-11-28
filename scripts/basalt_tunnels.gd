@@ -80,7 +80,7 @@ func _ready() -> void:
 	GameState.credits_changed.connect(_hud.set_credits)
 	GameState.ore_changed.connect(_hud.set_ore)
 	GameState.credibility_changed.connect(_on_credibility_changed)
-	GameState.lab_xp_changed.connect(_on_credibility_changed.bind(0))
+	GameState.lab_xp_changed.connect(_on_lab_xp_changed)
 	GameState.jobs_changed.connect(_refresh_jobs_hud)
 	GameState.upgrades_changed.connect(_refresh_jobs_hud)
 	GameState.oirm_changed.connect(_refresh_jobs_hud)
@@ -431,6 +431,9 @@ func _use_camp() -> void:
 func _lift_prompt() -> String:
 	var repaired: bool = GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth())
 	if repaired:
+		var shut: String = GameState.lava_deep_problem() if _built_depth == 0 and ZoneDepth.is_deep(_lift_depth()) else ""
+		if shut != "":
+			return "LIFT: " + shut
 		return "LIFT: press " + Controls.prompt(&"interact") + " to ride it %s." % ("up to the hub" if _built_depth > 0 else "down to depth %d" % _lift_depth())
 	if _built_depth > 0:
 		return "LIFT: broken. Press " + Controls.prompt(&"interact") + " to repair it. %s" % ZoneDepth.repair_cost_text(_built_depth)
@@ -638,6 +641,12 @@ func _on_dig_rejected(reason: String) -> void:
 
 func _on_fill_rejected(reason: String) -> void:
 	_hud.push_log("FILL FAILED: %s" % reason)
+
+
+## A new lab level can open the way down or the hub lift: the prompt is read again.
+func _on_lab_xp_changed() -> void:
+	_told_hub = ""
+	_on_credibility_changed(0)
 
 
 func _on_credibility_changed(_points: int) -> void:

@@ -357,3 +357,198 @@ func test_a_deep_save_round_trips_and_an_old_save_loads() -> String:
 	back.free()
 	old.free()
 	return "\n".join(problems)
+
+
+# --- Review fixes: the limits, the gate in every direction, the loaded rover -------
+
+func test_each_zone_has_its_own_most_depth_and_the_moons_have_none() -> String:
+	var problems: Array[String] = []
+	var limits: Dictionary = {"lava_tubes": 6, "flooded_aquifer": 1, "colony_mine": 1, "ice_caves": 1, "phobos": 0, "deimos": 0}
+	for zone: String in limits:
+		var most: int = limits[zone]
+		if ZoneDepth.max_depth_of(zone) != most:
+			problems.append("%s: max_depth_of is %d, not %d." % [zone, ZoneDepth.max_depth_of(zone), most])
+		if ZonePresence.place_problem(zone, most) != "" or ZonePresence.place_problem(zone, most + 1) == "":
+			problems.append("%s: the place rule is wrong at %d and %d." % [zone, most, most + 1])
+		if most >= 1 and ZoneDepth.deepest_problem({zone: most}) != "":
+			problems.append("%s: its own deepest is refused." % zone)
+		if ZoneDepth.deepest_problem({zone: most + 1}) == "":
+			problems.append("%s: a deepest past its most was let in." % zone)
+	# Finds: depth 4's and 6's ids belong to the Lava Tubes alone.
+	if ZoneDepth.taken_problem({"lava_tubes": {"day": 1, "ids": ["d6_f0"]}}) != "":
+		problems.append("The Lava Tubes' depth 6 find was refused.")
+	for zone: String in ["flooded_aquifer", "colony_mine", "ice_caves"]:
+		if ZoneDepth.taken_problem({zone: {"day": 1, "ids": ["d4_f0"]}}) == "":
+			problems.append("%s took a find id from depth 4." % zone)
+	# Lifts: 6 needs 3, in either order; no lift is deeper than the zone.
+	if ZoneDepth.lifts_problem({"lava_tubes": [6]}) == "":
+		problems.append("A lift at 6 with no lift at 3 was let in.")
+	if ZoneDepth.lifts_problem({"lava_tubes": [3, 6]}) != "" or ZoneDepth.lifts_problem({"lava_tubes": [6, 3]}) != "":
+		problems.append("Lifts 3 and 6 were refused.")
+	if ZoneDepth.lifts_problem({"flooded_aquifer": [6]}) == "" or ZoneDepth.lifts_problem({"phobos": [3]}) == "":
+		problems.append("A lift past a zone's depths was let in.")
+	return "\n".join(problems)
+
+
+func test_the_gate_holds_in_every_direction_among_the_deep_depths() -> String:
+	var problems: Array[String] = []
+	var gs: GameStateScript = _state(10, true)
+	_rover_at(gs, 5, ZoneDepth.descent_position(5))
+	gs.lab_xp = gs.xp_for_level(9)
+	for target: int in [4, 6]:
+		var epoch: int = gs.rover_epoch
+		var why: String = gs.change_depth(target)
+		if why == "" or gs.rover_depth != 5 or gs.rover_epoch != epoch:
+			problems.append("Depth 5 to %d went with the gate shut: %s" % [target, why])
+	# Going up out of depth 4 to 3 stays open: the way home is never shut.
+	_rover_at(gs, 4, ZoneDepth.ascent_position())
+	var up: String = gs.change_depth(3)
+	if up != "" or gs.rover_depth != 3:
+		problems.append("The rover could not leave the deep with the gate shut: %s" % up)
+	_rover_at(gs, 6, ZoneDepth.lift_position(6))
+	var credits: int = gs.credits
+	var why_lift: String = gs.repair_lift()
+	if why_lift == "" or not "lab level" in why_lift or gs.is_lift_repaired("lava_tubes", 6) or gs.credits != credits:
+		problems.append("The depth 6 lift was repaired with the gate shut: %s" % why_lift)
+	# Finds below 3 do not pay with the gate shut.
+	var day: int = GameClock.get_day_index()
+	var data: Dictionary = ZoneDepth.layout(SEED, ZoneDepth.ZONE, 4, day)
+	var find: Dictionary = data["finds"][0]
+	_rover_at(gs, 4, TunnelRock.at_in(data["grid"], find["cell"]))
+	credits = gs.credits
+	var ore: int = gs.crystal_ore
+	if gs.take_find(find["id"], day, HOST) == "" or gs.credits != credits or gs.crystal_ore != ore:
+		problems.append("A deep find paid with the gate shut.")
+	gs.lab_xp = gs.xp_for_level(10)
+	if gs.take_find(find["id"], day, HOST) != "":
+		problems.append("The find was refused with the gate open.")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_the_lift_at_six_has_its_reach_its_ore_and_its_order() -> String:
+	var problems: Array[String] = []
+	var gs: GameStateScript = _state(10, true)
+	var cost: Vector2i = ZoneDepth.lift_cost(6)
+	# Away from depth 6: refused. Away from the lift: refused, nothing taken.
+	_rover_at(gs, 5, ZoneDepth.lift_position(6))
+	if gs.repair_lift() == "" and gs.is_lift_repaired("lava_tubes", 6):
+		problems.append("Depth 5 repaired depth 6's lift.")
+	_rover_at(gs, 6, ZoneDepth.start_transform().origin)
+	var credits: int = gs.credits
+	if gs.repair_lift() == "" or gs.is_lift_repaired("lava_tubes", 6) or gs.credits != credits:
+		problems.append("The lift was repaired from the start, away from it.")
+	# Ore: one short is refused and takes nothing.
+	_rover_at(gs, 6, ZoneDepth.lift_position(6))
+	gs.crystal_ore = cost.y - 1
+	if gs.repair_lift() == "" or gs.crystal_ore != cost.y - 1 or gs.credits != credits or gs.is_lift_repaired("lava_tubes", 6):
+		problems.append("One ore short repaired it or took something.")
+	gs.crystal_ore = cost.y
+	if gs.repair_lift() != "" or gs.crystal_ore != 0 or gs.credits != credits - cost.x:
+		problems.append("The exact ore did not repair it, or the charge is wrong.")
+	# The ride to 6 is refused while 3's lift is broken.
+	gs.lifts_repaired = {"lava_tubes": [6]}
+	_rover_at(gs, 0, ZoneDepth.lift_position(0))
+	if gs.use_lift(6) == "" or gs.rover_depth != 0:
+		problems.append("The lift went to 6 with depth 3's lift broken.")
+	# From 6 up to the hub works once both are repaired; the layout keeps the lift reachable.
+	gs.lifts_repaired = {"lava_tubes": [3, 6]}
+	_rover_at(gs, 6, ZoneDepth.lift_position(6))
+	if gs.use_lift(0) != "" or gs.rover_depth != 0:
+		problems.append("Depth 6 to the hub failed with both lifts repaired.")
+	for day: int in range(0, 40):
+		var grid: PackedStringArray = ZoneDepth.layout(SEED, ZoneDepth.ZONE, 6, day)["grid"]
+		if not ZoneDepth.LIFT_CELL in ZoneDepth.reachable(grid, ZoneDepth.START_CELL):
+			problems.append("Day %d: the lift at 6 is cut off." % day)
+			break
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_the_rockfall_pile_is_on_the_start_side_and_the_finds_keep_off_it() -> String:
+	var seen: int = 0
+	for seed_value: int in range(1, 31):
+		for day: int in range(0, 25):
+			for depth: int in DEEP:
+				var data: Dictionary = ZoneDepth.layout(seed_value * 104729, ZoneDepth.ZONE, depth, day)
+				var fall: Dictionary = data["fall"]
+				if fall.is_empty():
+					continue
+				seen += 1
+				var beside: Vector2i = fall["beside"]
+				var grid: PackedStringArray = data["grid"]
+				if grid[beside.y][beside.x] != ".":
+					return "Depth %d day %d: the pile's side is not floor." % [depth, day]
+				if not beside in ZoneDepth.reachable(grid, ZoneDepth.START_CELL):
+					return "Depth %d day %d: the pile's side is not reached from the start." % [depth, day]
+				for find: Dictionary in data["finds"]:
+					if find["cell"] == beside:
+						return "Depth %d day %d: a find sits on the pile's side." % [depth, day]
+	if seen == 0:
+		return "No rockfall was drawn at all."
+	return ""
+
+
+func test_a_deep_rover_loaded_with_the_gate_shut_is_put_back_at_depth_three() -> String:
+	var problems: Array[String] = []
+	var gs: GameStateScript = _state(10, true)
+	_rover_at(gs, 6, ZoneDepth.lift_position(6))
+	gs.deepest_depth["lava_tubes"] = 6
+	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
+	if data.get("rover_depth", 0) != 6 or data.get("rover_zone", "") != "lava_tubes":
+		problems.append("The save did not hold the rover at depth 6.")
+	# The same farm, loaded where the lab level is not enough.
+	var low_data: Dictionary = data.duplicate(true)
+	low_data["lab_xp"] = 0
+	var low: GameStateScript = _state(1, false)
+	if low.farm_from_dict(low_data) != "":
+		problems.append("The low-level deep save was refused.")
+	if low.rover_depth != 3 or low.rover_zone != "lava_tubes":
+		problems.append("The rover was left at depth %d (%s)." % [low.rover_depth, low.rover_zone])
+	if low.lava_deep_problem() == "":
+		problems.append("The gate opened by loading.")
+	# With the gate open the rover stays where the save had it.
+	var kept: GameStateScript = _state(10, true)
+	if kept.farm_from_dict(data) != "" or kept.rover_depth != 6:
+		problems.append("The rover was moved though the gate is open (depth %d)." % kept.rover_depth)
+	gs.free()
+	low.free()
+	kept.free()
+	return "\n".join(problems)
+
+
+func test_deep_finds_pay_once_at_depths_four_and_six() -> String:
+	var problems: Array[String] = []
+	var gs: GameStateScript = _state(10, true)
+	var day: int = GameClock.get_day_index()
+	for depth: int in [4, 6]:
+		var data: Dictionary = ZoneDepth.layout(SEED, ZoneDepth.ZONE, depth, day)
+		var find: Dictionary = data["finds"][1]
+		_rover_at(gs, depth, TunnelRock.at_in(data["grid"], find["cell"]))
+		var credits: int = gs.credits
+		var ore: int = gs.crystal_ore
+		var pay: Dictionary = ZoneDepth.reward(str(find["kind"]), depth)
+		if gs.take_find(find["id"], day, HOST) != "" or gs.credits - credits != int(pay.get("credits", 0)) or gs.crystal_ore - ore != int(pay.get("crystal_ore", 0)):
+			problems.append("Depth %d paid wrong." % depth)
+		credits = gs.credits
+		if gs.take_find(find["id"], day, HOST) == "" or gs.credits != credits:
+			problems.append("Depth %d paid twice." % depth)
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_depth_five_always_has_a_rockfall_and_never_cuts_off_the_floor() -> String:
+	for seed_value: int in range(1, 201):
+		for day: int in range(0, 12):
+			var data: Dictionary = ZoneDepth.layout(seed_value * 7919 + 13, ZoneDepth.ZONE, 5, day)
+			var fall: Dictionary = data["fall"]
+			if fall.is_empty() or (fall["cells"] as Array).is_empty():
+				return "Depth 5 seed %d day %d: no rockfall." % [seed_value, day]
+			var grid: PackedStringArray = data["grid"]
+			var reach: Array[Vector2i] = ZoneDepth.reachable(grid, ZoneDepth.START_CELL)
+			if not ZoneDepth.UP_CELL in reach or not ZoneDepth.hatch_cell(5) in reach:
+				return "Depth 5 seed %d day %d: the way up or down is cut off." % [seed_value, day]
+			for find: Dictionary in data["finds"]:
+				if not find["cell"] in reach:
+					return "Depth 5 seed %d day %d: a find is cut off." % [seed_value, day]
+	return ""

@@ -12,6 +12,7 @@
       "name": "Lava Tubes",
       "area": "underground",
       "band": [5, 20],
+      "deep_gate": "lava_tubes_deep",
       "hazards": ["heat", "loose_basalt", "dark"],
       "finds": ["crystal_ore", "basalt_glass", "vent_samples"],
       "hub_scene": "res://scenes/basalt_tunnels.tscn",

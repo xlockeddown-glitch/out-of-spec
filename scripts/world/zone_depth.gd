@@ -211,7 +211,7 @@ static func layout(world_seed: int, zone: String, depth: int, day: int) -> Dicti
 	for row: Array in cells:
 		grid.append("".join(row))
 	var out: Dictionary = { "depth": depth, "day": day, "grid": grid, "start": START_CELL, "rooms": rooms, "finds": [], "fall": fall }
-	out["finds"] = _finds(base, grid, rooms, depth)
+	out["finds"] = _finds(base, grid, rooms, depth, fall.get("beside", START_CELL))
 	return out
 
 
@@ -240,13 +240,40 @@ static func _rockfall(base: int, cells: Array, rooms: Array[Rect2i], plan: Dicti
 				options.append(line)
 	if options.is_empty():
 		return {}
-	var total: int = _flood(cells, START_CELL, []).size()
+	var whole: Array[Vector2i] = _flood(cells, START_CELL, [])
 	var first: int = draw(base, 60, options.size())
-	for offset: int in options.size():
-		var line: Array = options[(first + offset) % options.size()]
-		if _flood(cells, START_CELL, line).size() == total - line.size():
-			return { "cells": line, "beside": _beside(cells, line) }
+	# First choice: a line that cuts nothing off. Failing that (a side passage that is a
+	# dead end in a room's rock), one that cuts off only bare passage: no room, landing,
+	# hatch or lift cell, so no find and no way is lost with it [PLACEHOLDER].
+	for strict: bool in [true, false]:
+		for offset: int in options.size():
+			var line: Array = options[(first + offset) % options.size()]
+			var reached: Array[Vector2i] = _flood(cells, START_CELL, line)
+			var lost: Array[Vector2i] = []
+			for cell: Vector2i in whole:
+				if not cell in line and not cell in reached:
+					lost.append(cell)
+			if strict and not lost.is_empty():
+				continue
+			if not strict and not _only_passage(lost, rooms, plan):
+				continue
+			return { "cells": line, "beside": _beside(cells, line, reached, rooms, plan) }
 	return {}
+
+
+## True if none of `lost` is in a room, a carve (the landing, the trunk), or a cell a way
+## down or a lift is at.
+static func _only_passage(lost: Array[Vector2i], rooms: Array[Rect2i], plan: Dictionary) -> bool:
+	for cell: Vector2i in lost:
+		for area: Rect2i in rooms:
+			if area.has_point(cell):
+				return false
+		for area: Rect2i in plan["carves"]:
+			if area.has_point(cell):
+				return false
+		if cell in [HATCH_CELL, LIFT_CELL, UP_CELL, START_CELL]:
+			return false
+	return true
 
 
 ## The floor cells reached from `from` with `blocked` cells counted as rock.
@@ -266,17 +293,28 @@ static func _flood(cells: Array, from: Vector2i, blocked: Array) -> Array[Vector
 	return out
 
 
-## A floor cell beside the blocked line, on the side the rover comes from (the one
-## nearer the start); the line is a straight one.
-static func _beside(cells: Array, line: Array) -> Vector2i:
-	var along: Vector2i = line[line.size() - 1] - line[0]
-	var back: Vector2i = Vector2i.LEFT if along.y != 0 or line.size() == 1 else Vector2i.UP
-	var first: Vector2i = line[0]
-	var options: Array[Vector2i] = [first + back, line[line.size() - 1] - back, first - back]
-	for cell: Vector2i in options:
-		if cell.y >= 0 and cell.y < HEIGHT and cell.x >= 0 and cell.x < WIDTH and cells[cell.y][cell.x] == ".":
-			return cell
-	return first
+## A floor cell next to the blocked line on the side the rover comes from: one the
+## flood from the start reaches (`reached`, with the line blocked), outside the rooms and
+## the carves where one is. The pile is shown there, so it is never behind the rock.
+static func _beside(cells: Array, line: Array, reached: Array[Vector2i], rooms: Array[Rect2i], plan: Dictionary) -> Vector2i:
+	var near: Array[Vector2i] = []
+	for cell: Vector2i in line:
+		for side: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var next: Vector2i = cell + side
+			if next in reached and not next in line and not next in near:
+				near.append(next)
+	var open: Array[Vector2i] = []
+	for cell: Vector2i in near:
+		var held: bool = cell in [START_CELL, HATCH_CELL, LIFT_CELL, UP_CELL]
+		for area: Rect2i in rooms:
+			held = held or area.has_point(cell)
+		for area: Rect2i in plan["carves"]:
+			held = held or area.has_point(cell)
+		if not held:
+			open.append(cell)
+	if not open.is_empty():
+		return open[0]
+	return near[0] if not near.is_empty() else (line[0] as Vector2i)
 
 
 static func _put(cells: Array, cell: Vector2i, tile: String) -> void:
@@ -301,9 +339,10 @@ static func _floor_cells(grid: PackedStringArray, area: Rect2i) -> Array[Vector2
 
 ## The finds: PER_ROOM in each room and ON_LANDING on the landing, never on the
 ## start, never two on one cell. Ids are "d<depth>_f<number>" in this order.
-static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], depth: int) -> Array:
+static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], depth: int, rubble: Vector2i = START_CELL) -> Array:
 	var finds: Array = []
-	var used: Array[Vector2i] = [START_CELL]
+	# Nor on the cell the rubble is shown at.
+	var used: Array[Vector2i] = [START_CELL, rubble]
 	# Nor on a way down or a lift, nor the cell a rover comes out at beside one.
 	for cell: Vector2i in _kept_clear(depth):
 		used.append(cell)
@@ -677,7 +716,7 @@ static func taken_problem(taken: Variant) -> String:
 			return "'finds_taken' has ids that are not a list."
 		var seen: Array[String] = []
 		for id: Variant in ids:
-			if not id is String or not _is_find_id(id):
+			if not id is String or not _is_find_id(id, zone):
 				return "'finds_taken' has an id that is not a find's."
 			if id in seen:
 				return "'finds_taken' has an id twice."
@@ -685,9 +724,9 @@ static func taken_problem(taken: Variant) -> String:
 	return ""
 
 
-static func _is_find_id(text: String) -> bool:
-	# Only the canonical spelling: d01_f00 or d1_f+1 are not ids.
-	for depth: int in range(DEPTH, MAX_DEPTH + 1):
+static func _is_find_id(text: String, zone: String = ZONE) -> bool:
+	# Only the canonical spelling: d01_f00 or d1_f+1 are not ids. Only depths the zone has.
+	for depth: int in range(DEPTH, max_depth_of(zone) + 1):
 		for index: int in find_count(depth):
 			if text == find_id(index, depth):
 				return true
@@ -707,15 +746,19 @@ static func lifts_problem(lifts: Variant) -> String:
 			return "'lifts_repaired' has an entry that is not a known zone's list."
 		var seen: Array[int] = []
 		for depth: Variant in depths:
-			if not depth is int or not is_lift_depth(depth):
+			if not depth is int or not is_lift_depth(depth) or depth > max_depth_of(zone):
 				return "'lifts_repaired' has a depth with no lift."
 			if depth in seen:
 				return "'lifts_repaired' has a depth twice."
 			seen.append(depth)
+		# The lift at 6 is repaired from the way the lift at 3 opens.
+		for depth: int in seen:
+			if depth > LIFT_EVERY and not (depth - LIFT_EVERY) in seen:
+				return "'lifts_repaired' has a lift whose lift above is not repaired."
 	return ""
 
 
-## Why a saved `deepest_depth` can't be, or "": zone id -> a depth from 1 to MAX_DEPTH.
+## Why a saved `deepest_depth` can't be, or "": zone id -> a depth from 1 to the zone's own most.
 static func deepest_problem(deepest: Variant) -> String:
 	if not deepest is Dictionary:
 		return "'deepest_depth' is not a dictionary."
@@ -723,7 +766,7 @@ static func deepest_problem(deepest: Variant) -> String:
 		var depth: Variant = deepest[zone]
 		if not zone is String or not StringName(zone) in ZoneData.ids():
 			return "'deepest_depth' has an entry that is not a known zone's."
-		if not depth is int or depth < DEPTH or depth > MAX_DEPTH:
+		if not depth is int or depth < DEPTH or depth > max_depth_of(zone):
 			return "'deepest_depth' has a depth out of range."
 	return ""
 
