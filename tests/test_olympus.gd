@@ -250,6 +250,129 @@ func test_heat_drains_warns_and_runs_out() -> String:
 	return run if run != "" else "\n".join(problems)
 
 
+func test_heat_overload_loses_trip_finds_and_rewards() -> String:
+	var problems: Array[String] = []
+	var held_guest: bool = FarmCommands.guest
+	FarmCommands.guest = false
+	var run: String = _at(3.0, func() -> String:
+		var gs: GameStateScript = _state()
+		if _inside(gs) != "":
+			return "The rover did not go in."
+		var day: int = GameClock.get_day_index()
+		var start: float = float(gs.cold_since[HOST])
+		var credits_before: int = gs.credits
+		var ore_before: int = gs.crystal_ore
+		var data: Dictionary = OlympusDepth.layout(SEED, 1, day)
+		var f0: Dictionary = (data["finds"] as Array)[0]
+		var f1: Dictionary = (data["finds"] as Array)[1]
+		_at_find(gs, data, f0)
+		if gs.take_find(str(f0["id"]), day, HOST) != "":
+			return "First find was refused."
+		_at_find(gs, data, f1)
+		if gs.take_find(str(f1["id"]), day, HOST) != "":
+			return "Second find was refused."
+		if ZoneDepth.taken_today(gs.finds_taken, ZONE, day).size() != 2:
+			problems.append("Expected 2 taken finds before overload.")
+		# Guest calling check_olympus_heat() must do nothing.
+		var overload_hours: float = OlympusDepth.HEAT_MAX / OlympusDepth.HEAT_PER_HOUR + 0.5
+		GameClock.elapsed_days = start + overload_hours * HOUR
+		FarmCommands.guest = true
+		gs.check_olympus_heat()
+		FarmCommands.guest = false
+		if ZoneDepth.taken_today(gs.finds_taken, ZONE, day).size() != 2:
+			problems.append("Guest must not drop Olympus finds on heat overload.")
+		# Host overload drops the trip's finds, takes back their rewards, and posts one phone line.
+		gs.check_olympus_heat()
+		if not ZoneDepth.taken_today(gs.finds_taken, ZONE, day).is_empty():
+			problems.append("Trip finds were not removed on heat overload: %s" % [ZoneDepth.taken_today(gs.finds_taken, ZONE, day)])
+		if gs.credits != credits_before or gs.crystal_ore != ore_before:
+			problems.append("Rewards were not taken back on heat overload: credits %d/%d, ore %d/%d." % [
+				gs.credits, credits_before, gs.crystal_ore, ore_before])
+		var expected_line: String = OlympusDepth.heat_overload_text(2)
+		if not expected_line in gs.phone_log:
+			problems.append("Expected overload phone line '%s', got %s." % [expected_line, gs.phone_log])
+		gs.free()
+		return "")
+	FarmCommands.guest = held_guest
+	return run if run != "" else "\n".join(problems)
+
+
+func test_finds_kept_when_leaving_olympus_before_heat_overload() -> String:
+	var problems: Array[String] = []
+	var held_guest: bool = FarmCommands.guest
+	FarmCommands.guest = false
+	var run: String = _at(3.0, func() -> String:
+		var gs: GameStateScript = _state()
+		if _inside(gs) != "":
+			return "The rover did not go in."
+		var day: int = GameClock.get_day_index()
+		var start: float = float(gs.cold_since[HOST])
+		var data: Dictionary = OlympusDepth.layout(SEED, 1, day)
+		var find: Dictionary = (data["finds"] as Array)[0]
+		var pay: Dictionary = OlympusDepth.reward(str(find["kind"]))
+		var credits_before: int = gs.credits
+		var ore_before: int = gs.crystal_ore
+		_at_find(gs, data, find)
+		if gs.take_find(str(find["id"]), day, HOST) != "":
+			return "Find was refused."
+		# Leave Olympus before heat reaches 100 %.
+		GameClock.elapsed_days = start + 2.0 * HOUR
+		gs._set_place(HOST, ZonePresence.FARM, 0)
+		# Even after the overload time passes, the banked find and its rewards stay kept.
+		var overload_hours: float = OlympusDepth.HEAT_MAX / OlympusDepth.HEAT_PER_HOUR + 0.5
+		GameClock.elapsed_days = start + overload_hours * HOUR
+		gs.check_olympus_heat()
+		if not str(find["id"]) in ZoneDepth.taken_today(gs.finds_taken, ZONE, day):
+			problems.append("Find taken before leaving was lost.")
+		if gs.credits != credits_before + int(pay.get("credits", 0)) or gs.crystal_ore != ore_before + int(pay.get("crystal_ore", 0)):
+			problems.append("Rewards from a banked Olympus trip were not kept.")
+		for line: String in gs.phone_log:
+			if line.begins_with("HEAT OVERLOAD:"):
+				problems.append("No overload line should post when leaving in time: '%s'." % line)
+		gs.free()
+		return "")
+	FarmCommands.guest = held_guest
+	return run if run != "" else "\n".join(problems)
+
+
+func test_heat_overload_does_not_fire_twice_on_same_trip() -> String:
+	var problems: Array[String] = []
+	var held_guest: bool = FarmCommands.guest
+	FarmCommands.guest = false
+	var run: String = _at(3.0, func() -> String:
+		var gs: GameStateScript = _state()
+		if _inside(gs) != "":
+			return "The rover did not go in."
+		var day: int = GameClock.get_day_index()
+		var start: float = float(gs.cold_since[HOST])
+		var data: Dictionary = OlympusDepth.layout(SEED, 1, day)
+		var find: Dictionary = (data["finds"] as Array)[0]
+		_at_find(gs, data, find)
+		if gs.take_find(str(find["id"]), day, HOST) != "":
+			return "Find was refused."
+		var overload_hours: float = OlympusDepth.HEAT_MAX / OlympusDepth.HEAT_PER_HOUR + 0.5
+		GameClock.elapsed_days = start + overload_hours * HOUR
+		gs.check_olympus_heat()
+		var credits_after: int = gs.credits
+		var ore_after: int = gs.crystal_ore
+		# Repeated checks, time ticks, and find attempts on the same trip must not fire again.
+		gs.check_olympus_heat()
+		gs._on_time_advanced(0.05)
+		gs.take_find(str(find["id"]), day, HOST)
+		var overload_lines: int = 0
+		for line: String in gs.phone_log:
+			if line.begins_with("HEAT OVERLOAD:"):
+				overload_lines += 1
+		if overload_lines != 1:
+			problems.append("Expected exactly 1 overload line on the same trip, got %d." % overload_lines)
+		if gs.credits != credits_after or gs.crystal_ore != ore_after:
+			problems.append("Second overload check changed credits or ore.")
+		gs.free()
+		return "")
+	FarmCommands.guest = held_guest
+	return run if run != "" else "\n".join(problems)
+
+
 func test_heat_grace_is_the_zones_own_and_never_carries_between_zones() -> String:
 	var problems: Array[String] = []
 	var held_guest: bool = FarmCommands.guest

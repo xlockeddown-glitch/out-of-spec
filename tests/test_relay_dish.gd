@@ -243,15 +243,20 @@ func _check_lag_cut(gs: GameStateScript) -> String:
 	gs.slot_spool_into_relay(HOST)
 	if not is_equal_approx(gs.get_relay_lag_multiplier(), 0.30):
 		return "Cobalt Sentinel relay lag before quest must stay 0.30, got %s." % gs.get_relay_lag_multiplier()
-	# Whole Silk-Spinner seated BEFORE quest is done: base 60 % cut only (0.40), no extra 20 %.
+	# Whole Silk-Spinner seated BEFORE quest is done: base 60 % cut * species 30 % cut = 0.28,
+	# already lower than whole Cobalt Sentinel (0.30), with no extra 20 % yet.
+	var sentinel_mult: float = gs.get_relay_lag_multiplier()
 	gs.relay_slotted = false
 	gs._spool_species.clear()
 	gs._spool_damaged.clear()
 	gs.optical_silk_spools = 0
 	gs._add_spool(SILK_SPINNER, false)
 	gs.slot_spool_into_relay(HOST)
-	if not is_equal_approx(gs.get_relay_lag_multiplier(), 0.40):
-		return "Whole Silk-Spinner before quest done must be 0.40, got %s." % gs.get_relay_lag_multiplier()
+	var spinner_before: float = gs.get_relay_lag_multiplier()
+	if not is_equal_approx(spinner_before, 0.28):
+		return "Whole Silk-Spinner before quest done must be 0.28, got %s." % spinner_before
+	if not (spinner_before < sentinel_mult):
+		return "Whole Silk-Spinner without link (%s) must still beat Cobalt Sentinel (%s)." % [spinner_before, sentinel_mult]
 	if gs.gossamer_link_up() or gs.gossamer_status_text() != "":
 		return "Before quest done, gossamer_link_up must be false and status empty."
 	# Offer and complete the quest.
@@ -262,33 +267,35 @@ func _check_lag_cut(gs: GameStateScript) -> String:
 	gs.update_quests(none, false)
 	if not QuestEngine.is_done(gs, QUEST_ID):
 		return "Setup: quest must complete."
-	# Now done AND whole Silk-Spinner seated -> 0.40 * 0.80 = 0.32.
+	# Now done AND whole Silk-Spinner seated -> 0.28 * 0.80 = 0.224 (< Cobalt Sentinel 0.30).
 	if not gs.gossamer_link_up() or gs.gossamer_status_text() != "Gossamer link: up":
 		return "Link must be up after completion: '%s'" % gs.gossamer_status_text()
-	if not is_equal_approx(gs.get_relay_lag_multiplier(), 0.32):
-		return "Expected 0.32 with Gossamer link up, got %s." % gs.get_relay_lag_multiplier()
-	# Swap out to Cobalt Sentinel -> link stutters, extra cut stops (back to 0.30).
+	var spinner_after: float = gs.get_relay_lag_multiplier()
+	if not is_equal_approx(spinner_after, 0.224) or not (spinner_after < sentinel_mult):
+		return "Expected 0.224 (< %s) with Gossamer link up, got %s." % [sentinel_mult, spinner_after]
+	# Cobalt Sentinel (0.30) in stock must NOT replace whole Silk-Spinner (0.224).
 	gs._add_spool(SENTINEL, false)
-	if not gs.slot_spool_into_relay(HOST):
-		return "Setup: Cobalt Sentinel must be able to swap in."
+	if gs.can_slot_spool():
+		return "Cobalt Sentinel (0.30) must not replace whole Silk-Spinner (0.224) after completion."
+	# Damage the seated Silk-Spinner -> link stutters, base damaged cut * species cut (0.70 * 0.70 = 0.49).
+	gs.slotted_spool_damaged = true
+	if gs.gossamer_link_up() or gs.gossamer_status_text() != "Gossamer link: stuttering":
+		return "Damaged Silk-Spinner must make link stutter: '%s'" % gs.gossamer_status_text()
+	if not is_equal_approx(gs.get_relay_lag_multiplier(), 0.49):
+		return "Damaged Silk-Spinner must be 0.49 (no extra cut), got %s." % gs.get_relay_lag_multiplier()
+	# Whole Cobalt Sentinel in stock replaces the damaged Silk-Spinner -> link still stutters, 0.30.
+	if not gs.can_slot_spool() or not gs.slot_spool_into_relay(HOST):
+		return "Setup: whole Cobalt Sentinel must replace a damaged Silk-Spinner."
 	if gs.gossamer_link_up() or gs.gossamer_status_text() != "Gossamer link: stuttering":
 		return "Swapping to another species must make link stutter: '%s'" % gs.gossamer_status_text()
 	if not is_equal_approx(gs.get_relay_lag_multiplier(), 0.30):
 		return "Swapped Cobalt Sentinel must stay 0.30 (no extra cut), got %s." % gs.get_relay_lag_multiplier()
-	if gs.can_slot_spool():
-		return "Whole Silk-Spinner (0.32) must not replace Cobalt Sentinel (0.30) after completion."
-	# Damage the seated Sentinel so the whole Silk-Spinner in stock can replace it -> link up again (0.32).
-	gs.slotted_spool_damaged = true
+	# Whole Silk-Spinner (0.224) in stock replaces whole Cobalt Sentinel (0.30) -> link up again (0.224).
+	gs._add_spool(SILK_SPINNER, false)
 	if not gs.can_slot_spool() or not gs.slot_spool_into_relay(HOST):
-		return "Whole Silk-Spinner in stock must replace a damaged spool to restore Gossamer link."
-	if not gs.gossamer_link_up() or not is_equal_approx(gs.get_relay_lag_multiplier(), 0.32):
-		return "Re-seating whole Silk-Spinner must restore 0.32 lag multiplier, got %s." % gs.get_relay_lag_multiplier()
-	# Damage the seated spool -> link stutters, base damaged cut only (0.70).
-	gs.slotted_spool_damaged = true
-	if gs.gossamer_link_up() or gs.gossamer_status_text() != "Gossamer link: stuttering":
-		return "Damaged Silk-Spinner must make link stutter: '%s'" % gs.gossamer_status_text()
-	if not is_equal_approx(gs.get_relay_lag_multiplier(), 0.70):
-		return "Damaged Silk-Spinner must be 0.70 (no extra cut), got %s." % gs.get_relay_lag_multiplier()
+		return "Whole Silk-Spinner (0.224) in stock must replace Cobalt Sentinel (0.30) to restore Gossamer link."
+	if not gs.gossamer_link_up() or not is_equal_approx(gs.get_relay_lag_multiplier(), 0.224):
+		return "Re-seating whole Silk-Spinner must restore 0.224 lag multiplier, got %s." % gs.get_relay_lag_multiplier()
 	return ""
 
 
@@ -297,49 +304,47 @@ func test_swap_rule_is_stable_and_never_loops() -> String:
 
 
 func _check_swap_stability(gs: GameStateScript) -> String:
-	# 1. Quest not offered: Silk-Spinner in stock does not replace seated Curlyhair (old rule unchanged).
+	# 1. Quest not offered: Silk-Spinner (0.28) beats Curlyhair (0.38) in one swap, then stable.
 	gs._add_spool(CURLYHAIR, false)
 	if not gs.slot_spool_into_relay(HOST):
 		return "Setup: Curlyhair must slot into empty relay."
 	gs._add_spool(SILK_SPINNER, false)
-	if gs.can_slot_spool():
-		return "Before quest is offered, Silk-Spinner must not replace seated Curlyhair."
-	# 2. Quest offered, seat_silk not done: Silk-Spinner can replace Curlyhair to do step a.
-	_at_level(gs, 48)
-	gs.update_quests()
-	if not gs.can_slot_spool() or not gs.slot_spool_into_relay(HOST):
-		return "With quest open and seat_silk pending, Silk-Spinner must replace Curlyhair."
-	var none: Array[String] = []
-	gs.update_quests(none, false)
-	if not ("seat_silk" in gs.quest_state[QUEST_ID]["steps_done"]):
-		return "Setup: seat_silk must be done after seating whole Silk-Spinner."
-	# Before quest is done, with Silk-Spinner (0.40) seated and Curlyhair (0.38) in stock:
-	# at most one swap is possible (to Curlyhair), and then can_slot_spool() is false.
 	var swaps_before: int = 0
 	while gs.can_slot_spool() and swaps_before < 4:
 		gs.slot_spool_into_relay(HOST)
 		swaps_before += 1
-	if swaps_before > 1 or gs.can_slot_spool():
-		return "Before quest done, expected at most 1 swap then stable, got %d swaps (can_slot=%s)." % [
-			swaps_before, gs.can_slot_spool()]
-	if gs.slotted_spool_species != CURLYHAIR:
-		return "Before quest done, single swap should seat Curlyhair (0.38 < 0.40), got %s." % gs.slotted_spool_species
-	# 3. Complete the quest: Silk-Spinner (0.32) now beats Curlyhair (0.38) in one swap, then stable.
+	if swaps_before != 1 or gs.can_slot_spool():
+		return "Before quest offered, Silk-Spinner (0.28) must replace Curlyhair (0.38) once then stop, got %d swaps." % swaps_before
+	if gs.slotted_spool_species != SILK_SPINNER:
+		return "Before quest offered, single swap must seat Silk-Spinner, got %s." % gs.slotted_spool_species
+	# 2. Quest offered, seat_silk pending with Cobalt Sentinel seated: Silk-Spinner replaces Sentinel once and stops.
+	gs.slotted_spool_species = SENTINEL
+	gs.slotted_spool_damaged = false
+	gs._spool_species.clear()
+	gs._spool_damaged.clear()
+	gs.optical_silk_spools = 0
+	gs._add_spool(SILK_SPINNER, false)
+	_at_level(gs, 48)
+	gs.update_quests()
+	var swaps_open: int = 0
+	while gs.can_slot_spool() and swaps_open < 4:
+		gs.slot_spool_into_relay(HOST)
+		swaps_open += 1
+	if swaps_open != 1 or gs.can_slot_spool():
+		return "With quest open, Silk-Spinner must replace Sentinel once then stop, got %d swaps." % swaps_open
+	var none: Array[String] = []
+	gs.update_quests(none, false)
+	if not ("seat_silk" in gs.quest_state[QUEST_ID]["steps_done"]):
+		return "Setup: seat_silk must be done after seating whole Silk-Spinner."
+	# 3. Complete the quest: Silk-Spinner (0.224) stays seated; Sentinel (0.30) in stock does not swap back.
 	gs.cal_log.append(_cal_row())
 	gs.update_quests(none, false)
 	if not QuestEngine.is_done(gs, QUEST_ID):
-		return "Setup: quest must complete (seat_silk stayed done)."
-	var swaps_after: int = 0
-	while gs.can_slot_spool() and swaps_after < 4:
-		gs.slot_spool_into_relay(HOST)
-		swaps_after += 1
-	if swaps_after != 1 or gs.can_slot_spool():
-		return "After quest done, Silk-Spinner (0.32) should replace Curlyhair (0.38) once then stop, got %d swaps." % swaps_after
+		return "Setup: quest must complete."
 	if gs.slotted_spool_species != SILK_SPINNER or not gs.gossamer_link_up():
 		return "After quest done, Silk-Spinner must stay seated with link up."
-	# With Silk-Spinner seated and Curlyhair in stock after completion, no further swap is possible.
 	if gs.can_slot_spool():
-		return "After quest done, Curlyhair in stock must not replace seated Silk-Spinner."
+		return "After quest done, Cobalt Sentinel in stock must not replace seated Silk-Spinner."
 	return ""
 
 
@@ -387,7 +392,7 @@ func _check_save_and_coop(gs: GameStateScript) -> String:
 	if not guest_still_open:
 		loaded.free()
 		return "Guest must never complete quests locally."
-	# Host completes step b; late joiner connects and sees link up and 0.32 lag multiplier.
+	# Host completes step b; late joiner connects and sees link up and 0.224 lag multiplier.
 	loaded.cal_log.append(_cal_row())
 	loaded.update_quests(none, false)
 	var late: GameStateScript = _farm()
@@ -396,8 +401,8 @@ func _check_save_and_coop(gs: GameStateScript) -> String:
 	late.local_player_id = LATE_GUEST
 	var late_ok: bool = read_late == "" and QuestEngine.is_done(late, QUEST_ID) \
 		and late.gossamer_link_up() and late.gossamer_status_text() == "Gossamer link: up" \
-		and is_equal_approx(late.get_relay_lag_multiplier(), 0.32)
+		and is_equal_approx(late.get_relay_lag_multiplier(), 0.224)
 	FarmCommands.guest = false
 	late.free()
 	loaded.free()
-	return "" if late_ok else "Late joiner must see gossamer_link done, link up, and 0.32 lag multiplier."
+	return "" if late_ok else "Late joiner must see gossamer_link done, link up, and 0.224 lag multiplier."

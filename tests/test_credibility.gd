@@ -381,3 +381,32 @@ func test_contract_standard_without_wd1() -> String:
 	gs.free()
 	GameClock.elapsed_days = saved
 	return problem
+
+
+## Owning the HB-700 before reaching the offer band marks the first contract
+## fulfilled on offer so the level-35 second contract can still open.
+func test_contract_fulfilled_when_standard_owned_first() -> String:
+	var saved: float = GameClock.elapsed_days
+	var gs: GameStateScript = _make_state()
+	var problem: String = ""
+	var emitted: Array[int] = [0]
+	gs.credibility_changed.connect(func(_v: int) -> void: emitted[0] += 1)
+	gs.owned_standards[HB700] = DAY
+	_reach_offer(gs)
+	if gs.contract_state != "fulfilled":
+		problem = "Owning the HB-700 first must mark the contract fulfilled, got '%s'." % gs.contract_state
+	if problem == "" and emitted[0] < 1:
+		problem = "Marking the contract fulfilled must emit credibility_changed."
+	var expected_line: String = "OIRM CONTRACT closed: the %s is already on the colony." % gs.instrument_name(HB700)
+	if problem == "" and not _phone_has(gs, expected_line):
+		problem = "Expected phone line '%s', got %s." % [expected_line, gs.phone_log]
+	if problem == "" and gs.contract_text() != "":
+		problem = "A fulfilled contract must show no open contract text, got '%s'." % gs.contract_text()
+	# The second contract's precondition (first contract complete or fulfilled) is now met.
+	gs.lab_xp = gs.xp_for_level(gs.lab_gate_level("second_contract"))
+	gs.update_quests()
+	if problem == "" and (not gs.quest_state.has("second_contract") or QuestEngine.is_done(gs, "second_contract")):
+		problem = "Second contract must be offered at level 35 once the first contract is fulfilled."
+	gs.free()
+	GameClock.elapsed_days = saved
+	return problem
