@@ -38,6 +38,7 @@
       "name": "Abandoned Colony Mine",
       "area": "underground",
       "band": [12, 30],
+      "deep_gate": "mine_deep",
       "hazards": ["collapse", "bad_air", "old_charges"],
       "finds": ["ore", "lost_gear", "robot_parts", "gauge_blocks"],
       "hub_scene": "res://scenes/colony_mine.tscn",

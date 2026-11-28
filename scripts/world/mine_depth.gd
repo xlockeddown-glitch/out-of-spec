@@ -10,12 +10,16 @@ extends RefCounted
 ## The collapse (zones doc section 5): each day the hash drops a rockfall across the way
 ## into one or two of the three side rooms. A find in a blocked room cannot be taken that
 ## day, whatever the rover does. Shoring the room (a prop, bought at the hub's crate for
-## crystal ore) clears it until 06:00. Not built here (later PRs): bad air, old charges,
-## the lift (and Old Props' lift step), depth 2 and below, a Mine camp.
+## crystal ore) clears it until 06:00. Depths 2 to 6 (feat/mine-deep) use the same rooms and
+## the same hazard, stored by depth (storage_id): shoring depth 2 leaves depth 5 buried.
+## Not built here (later PRs): bad air, old charges, Old Props' lift step, a Mine camp.
 
 const ZONE: String = "colony_mine"
-## One depth below the hub: no lift, no depth 2.
-const MAX_DEPTH: int = 1
+## Six depths below the hub, as the Lava Tubes and the Aquifer [PLACEHOLDER]: lifts at 3 and 6,
+## and 4 to 6 behind the `mine_deep` gate (GameState.mine_deep_problem).
+const MAX_DEPTH: int = 6
+## The gate row of data/skills.json that holds the lab level for the deep depths.
+const DEEP_GATE: String = "mine_deep"
 ## The hub's way down, the crate and the notice board (all floor in the hub's map).
 const HATCH_CELL := Vector2i(8, 16)
 const CRATE_CELL := Vector2i(12, 18)
@@ -41,6 +45,10 @@ const ROCKFALL_IDS: Array[String] = ["r0", "r1", "r2"]
 ## At least this many rooms are blocked each day, and at most this many [PLACEHOLDER].
 const MIN_BLOCKED: int = 1
 const MAX_BLOCKED: int = 2
+## From this depth down a day always blocks two rooms, and on the last depth all three
+## [PLACEHOLDER]. Depths 1 to 3 keep the one-or-two rule.
+const TWO_BLOCKED_FROM: int = 4
+const ALL_BLOCKED_AT: int = 6
 ## What shoring a rockfall and opening a colonist's case count under in GameState.action_counts.
 const SHORE_COUNT: String = "shore_room"
 const CASE_COUNT: String = "open_colonist_case"
@@ -58,6 +66,9 @@ const REWARDS: Dictionary = {
 	"mineral": { "credits": 14 },
 	"scrap": { "credits": 9 },
 }
+## What a find pays more for each level below depth 1, by kind [PLACEHOLDER]; ore also adds one
+## crystal ore for every second level.
+const CREDITS_PER_LEVEL: Dictionary = { "ore": 3, "mineral": 6, "scrap": 4 }
 const NAMES: Dictionary = {
 	"ore": "stained ore",
 	"mineral": "a mineral",
@@ -105,7 +116,8 @@ static func _near(there: Vector3, at: Vector3) -> bool:
 ## Depth `depth` on `day`, with the rooms in `shored` (rockfall ids) cleared: { "depth",
 ## "day", "grid", "start", "rooms", "finds" (Array of { "id", "kind", "cell", "room" }),
 ## "rockfalls" (Array of { "id", "room", "cell", "shored" }) }. "room" is -1 for the
-## landing. Only depth 1 exists: any other asks for {}.
+## landing. `shored` holds plain rockfall ids ("r0"; see shored_today). Only depths 1 to
+## MAX_DEPTH exist: any other asks for {}.
 static func layout(world_seed: int, depth: int, day: int, shored: Array = []) -> Dictionary:
 	if depth < 1 or depth > MAX_DEPTH:
 		return {}
@@ -125,36 +137,43 @@ static func layout(world_seed: int, depth: int, day: int, shored: Array = []) ->
 	# Where each room's way in is: its edge next to the passage (north: the trunk's top).
 	var mouths: Array[Vector2i] = [Vector2i(8, west_y), Vector2i(15, east_y), Vector2i(11, 5)]
 	var rockfalls: Array = []
-	for room: int in blocked_rooms(base):
+	for room: int in blocked_rooms(base, depth):
 		rockfalls.append({ "id": ROCKFALL_IDS[room], "room": room, "cell": mouths[room], "shored": ROCKFALL_IDS[room] in shored })
 	var used: Array[Vector2i] = [ZoneDepth.START_CELL, ZoneDepth.UP_CELL]
+	if depth >= 2:  # below depth 1 (which is as it was) no find sits on the hatch or the lift or beside them
+		used.append_array(ZoneDepth._kept_clear(depth))
 	for fall: Dictionary in rockfalls:
 		used.append(fall["cell"])
 	return { "depth": depth, "day": day, "grid": grid, "start": ZoneDepth.START_CELL, "rooms": rooms,
-			"finds": _finds(base, grid, rooms, used), "rockfalls": rockfalls }
+			"finds": _finds(base, grid, rooms, used, depth), "rockfalls": rockfalls }
 
 
 ## Today's depth: the rooms the farm has shored today (GameState.rooms_shored) are clear.
 static func layout_today(world_seed: int, depth: int, day: int) -> Dictionary:
-	return layout(world_seed, depth, day, shored_today(GameState.rooms_shored, day))
+	return layout(world_seed, depth, day, shored_today(GameState.rooms_shored, day, depth))
 
 
 ## Which rooms (numbers, in order) the rockfall blocks on the day this stream is for
-## [PLACEHOLDER rule]: one room, or two, from the hash; never all three.
-static func blocked_rooms(base: int) -> Array[int]:
+## [PLACEHOLDER rule]: one room, or two, from the hash at depths 1 to 3; always two from
+## depth 4 (TWO_BLOCKED_FROM); all three at the last depth (ALL_BLOCKED_AT). The draws and
+## their tags are the same at every depth, so depth 1 is as it was.
+static func blocked_rooms(base: int, depth: int = 1) -> Array[int]:
 	var first: int = ZoneDepth.draw(base, 301, ROOMS.size())
 	var out: Array[int] = [first]
-	if MIN_BLOCKED + ZoneDepth.draw(base, 300, MAX_BLOCKED - MIN_BLOCKED + 1) >= 2:
-		out.append((first + 1 + ZoneDepth.draw(base, 302, ROOMS.size() - 1)) % ROOMS.size())
+	var second: int = (first + 1 + ZoneDepth.draw(base, 302, ROOMS.size() - 1)) % ROOMS.size()
+	if depth >= TWO_BLOCKED_FROM or MIN_BLOCKED + ZoneDepth.draw(base, 300, MAX_BLOCKED - MIN_BLOCKED + 1) >= 2:
+		out.append(second)
+		if depth >= ALL_BLOCKED_AT:
+			out.append(ROOMS.size() * (ROOMS.size() - 1) / 2 - first - second)
 	out.sort()
 	return out
 
 
 ## The finds: PER_ROOM in each room and ON_LANDING on the landing, never on the start,
-## the way up or a rockfall. Ids are "d1_f<number>" in this order (as the other zones'
+## the way up or a rockfall. Ids are "d<depth>_f<number>" in this order (as the other zones'
 ## are); "room" is the room's number, or -1 on the landing. On case days (has_case), one
 ## side-room find becomes a colonist's case so a rockfall can bury it.
-static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], used_in: Array[Vector2i]) -> Array:
+static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], used_in: Array[Vector2i], depth: int = 1) -> Array:
 	var finds: Array = []
 	var room_slots: Array[int] = []
 	var used: Array[Vector2i] = used_in.duplicate()
@@ -177,7 +196,7 @@ static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], use
 			var room: int = int(area[2])
 			if room >= 0:
 				room_slots.append(index)
-			finds.append({ "id": ZoneDepth.find_id(index, 1), "kind": KINDS[ZoneDepth.draw(base, 200 + index, KINDS.size())],
+			finds.append({ "id": ZoneDepth.find_id(index, depth), "kind": KINDS[ZoneDepth.draw(base, 200 + index, KINDS.size())],
 					"cell": cell, "room": room })
 	if not room_slots.is_empty() and has_case(base):
 		var chosen: int = room_slots[ZoneDepth.draw(base, CASE_SLOT_TAG, room_slots.size())]
@@ -194,16 +213,23 @@ static func find_count() -> int:
 	return PER_ROOM * ROOMS.size() + ON_LANDING
 
 
-## What a find pays: { "crystal_ore": n, "credits": n }, only what it has.
-static func reward(kind: String) -> Dictionary:
-	return (REWARDS.get(kind, {}) as Dictionary).duplicate()
+## What a find pays: { "crystal_ore": n, "credits": n }, only what it has. It pays more
+## for each level below depth 1 (CREDITS_PER_LEVEL), so a deeper find is always worth more.
+static func reward(kind: String, depth: int = 1) -> Dictionary:
+	var pay: Dictionary = (REWARDS.get(kind, {}) as Dictionary).duplicate()
+	var levels: int = maxi(depth - 1, 0)
+	if levels > 0 and pay.has("credits"):
+		pay["credits"] = int(pay["credits"]) + int(CREDITS_PER_LEVEL.get(kind, 0)) * levels
+	if levels > 1 and kind == "ore":
+		pay["crystal_ore"] = int(pay.get("crystal_ore", 0)) + (levels >> 1)
+	return pay
 
 
-static func reward_text(kind: String) -> String:
+static func reward_text(kind: String, depth: int = 1) -> String:
 	if kind == CASE:
 		return "Took %s: a reference block." % NAMES.get(kind, kind)
 	var parts: PackedStringArray = []
-	var pay: Dictionary = reward(kind)
+	var pay: Dictionary = reward(kind, depth)
 	if pay.has("crystal_ore"):
 		parts.append("%d crystal ore" % int(pay["crystal_ore"]))
 	if pay.has("credits"):
@@ -303,9 +329,29 @@ static func shore_problem(layout_data: Dictionary, rockfall_id: String, shored: 
 	return ""
 
 
-## The rockfall ids shored in the zone on `day` (a record of another day is no longer true).
-static func shored_today(shored: Dictionary, day: int) -> Array:
-	return ZoneDepth.taken_today(shored, ZONE, day)
+## How a rockfall id is stored in `rooms_shored`: plain at depth 1 (old saves read as before),
+## "d<depth>_<id>" below, so shoring depth 2 leaves depth 5 buried.
+static func storage_id(depth: int, plain: String) -> String:
+	return plain if depth <= 1 else "d%d_%s" % [depth, plain]
+
+
+## Every id a saved `rooms_shored` may hold for `plain_ids`.
+static func storage_ids(plain_ids: Array[String]) -> Array[String]:
+	var out: Array[String] = []
+	for depth: int in range(1, MAX_DEPTH + 1):
+		for plain: String in plain_ids:
+			out.append(storage_id(depth, plain))
+	return out
+
+
+## The plain rockfall ids shored at `depth` on `day` (a record of another day is no longer
+## true; another depth's ids are not this depth's).
+static func shored_today(shored: Dictionary, day: int, depth: int = 1) -> Array:
+	var out: Array = []
+	for plain: String in ROCKFALL_IDS:
+		if storage_id(depth, plain) in ZoneDepth.taken_today(shored, ZONE, day):
+			out.append(plain)
+	return out
 
 
 ## Why a saved `rooms_shored` can't be, or "". Shape only: a past day is dropped on load.
@@ -324,7 +370,7 @@ static func shored_problem(shored: Variant) -> String:
 			return "'rooms_shored' has ids that are not a list."
 		var seen: Array[String] = []
 		for id: Variant in ids:
-			if not id is String or not id in ROCKFALL_IDS or id in seen:
+			if not id is String or not id in storage_ids(ROCKFALL_IDS) or id in seen:
 				return "'rooms_shored' has an id that is not a rockfall's, or has it twice."
 			seen.append(id)
 	return ""

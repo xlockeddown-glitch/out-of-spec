@@ -180,8 +180,8 @@ func test_depth_one_is_the_same_for_the_same_seed_and_day_and_new_the_next_day()
 			changed += 1
 	if changed < 9:
 		return "The floor changed on only %d of 10 days." % changed
-	if not MineDepth.layout(SEED, 0, 5).is_empty() or not MineDepth.layout(SEED, 2, 5).is_empty():
-		return "Only depth 1 exists: there is no depth 0 floor and no depth 2."
+	if not MineDepth.layout(SEED, 0, 5).is_empty() or not MineDepth.layout(SEED, 7, 5).is_empty():
+		return "Only depth 1 exists: there is no depth 0 floor and no depth 7."
 	if a["finds"].size() != MineDepth.find_count():
 		return "The floor has %d finds, not %d." % [a["finds"].size(), MineDepth.find_count()]
 	for day: int in range(1, 60):
@@ -481,8 +481,8 @@ func test_zone_presence_accepts_depth_one_in_the_mine() -> String:
 	for depth: int in [0, 1]:
 		if ZonePresence.place_problem(ZONE, depth) != "":
 			return "Depth %d in the Mine was refused: %s" % [depth, ZonePresence.place_problem(ZONE, depth)]
-	if ZonePresence.place_problem(ZONE, 2) == "":
-		return "Depth 2 in the Mine was accepted: there is none."
+	if ZonePresence.place_problem(ZONE, 7) == "":
+		return "Depth 7 in the Mine was accepted: there is none."
 	return ""
 
 

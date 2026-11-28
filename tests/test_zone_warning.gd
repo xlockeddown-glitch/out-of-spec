@@ -104,6 +104,10 @@ func test_the_zone_rows_are_in_order_and_gate_nothing() -> String:
 			# Built by slice 12: it gates depth 4 and below of the Flooded Aquifer.
 			if not row.get("built", false) or row.get("beat", false) or gs.lab_gate_level(id) != 14:
 				problem = "aquifer_deep must be built, level 14 and no beat."
+		elif id == "mine_deep":
+			# Built by slice 13: it gates depth 4 and below of the Colony Mine.
+			if not row.get("built", false) or row.get("beat", false) or gs.lab_gate_level(id) != 24:
+				problem = "mine_deep must be built, level 24 and no beat."
 		elif row.get("built", true) or row.get("beat", false):
 			problem = "%s must be built:false and no beat." % id
 		elif gs.lab_gate_level(id) != 0 or not gs.lab_gate_open(id):
