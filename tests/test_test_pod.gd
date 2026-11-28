@@ -335,3 +335,58 @@ func test_the_pod_stands_in_the_ice_hub_with_a_line_and_a_look() -> String:
 		problem = "The pod must be built from primitives."
 	parent.free()
 	return problem
+
+
+func test_a_pod_spinner_with_no_dome_tank_neither_molts_nor_gives_silk() -> String:
+	return _in_the_caves(func(gs: GameStateScript) -> String:
+		gs.open_test_pod(HOST)
+		gs._tick_enclosures(500.0)
+		if float(gs.enclosures[SPINNER]["molt_progress"]) != 0.0:
+			return "The Spinner has no dome tank yet, so it must not molt."
+		gs.enclosures[SPINNER] = { "molt_progress": 1.0, "molt_stage": int(GameStateScript.MoltStage.MOLTED), "exuvia_until_day": 0 }
+		var spools: float = gs.optical_silk_spools
+		gs.lab_sitter = LabSitter.new_booking(GameClock.get_day_index())
+		gs._sitter_tend()
+		if gs.is_enclosure_spool_ready(SPINNER) or gs.collect_enclosure_spool(SPINNER, HOST) or gs.optical_silk_spools != spools:
+			return "Nothing may collect silk from a tank nobody can see."
+		return "")
+
+
+func test_it_refuses_below_the_hub_and_changes_nothing() -> String:
+	return _in_the_caves(func(gs: GameStateScript) -> String:
+		gs.player_places[HOST] = [IceDepth.ZONE, 1]
+		var why: String = gs.open_test_pod(HOST)
+		if why == "" or gs.test_pod_opened_today() or not gs.enclosures.is_empty() or _count(gs, HOST, GameStateScript.TEST_POD_COUNT) != 0:
+			return "Depth 1 must not open the hub pod: '%s'" % why
+		gs.player_places[HOST] = [IceDepth.ZONE, 0]
+		if gs.open_test_pod(HOST) != "" or not gs.test_pod_opened_today():
+			return "The hub must still open it."
+		return "")
+
+
+func test_a_kestrel_purchase_before_the_offer_leaves_the_quest_open() -> String:
+	return _in_the_caves(func(gs: GameStateScript) -> String:
+		var present: Array[String] = [HOST]
+		gs.lab_gates_kept = gs.all_lab_gate_ids()
+		gs.credits = 100000
+		gs.tier1_unlocked = true
+		gs.crystal_ore = 100
+		for id: String in gs.sensors:
+			gs.get_sensor(id).max_error = INF
+		gs.player_places[HOST] = [ZonePresence.FARM, 0]
+		var flare_day: int = int(DataManager.get_number(&"sensor_drift_config", "flares/first_day", 0.0))
+		var start_hour: float = DataManager.get_number(&"sensor_drift_config", "flares/start_hour", 0.0)
+		GameClock.elapsed_days = GameClock.elapsed_at_hour(flare_day, start_hour + 1.0)
+		if gs.buy_standard(FM3, HOST) != "":
+			return "Could not buy the FM-3 to open the OIRM account."
+		gs.oirm_calibrate(FM3, GameClock.get_day_index())
+		gs.send_to_oirm(FM3)
+		gs.at_oirm.clear()
+		if gs.buy_from_kestrel(HM3, HOST) != "":
+			return "The Kestrel purchase failed: " + gs.kestrel_purchase_problem(HM3)
+		gs.action_counts[HOST]["reached_ice_caves"] = { "count": 1, "xp": 0 }
+		QuestEngine.update(gs, present)
+		QuestEngine.update(gs, present)
+		if not gs.quest_state.has(QUEST) or QuestEngine.is_done(gs, QUEST, HOST):
+			return "A purchase made before the offer must not finish the quest (it counts from acceptance)."
+		return "")

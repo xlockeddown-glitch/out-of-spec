@@ -188,7 +188,7 @@ const TEST_POD_COUNT: String = "test_pod:open"
 const TEST_POD_KESTREL_COUNT: String = "test_pod:kestrel"
 ## Species caught with a tank record but no dome tank yet: they sit out the molt and the
 ## lab sitter's round until the tank exists (nothing could show or collect them).
-const NO_DOME_TANK: Array[StringName] = [&"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace"]
+const NO_DOME_TANK: Array[StringName] = [&"rime_carapace_spinner", &"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace"]
 const STATION_LINE: String = "Station stock, caught in a Phobos service tunnel"
 ## What a catch is counted under in action_counts (the Strays quest reads it), and the
 ## prefix of a count of arriving on a moon ("reached_phobos"): both with no XP.
@@ -1267,24 +1267,24 @@ static func _stray_problem(strays: Variant, origins: Variant, tanks: Dictionary)
 
 
 ## Why a save's deimos_cache can't load, or "".
-static func _deimos_cache_problem(cache: Variant) -> String:
+static func _deimos_cache_problem(cache: Variant, field: String = "deimos_cache") -> String:
 	if not cache is Dictionary:
-		return "'deimos_cache' must be a dictionary."
+		return "'%s' must be a dictionary." % field
 	var dict: Dictionary = cache as Dictionary
 	for key: Variant in dict:
 		if not key in ["day", "opened", "fallback_paid"]:
-			return "'deimos_cache' has an unknown field."
+			return "'%s' has an unknown field." % field
 	var has_day: bool = dict.has("day")
 	var has_opened: bool = dict.has("opened")
 	if has_day != has_opened:
-		return "'deimos_cache' is not a day and its opened state."
+		return "'%s' is not a day and its opened state." % field
 	if has_day:
 		var day: Variant = dict.get("day")
 		var opened: Variant = dict.get("opened")
 		if not day is int or day < 0 or not opened is bool:
-			return "'deimos_cache' is not a day and its opened state."
+			return "'%s' is not a day and its opened state." % field
 	if dict.has("fallback_paid") and not dict.get("fallback_paid") is bool:
-		return "'deimos_cache' fallback_paid must be a bool."
+		return "'%s' fallback_paid must be a bool." % field
 	return ""
 
 
@@ -6852,7 +6852,7 @@ func open_cache(player_id: String = "") -> String:
 
 ## Why a save's test_pod can't load, or "": the Deimos cache's rules, in this field's words.
 static func _test_pod_problem(pod: Variant) -> String:
-	return _deimos_cache_problem(pod).replace("'deimos_cache'", "'test_pod'")
+	return _deimos_cache_problem(pod, "test_pod")
 
 
 ## Today's Ice Caves test pod state (opened today, and the farm-wide fallback_paid if set), or
@@ -6889,6 +6889,8 @@ func open_test_pod(player_id: String = "") -> String:
 	var who: String = _player(player_id)
 	if place_of(who) != IceDepth.ZONE:
 		return "The test pod is in the Ice Caves."
+	if depth_of(who) != 0:
+		return "The test pod is in the hub."
 	if test_pod_opened_today():
 		return "Today's opening is already used."
 	var paid: bool = test_pod_fallback_paid()

@@ -234,7 +234,7 @@ func _tell_hub() -> void:
 		SIGN:
 			_hud.push_log("NOTICE SIGN: press " + Controls.prompt(&"interact") + " to read it.")
 		POD:
-			_hud.push_log("TEST POD: " + IceDepth.POD_LINE + " Press " + Controls.prompt(&"interact") + " to open it.")
+			_hud.push_log("TEST POD: " + IceDepth.POD_LINE + (" Opened today." if GameState.test_pod_opened_today() else " Press " + Controls.prompt(&"interact") + " to open it."))
 		CAMP:
 			_tell_camp()
 
