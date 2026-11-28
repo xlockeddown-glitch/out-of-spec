@@ -962,8 +962,10 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return "'ice_cores_held' is out of range."
 	if data.has("last_interlock_override_day") and int(data["last_interlock_override_day"]) < -1:
 		return "'last_interlock_override_day' is out of range."
-	if data.has("master_audit") and master_audit_dict_problem(data["master_audit"]) != "":
-		return master_audit_dict_problem(data["master_audit"])
+	if data.has("master_audit") or bool(data.get("master_audit_passed", false)):
+		var ma_problem: String = master_audit_dict_problem(data.get("master_audit", {}), data.get("master_audit_passed", false))
+		if ma_problem != "":
+			return ma_problem
 	if data.has("mine_gate_open") and not data["mine_gate_open"] is bool:
 		return "'mine_gate_open' is not a yes or no."
 	if data.has("pump_owned") and not data["pump_owned"] is bool:
@@ -3950,12 +3952,18 @@ func set_interlock_override(robot_id: String, on: bool, player_id: String = "") 
 		return "%s's interlock is armed." % robot["name"]
 	robot["override"] = on
 	robot["holding"] = not on and not robot_out_of_tolerance(robot_id).is_empty()
+	var override_day_changed: bool = false
 	if on:
 		robot["override_logged"] = true
 		robot["override_by"] = local_player_id if player_id == "" else player_id
-		last_interlock_override_day = GameClock.get_day_index()
+		var today: int = GameClock.get_day_index()
+		if last_interlock_override_day != today:
+			last_interlock_override_day = today
+			override_day_changed = true
 	post_phone("ROBOT: %s: interlock %s." % [robot["name"], "OVERRIDDEN" if on else "armed"])
 	robots_changed.emit()
+	if override_day_changed:
+		oirm_changed.emit()
 	return ""
 
 
@@ -4750,11 +4758,14 @@ const INTRINSIC_CHAIN_ROOT: String = "Intrinsic silk standard (your conservatory
 
 
 ## Validates a saved `master_audit` dictionary, returning "" when valid.
-static func master_audit_dict_problem(raw: Variant) -> String:
+## When `passed_flag` is a bool, also checks consistency with `master_audit_passed`.
+static func master_audit_dict_problem(raw: Variant, passed_flag: Variant = null) -> String:
 	if not (raw is Dictionary):
 		return "'master_audit' is not a dictionary."
 	var d: Dictionary = raw as Dictionary
 	if d.is_empty():
+		if passed_flag is bool and passed_flag:
+			return "'master_audit_passed' is true while 'master_audit' is empty."
 		return ""
 	for key: Variant in d:
 		if not (key is String) or not (str(key) in ["status", "start_day", "days_done", "cooldown_until", "passed_day"]):
@@ -4762,6 +4773,7 @@ static func master_audit_dict_problem(raw: Variant) -> String:
 	var status: Variant = d.get("status", "")
 	if not (status is String) or not (str(status) in MASTER_AUDIT_STATUSES):
 		return "'master_audit' has a bad status."
+	var st: String = str(status)
 	for int_key: String in ["start_day", "days_done", "cooldown_until", "passed_day"]:
 		if d.has(int_key) and typeof(d[int_key]) != TYPE_INT:
 			return "'master_audit' has a bad '%s'." % int_key
@@ -4770,6 +4782,13 @@ static func master_audit_dict_problem(raw: Variant) -> String:
 	var days_done: int = int(d.get("days_done", 0))
 	if days_done < 0 or days_done > MASTER_AUDIT_MORNINGS:
 		return "'master_audit' has 'days_done' out of range."
+	if (st == "booked" or st == "running") and (not d.has("start_day") or typeof(d["start_day"]) != TYPE_INT or int(d["start_day"]) <= 0):
+		return "'master_audit' status '%s' requires a positive 'start_day'." % st
+	if passed_flag is bool:
+		if st == "passed" and not passed_flag:
+			return "'master_audit' status is 'passed' while 'master_audit_passed' is false."
+		if passed_flag and st != "passed":
+			return "'master_audit_passed' is true while 'master_audit' status is '%s'." % st
 	return ""
 
 
@@ -4790,6 +4809,18 @@ func master_audit_problem() -> String:
 	if until > today:
 		return "Master audit on cooldown until day %s (%s d remaining)." % [
 			SP811.integer(until), SP811.integer(until - today)]
+	for rid: Variant in robots:
+		if is_interlock_overridden(str(rid)):
+			return "A robot safety interlock is overridden; arm it before requesting the master audit."
+	if last_interlock_override_day >= 0:
+		var clear_day: int = last_interlock_override_day + MASTER_AUDIT_INTERLOCK_DAYS
+		if clear_day > today:
+			return "An interlock override was logged on day %s; OIRM will see it until day %s." % [
+				SP811.integer(last_interlock_override_day), SP811.integer(clear_day)]
+	for rid: Variant in robots:
+		var r: Dictionary = robots[rid]
+		if bool(r.get("override_logged", false)):
+			return "An interlock override is still on %s's log until the next audit clears it." % r["name"]
 	return ""
 
 
@@ -4824,7 +4855,7 @@ func master_audit_auditors_text(players: Array[String] = []) -> String:
 		crew = [local_player_id]
 	var pairs: PackedStringArray = []
 	for i: int in MASTER_AUDIT_AUDITORS.size():
-		pairs.append("%s (%s)" % [MASTER_AUDIT_AUDITORS[i], crew[i % crew.size()]])
+		pairs.append("%s (%s)" % [MASTER_AUDIT_AUDITORS[i], CoopUI.player_name(crew[i % crew.size()])])
 	return ", ".join(pairs)
 
 
@@ -4837,6 +4868,8 @@ func ask_master_audit(player_id: String = "") -> String:
 	var problem: String = master_audit_problem()
 	if problem != "":
 		return problem
+	# GameClock days run 06:00 to 06:00 (00:00–05:59 still carries the current day index),
+	# so day_index + 1 is always the coming 06:00 morning.
 	var start_day: int = GameClock.get_day_index() + 1
 	master_audit = {
 		"status": "booked",
@@ -4864,38 +4897,47 @@ func _run_master_audit(day: int) -> void:
 	master_audit["status"] = "running"
 	var findings: Array[String] = []
 	var notes: Array[String] = []
+	var excused: Dictionary = _excused_units(day)
 	# 1. Every in-service instrument traceable and in date (and units in tolerance),
-	#    except a robot sensor out of tolerance triggers the Jig-3 self-quarantine beat.
+	#    skipping standards at OIRM and excusing units overdue only because their
+	#    standard was at OIRM. A released robot sensor out of tolerance triggers the
+	#    Jig-3 self-quarantine beat.
 	for id: String in unit_ids():
 		var sensor: DriftingSensor = get_sensor(id)
 		var robot_id: String = robot_of(id)
 		if robot_id != "":
-			if sensor.is_overdue(day):
+			if sensor.is_overdue(day) and not excused.has(id):
 				findings.append("Finding: Robot %s (%s) calibration overdue (%s)." % [
 					robots[robot_id]["name"], sensor.short_name.trim_prefix(robot_id + " "),
 					DriftingSensor.overdue_text(sensor.cal_due_day)])
 				continue
-			var r_chain: Dictionary = traceability_chain(id)
+			var r_chain: Dictionary = _master_audit_unit_traceable(id, excused)
 			if not r_chain["traceable"]:
 				findings.append("Finding: %s." % r_chain["text"])
 				continue
 			if sensor.get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE:
-				var suspect_list: PackedStringArray = _robot_suspect_cals_since_good(robot_id, id)
-				var s_name: String = sensor.short_name.trim_prefix(robot_id + " ")
-				if suspect_list.is_empty():
-					notes.append("JIG-3 SELF-QUARANTINE (credited, not a finding): %s %s out of tolerance; robot quarantined itself (no calibrations performed since last good check)." % [
-						robots[robot_id]["name"], s_name])
+				if str(robots[robot_id].get("state", "")) == "released":
+					var suspect_list: PackedStringArray = _robot_suspect_cals_since_good(robot_id, id)
+					var s_name: String = sensor.short_name.trim_prefix(robot_id + " ")
+					if suspect_list.is_empty():
+						notes.append("JIG-3 SELF-QUARANTINE (credited, not a finding): %s %s out of tolerance; robot quarantined itself (no calibrations performed since last good check)." % [
+							robots[robot_id]["name"], s_name])
+					else:
+						notes.append("JIG-3 SELF-QUARANTINE (credited, not a finding): %s %s out of tolerance; robot quarantined %s calibration(s) as suspect: %s." % [
+							robots[robot_id]["name"], s_name, SP811.integer(suspect_list.size()), ", ".join(suspect_list)])
 				else:
-					notes.append("JIG-3 SELF-QUARANTINE (credited, not a finding): %s %s out of tolerance; robot quarantined %s calibration(s) as suspect: %s." % [
-						robots[robot_id]["name"], s_name, SP811.integer(suspect_list.size()), ", ".join(suspect_list)])
+					findings.append("Finding: %s out of tolerance (%s × MPE)." % [
+						instrument_name(id), SP811.number(sensor.get_error_ratio(), 3)])
 			continue
-		var chain: Dictionary = traceability_chain(id)
+		var chain: Dictionary = _master_audit_unit_traceable(id, excused)
 		if not chain["traceable"]:
 			findings.append("Finding: %s." % chain["text"])
 		elif sensor.get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE:
 			findings.append("Finding: %s out of tolerance (%s × MPE)." % [
 				instrument_name(id), SP811.number(sensor.get_error_ratio(), 3)])
 	for id: String in standard_ids():
+		if at_oirm.has(id):
+			continue
 		var s_chain: Dictionary = traceability_chain(id)
 		if not s_chain["traceable"]:
 			findings.append("Finding: %s." % s_chain["text"])
@@ -4958,12 +5000,25 @@ func _run_master_audit(day: int) -> void:
 	oirm_changed.emit()
 
 
+## Traceability check for a unit during the master audit: excuses overdue when
+## its standard was at OIRM (matching Vance's `_excused_units`), while still
+## failing missing, suspect, or untraceably adjusted calibrations.
+func _master_audit_unit_traceable(id: String, excused: Dictionary) -> Dictionary:
+	var chain: Dictionary = traceability_chain(id)
+	if chain["traceable"]:
+		return chain
+	if excused.has(id) and not _last_traceable_record(id).is_empty() \
+			and not suspect_units.has(id) and not _untraceable_since_cal.has(id):
+		return { "traceable": true, "text": chain["text"] }
+	return chain
+
+
 ## Calibrations `robot_id` performed since `sensor_id`'s last good check, newest first.
 func _robot_suspect_cals_since_good(robot_id: String, sensor_id: String) -> PackedStringArray:
 	var names: PackedStringArray = []
 	for i: int in range(cal_log.size() - 1, -1, -1):
 		var done: Dictionary = cal_log[i]
-		if not done.get("traceable", false):
+		if done.get("suspect", false) or not done.get("traceable", false):
 			continue
 		if str(done.get("instrument_id", "")) == sensor_id and str(done.get("result", "")) != CalUncertainty.FAIL:
 			break

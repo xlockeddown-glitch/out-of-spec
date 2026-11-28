@@ -466,6 +466,7 @@ static func _accepted(farm: Node, quest: Dictionary, present: Array[String], own
 static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: Array[String], owner: String = "") -> void:
 	entry["done"] = GameClock.get_day_index()
 	if owner == "" and str(quest.get("kind", "")) == "lab" and str(quest.get("scope", SCOPE_FARM)) == SCOPE_FARM \
+			and str(quest.get("giver", "")) != "oirm" \
 			and farm.lab_gate_open(Cosmetics.GATE_GOLD_BORDER):
 		entry[GOLD_BORDER] = true
 	# Before anything is paid: a reward must not change which ending it is.
@@ -741,10 +742,16 @@ static func data_problem(quest: Dictionary) -> String:
 		ids.append(id)
 		if str(step.get("check", "")) == "quest_job" and (not step.get("quest") is String or step["quest"] == ""):
 			return "step '%s' looks for a quest's job and names no quest." % id
-		if str(step.get("check", "")) == "relay_spool" and (not step.get("species") is String or step["species"] == ""):
-			return "step '%s' checks the relay spool and names no species." % id
-		if str(step.get("check", "")) == "silk_stock" and (not step.get("species") is String or step["species"] == ""):
-			return "step '%s' checks silk stock and names no species." % id
+		if str(step.get("check", "")) == "relay_spool":
+			if not step.get("species") is String or step["species"] == "":
+				return "step '%s' checks the relay spool and names no species." % id
+			if DataManager.get_record(&"tarantula_species", StringName(step["species"])).is_empty():
+				return "step '%s' checks the relay spool for unknown species '%s'." % [id, step["species"]]
+		if str(step.get("check", "")) == "silk_stock":
+			if not step.get("species") is String or step["species"] == "":
+				return "step '%s' checks silk stock and names no species." % id
+			if DataManager.get_record(&"tarantula_species", StringName(step["species"])).is_empty():
+				return "step '%s' checks silk stock for unknown species '%s'." % [id, step["species"]]
 		if step.has(MINIGAME_LINE) and not step.has("minigame"):
 			return "step '%s' has a mini-game line and no mini-game." % id
 		if step.has("minigame"):

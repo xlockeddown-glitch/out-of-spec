@@ -149,7 +149,7 @@ func test_halfway_plaque_and_gold_border_on_wall() -> String:
 	# Lab quest finished before 99 has no gold_border; lab quest finished at 99 gets gold_border.
 	var lab_quests: Array[Dictionary] = QuestEngine.quests().filter(func(q: Dictionary) -> bool:
 		return str(q.get("kind", "")) == "lab" and str(q.get("scope", QuestEngine.SCOPE_FARM)) == QuestEngine.SCOPE_FARM \
-			and QuestEngine.data_problem(q) == "")
+			and str(q.get("giver", "")) != "oirm" and QuestEngine.data_problem(q) == "")
 	if problem == "" and lab_quests.size() < 2:
 		problem = "Expected at least 2 farm lab quests in data."
 	if problem == "":
