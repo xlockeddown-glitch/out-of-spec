@@ -40,6 +40,7 @@ func _build_zone() -> void:
 	_rover.get_parent().add_child(_decor)
 	if _below:
 		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
+		_build_cases(ZoneDepth.local_layout)
 		for fall: Dictionary in ZoneDepth.local_layout.get("rockfalls", []):
 			_draw_rockfall(fall)
 		_build_depth_decor()
@@ -93,10 +94,37 @@ func _draw_crate() -> void:
 	_depth_props.add_child(MineLook.build_prop_crate(MineDepth.crate_position()))
 
 
-## The notice board: the Lava hub's with mine-weathered trim and Bram's notice
-## for later [PLACEHOLDER].
+## Replaces the default find marker on any colonist's case with a small latched
+## crate built from primitives (visual only, no collision) [PLACEHOLDER].
+func _build_cases(layout_data: Dictionary) -> void:
+	for find: Dictionary in layout_data.get("finds", []):
+		if str(find.get("kind", "")) != MineDepth.CASE:
+			continue
+		var node: Node3D = _depth_props.find_node(str(find.get("id", "")))
+		if node == null:
+			continue
+		for child: Node in node.get_children():
+			node.remove_child(child)
+			child.free()
+		_draw_colonist_case(node)
+
+
+func _draw_colonist_case(node: Node3D) -> void:
+	node.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.84, 0.10, 0.64)), Vector3(0.0, 0.05, 0.0), MineLook.flat_mat(MineLook.ORE_DARK)))
+	node.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.68, 0.28, 0.48)), Vector3(0.0, 0.24, 0.0), MineLook.flat_mat(MineLook.CRATE_BODY)))
+	node.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.72, 0.07, 0.52)), Vector3(0.0, 0.415, 0.0), MineLook.flat_mat(MineLook.TIMBER_SPLIT)))
+	for x_off: float in [-0.24, 0.24]:
+		node.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.06, 0.36, 0.54)), Vector3(x_off, 0.25, 0.0), MineLook.flat_mat(MineLook.RUST_IRON)))
+	var latch: MeshInstance3D = TunnelLook.part(TunnelLook.box(Vector3(0.14, 0.12, 0.04)), Vector3(0.0, 0.36, 0.27), MineLook.flat_mat(MineLook.LAMP_BRASS, 0.65))
+	latch.name = &"CaseLatch"
+	node.add_child(latch)
+	node.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.06, 0.08, 0.05)), Vector3(0.0, 0.34, 0.29), TunnelLook.glow_mat(TunnelLook.BRASS, 0.85)))
+	node.add_child(TunnelLook.label(MineDepth.NAMES[MineDepth.CASE], Vector3(0.0, 1.5, 0.0), MineLook.CRATE_LABEL))
+
+
+## The notice board: the Lava hub's with mine-weathered trim and Bram's Mine notices [PLACEHOLDER].
 func _draw_sign() -> void:
-	var board: Node3D = LavaHubProps.board_node("Bram: [later]")
+	var board: Node3D = LavaHubProps.board_node("NOTICE BOARD")
 	board.name = "NoticeSign"
 	board.position = MineDepth.sign_position()
 	_depth_props.add_child(board)
@@ -166,7 +194,9 @@ func _use_hub(target: Dictionary) -> void:
 		CRATE:
 			_use_crate()
 		SIGN:
-			_hud.push_log("NOTICE SIGN: Bram: [later]")
+			for line: String in MineDepth.board_lines(QuestEngine.quests(), GameState.quest_state,
+					GameState.player_quest_state.get(GameState.local_player_id, {})):
+				_hud.push_log(line)
 		ROCKFALL:
 			_use_shore(str(target["id"]))
 		_:
@@ -194,14 +224,14 @@ func _taken_today() -> Array:
 
 
 func _use_find(find_id: String) -> void:
-	var problem: String = await FarmCommands.request(&"take_find", [find_id, int(ZoneDepth.local_layout.get("day", 0))])
+	var reply: String = await FarmCommands.request(&"take_find", [find_id, int(ZoneDepth.local_layout.get("day", 0))])
 	if not is_inside_tree():
 		return
-	if problem != "":
-		_hud.push_log("FIND: " + problem)
+	if reply != "" and not MineDepth.is_case_fallback_reply(reply):
+		_hud.push_log("FIND: " + reply)
 		return
 	var find: Dictionary = ZoneDepth.find_in(ZoneDepth.local_layout, find_id)
-	_hud.push_log("FIND: " + MineDepth.reward_text(str(find.get("kind", ""))))
+	_hud.push_log("FIND: " + (reply if reply != "" else MineDepth.reward_text(str(find.get("kind", "")))))
 
 
 ## A room was shored (here or by a friend), so this depth is built again with the rover

@@ -166,6 +166,10 @@ const STATION_LINE: String = "Station stock, caught in a Phobos service tunnel"
 ## prefix of a count of arriving on a moon ("reached_phobos"): both with no XP.
 const STRAY_COUNT: String = "catch_stray"
 const REACHED_PREFIX: String = "reached_"
+## What shoring a rockfall and opening a colonist's case in the Colony Mine count under
+## in action_counts (Old Props and The Colonist's Set read them, with no XP).
+const SHORE_COUNT: String = MineDepth.SHORE_COUNT
+const CASE_COUNT: String = MineDepth.CASE_COUNT
 const SENTINEL: StringName = &"cobalt_sentinel"
 ## Where the wild one sits, off the sump's edge. How near it notices the rover, how
 ## fast is calm, how close is on top of it, and how far the cup reaches. [PLACEHOLDER]
@@ -6141,6 +6145,15 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 	if pay.has("credits"):
 		add_credits(int(pay["credits"]))
 	var reply: String = ""
+	if mine and kind == MineDepth.CASE:
+		var who_case: String = _player(player_id)
+		var next_cell: Variant = MineDepth.next_block_cell(world_seed, found_blocks)
+		if not (next_cell is Vector2i and _find_block_at(next_cell, who_case)):
+			add_credits(MineDepth.CASE_FALLBACK_CREDITS)
+			reply = MineDepth.case_fallback_reply()
+		if who_case != MANAGER_ID:
+			var opened: Dictionary = (action_counts.get_or_add(who_case, {}) as Dictionary).get_or_add(CASE_COUNT, { "count": 0, "xp": 0 })
+			opened["count"] = int(opened["count"]) + 1
 	if aquifer:
 		var find_cell: Vector2i = taken_find["cell"]
 		var rover_cell: Vector2i = AquiferDepth.cell_in(today["grid"], rover_at)
@@ -6221,6 +6234,10 @@ func shore_room(rockfall_id: String, layout_day: int, player_id: String = "") ->
 		return reason
 	mine_props -= MineDepth.PROPS_PER_ROOM
 	rooms_shored = ZoneDepth.with_taken(rooms_shored, MineDepth.ZONE, day, rockfall_id)
+	var who: String = _player(player_id)
+	if who != MANAGER_ID:
+		var done: Dictionary = (action_counts.get_or_add(who, {}) as Dictionary).get_or_add(SHORE_COUNT, { "count": 0, "xp": 0 })
+		done["count"] = int(done["count"]) + 1
 	mine_changed.emit()
 	return ""
 
@@ -7649,10 +7666,7 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 		# The digging may have changed where the water ends, so look at it next step.
 		_seep_full = false
 		terrain_changed.emit()
-		if not found_blocks.has(at) and not ReferenceBlock.at(world_seed, at).is_empty():
-			found_blocks[at] = true
-			_award_xp("find_block", player_id)
-			blocks_changed.emit()
+		_find_block_at(at, player_id)
 		if not found_pockets.has(at) and (at in OrePocket.cells(world_seed) or at in new_pockets):
 			found_pockets[at] = true
 			pocket_pending[at] = GameClock.get_day_index() + OrePocket.REGROW_DAYS
@@ -7660,6 +7674,17 @@ func dig(cell: Vector3i, player_id: String = "") -> String:
 			pockets_changed.emit()
 			ore_changed.emit(crystal_ore)
 	return problem
+
+
+## Records the buried reference block at `at` as found by `player_id` when one lies
+## there and is not yet in `found_blocks`. Shared by digging and the Mine's cases.
+func _find_block_at(at: Vector2i, player_id: String = "") -> bool:
+	if found_blocks.has(at) or ReferenceBlock.at(world_seed, at).is_empty():
+		return false
+	found_blocks[at] = true
+	_award_xp("find_block", player_id)
+	blocks_changed.emit()
+	return true
 
 
 const STONE_IN_THE_WAY: String = "Stone is built here. Take it up first."

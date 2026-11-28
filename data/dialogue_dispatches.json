@@ -212,7 +212,11 @@
         "greenhouse_four_offer": "[PLACEHOLDER] You have outgrown that closet you call a lab, Doc. Six hundred credits and four ore buys you a bigger one. I will not do the paperwork, but I will say I told you so.",
         "greenhouse_four_done": "[PLACEHOLDER] Bigger walls, same bad coffee. Go on, put a bench in the new space. The next refit is on me.",
         "brams_ore_run_offer": "[PLACEHOLDER] Ore does not walk to the rover. Mine five fissures yourself, with your own hands, and I will take ten percent off the next standard I sell you.",
-        "brams_ore_run_done": "[PLACEHOLDER] Five fissures, and you only complained twice. Ten percent off your next standard. The ore goes in the farm's pile, so we both won."
+        "brams_ore_run_done": "[PLACEHOLDER] Five fissures, and you only complained twice. Ten percent off your next standard. The ore goes in the farm's pile, so we both won.",
+        "old_props_offer": "[PLACEHOLDER] Those first-drift timbers have been holding on habit since the founding crew left. Buy props at the hub crate and shore two rockfalls down there. Do that and I will square Dana Pike for a day in your lab.",
+        "old_props_done": "[PLACEHOLDER] Two rooms wedged tight. That roof will outlast the both of us now. Dana Pike has a day on my tab whenever you book her at the console.",
+        "colonists_set_offer": "[PLACEHOLDER] The first machinists left latched block cases in the side rooms when they pulled out. Most are behind fallen rock. Open three of those cases yourself, Doc, and keep whatever blocks your set is still short.",
+        "colonists_set_done": "[PLACEHOLDER] Three cases pried open, and good steel back on a bench instead of under rubble. Keep the empty cedar box. The latch still works."
       }
     },
     "lin": {
