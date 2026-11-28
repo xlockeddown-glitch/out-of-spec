@@ -184,3 +184,32 @@ func test_only_poses_are_sent_unreliably() -> String:
 	if guest._peer.sent_modes != [late, late, sure] or host._peer.sent_modes != [late, late, sure]:
 		return _finish("Got %s, %s" % [guest._peer.sent_modes, host._peer.sent_modes])
 	return _finish("")
+
+
+func test_a_short_list_of_ids_is_a_plain_argument() -> String:
+	if not SessionScript.plain_arguments(["phobos", ["player_1", "player_2"]]):
+		return "A shuttle party's ids must pass"
+	if not SessionScript.plain_arguments([[]]):
+		return "An empty list is plain (the command refuses it)"
+	if SessionScript.plain_arguments([["a", "b", "c", "d", "e"]]):
+		return "No more ids than players"
+	if SessionScript.plain_arguments([[1]]) or SessionScript.plain_arguments([[["x"]]]) or SessionScript.plain_arguments([[{}]]):
+		return "Only texts in a list"
+	if SessionScript.plain_arguments([["x".repeat(SessionScript.MAX_TEXT + 1)]]):
+		return "Each id is short"
+	var typed: Array[String] = ["player_1"]
+	if SessionScript.plain_arguments([typed]):
+		return "A typed list is not plain"
+	if SessionScript.plain_arguments([{}]) or SessionScript.plain_arguments([NAN]):
+		return "The old refusals stand"
+	return ""
+
+
+func test_a_guest_booking_with_ids_is_answered_not_dropped() -> String:
+	var host: Node = _host()
+	var peer: MultiplayerPeerExtension = _raw_peer(host, true)
+	peer.put_packet(var_to_bytes([SessionScript.COMMAND, 1, "none", ["phobos", ["player_2"]]]))
+	# WELCOME, then the answer.
+	if not _until(func() -> bool: return peer.get_available_packet_count() == 2):
+		return _finish("A command with a list of ids must be answered")
+	return _finish("" if host._links.size() == 1 else "A list of ids must not end the link")
