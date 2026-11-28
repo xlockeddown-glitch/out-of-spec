@@ -393,8 +393,8 @@ func test_shuttle_home_is_a_host_command_allowed_on_foot_in_phobos_only() -> Str
 	var till: Variant = commands.execute(HOST, &"till", [Vector3i(1, 0, 1)])
 	if till != false:
 		problems.append("A traveller on Phobos cannot till the farm.")
-	if CoopSession.PROTOCOL != 41:
-		problems.append("The protocol is %d, not 41." % CoopSession.PROTOCOL)
+	if CoopSession.PROTOCOL != 42:
+		problems.append("The protocol is %d, not 42." % CoopSession.PROTOCOL)
 	if not FarmSync.SHOWN_BY.has(&"shuttle_trips_changed"):
 		problems.append("The trips are shown to a guest.")
 	commands.free()
@@ -747,7 +747,8 @@ func test_a_report_of_a_moon_with_a_depth_is_refused_and_a_traveller_cannot_go_t
 	if deep == "" or gs.depth_of(HOST) != 0 or gs.place_of(HOST) != Shuttle.PHOBOS:
 		problems.append("A moon has no depth: '%s', %d" % [deep, gs.depth_of(HOST)])
 	var bed: Variant = commands.execute(HOST, &"go_to_bed", [])
-	if bed != FarmCommands.MOON_REFUSAL:
+	# A day-trip traveller has no bed on the moon: the camp's rule refuses it (zones step 18).
+	if not bed is String or bed == "" or gs.camp_supplies != 0:
 		problems.append("A traveller on a moon cannot go to bed: '%s'" % bed)
 	commands.free()
 	_done(gs)

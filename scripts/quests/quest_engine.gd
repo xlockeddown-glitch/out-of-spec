@@ -766,6 +766,13 @@ static func data_problem(quest: Dictionary) -> String:
 			return "step '%s' has a prompt that is not an input action." % str(step.get("id", ""))
 	if quest.has(CAMP) and (not quest[CAMP] is String or not Camp.has_camp(quest[CAMP])):
 		return "its camp is not a zone that has one."
+	var lab_gate: Variant = (quest.get("gates", {}) as Dictionary).get("lab_gate") if quest.get("gates") is Dictionary else null
+	if lab_gate != null:
+		var known: bool = false
+		for row: Dictionary in DataManager.get_records(&"skills", "lab_gates"):
+			known = known or str(row.get("id", "")) == str(lab_gate)
+		if not lab_gate is String or not known:
+			return "its lab_gate is not a row of the lab's gates."
 	if quest.has("zone") and (not quest["zone"] is String or not ZoneData.has_zone(StringName(quest["zone"]))):
 		return "its zone is not one data/zones.json has."
 	for key: String in ["gates", "offer", "closed_when", "rewards"]:
@@ -876,6 +883,10 @@ static func gates_hold(farm: Node, gates: Dictionary, present: Array[String], ow
 		match str(key):
 			"lab_level":
 				if farm.lab_level() < int(gate):
+					return false
+			"lab_gate":
+				# A lab gate row (data/skills.json lab_gates), as the lab level or a kept row opens it.
+				if not farm.lab_gate_open(str(gate)):
 					return false
 			"band":
 				if farm.credibility_band_index() < farm._band_index_named(str(gate)):

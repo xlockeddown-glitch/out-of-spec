@@ -52,7 +52,14 @@ func here_refusal() -> String:
 		return "The clock is paused."
 	var scene: Node = session.get_tree().current_scene if session.is_inside_tree() else null
 	var path: String = scene.scene_file_path if scene != null else ""
-	return scene_refusal(path, GameState.camp_scene_open(path))
+	var open: bool = GameState.camp_scene_open(path)
+	if open:
+		# A moon's camp is a spot on the deck, not the whole hub: the walker must be near it.
+		var at: Array = ZonePresence.for_scene(path)
+		var far: String = Camp.moon_reach_refusal(str(at[0]), scene.get("walker"))
+		if far != "":
+			return far
+	return scene_refusal(path, open)
 
 
 ## Beds are on the farm, and nowhere else (no scene counts as elsewhere), but for an

@@ -132,10 +132,10 @@ func test_collision_counts_lights_and_spots_are_unchanged() -> String:
 	var d_lights: int = _count_type(deimos, "OmniLight3D")
 	if d_static != 11:
 		problem = "DeimosHub StaticBody3D count changed: expected 11, got %d." % d_static
-	elif d_area != 4:
-		problem = "DeimosHub Area3D count changed: expected 4, got %d." % d_area
-	elif d_lights > 2:
-		problem = "DeimosHub added too many lights: %d (max 2)." % d_lights
+	elif d_area != 5:
+		problem = "DeimosHub Area3D count changed: expected 5 (the camp's click is the new one), got %d." % d_area
+	elif d_lights > 3:
+		problem = "DeimosHub added too many lights: %d (max 3: two of its own and the camp's lantern)." % d_lights
 	elif deimos._spots() != {
 		"Console": Vector3(-6.0, 0.0, 3.0),
 		"Board": Vector3(-3.0, 0.0, -8.6),

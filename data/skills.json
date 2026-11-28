@@ -69,7 +69,7 @@
     { "id": "deimos_hub", "level": 26, "opens": "Deimos hub (warning below this level)", "needs": "the shuttle license", "built": false },
     { "id": "board_4_jobs", "level": 28, "opens": "A fourth job on the board", "built": false },
     { "id": "collect_spool_card", "level": 30, "opens": "COLLECT SPOOL cards", "needs": "Robotics" },
-    { "id": "expedition_permit", "level": 30, "opens": "The expedition permit: multi-day trips", "built": false },
+    { "id": "expedition_permit", "level": 30, "opens": "The expedition permit: multi-day trips", "built": true },
     { "id": "robot_2", "level": 35, "opens": "A second robot", "needs": "Robotics" },
     { "id": "second_contract", "level": 35, "opens": "The second contract", "built": false, "beat": true },
     { "id": "ice_caves_cores", "level": 35, "opens": "Ice Caves deep cores", "built": false },

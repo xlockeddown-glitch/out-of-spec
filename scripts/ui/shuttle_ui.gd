@@ -21,6 +21,11 @@ var _busy: bool = false
 ## The party the panel last drew (player ids, this player first): what Book sends.
 var _party_ids: Array[String] = []
 var _watch: float = 0.0
+## The expedition section (zones step 18): its lines, and the Book button with the total it shows.
+var _exp_lines: VBoxContainer
+var _exp_book: Button
+## The total the section last showed: what Book sends, so the host can refuse a changed price.
+var _exp_total: int = 0
 ## Where a booked screen goes; only tests set it (the real swap would change the scene).
 var change_scene: Callable = Callable()
 
@@ -28,6 +33,27 @@ var change_scene: Callable = Callable()
 ## The panel's lines for a farm at `elapsed_days`: a window line for each moon, the
 ## fare, the party (`others`: the names of the other people who would fly) with the
 ## total fare, then the license line. Tests and the panel both use this.
+## The expedition section for `people` flying at `elapsed_days` ({ lines, problem, total }):
+## the length and the return day, the whole cost split, and why it can't be booked (""
+## when it can). It is shown before Book, so the price is never a surprise. The host
+## checks again; this is the same rule (Shuttle.expedition_problem) with this copy's data.
+static func expedition_view(elapsed_days: float, people: int) -> Dictionary:
+	var out: Array[String] = []
+	var back: float = Shuttle.expedition_end(elapsed_days)
+	out.append(Shuttle.text("terminal_exp_plan") % [SP811.integer(Shuttle.expedition_nights()), SP811.integer(floori(back) + 1), Shuttle.clock_text(back)])
+	var cost: Dictionary = GameState.expedition_cost(people)
+	var held: int = GameState.camp_supplies
+	out.append(Shuttle.text("terminal_exp_cost") % [SP811.integer(int(cost["fare"])), SP811.integer(Shuttle.fare()), SP811.integer(people),
+		SP811.integer(int(cost["supplies"])), SP811.integer(int(cost["needed"])), SP811.integer(held), SP811.integer(int(cost["total"]))])
+	var permit: String = "expedition_permit"
+	var problem: String = Shuttle.expedition_problem(Shuttle.DEIMOS, GameState.lab_level(), GameState.shuttle_licensed, GameState.credits, people,
+		elapsed_days, ZoneData.is_playable(&"deimos"), GameState.lab_gate_level(permit), GameState.lab_gate_open(permit),
+		GameState.expedition_quest_taken(GameState.local_player_id), held)
+	if problem != "":
+		out.append(problem)
+	return { "lines": out, "problem": problem, "total": int(cost["total"]) }
+
+
 static func lines(elapsed_days: float, licensed: bool, others: Array[String] = []) -> Array[String]:
 	var out: Array[String] = []
 	for moon: String in Shuttle.MOONS:
@@ -70,6 +96,16 @@ func _ready() -> void:
 		book.pressed.connect(_on_book.bind(moon))
 		books.add_child(book)
 	column.add_child(books)
+	column.add_child(PlanBoardUI._label(Shuttle.text("terminal_exp_title"), TEAL, 24))
+	_exp_lines = VBoxContainer.new()
+	_exp_lines.name = "ExpeditionLines"
+	_exp_lines.add_theme_constant_override(&"separation", 4)
+	column.add_child(_exp_lines)
+	_exp_book = PlanBoardUI._button(Shuttle.text("terminal_exp_book") % "0")
+	_exp_book.name = "Book_expedition"
+	_exp_book.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	_exp_book.pressed.connect(_on_book_expedition)
+	column.add_child(_exp_book)
 	_status = PlanBoardUI._label("", TEXT, 18)
 	_status.name = "Status"
 	_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -150,6 +186,43 @@ func _refresh() -> void:
 		var label: Label = PlanBoardUI._label(line, TEXT, 20)
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_lines.add_child(label)
+	_refresh_expedition(_party_ids.size())
+
+
+## Redraws the expedition section for `people`. A traveller already away sees the away line.
+func _refresh_expedition(people: int) -> void:
+	for child: Node in _exp_lines.get_children():
+		_exp_lines.remove_child(child)
+		child.queue_free()
+	var view: Dictionary = expedition_view(GameClock.elapsed_days, maxi(people, 1))
+	var shown: Array[String] = []
+	shown.assign(view["lines"])
+	for line: String in shown:
+		var label: Label = PlanBoardUI._label(line, TEXT, 18)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_exp_lines.add_child(label)
+	_exp_total = int(view["total"])
+	_exp_book.text = Shuttle.text("terminal_exp_book") % SP811.integer(_exp_total)
+	_exp_book.disabled = String(view["problem"]) != ""
+
+
+## Books the expedition for the drawn party at the total the section shows (the host
+## refuses if the price moved), then goes to the hub as a day trip does.
+func _on_book_expedition() -> void:
+	if _busy:
+		return
+	_busy = true
+	var ids: Array = []
+	ids.assign(_party_ids)
+	var problem: String = await FarmCommands.request(&"book_expedition", [Shuttle.DEIMOS, ids, _exp_total])
+	_busy = false
+	if not is_inside_tree():
+		return
+	_status.text = problem
+	_refresh()
+	if problem == "":
+		close()
+		_enter_hub(Shuttle.DEIMOS)
 
 
 ## Asks the host for a seat for exactly the party the panel last drew (their ids, this

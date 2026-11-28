@@ -92,6 +92,10 @@ func test_the_zone_rows_are_in_order_and_gate_nothing() -> String:
 		seen += 1
 		if int(row["level"]) != int(wanted[id]):
 			problem = "%s is at level %d, the doc says %d." % [id, int(row["level"]), int(wanted[id])]
+		elif id == "expedition_permit":
+			# Built by zones step 18: it gates the expedition booking.
+			if not row.get("built", false) or row.get("beat", false):
+				problem = "expedition_permit must be built and no beat."
 		elif row.get("built", true) or row.get("beat", false):
 			problem = "%s must be built:false and no beat." % id
 		elif gs.lab_gate_level(id) != 0 or not gs.lab_gate_open(id):

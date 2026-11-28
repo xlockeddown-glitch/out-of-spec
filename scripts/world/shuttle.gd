@@ -149,14 +149,46 @@ static func trip_end(elapsed_days: float) -> float:
 	return elapsed_days + trip_hours() / 24.0
 
 
+## True if `trip` (one row of GameState.shuttle_trips) is an expedition: it ends at its
+## planned morning, not at the day's end or the 02:00 recall.
+static func is_expedition(trip: Variant) -> bool:
+	return trip is Dictionary and (trip as Dictionary).get("expedition", false) == true
+
+
+## The nights an expedition lasts [PLACEHOLDER 2].
+static func expedition_nights() -> int:
+	return clampi(int(number("expedition_nights", 2.0)), 1, 4)
+
+
+## When an expedition booked at `elapsed_days` ends: 06:00 of the morning after its last
+## night, so a booking on day 1 with 2 nights ends 06:00 on day 3.
+static func expedition_end(elapsed_days: float) -> float:
+	return float(floori(elapsed_days + EPSILON_H / 24.0)) + float(expedition_nights())
+
+
+## What an expedition for `people` costs when `held` nights of supplies are on hand: the
+## fare for each person plus the supplies short of a night each person sleeps there.
+## { fare, needed, buy, supplies, total } (credits for fare, supplies and total).
+static func expedition_cost(people: int, held: int) -> Dictionary:
+	var needed: int = people * expedition_nights()
+	var buy: int = maxi(needed - held, 0)
+	var fare_total: int = fare() * people
+	var supplies: int = buy * Camp.SUPPLY_COST_CREDITS
+	return { "fare": fare_total, "needed": needed, "buy": buy, "supplies": supplies, "total": fare_total + supplies }
+
+
 ## "" or why `trip` (one row of GameState.shuttle_trips) is not one: a moon with a hub
 ## and a finite end.
 static func trip_shape_problem(trip: Variant) -> String:
 	if not trip is Dictionary:
 		return "is not a dictionary"
 	var row: Dictionary = trip
-	if row.size() != 2 or not row.get("moon") is String or not is_moon(row["moon"]) 			or not ZoneData.is_playable(StringName(row["moon"])):
+	# An expedition row carries one more key, `expedition: true`; a day trip's has two.
+	var shaped: bool = row.size() == 2 or (row.size() == 3 and row.get("expedition") == true)
+	if not shaped or not row.get("moon") is String or not is_moon(row["moon"]) 			or not ZoneData.is_playable(StringName(row["moon"])):
 		return "has a moon with no hub"
+	if row.get("expedition") == true and row["moon"] != DEIMOS:
+		return "has an expedition to a moon with no camp"
 	var ends: Variant = row.get("ends_at")
 	if not ends is float or not is_finite(ends) or ends < 0.0:
 		return "has an end that is not a time"
@@ -198,6 +230,43 @@ static func trip_problem(moon: String, lab_level: int, licensed: bool, credits: 
 	return ""
 
 
+## "" or why an expedition to `moon` for `people` can't go at `elapsed_days`. The reasons
+## come in this order: not Deimos, a bad party, no license, the moon down (the day trip's
+## first four), no permit, no survey job taken, the booking hours shut (02:00 to 06:00),
+## the window shutting before the planned return, the wallet short (fare and the
+## supplies the nights need), and no hub to land at.
+static func expedition_problem(moon: String, lab_level: int, licensed: bool, credits: int, people: int, elapsed_days: float,
+		hub_ready: bool, permit_level: int, permitted: bool, quest_taken: bool, held: int) -> String:
+	if not is_moon(moon):
+		return text("no_moon_text")
+	if moon != DEIMOS:
+		return text("expedition_only_deimos_text")
+	if people < 1 or people > party_most():
+		return text("bad_party_text") % SP811.integer(party_most())
+	var license: String = license_problem(lab_level, licensed)
+	if license != "":
+		return license
+	if not is_open(moon, elapsed_days):
+		return text("moon_down_text") % window_line(moon, elapsed_days)
+	if not permitted:
+		return text("expedition_no_permit_text") % [SP811.integer(permit_level), SP811.integer(lab_level)]
+	if not quest_taken:
+		return text("expedition_no_quest_text")
+	if TunnelRecall.closed(elapsed_days):
+		return text("expedition_closed_text")
+	var back: float = expedition_end(elapsed_days)
+	var shuts: float = closes_at(moon, elapsed_days)
+	if shuts < back - EPSILON_H / 24.0:
+		return text("expedition_window_text") % [SP811.integer(expedition_nights()), SP811.integer(floori(back) + 1), clock_text(back), SP811.integer(floori(shuts) + 1), clock_text(shuts)]
+	var cost: Dictionary = expedition_cost(people, held)
+	if credits < int(cost["total"]):
+		return text("expedition_short_text") % [moon_name(moon), SP811.integer(int(cost["total"])), SP811.integer(int(cost["fare"])),
+			SP811.integer(people), SP811.integer(int(cost["supplies"])), SP811.integer(int(cost["buy"])), SP811.integer(int(cost["needed"])), SP811.integer(credits)]
+	if not hub_ready:
+		return text("no_hub_text") % moon_name(moon)
+	return ""
+
+
 ## "" or why the shuttle's numbers in the data can't be used.
 static func data_problem() -> String:
 	for key: String in ["fare_credits", "license_level", "trip_hours", "recall_hour", "party_most"]:
@@ -207,6 +276,10 @@ static func data_problem() -> String:
 		return "the fare is out of range."
 	if trip_hours() <= 0.0 or trip_hours() >= 24.0:
 		return "a day trip must take under a day."
+	if typeof(DataManager.get_value(TABLE, PATH + "expedition_nights")) not in [TYPE_INT, TYPE_FLOAT]:
+		return "shuttle 'expedition_nights' is not a number."
+	if int(number("expedition_nights", 0.0)) < 1 or int(number("expedition_nights", 0.0)) > 4:
+		return "an expedition must last 1 to 4 nights."
 	for moon: String in MOONS:
 		for key: String in ["open_hours", "offset_hours"]:
 			if typeof(DataManager.get_value(TABLE, PATH + moon + "/" + key)) not in [TYPE_INT, TYPE_FLOAT]:
