@@ -115,7 +115,8 @@
     "molt_days": null,
     "silk_grade": null,
     "optical_silk_yield": null,
-    "lag_reduction_pct": null,
+    "lag_reduction_pct": 30,
+    "_lag_note": "30 is [PLACEHOLDER], Ryan 2026-11-28: own cut so it beats the others when Gossamer-linked",
     "output": "Zero-expansion reticle silk",
     "unlock": "Unlocks multi-rover autopilot pathing across solar-flare days."
   },

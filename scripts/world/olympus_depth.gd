@@ -9,11 +9,12 @@ extends RefCounted
 ## Valles' thin air use too: ZoneExposure), the markers are `olympus_markers`. Every number and name
 ## here is a [PLACEHOLDER].
 ##
-## Heat: the suit's cooling drains HEAT_PER_HOUR percent per game hour; at 100 % the host takes no
-## more finds until the player has been out for longer than the grace. Scale: away from the skylight
-## the tube is dark and the halls look alike; a player who has left a marker on a depth gets a "back
-## to skylight" heading on the field phone there, and no one else does. The long climb: the first
-## trip costs FIRST_DRIVE_HOURS of game time; fast travel after the first visit costs none.
+## Heat: the suit's cooling drains HEAT_PER_HOUR percent per game hour; at 100 % the host drops the
+## finds taken on this trip (taking back their rewards) and takes no more finds until the player has
+## been out for longer than the grace. Scale: away from the skylight the tube is dark and the halls
+## look alike; a player who has left a marker on a depth gets a "back to skylight" heading on the
+## field phone there, and no one else does. The long climb: the first trip costs FIRST_DRIVE_HOURS
+## of game time; fast travel after the first visit costs none.
 
 const ZONE: String = "olympus_caves"
 ## Two depths below the hub [PLACEHOLDER].
@@ -207,6 +208,11 @@ static func heat_text(used: float) -> String:
 
 static func heat_out_reply() -> String:
 	return "The suit's cooling is spent. Go out to the farm and come back."
+
+
+static func heat_overload_text(lost_count: int) -> String:
+	return "HEAT OVERLOAD: suit cooling spent — lost %s from this Olympus trip." % (
+		"1 find" if lost_count == 1 else "%s finds" % SP811.integer(lost_count))
 
 
 ## Whether a player who left at `left` and is back at `now` keeps the heat they had taken.

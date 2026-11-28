@@ -38,7 +38,7 @@
       "title": "The Second Contract",
       "scope": "farm",
       "gates": { "lab_gate": "second_contract" },
-      "offer": { "when": "state_is", "state": "contract_state", "is": ["complete", "fulfilled"] },
+      "offer": { "when": "state_is", "state": "contract_state", "is": ["complete", "fulfilled", "waived"] },
       "offer_line": "npcs/oirm/quests/second_contract_offer",
       "steps": [
         { "id": "calibrations", "text": "Complete 8 traceable, on-time calibrations by your own hand (a unit counts again once half its interval has passed).",

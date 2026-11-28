@@ -158,7 +158,7 @@ func _check_contract(gs: GameStateScript) -> String:
 		return "It must take over the dome gauge."
 	gs.contract_state = ""
 	gs._offer_first_contract()
-	return "" if gs.contract_state == "" else "It must not be offered when the HB-700 is owned."
+	return "" if gs.contract_state == "waived" else "When the HB-700 is already owned, _offer_first_contract must mark the contract waived."
 
 
 func test_jobs_prefer_a_certified_standard() -> String:

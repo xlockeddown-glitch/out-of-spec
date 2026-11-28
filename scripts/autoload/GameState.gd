@@ -317,6 +317,14 @@ var olympus_markers: Dictionary = {}
 ## Host only, not saved or synced: the cold of players who left the caves, kept for the grace
 ## (IceDepth.COLD_GRACE_HOURS): player id -> [their cold_since stamp, the elapsed_days they left].
 var _cold_kept: Dictionary = {}
+## Host only, not saved or synced: Olympus finds taken by each player on their current trip down
+## (rewards are paid immediately on take_find() like every other zone, so this ledger lets the host
+## take them back if heat hits 100 % before the player leaves).
+## player id -> Array of { "id": String, "day": int, "crystal_ore": int, "credits": int }.
+var _olympus_trip_finds: Dictionary = {}
+## Host only, not saved or synced: players whose suit cooling has already overloaded on the
+## current Olympus trip (cleared when a fresh trip starts, so overload never fires twice).
+var _olympus_overloaded: Dictionary = {}
 ## The lift stations repaired, for good: zone id -> Array of the depths (ZoneDepth).
 ## Never reset, never expires. Shared by the farm.
 var lifts_repaired: Dictionary = {}
@@ -550,7 +558,9 @@ var credibility: int = 0
 ## Highest band index reached so far, so a band is announced once.
 var _best_band: int = 0
 ## First OIRM contract: "" (not offered), "active" (counting the run),
-## "complete" (its standard is for sale) or "fulfilled" (bought).
+## "complete" (its standard is for sale), "fulfilled" (bought) or "waived" (the standard was
+## already owned when the contract would have been offered: no run, no L3 reward, but the
+## second contract can still open).
 var contract_state: String = ""
 var contract_run: int = 0
 
@@ -885,7 +895,7 @@ const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
 	"rover_place_scope", "_skid_last", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_expedition_warned_day", "_expedition_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers", "_cold_kept",
-	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip", "_phobos_wiped", "_on_phobos_deck", "_deimos_wiped", "_on_deimos_deck",
+	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip", "_phobos_wiped", "_on_phobos_deck", "_deimos_wiped", "_on_deimos_deck", "_olympus_trip_finds", "_olympus_overloaded",
 ]
 
 
@@ -2123,6 +2133,7 @@ func _on_time_advanced(delta_days: float) -> void:
 	_end_due_trips()
 	_tick_expeditions()
 	_tick_recall()
+	check_olympus_heat()
 
 
 # --- Kestrel (section 1.7) ----------------------------------------------------
@@ -5684,17 +5695,78 @@ func _track_cold(player_id: String, was_place: String) -> void:
 	var was_in_caves: bool = _is_cold_place(was_place)
 	# Straight from one cold zone to the other: the cold is the zone's own, so it starts again.
 	var switched: bool = in_caves and was_in_caves and here != was_place
+	if was_place == OlympusDepth.ZONE and here != OlympusDepth.ZONE:
+		# Leaving Olympus: if heat already hit 100 % before a tick ran, lose the trip's finds;
+		# otherwise the player got out in time and those finds are banked.
+		if cold_since.has(player_id) and not _olympus_overloaded.has(player_id) \
+				and OlympusDepth.heat_is_out(OlympusDepth.heat_used(float(cold_since[player_id]), now)):
+			_overload_olympus_player(player_id, GameClock.get_day_index())
+		_olympus_trip_finds.erase(player_id)
 	if in_caves and (not was_in_caves or not cold_since.has(player_id) or switched):
 		var kept: Variant = _cold_kept.get(player_id)
 		_cold_kept.erase(player_id)
 		# The grace is the zone's own: a stamp kept from the other zone does not carry over.
 		var back: bool = kept is Array and not switched and str(kept[2]) == here and _grace_of(here, float(kept[1]), now)
 		cold_since[player_id] = now - maxf(float(kept[1]) - float(kept[0]), 0.0) if back else now
+		if here == OlympusDepth.ZONE and not back:
+			_olympus_overloaded.erase(player_id)
+			_olympus_trip_finds.erase(player_id)
 		ice_changed.emit()
 	elif not in_caves and cold_since.has(player_id):
 		_cold_kept[player_id] = [float(cold_since[player_id]), now, was_place]
 		cold_since.erase(player_id)
 		ice_changed.emit()
+
+
+## Host: checks every player currently in the Olympus Mons caves for heat overload (100 %).
+## Because take_find() pays rewards immediately (matching all other zones), an overload takes
+## back the credits and crystal ore from that trip's finds. The finds stay taken: they are lost
+## for the day, not put back to be taken again. Fires at most once per trip (_olympus_overloaded); guests do nothing.
+func check_olympus_heat() -> void:
+	if FarmCommands.guest:
+		return
+	var day: int = GameClock.get_day_index()
+	var ids: Array = cold_since.keys()
+	ids.sort()
+	for raw_id: Variant in ids:
+		var who: String = str(raw_id)
+		if place_of(who) != OlympusDepth.ZONE:
+			continue
+		if _olympus_overloaded.has(who):
+			continue
+		if not OlympusDepth.heat_is_out(cold_of(who)):
+			continue
+		_overload_olympus_player(who, day)
+
+
+func _overload_olympus_player(who: String, day: int) -> void:
+	_olympus_overloaded[who] = true
+	var raw_finds: Variant = _olympus_trip_finds.get(who, [])
+	_olympus_trip_finds.erase(who)
+	if not raw_finds is Array or (raw_finds as Array).is_empty():
+		return
+	var lost_count: int = 0
+	var lost_ore: int = 0
+	var lost_credits: int = 0
+	for entry: Variant in (raw_finds as Array):
+		if not entry is Dictionary:
+			continue
+		var item: Dictionary = entry as Dictionary
+		lost_count += 1
+		lost_ore += int(item.get("crystal_ore", 0))
+		lost_credits += int(item.get("credits", 0))
+	if lost_count == 0:
+		return
+	if lost_ore > 0:
+		var take_ore: int = mini(lost_ore, crystal_ore)
+		if take_ore > 0:
+			crystal_ore -= take_ore
+			ore_changed.emit(crystal_ore)
+	if lost_credits > 0:
+		var take_cr: int = mini(lost_credits, credits)
+		if take_cr > 0:
+			add_credits(-take_cr)
+	post_phone(OlympusDepth.heat_overload_text(lost_count))
 
 
 ## Host: drops the stamps of everyone who is not in the caves.
@@ -7689,6 +7761,8 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 		if reason == "" and aquifer:
 			reason = AquiferDepth.seal_problem(today, find_id)
 	if reason == "" and ZoneExposure.blocks_finds(zone) and ZoneExposure.is_out(zone, cold_of(_player(player_id))):
+		if olympus:
+			check_olympus_heat()
 		reason = ZoneExposure.out_reply(zone)  # the suit's air or cooling is gone: the host takes no find
 	if reason != "":
 		return reason
@@ -7705,6 +7779,15 @@ func take_find(find_id: String, layout_day: int, player_id: String = "") -> Stri
 			ore_changed.emit(crystal_ore)
 		if pay.has("credits"):
 			add_credits(int(pay["credits"]))
+	if olympus and not FarmCommands.guest:
+		var who_olympus: String = _player(player_id)
+		var ledger: Array = _olympus_trip_finds.get_or_add(who_olympus, []) as Array
+		ledger.append({
+			"id": find_id,
+			"day": day,
+			"crystal_ore": int(pay.get("crystal_ore", 0)),
+			"credits": int(pay.get("credits", 0)),
+		})
 	if valles and kind == "sediment":
 		_note_valles_band(_player(player_id), int(taken_find.get("band", -1)))
 	if olympus and OlympusDepth.is_vein(kind):
@@ -8241,9 +8324,10 @@ func _lag_mult_for(species_id: StringName, damaged: bool) -> float:
 
 ## Multiplier applied to rover uplink lag (1.0 = no upgrade). The spool's base
 ## cut and the spinning species' lag_reduction_pct stack multiplicatively:
-## (1 - spool%) * (1 - species%). Curlyhair: 0.40 * 0.95 = 0.38. A damaged spool
-## gives only part of the base cut. Once The Gossamer Link is done and a whole
-## Silk-Spinner spool stays seated, an extra 20 % cut stacks multiplicatively.
+## (1 - spool%) * (1 - species%). Curlyhair: 0.40 * 0.95 = 0.38; Orbital
+## Silk-Spinner: 0.40 * 0.70 = 0.28. A damaged spool gives only part of the
+## base cut. Once The Gossamer Link is done and a whole Silk-Spinner spool
+## stays seated, an extra 20 % cut stacks multiplicatively (0.28 * 0.80 = 0.224).
 func get_relay_lag_multiplier() -> float:
 	if not relay_slotted:
 		return 1.0
@@ -8497,7 +8581,12 @@ func _band_index_named(band_name: String) -> int:
 func _offer_first_contract() -> void:
 	var standard: String = contract_standard_id()
 	var sensor: DriftingSensor = get_sensor(standard)
-	if sensor == null or owned_standards.has(standard):
+	if sensor == null:
+		return
+	if owned_standards.has(standard):
+		contract_state = "waived"
+		credibility_changed.emit(credibility)
+		post_phone("OIRM CONTRACT closed: the %s is already on the colony." % instrument_name(standard))
 		return
 	contract_state = "active"
 	contract_run = 0
