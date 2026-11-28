@@ -273,8 +273,8 @@ Built mostly from things that exist or are already designed in `docs/design/equi
 | 42 | CALIBRATE card | | designed |
 | 45 | Large lab (8 areas); Accredited jobs | 1 500 CR, 8 ore; Accredited | exists |
 | 48 | The relay dish azimuth and the Gossamer link | Orbital Silk-Spinner reticle silk (`story.md`) | built (quest + 20 % lag cut; Loom panel left out) |
-| 52 | The master audit can be asked for | Accredited | NEW |
-| 56 | The intrinsic silk standard contract | | NEW |
+| 52 | The master audit can be asked for | Accredited | built (two-morning audit, Jig-3 beat, lab quest + bench button) |
+| 56 | The intrinsic silk standard contract | master audit passed | built (lab quest + conservatory chain root) |
 | 60 | The Larder | | NEW |
 | 65 | Third robot; job board shows 5 jobs | | NEW |
 | 75 | Fourth robot | | NEW |

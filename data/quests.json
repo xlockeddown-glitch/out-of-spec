@@ -471,6 +471,43 @@
       "rewards": { "credits": 500, "lab_xp": 1000, "phone": "npcs/odalys/quests/gossamer_link_done" }
     },
     {
+      "id": "master_audit",
+      "kind": "lab",
+      "giver": "oirm",
+      "title": "The Master Audit",
+      "scope": "farm",
+      "gates": { "lab_gate": "master_audit", "band": "Accredited" },
+      "offer": { "when": "always" },
+      "offer_line": "npcs/oirm/quests/master_audit_offer",
+      "steps": [
+        { "id": "pass", "text": "Request and pass the two-morning OIRM master audit from the lab bench.",
+          "check": "master_audit_passed" }
+      ],
+      "rewards": { "phone": "npcs/oirm/quests/master_audit_done" }
+    },
+    {
+      "id": "intrinsic_silk",
+      "kind": "lab",
+      "giver": "oirm",
+      "title": "The Intrinsic Silk Standard",
+      "scope": "farm",
+      "gates": { "lab_gate": "intrinsic_silk_contract" },
+      "offer": { "when": "master_audit_passed" },
+      "offer_line": "npcs/oirm/quests/intrinsic_silk_offer",
+      "any_order": true,
+      "steps": [
+        { "id": "seat_spinner", "text": "Seat a whole Orbital Silk-Spinner spool in the relay dish.",
+          "check": "relay_spool", "species": "orbital_silk_spinner" },
+        { "id": "crystal_silk", "text": "Hold 3 whole Crystal Weaver silk spools in stock.",
+          "check": "silk_stock", "species": "crystal_weaver", "at_least": 3 },
+        { "id": "calibrations", "text": "Complete 5 traceable, on-time calibrations by your own hand after this contract opens.",
+          "check": "count", "log": "cal_log",
+          "where": { "traceable": true, "on_time": true, "interval_evidence": true, "not_performed_by": "Manager", "programmed_by": "" },
+          "at_least": 5 }
+      ],
+      "rewards": { "credits": 800, "lab_xp": 2000, "intrinsic_standard": true, "phone": "npcs/oirm/quests/intrinsic_silk_done" }
+    },
+    {
       "id": "layer_by_layer", "kind": "lab", "giver": "vance", "title": "Layer by Layer", "scope": "farm", "zone": "valles_marineris",
       "gates": { "lab_level": 50 },
       "offer": { "when": "counter", "counter": "reached_valles_marineris", "at_least": 1 },

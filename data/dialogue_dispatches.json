@@ -262,7 +262,11 @@
         "second_contract_offer": "[PLACEHOLDER] Your first contract is on file and your lab is at level 35. OIRM has a longer run for you: 8 traceable, on-time calibrations by your own hand. Complete them for 400 CR and 900 lab XP.",
         "second_contract_done": "[PLACEHOLDER] Eight traceable, on-time calibrations on file. The second contract is closed; 400 CR is credited to your lab account.",
         "paperwork_from_orbit_offer": "Your lab is of a size we take paperwork from. An account opens when you send us a standard you bought.",
-        "paperwork_from_orbit_done": "Account open, one standard received, one certificate issued. 100 CR is credited toward your next trip."
+        "paperwork_from_orbit_done": "Account open, one standard received, one certificate issued. 100 CR is credited toward your next trip.",
+        "master_audit_offer": "[PLACEHOLDER] Your lab holds Accredited standing at level 52. Request the two-morning master audit from the bench when your chain, climate, interlocks and robots are in order.",
+        "master_audit_done": "[PLACEHOLDER] Two clean mornings on file. The master audit certificate is issued. Mars has a surface lab we can cross-examine without wincing.",
+        "intrinsic_silk_offer": "[PLACEHOLDER] Your master audit is on file at level 56. OIRM is ready to recognize a surface primary: seat an Orbital Silk-Spinner spool in the relay dish, hold 3 whole Crystal Weaver silk spools, and log 5 traceable, on-time calibrations by hand.",
+        "intrinsic_silk_done": "[PLACEHOLDER] Intrinsic silk standard recognized. Your traceability chain now ends at your conservatory. 800 CR and 2 000 lab XP credited."
       }
     },
     "odalys": {

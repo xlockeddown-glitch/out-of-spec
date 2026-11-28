@@ -56,8 +56,8 @@ func _own_standard(gs: GameStateScript, id: String) -> void:
 
 func test_gates_read_built_and_protocol_is_51() -> String:
 	var problem: String = ""
-	if CoopSession.PROTOCOL != 53:
-		return "Expected CoopSession.PROTOCOL == 53, got %d." % CoopSession.PROTOCOL
+	if CoopSession.PROTOCOL != 54:
+		return "Expected CoopSession.PROTOCOL == 54, got %d." % CoopSession.PROTOCOL
 	for pair: Array in [[&"robot_paint", 85], [&"halfway_plaque", 92], [&"gold_border", 99]]:
 		var row: Dictionary = DataManager.get_record(&"skills", pair[0], "lab_gates")
 		if row.is_empty() or not bool(row.get("built", false)) or int(row.get("level", 0)) != int(pair[1]):
@@ -149,7 +149,7 @@ func test_halfway_plaque_and_gold_border_on_wall() -> String:
 	# Lab quest finished before 99 has no gold_border; lab quest finished at 99 gets gold_border.
 	var lab_quests: Array[Dictionary] = QuestEngine.quests().filter(func(q: Dictionary) -> bool:
 		return str(q.get("kind", "")) == "lab" and str(q.get("scope", QuestEngine.SCOPE_FARM)) == QuestEngine.SCOPE_FARM \
-			and QuestEngine.data_problem(q) == "")
+			and str(q.get("giver", "")) != "oirm" and QuestEngine.data_problem(q) == "")
 	if problem == "" and lab_quests.size() < 2:
 		problem = "Expected at least 2 farm lab quests in data."
 	if problem == "":

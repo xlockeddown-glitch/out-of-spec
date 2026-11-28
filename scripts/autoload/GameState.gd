@@ -358,6 +358,14 @@ var _untraceable_since_cal: Dictionary = {}
 var certificates: Dictionary = {}
 ## Every certificate issued, oldest first, founding stock included.
 var certificate_log: Array[Dictionary] = []
+## True once the farm has passed the OIRM master audit (lab 52, Accredited).
+var master_audit_passed: bool = false
+## Active or recent master audit state: {} when idle, else { status, start_day, days_done, cooldown_until, passed_day }.
+var master_audit: Dictionary = {}
+## Day of the most recent robot safety interlock override (-1 if never overridden).
+var last_interlock_override_day: int = -1
+## True once the farm has completed the intrinsic silk standard contract (lab 56).
+var intrinsic_standard: bool = false
 ## standard_id -> the day it comes back (next audit pod, or courier).
 var at_oirm: Dictionary = {}
 ## Every trip to OIRM: { standard_id, sent_day, return_day, courier }. Used to
@@ -869,7 +877,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "olympus_markers", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "test_pod", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened", "odalys_mug_sent"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "olympus_markers", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "test_pod", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened", "odalys_mug_sent", "master_audit_passed", "master_audit", "last_interlock_override_day", "intrinsic_standard"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -952,6 +960,12 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return IceDepth.cold_problem(data["cold_since"])
 	if data.has("ice_cores_held") and (int(data["ice_cores_held"]) < 0 or int(data["ice_cores_held"]) > ICE_CORES_CAP):
 		return "'ice_cores_held' is out of range."
+	if data.has("last_interlock_override_day") and int(data["last_interlock_override_day"]) < -1:
+		return "'last_interlock_override_day' is out of range."
+	if data.has("master_audit") or bool(data.get("master_audit_passed", false)):
+		var ma_problem: String = master_audit_dict_problem(data.get("master_audit", {}), data.get("master_audit_passed", false))
+		if ma_problem != "":
+			return ma_problem
 	if data.has("mine_gate_open") and not data["mine_gate_open"] is bool:
 		return "'mine_gate_open' is not a yes or no."
 	if data.has("pump_owned") and not data["pump_owned"] is bool:
@@ -3938,11 +3952,18 @@ func set_interlock_override(robot_id: String, on: bool, player_id: String = "") 
 		return "%s's interlock is armed." % robot["name"]
 	robot["override"] = on
 	robot["holding"] = not on and not robot_out_of_tolerance(robot_id).is_empty()
+	var override_day_changed: bool = false
 	if on:
 		robot["override_logged"] = true
 		robot["override_by"] = local_player_id if player_id == "" else player_id
+		var today: int = GameClock.get_day_index()
+		if last_interlock_override_day != today:
+			last_interlock_override_day = today
+			override_day_changed = true
 	post_phone("ROBOT: %s: interlock %s." % [robot["name"], "OVERRIDDEN" if on else "armed"])
 	robots_changed.emit()
+	if override_day_changed:
+		oirm_changed.emit()
 	return ""
 
 
@@ -4502,6 +4523,7 @@ func _on_day_started(day: int) -> void:
 	var cadence: int = int(_schedule("cadence_days", 5.0))
 	if cadence > 0 and day % cadence == 0:
 		_run_audit(day)
+	_run_master_audit(day)
 	_morning = false
 	# After the audit, so the board matches the band the lab ends the morning in.
 	refresh_job_board(day)
@@ -4721,6 +4743,298 @@ static func _mid_sentence(name: String) -> String:
 	if first.length() > 1 and first.substr(1) == first.substr(1).to_lower() 			and first.substr(1).to_upper() != first.substr(1).to_lower():
 		return first.to_lower() + name.substr(first.length())
 	return name
+
+# --- OIRM master audit and intrinsic silk standard (slice 34) -------------------
+
+const MASTER_AUDIT_GATE: String = "master_audit"
+const MASTER_AUDIT_MORNINGS: int = 2  # [PLACEHOLDER]
+const MASTER_AUDIT_COOLDOWN_DAYS: int = 7  # [PLACEHOLDER]
+const MASTER_AUDIT_INTERLOCK_DAYS: int = 7  # [PLACEHOLDER]
+const MASTER_AUDIT_LAB_XP: int = 1500  # [PLACEHOLDER]
+const MASTER_AUDIT_CREDITS: int = 600  # [PLACEHOLDER]
+const MASTER_AUDIT_AUDITORS: Array[String] = ["CLADEUS", "GEMINID", "CHATTERLY-PT", "SPACEFLUX-SI"]
+const MASTER_AUDIT_STATUSES: Array[String] = ["booked", "running", "cooldown", "passed"]
+const INTRINSIC_CHAIN_ROOT: String = "Intrinsic silk standard (your conservatory)"
+
+
+## Validates a saved `master_audit` dictionary, returning "" when valid.
+## When `passed_flag` is a bool, also checks consistency with `master_audit_passed`.
+static func master_audit_dict_problem(raw: Variant, passed_flag: Variant = null) -> String:
+	if not (raw is Dictionary):
+		return "'master_audit' is not a dictionary."
+	var d: Dictionary = raw as Dictionary
+	if d.is_empty():
+		if passed_flag is bool and passed_flag:
+			return "'master_audit_passed' is true while 'master_audit' is empty."
+		return ""
+	for key: Variant in d:
+		if not (key is String) or not (str(key) in ["status", "start_day", "days_done", "cooldown_until", "passed_day"]):
+			return "'master_audit' has an unknown key '%s'." % str(key)
+	var status: Variant = d.get("status", "")
+	if not (status is String) or not (str(status) in MASTER_AUDIT_STATUSES):
+		return "'master_audit' has a bad status."
+	var st: String = str(status)
+	for int_key: String in ["start_day", "days_done", "cooldown_until", "passed_day"]:
+		if d.has(int_key) and typeof(d[int_key]) != TYPE_INT:
+			return "'master_audit' has a bad '%s'." % int_key
+	if int(d.get("start_day", 0)) < 0 or int(d.get("cooldown_until", 0)) < 0 or int(d.get("passed_day", -1)) < -1:
+		return "'master_audit' has a day out of range."
+	var days_done: int = int(d.get("days_done", 0))
+	if days_done < 0 or days_done > MASTER_AUDIT_MORNINGS:
+		return "'master_audit' has 'days_done' out of range."
+	if (st == "booked" or st == "running") and (not d.has("start_day") or typeof(d["start_day"]) != TYPE_INT or int(d["start_day"]) <= 0):
+		return "'master_audit' status '%s' requires a positive 'start_day'." % st
+	if passed_flag is bool:
+		if st == "passed" and not passed_flag:
+			return "'master_audit' status is 'passed' while 'master_audit_passed' is false."
+		if passed_flag and st != "passed":
+			return "'master_audit_passed' is true while 'master_audit' status is '%s'." % st
+	return ""
+
+
+## Why the farm cannot request the OIRM master audit right now, or "".
+func master_audit_problem() -> String:
+	if master_audit_passed:
+		return "The OIRM master audit is already passed."
+	var gate: String = lab_gate_problem(MASTER_AUDIT_GATE, "The master audit")
+	if gate != "":
+		return gate
+	if credibility_band_index() < _band_index_named("Accredited"):
+		return "The master audit needs Accredited credibility (currently %s)." % credibility_band()
+	var status: String = str(master_audit.get("status", ""))
+	if status == "booked" or status == "running":
+		return "A master audit is already %s." % status
+	var today: int = GameClock.get_day_index()
+	var until: int = int(master_audit.get("cooldown_until", 0))
+	if until > today:
+		return "Master audit on cooldown until day %s (%s d remaining)." % [
+			SP811.integer(until), SP811.integer(until - today)]
+	for rid: Variant in robots:
+		if is_interlock_overridden(str(rid)):
+			return "A robot safety interlock is overridden; arm it before requesting the master audit."
+	if last_interlock_override_day >= 0:
+		var clear_day: int = last_interlock_override_day + MASTER_AUDIT_INTERLOCK_DAYS
+		if clear_day > today:
+			return "An interlock override was logged on day %s; OIRM will see it until day %s." % [
+				SP811.integer(last_interlock_override_day), SP811.integer(clear_day)]
+	for rid: Variant in robots:
+		var r: Dictionary = robots[rid]
+		if bool(r.get("override_logged", false)):
+			return "An interlock override is still on %s's log until the next audit clears it." % r["name"]
+	return ""
+
+
+## Short button label for the calibration bench's master audit button.
+func master_audit_button_text() -> String:
+	var note: String = lab_gate_note(MASTER_AUDIT_GATE)
+	if note != "":
+		return "MASTER AUDIT (%s)" % note
+	var status: String = str(master_audit.get("status", ""))
+	if status == "booked":
+		return "MASTER AUDIT (day %s)" % SP811.integer(int(master_audit.get("start_day", 0)))
+	if status == "running":
+		return "MASTER AUDIT (in progress)"
+	if credibility_band_index() < _band_index_named("Accredited"):
+		return "MASTER AUDIT (needs Accredited)"
+	var today: int = GameClock.get_day_index()
+	var until: int = int(master_audit.get("cooldown_until", 0))
+	if until > today:
+		return "MASTER AUDIT (day %s)" % SP811.integer(until)
+	return "ASK MASTER AUDIT"
+
+
+## Co-op auditor assignment text: one auditor per player in player order;
+## fewer players means auditors double up across them.
+func master_audit_auditors_text(players: Array[String] = []) -> String:
+	var crew: Array[String] = []
+	if not players.is_empty():
+		crew = players
+	elif not CoopSession.players.is_empty():
+		crew = CoopSession.players
+	else:
+		crew = [local_player_id]
+	var pairs: PackedStringArray = []
+	for i: int in MASTER_AUDIT_AUDITORS.size():
+		pairs.append("%s (%s)" % [MASTER_AUDIT_AUDITORS[i], CoopUI.player_name(crew[i % crew.size()])])
+	return ", ".join(pairs)
+
+
+## Host-run farm command: books the two-morning OIRM master audit for the next
+## morning at 06:00. `player_id` is supplied by FarmCommands from the connection.
+@warning_ignore("unused_parameter")
+func ask_master_audit(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host can request the master audit."
+	var problem: String = master_audit_problem()
+	if problem != "":
+		return problem
+	# GameClock days run 06:00 to 06:00 (00:00–05:59 still carries the current day index),
+	# so day_index + 1 is always the coming 06:00 morning.
+	var start_day: int = GameClock.get_day_index() + 1
+	master_audit = {
+		"status": "booked",
+		"start_day": start_day,
+		"days_done": 0,
+		"cooldown_until": 0,
+		"passed_day": -1,
+	}
+	post_phone("OIRM: Master audit booked for day %s at 06:00 (%s mornings). Auditors will review your chain, conservatory climate, interlocks and robots." % [
+		SP811.integer(start_day), SP811.integer(MASTER_AUDIT_MORNINGS)])
+	oirm_changed.emit()
+	return ""
+
+
+## Runs one morning of an active OIRM master audit at 06:00 (host only).
+func _run_master_audit(day: int) -> void:
+	if FarmCommands.guest:
+		return
+	var status: String = str(master_audit.get("status", ""))
+	if status != "booked" and status != "running":
+		return
+	if day < int(master_audit.get("start_day", 0)):
+		return
+	var morning: int = int(master_audit.get("days_done", 0)) + 1
+	master_audit["status"] = "running"
+	var findings: Array[String] = []
+	var notes: Array[String] = []
+	var excused: Dictionary = _excused_units(day)
+	# 1. Every in-service instrument traceable and in date (and units in tolerance),
+	#    skipping standards at OIRM and excusing units overdue only because their
+	#    standard was at OIRM. A released robot sensor out of tolerance triggers the
+	#    Jig-3 self-quarantine beat.
+	for id: String in unit_ids():
+		var sensor: DriftingSensor = get_sensor(id)
+		var robot_id: String = robot_of(id)
+		if robot_id != "":
+			if sensor.is_overdue(day) and not excused.has(id):
+				findings.append("Finding: Robot %s (%s) calibration overdue (%s)." % [
+					robots[robot_id]["name"], sensor.short_name.trim_prefix(robot_id + " "),
+					DriftingSensor.overdue_text(sensor.cal_due_day)])
+				continue
+			var r_chain: Dictionary = _master_audit_unit_traceable(id, excused)
+			if not r_chain["traceable"]:
+				findings.append("Finding: %s." % r_chain["text"])
+				continue
+			if sensor.get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE:
+				if str(robots[robot_id].get("state", "")) == "released":
+					var suspect_list: PackedStringArray = _robot_suspect_cals_since_good(robot_id, id)
+					var s_name: String = sensor.short_name.trim_prefix(robot_id + " ")
+					if suspect_list.is_empty():
+						notes.append("JIG-3 SELF-QUARANTINE (credited, not a finding): %s %s out of tolerance; robot quarantined itself (no calibrations performed since last good check)." % [
+							robots[robot_id]["name"], s_name])
+					else:
+						notes.append("JIG-3 SELF-QUARANTINE (credited, not a finding): %s %s out of tolerance; robot quarantined %s calibration(s) as suspect: %s." % [
+							robots[robot_id]["name"], s_name, SP811.integer(suspect_list.size()), ", ".join(suspect_list)])
+				else:
+					findings.append("Finding: %s out of tolerance (%s × MPE)." % [
+						instrument_name(id), SP811.number(sensor.get_error_ratio(), 3)])
+			continue
+		var chain: Dictionary = _master_audit_unit_traceable(id, excused)
+		if not chain["traceable"]:
+			findings.append("Finding: %s." % chain["text"])
+		elif sensor.get_band() == DriftingSensor.Band.OUT_OF_TOLERANCE:
+			findings.append("Finding: %s out of tolerance (%s × MPE)." % [
+				instrument_name(id), SP811.number(sensor.get_error_ratio(), 3)])
+	for id: String in standard_ids():
+		if at_oirm.has(id):
+			continue
+		var s_chain: Dictionary = traceability_chain(id)
+		if not s_chain["traceable"]:
+			findings.append("Finding: %s." % s_chain["text"])
+	# 2. No robot safety interlock override in the last MASTER_AUDIT_INTERLOCK_DAYS days.
+	var interlock_violated: bool = last_interlock_override_day >= 0 \
+			and (day - last_interlock_override_day) < MASTER_AUDIT_INTERLOCK_DAYS
+	if not interlock_violated:
+		for rid: Variant in robots:
+			var r: Dictionary = robots[rid]
+			if is_interlock_overridden(str(rid)) or bool(r.get("override_logged", false)):
+				interlock_violated = true
+				break
+	if interlock_violated:
+		findings.append("Finding: Robot safety interlock overridden within the last %s d." % SP811.integer(MASTER_AUDIT_INTERLOCK_DAYS))
+	# 3. Conservatory climate in band at the morning check.
+	var climate_causes: PackedStringArray = molt_pause_causes()
+	if not climate_causes.is_empty():
+		findings.append("Finding: Conservatory climate out of band (%s)." % " and ".join(climate_causes))
+	# Post morning report (header, credited notes, one line per finding, verdict).
+	post_phone("OIRM MASTER AUDIT (day %s, morning %s of %s) — Auditors: %s." % [
+		SP811.integer(day), SP811.integer(morning), SP811.integer(MASTER_AUDIT_MORNINGS),
+		master_audit_auditors_text()])
+	for note: String in notes:
+		post_phone(note)
+	for finding: String in findings:
+		post_phone(finding)
+	if not findings.is_empty():
+		var until: int = day + MASTER_AUDIT_COOLDOWN_DAYS
+		master_audit = {
+			"status": "cooldown",
+			"start_day": 0,
+			"days_done": 0,
+			"cooldown_until": until,
+			"passed_day": -1,
+		}
+		post_phone("OIRM MASTER AUDIT FAILED (%s finding(s)). You may ask again on day %s." % [
+			SP811.integer(findings.size()), SP811.integer(until)])
+		oirm_changed.emit()
+		return
+	master_audit["days_done"] = morning
+	if morning < MASTER_AUDIT_MORNINGS:
+		post_phone("OIRM MASTER AUDIT: Morning %s of %s clean. Returning tomorrow at 06:00." % [
+			SP811.integer(morning), SP811.integer(MASTER_AUDIT_MORNINGS)])
+		oirm_changed.emit()
+		return
+	var first_pass: bool = not master_audit_passed
+	master_audit_passed = true
+	master_audit = {
+		"status": "passed",
+		"start_day": int(master_audit.get("start_day", day)),
+		"days_done": MASTER_AUDIT_MORNINGS,
+		"cooldown_until": 0,
+		"passed_day": day,
+	}
+	if first_pass:
+		add_credits(MASTER_AUDIT_CREDITS)
+		give_lab_xp(MASTER_AUDIT_LAB_XP)
+	post_phone("OIRM MASTER AUDIT PASSED: Both mornings clean. Credited %s CR and %s lab XP." % [
+		SP811.integer(MASTER_AUDIT_CREDITS), SP811.integer(MASTER_AUDIT_LAB_XP)])
+	oirm_changed.emit()
+
+
+## Traceability check for a unit during the master audit: excuses overdue when
+## its standard was at OIRM (matching Vance's `_excused_units`), while still
+## failing missing, suspect, or untraceably adjusted calibrations.
+func _master_audit_unit_traceable(id: String, excused: Dictionary) -> Dictionary:
+	var chain: Dictionary = traceability_chain(id)
+	if chain["traceable"]:
+		return chain
+	if excused.has(id) and not _last_traceable_record(id).is_empty() \
+			and not suspect_units.has(id) and not _untraceable_since_cal.has(id):
+		return { "traceable": true, "text": chain["text"] }
+	return chain
+
+
+## Calibrations `robot_id` performed since `sensor_id`'s last good check, newest first.
+func _robot_suspect_cals_since_good(robot_id: String, sensor_id: String) -> PackedStringArray:
+	var names: PackedStringArray = []
+	for i: int in range(cal_log.size() - 1, -1, -1):
+		var done: Dictionary = cal_log[i]
+		if done.get("suspect", false) or not done.get("traceable", false):
+			continue
+		if str(done.get("instrument_id", "")) == sensor_id and str(done.get("result", "")) != CalUncertainty.FAIL:
+			break
+		if str(done.get("programmed_by", "")) == "" or str(done.get("performed_by", "")) != robot_id:
+			continue
+		names.append("%s (day %s)" % [instrument_name(str(done["instrument_id"])), SP811.integer(int(done["day"]))])
+	return names
+
+
+## Sets the farm's intrinsic silk standard flag once the lab 56 quest finishes.
+func grant_intrinsic_standard() -> void:
+	if intrinsic_standard:
+		return
+	intrinsic_standard = true
+	oirm_changed.emit()
+
 
 # --- OIRM, certificates, recall (milestone 2) -------------------------------------
 
@@ -5115,20 +5429,22 @@ func traceability_chain(instrument_id: String) -> Dictionary:
 		if cert.is_empty():
 			return { "traceable": false, "text": "%s: no certificate" % name }
 		if sensor.relay_disciplined and standard_problem(instrument_id) == "":
-			return { "traceable": true, "text": "%s ← %s ← OIRM time" % [name, "relay lock" if is_relay_locked(instrument_id)
-				else "holdover (good to day %d)" % sensor.cal_due_day] }
+			return { "traceable": true, "text": "%s ← %s ← %s" % [name, "relay lock" if is_relay_locked(instrument_id)
+				else "holdover (good to day %d)" % sensor.cal_due_day,
+				INTRINSIC_CHAIN_ROOT if intrinsic_standard else "OIRM time"] }
 		if sensor.is_overdue(today):
 			return { "traceable": false, "text": "%s ← %s %s" % [name, cert["id"], DriftingSensor.overdue_text(sensor.cal_due_day)] }
 		if suspect_units.has(instrument_id):
 			return { "traceable": false, "text": "%s ← %s: SUSPECT, recalled day %d" % [name, cert["id"], suspect_units[instrument_id]] }
 		if _untraceable_since_cal.has(instrument_id):
 			return { "traceable": false, "text": "%s ← %s: adjusted since without a traceable standard" % [name, cert["id"]] }
+		var root: String = INTRINSIC_CHAIN_ROOT if intrinsic_standard else "OIRM"
 		if cert.has("reference_id"):
-			return { "traceable": true, "text": "%s ← %s (due day %d) ← %s (%s) ← OIRM" % [name, cert["id"], cert["due_day"],
-				instrument_name(cert["reference_id"]), cert["reference_certificate"]] }
+			return { "traceable": true, "text": "%s ← %s (due day %d) ← %s (%s) ← %s" % [name, cert["id"], cert["due_day"],
+				instrument_name(cert["reference_id"]), cert["reference_certificate"], root] }
 		# A maker's certificate traces through the maker's own lab to OIRM.
 		var via: String = "" if str(cert.get("issuer", "OIRM")) == "OIRM" else " ← " + str(cert["issuer"])
-		return { "traceable": true, "text": "%s ← %s (due day %d)%s ← OIRM" % [name, cert["id"], cert["due_day"], via] }
+		return { "traceable": true, "text": "%s ← %s (due day %d)%s ← %s" % [name, cert["id"], cert["due_day"], via, root] }
 	var record: Dictionary = _last_traceable_record(instrument_id)
 	if record.is_empty():
 		return { "traceable": false, "text": "%s: no traceable calibration on record" % name }
@@ -5140,7 +5456,7 @@ func traceability_chain(instrument_id: String) -> Dictionary:
 		return { "traceable": false, "text": "%s: adjusted since without a traceable standard" % link }
 	if sensor.is_overdue(today):
 		return { "traceable": false, "text": "%s: %s" % [link, DriftingSensor.overdue_text(sensor.cal_due_day)] }
-	return { "traceable": true, "text": link + " ← OIRM" }
+	return { "traceable": true, "text": link + " ← " + (INTRINSIC_CHAIN_ROOT if intrinsic_standard else "OIRM") }
 
 
 func _last_traceable_record(instrument_id: String) -> Dictionary:
@@ -7815,6 +8131,15 @@ const GOSSAMER_LAG_CUT_PCT: float = 20.0
 ## True while the relay holds a whole spool from `species_id` (or any whole spool if empty).
 func has_relay_spool(species_id: StringName = &"") -> bool:
 	return relay_slotted and not slotted_spool_damaged and (species_id == &"" or slotted_spool_species == species_id)
+
+
+## Count of whole (undamaged) spools of `species_id` currently held in stock.
+func whole_spools_of(species_id: StringName) -> int:
+	var count: int = 0
+	for i: int in _spool_species.size():
+		if _spool_species[i] == species_id and not _is_spool_damaged(i):
+			count += 1
+	return count
 
 
 ## True once The Gossamer Link lab quest is done (derived from quest_state, no saved flag).

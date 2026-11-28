@@ -104,7 +104,7 @@ func test_fast_travel_is_listed_only_after_the_first_visit() -> String:
 func test_the_command_is_on_the_list_and_the_protocol_moved() -> String:
 	if not &"move_rover_valles" in FarmCommands.ACTIONS:
 		return "move_rover_valles is not a farm command."
-	return "" if SessionScript.PROTOCOL == 53 else "The protocol is %d, not 53." % SessionScript.PROTOCOL
+	return "" if SessionScript.PROTOCOL == 54 else "The protocol is %d, not 54." % SessionScript.PROTOCOL
 
 
 # --- The depths ----------------------------------------------------------------------
