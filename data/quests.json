@@ -528,6 +528,22 @@
           "check": "counter", "counter": "olympus_new_vein", "at_least": 3 }
       ],
       "rewards": { "lab_xp": 450, "phone": "npcs/bram/quests/three_veins_done" }
+    },
+    {
+      "id": "colony_wildlife_survey", "kind": "lab", "giver": "oirm", "title": "Colony Wildlife Survey", "scope": "farm",
+      "gates": {},
+      "offer": { "when": "animal_trust_reached", "at_least": 1 },
+      "offer_line": "npcs/oirm/quests/colony_wildlife_survey_offer",
+      "any_order": true,
+      "steps": [
+        { "id": "weigh_hen", "text": "Weigh a hen with a calibrated hanging field scale.",
+          "check": "counter", "counter": "survey_weighings", "where": { "group_id": "dome_hen" } },
+        { "id": "weigh_goat", "text": "Weigh a goat with a calibrated hanging field scale.",
+          "check": "counter", "counter": "survey_weighings", "where": { "group_id": "dome_goat" } },
+        { "id": "weigh_rabbit", "text": "Weigh a rabbit with a calibrated hanging field scale.",
+          "check": "counter", "counter": "survey_weighings", "where": { "group_id": "dome_rabbit" } }
+      ],
+      "rewards": { "credits": 120, "lab_xp": 150, "phone": "npcs/oirm/quests/colony_wildlife_survey_done" }
     }
   ],
   "keepsakes": [

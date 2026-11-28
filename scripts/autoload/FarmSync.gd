@@ -35,7 +35,7 @@ const SHOWN_BY: Dictionary = {
 	&"oirm_changed": ["at_oirm", "oirm_trips", "certificate_log", "suspect_units", "_untraceable_since_cal", "ice_cores_held", "master_audit_passed", "master_audit", "last_interlock_override_day", "intrinsic_standard"],
 	&"credibility_changed": ["credibility", "_best_band", "contract_state", "contract_run"],
 	&"crops_changed": ["plantings", "harvest_bin"],
-	&"animals_changed": ["feed_bin", "animal_groups"],
+	&"animals_changed": ["feed_bin", "animal_groups", "survey_weighings", "animal_weighed_day"],
 	&"jobs_changed": ["job_board", "active_jobs", "job_log", "_board_day"],
 	&"lab_changed": ["lab_size", "lab_areas", "lab_areas_paid", "lab_build", "lab_layout"],
 	&"robots_changed": ["robots"],

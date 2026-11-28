@@ -1,5 +1,5 @@
 {
-  "_note": "Wild farm animals (docs/design/farm_animals.md). Numbers marked [PLACEHOLDER]: group_size (hens 4, goats 3, rabbits 3), model_scale (rabbit scaled to 0.06 so it reads smaller than the hen at 0.1), gift_price (12, 30, 40 CR), trust rules (max 5, +1 per fed day, -1 after 3 unfed days, approach 1, gifts 2, gift_cap_days 3, finds 4 at 1 in 5 days), and find_reward (1 crystal_ore).",
+  "_note": "Wild farm animals (docs/design/farm_animals.md). Numbers marked [PLACEHOLDER]: group_size (hens 4, goats 3, rabbits 3), model_scale (rabbit scaled to 0.06 so it reads smaller than the hen at 0.1), gift_price (12, 30, 40 CR), trust rules (max 5, +1 per fed day, -1 after 3 unfed days, approach 1, gifts 2, gift_cap_days 3, finds 4 at 1 in 5 days), find_reward (1 crystal_ore), and survey weights (hen 1.8 kg, goat 35 kg, rabbit 2.4 kg, ±10 % spread, 1 accepted weighing per farm per day).",
   "trust": {
     "max": 5,
     "gain_per_fed_day": 1,
@@ -11,6 +11,9 @@
     "finds_min": 4,
     "find_chance_denom": 5
   },
+  "survey": {
+    "weight_spread_frac": 0.1
+  },
   "find_reward": {
     "kind": "crystal_ore",
     "amount": 1
@@ -19,6 +22,8 @@
     {
       "id": "dome_hen",
       "name": "Hens",
+      "singular": "hen",
+      "weight_kg": 1.8,
       "group_size": 4,
       "home_kind": "scrub",
       "gift_id": "hen_egg",
@@ -32,6 +37,8 @@
     {
       "id": "dome_goat",
       "name": "Goats",
+      "singular": "goat",
+      "weight_kg": 35.0,
       "group_size": 3,
       "home_kind": "plateau_rim",
       "gift_id": "goat_cashmere",
@@ -45,6 +52,8 @@
     {
       "id": "dome_rabbit",
       "name": "Rabbits",
+      "singular": "rabbit",
+      "weight_kg": 2.4,
       "group_size": 3,
       "home_kind": "gulch",
       "gift_id": "rabbit_fur",
