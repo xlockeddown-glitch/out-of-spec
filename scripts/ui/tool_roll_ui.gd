@@ -229,7 +229,12 @@ static func slots(tab: StringName) -> Array[Dictionary]:
 					"Bought as planted, %s CR each" % SP811.integer(GameState.seed_cost(seed_id)), SEED_ICON))
 			var held: Dictionary = {}
 			var in_spec: Dictionary = {}
+			var gifts_held: Dictionary = {}
 			for entry: Dictionary in GameState.harvest_bin:
+				if entry.has("gift_id"):
+					var gift_id: String = str(entry.get("gift_id", ""))
+					gifts_held[gift_id] = int(gifts_held.get(gift_id, 0)) + 1
+					continue
 				var crop_id: String = str(entry.get("crop_id", ""))
 				held[crop_id] = int(held.get(crop_id, 0)) + 1
 				if entry.get("in_spec", false):
@@ -238,6 +243,12 @@ static func slots(tab: StringName) -> Array[Dictionary]:
 				if held.has(crop_id):
 					out.append(_slot("crop:" + crop_id, GameState.crop_name(crop_id), SP811.integer(held[crop_id]),
 						"%s in spec, in the bin" % SP811.integer(int(in_spec.get(crop_id, 0))), crop_id))
+			for group_id: String in GameState.animal_group_ids():
+				var spec: Dictionary = GameState.animal_group(group_id)
+				var gift_id: String = str(spec.get("gift_id", ""))
+				if gifts_held.has(gift_id):
+					var label: String = str(spec.get("gift_plural", spec.get("gift_name", gift_id)))
+					out.append(_slot("gift:" + gift_id, label, SP811.integer(gifts_held[gift_id]), "In the bin", ""))
 		TAB_BLOCKS:
 			var pieces: Dictionary = GameState.gauge_pieces()
 			if not pieces.is_empty():

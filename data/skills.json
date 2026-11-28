@@ -45,7 +45,8 @@
     { "id": "job_clean", "skill": "uncertainty", "xp": 0.25, "per": "credit paid" },
     { "id": "plant_crop", "skill": "agronomy", "xp": 5, "crop": true },
     { "id": "harvest_in_spec", "skill": "agronomy", "xp": 0.25, "per": "credit of the crop's price", "crop": true },
-    { "id": "sell_crop", "skill": "agronomy", "xp": 0.25, "per": "credit of the crops' price", "crop": true }
+    { "id": "sell_crop", "skill": "agronomy", "xp": 0.25, "per": "credit of the crops' price", "crop": true },
+    { "id": "collect_animal_gift", "skill": "agronomy", "xp": 5 }
   ],
   "lab_level": { "size_xp": { "small": 1, "medium": 3, "large": 8 }, "provisional_gap_share": 0.75 },
   "lab_gates": [
