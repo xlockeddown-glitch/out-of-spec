@@ -939,8 +939,8 @@ func test_the_lava_tubes_and_the_aquifer_keep_their_own_gates() -> String:
 # --- Nothing new on the wire ------------------------------------------------------------
 
 func test_the_protocol_did_not_move_for_depths_two_to_six() -> String:
-	if CoopSession.PROTOCOL != 42:
-		return "PROTOCOL is %d; depths 2 to 6 add no command or synced field, so it stays 42." % CoopSession.PROTOCOL
+	if CoopSession.PROTOCOL != 43:
+		return "PROTOCOL is %d; depths 2 to 6 add no command or synced field, so it stays 43." % CoopSession.PROTOCOL
 	return ""
 
 

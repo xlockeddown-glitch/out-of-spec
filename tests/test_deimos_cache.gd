@@ -137,19 +137,66 @@ func test_species_pick_is_deterministic_prefers_low_g_and_uses_catch_species_wit
 		return "")
 
 
-func test_all_held_fallback_pays_credits_and_still_counts() -> String:
+func test_every_id_the_picker_returns_passes_the_save_check() -> String:
+	return _on_deimos(func(gs: GameStateScript) -> String:
+		var held: Dictionary = {}
+		var picked: Array[String] = []
+		while true:
+			var id: String = GameStateScript.pick_deimos_cache_species(707070, held)
+			if id == "":
+				break
+			if id in picked:
+				return "Picker repeated '%s'." % id
+			picked.append(id)
+			held[id] = true
+			if not gs.catch_species(id):
+				return "Picker returned uncatchable id '%s'." % id
+			gs.enclosure_origins[id] = GameStateScript.CACHE_ORIGIN
+			var err: String = gs.farm_dict_problem(gs.farm_to_dict())
+			if err != "":
+				return "Picker id '%s' failed save check: %s" % [id, err]
+		if picked.size() != GameStateScript.DEIMOS_CACHE_SPECIES.size():
+			return "Expected %d picked ids, got %d." % [GameStateScript.DEIMOS_CACHE_SPECIES.size(), picked.size()]
+		return "")
+
+
+func test_all_held_fallback_pays_credits_once_then_empty_and_still_counts() -> String:
 	return _on_deimos(func(gs: GameStateScript) -> String:
 		gs.catch_species(LOW_G)
 		gs.catch_species(BRASS)
 		var credits_before: int = gs.credits
 		var reply: String = gs.open_cache(HOST)
 		if reply == "" or not reply.contains("CR"):
-			return "All-held fallback must return a credit reply: '%s'" % reply
+			return "First all-held fallback must return a credit reply: '%s'" % reply
 		if gs.credits != credits_before + GameStateScript.DEIMOS_CACHE_FALLBACK_CREDITS:
-			return "All-held fallback must pay %d CR, got %d." % [GameStateScript.DEIMOS_CACHE_FALLBACK_CREDITS, gs.credits - credits_before]
-		if not gs.deimos_cache_opened_today() or _count(gs, HOST, GameStateScript.CACHE_COUNT) != 1:
-			return "All-held fallback must still mark today opened and count open_cache."
-		return "")
+			return "First all-held fallback must pay %d CR, got %d." % [GameStateScript.DEIMOS_CACHE_FALLBACK_CREDITS, gs.credits - credits_before]
+		if not gs.deimos_cache_opened_today() or not gs.deimos_cache_fallback_paid() or _count(gs, HOST, GameStateScript.CACHE_COUNT) != 1:
+			return "First all-held fallback must mark opened, mark fallback_paid, and count open_cache."
+		# Next day: second all-held opening pays nothing, gives the empty line, and still counts.
+		GameClock.elapsed_days += 1.0
+		if gs.deimos_cache_opened_today() or not gs.deimos_cache_fallback_paid():
+			return "New day must reset opened state while keeping fallback_paid."
+		var credits_after_first: int = gs.credits
+		var second_reply: String = gs.open_cache(HOST)
+		if second_reply != GameStateScript.DEIMOS_CACHE_EMPTY_LINE:
+			return "Second all-held opening must return empty-crate line, got: '%s'" % second_reply
+		if gs.credits != credits_after_first:
+			return "Second all-held opening must pay nothing, got %d CR." % (gs.credits - credits_after_first)
+		if not gs.deimos_cache_opened_today() or _count(gs, HOST, GameStateScript.CACHE_COUNT) != 2:
+			return "Second all-held opening must still mark opened and count open_cache."
+		# Save/load on a new day retains fallback_paid while pruning day/opened.
+		GameClock.elapsed_days += 1.0
+		var saved: Dictionary = gs.farm_to_dict()
+		if saved.get("deimos_cache", {}) != { "fallback_paid": true }:
+			return "Saved deimos_cache on a later day must keep fallback_paid only: %s" % [saved.get("deimos_cache")]
+		var loaded: GameStateScript = GameStateScript.new()
+		loaded.build_registry()
+		var err: String = loaded.farm_from_dict(saved)
+		var problem: String = ""
+		if err != "" or loaded.deimos_cache_opened_today() or not loaded.deimos_cache_fallback_paid():
+			problem = "Reloaded farm must keep fallback_paid and stay unopened today: '%s'" % err
+		loaded.free()
+		return problem)
 
 
 func test_counter_finishes_quest_for_opener_only_and_pays_xp_once() -> String:
@@ -201,14 +248,15 @@ func test_opened_state_prunes_saves_loads_old_save_and_syncs_to_guest() -> Strin
 				stale["deimos_cache"] = { "day": GameClock.get_day_index() - 1, "opened": true }
 				if loaded.farm_from_dict(stale) != "" or loaded.deimos_cache_opened_today():
 					problem = "Yesterday's deimos_cache must be pruned on load."
-		# Old save without deimos_cache loads cleanly.
+		# Old save without deimos_cache resets a non-empty deimos_cache cleanly.
 		if problem == "":
+			loaded.deimos_cache = { "day": GameClock.get_day_index(), "opened": true, "fallback_paid": true }
 			var old: Dictionary = saved.duplicate(true)
 			old.erase("deimos_cache")
 			old.erase("enclosure_origins")
 			old["enclosures"] = {}
-			if loaded.farm_from_dict(old) != "" or loaded.deimos_cache_opened_today():
-				problem = "Old save without deimos_cache must load cleanly."
+			if loaded.farm_from_dict(old) != "" or not loaded.deimos_cache.is_empty() or loaded.deimos_cache_opened_today() or loaded.deimos_cache_fallback_paid():
+				problem = "Old save without deimos_cache must reset deimos_cache cleanly."
 		# Malformed deimos_cache is rejected.
 		if problem == "":
 			var bad: Dictionary = saved.duplicate(true)
@@ -286,6 +334,10 @@ func test_command_registration_protocol_and_guest_loopback() -> String:
 	return _finish(problem)
 
 
+func _world_aabb(node: MeshInstance3D) -> AABB:
+	return node.global_transform * node.mesh.get_aabb()
+
+
 func test_deimos_hub_switches_between_shut_and_opened_look() -> String:
 	var held_cache: Dictionary = GameState.deimos_cache.duplicate(true)
 	var held_clock: float = GameClock.elapsed_days
@@ -296,15 +348,42 @@ func test_deimos_hub_switches_between_shut_and_opened_look() -> String:
 	var problem: String = ""
 	var padlock: Node3D = hub.get_node_or_null("CachePadlock") as Node3D
 	var opened_group: Node3D = hub.get_node_or_null("CacheOpened") as Node3D
-	if padlock == null or opened_group == null:
-		problem = "DeimosHub must build CachePadlock and CacheOpened."
-	elif not padlock.visible or opened_group.visible:
-		problem = "Shut cache must show padlock and hide CacheOpened."
+	var trim: Node3D = hub.get_node_or_null("CacheTrim") as Node3D
+	var trim_lock: Node3D = null
+	if trim != null:
+		for child: Node in trim.get_children():
+			var part: Node3D = child as Node3D
+			if part != null and part.position.z > 0.4:
+				trim_lock = part
+	if padlock == null or opened_group == null or trim_lock == null:
+		problem = "DeimosHub must build CachePadlock, CacheOpened, and CacheTrim's lock block."
+	elif not padlock.visible or not trim_lock.visible or opened_group.visible:
+		problem = "Shut cache must show padlock and trim lock and hide CacheOpened."
 	else:
 		GameState.deimos_cache = { "day": GameClock.get_day_index(), "opened": true }
 		GameState.deimos_cache_changed.emit()
-		if padlock.visible or not opened_group.visible:
-			problem = "Opened cache must hide padlock and show CacheOpened."
+		if padlock.visible or trim_lock.visible or not opened_group.visible:
+			problem = "Opened cache must hide padlock and trim lock and show CacheOpened."
+		else:
+			var crate_a: MeshInstance3D = hub.get_node_or_null("CrateA") as MeshInstance3D
+			var lid_open: MeshInstance3D = opened_group.get_node_or_null("CacheLidOpen") as MeshInstance3D
+			if crate_a == null or lid_open == null:
+				problem = "DeimosHub must have CrateA and CacheLidOpen."
+			else:
+				var a_box: AABB = _world_aabb(crate_a)
+				var lid_box: AABB = _world_aabb(lid_open)
+				if lid_box.position.y < a_box.end.y or lid_box.intersects(a_box):
+					problem = "Open lid must sit above CrateA's top without overlapping it: lid=%s crate=%s" % [lid_box, a_box]
+				for other_name: String in ["CrateB", "CrateC"]:
+					var other: MeshInstance3D = hub.get_node_or_null(other_name) as MeshInstance3D
+					if other == null:
+						problem = "DeimosHub must have %s." % other_name
+						break
+					var o_box: AABB = _world_aabb(other)
+					var xz_overlap: bool = o_box.position.x < a_box.end.x and o_box.end.x > a_box.position.x and o_box.position.z < a_box.end.z and o_box.end.z > a_box.position.z
+					if o_box.intersects(a_box) or (xz_overlap and o_box.position.y >= a_box.end.y - 0.05):
+						problem = "%s must not sit on or overlap opened CrateA: other=%s crate=%s" % [other_name, o_box, a_box]
+						break
 	(Engine.get_main_loop() as SceneTree).root.remove_child(hub)
 	hub.free()
 	GameState.deimos_cache = held_cache

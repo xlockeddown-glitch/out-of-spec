@@ -23,11 +23,14 @@ const DEIMOS_SPOTS: Dictionary[String, Vector3] = {
 	"Pod": Vector3(16.0, 0.0, -2.5),
 }
 
+const CACHE_OPENED_TEXT: String = "The crate is open. Something warm inside."
+
 var cache_click: Inspectable
 var pod_click: Inspectable
 ## The expedition camp's click target (zones step 18): no collision body, layer 8 only.
 var camp_click: Clickable
 var _cache_padlock: Node3D
+var _cache_trim_lock: Node3D
 var _cache_lid_shut: Node3D
 var _cache_open_group: Node3D
 var _cache_day: int = -1
@@ -230,21 +233,29 @@ func _make_cache() -> Inspectable:
 	add_child(_part("CacheSwept", at + Vector3(0.0, 0.02, 0.0), Vector3(4.0, 0.04, 3.0), MoonLook.DEIMOS_DUST_LIGHT))
 	add_child(_part("CrateA", at + Vector3(-0.7, 0.5, 0.0), Vector3(1.2, 1.0, 1.0), ochre, true))
 	add_child(_part("CrateB", at + Vector3(0.7, 0.45, 0.2), Vector3(1.0, 0.9, 1.0), ochre.darkened(0.15), true))
-	add_child(_part("CrateC", at + Vector3(0.0, 1.4, 0.0), Vector3(1.1, 0.8, 0.9), ochre.lightened(0.1)))
+	add_child(_part("CrateC", at + Vector3(0.65, 0.4, -0.85), Vector3(1.1, 0.8, 0.9), ochre.lightened(0.1)))
 	_cache_padlock = _part("CachePadlock", at + Vector3(-0.7, 0.7, 0.55), Vector3(0.22, 0.28, 0.1), MoonLook.SCREEN_GLOW)
 	add_child(_cache_padlock)
 	_cache_lid_shut = _part("CacheLidShut", at + Vector3(-0.7, 1.04, 0.0), Vector3(1.26, 0.08, 1.06), ochre.lightened(0.1))
 	add_child(_cache_lid_shut)
 	_cache_open_group = Node3D.new()
 	_cache_open_group.name = "CacheOpened"
-	var lid_open: Node3D = _part("CacheLidOpen", at + Vector3(-0.7, 1.15, -0.58), Vector3(1.26, 0.08, 1.06), ochre.lightened(0.1))
+	var lid_open: Node3D = _part("CacheLidOpen", at + Vector3(-0.7, 1.48, -0.82), Vector3(1.26, 0.08, 1.06), ochre.lightened(0.1))
 	lid_open.rotation_degrees = Vector3(58.0, 0.0, 0.0)
 	_cache_open_group.add_child(lid_open)
 	_cache_open_group.add_child(_part("CacheWarmLiner", at + Vector3(-0.7, 0.98, 0.0), Vector3(1.06, 0.08, 0.86), MoonLook.WINDOW_GLOW))
 	_cache_open_group.add_child(_part("CacheLatchOpen", at + Vector3(-0.9, 0.09, 0.85), Vector3(0.22, 0.1, 0.28), MoonLook.DARK_METAL))
 	_cache_open_group.visible = false
 	add_child(_cache_open_group)
-	MoonLook.add_cache_detail(self, at)
+	var trim: Node3D = MoonLook.add_cache_detail(self, at)
+	for child: Node in trim.get_children():
+		var part: Node3D = child as Node3D
+		if part == null:
+			continue
+		if part.position.y > 1.5:
+			part.position = Vector3(0.65, 0.72, -0.85)
+		elif part.position.z > 0.4:
+			_cache_trim_lock = part
 	var click: Inspectable = get_node("CacheSign") as Inspectable
 	_clickable(click, at + Vector3(0.0, 0.9, 0.0), Vector3(3.2, 2.0, 2.4), "")
 	return click
@@ -257,6 +268,8 @@ func _refresh_cache() -> void:
 	var opened: bool = GameState.deimos_cache_opened_today()
 	if _cache_padlock != null:
 		_cache_padlock.visible = not opened
+	if _cache_trim_lock != null:
+		_cache_trim_lock.visible = not opened
 	if _cache_lid_shut != null:
 		_cache_lid_shut.visible = not opened
 	if _cache_open_group != null:
@@ -286,6 +299,8 @@ func _on_cache() -> void:
 	_refresh_cache()
 	if reply != "":
 		_toast(("Wrong label (marked 'DRILL SPARES'). " + reply) if mislabeled else reply)
+	elif GameState.deimos_cache_opened_today():
+		_toast(CACHE_OPENED_TEXT)
 
 
 ## The test pod: a pale capsule box with a fogged window, a warm glow at its foot.
