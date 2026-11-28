@@ -10,7 +10,8 @@ extends RefCounted
 ## percentage, 0 to 100, a pure function of the game time since the player came in (or last
 ## bought a heater). Past COLD_THRESHOLD the instruments drift: steering-encoder and tire-gauge
 ## wear on a rover driven in the caves is multiplied by DRIFT_MULTIPLIER. Nothing else changes.
-## A heater cartridge (the hub crate, credits) resets it; leaving the caves resets it.
+## A heater cartridge (the hub crate, credits) resets it; leaving the caves pauses it
+## (back within the grace it resumes; later, after a rescue or on a new day it starts from 0).
 ## Not built here (later PRs): slick ice, white-out, the lift, depth 2 and below, an Ice camp.
 
 const ZONE: String = "ice_caves"

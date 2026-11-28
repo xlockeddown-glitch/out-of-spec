@@ -271,7 +271,7 @@ func test_leaving_the_caves_resets_the_cold() -> String:
 	return run if run != "" else "\n".join(problems)
 
 
-func test_back_within_the_grace_keeps_the_cold_and_later_starts_from_nothing() -> String:
+func test_back_within_the_grace_resumes_the_paused_cold_and_later_starts_from_nothing() -> String:
 	var problems: Array[String] = []
 	var run: String = _at(3.0, func() -> String:
 		var gs: GameStateScript = _state()
@@ -285,9 +285,12 @@ func test_back_within_the_grace_keeps_the_cold_and_later_starts_from_nothing() -
 		GameClock.elapsed_days = 3.0 + 5.5 * HOUR
 		if _inside(gs) != "":
 			return "The rover did not go in again."
-		if not is_equal_approx(gs.cold_of(HOST), 5.5 * IceDepth.COLD_PER_HOUR):
-			problems.append("Back within the grace did not keep the old cold: %f." % gs.cold_of(HOST))
+		# Five hours in, half an hour out: the cold paused at five hours' worth.
+		if not is_equal_approx(gs.cold_of(HOST), 5.0 * IceDepth.COLD_PER_HOUR):
+			problems.append("Back within the grace did not resume the paused cold: %f." % gs.cold_of(HOST))
 		GameClock.elapsed_days = 3.0 + 6.0 * HOUR
+		if not is_equal_approx(gs.cold_of(HOST), 5.5 * IceDepth.COLD_PER_HOUR):
+			problems.append("The resumed cold did not keep rising from there: %f." % gs.cold_of(HOST))
 		gs.move_rover_ice(false, HOST)
 		GameClock.elapsed_days = 3.0 + (6.0 + IceDepth.COLD_GRACE_HOURS + 0.5) * HOUR
 		if _inside(gs) != "" or gs.cold_of(HOST) != 0.0:
