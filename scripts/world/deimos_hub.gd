@@ -90,7 +90,10 @@ func _build_world() -> void:
 	MoonLook.add_outer_rocks(self, 202, MoonLook.DEIMOS_BOULDER, MoonLook.DEIMOS_RIM, true)
 	# A hex lander pad where the shuttle sits, with amber markings and approach beacons.
 	MoonLook.add_lander_pad(self, Vector3(-14.0, 0.0, 1.0), true)
-	# Mars: a flat-shaded sphere on the horizon, behind the outpost.
+	MoonLook.add_pad_edge_lights(self, Vector3(-14.0, 0.0, 1.0), true)
+	# Mars: a flat-shaded sphere on the horizon, behind the outpost, with sky stars and faint horizon glow.
+	MoonLook.add_starfield(self, MoonLook.STAR_SEED_DEIMOS, MoonLook.STAR_COUNT_DEIMOS)
+	MoonLook.add_mars_horizon_glow(self, Vector3(60.0, 14.0, -95.0), 40.0, MoonLook.MARS_GLOW_DEIMOS, MoonLook.MARS_GLOW_ALPHA_DEIMOS)
 	MoonLook.add_mars(self, Vector3(60.0, 14.0, -95.0), 40.0, MoonLook.DEIMOS_MARS)
 	# The parked shuttle: solid collision boxes, paler than at Phobos, plus visual details.
 	add_child(_part("ShuttleBody", Vector3(-14.0, 1.6, 1.0), Vector3(9.0, 3.2, 3.6), MoonLook.DEIMOS_HULL, true))
@@ -107,6 +110,24 @@ func _build_world() -> void:
 	add_child(_part("HabDoor", hab + Vector3(-1.2, 1.3, 4.3), Vector3(1.0, 2.2, 0.2), MoonLook.DEIMOS_AMBIENT))
 	add_child(_part("HabPortA", hab + Vector3(1.8, 2.5, 4.0), Vector3(0.8, 0.8, 0.2), MoonLook.COCKPIT_GLASS))
 	MoonLook.add_deimos_hab_detail(self, hab)
+	MoonLook.add_utility_props(self, true)
+	var camp_at: Vector3 = Camp.position(DEIMOS)
+	var clear_spots: Array[Vector3] = [ARRIVE_AT, camp_at, camp_at + Vector3(-1.8, 0.0, -1.6), camp_at + Vector3(1.8, 0.0, 1.6)]
+	for spot: Vector3 in DEIMOS_SPOTS.values():
+		clear_spots.append(spot)
+	MoonLook.add_regolith_scatter(
+		self,
+		MoonLook.SCATTER_SEED_DEIMOS,
+		MoonLook.SCATTER_DRIFTS_DEIMOS,
+		MoonLook.SCATTER_ROCKS_DEIMOS,
+		MoonLook.DRIFT_DEIMOS,
+		MoonLook.DRIFT_DEIMOS_LIGHT,
+		MoonLook.DEIMOS_BOULDER,
+		MoonLook.DEIMOS_RIM,
+		clear_spots,
+		true
+	)
+	MoonLook.add_deimos_camp_dressing(self, camp_at)
 	console_click = _make_console()
 	board_click = _make_board()
 	board_click.hint = Shuttle.text("deimos_hint_board")
