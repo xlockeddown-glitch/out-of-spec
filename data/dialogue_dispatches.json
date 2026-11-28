@@ -275,7 +275,9 @@
         "a_clean_line_done": "Your line is on my board and it is holding. I have filed the old static under weather. Warmly, Dispatch.",
         "strays_offer": "Dispatch. You have been on Phobos. The old station kept tarantulas, and when the station was shut a few were never counted out. They have been living in the warm service tunnel since, and the logbook does not know them. Catch one. I have no paperwork for it and would like to have some.",
         "strays_done": "A station tarantula, caught in the tunnel and now in the dome's records. I have filed it as stock, which it was before it was a stray. Warmly, Dispatch.",
-        "a_clean_line_reference": "That went in dead center. I heard the line clear from here, and I am four hundred kilometers up. Warmly, Dispatch."
+        "a_clean_line_reference": "That went in dead center. I heard the line clear from here, and I am four hundred kilometers up. Warmly, Dispatch.",
+        "gossamer_link_offer": "[PLACEHOLDER] Dispatch. The Gossamer relay constellation is overhead, and its ground antenna needs zero-expansion reticle silk. Seat a whole Orbital Silk-Spinner spool in the relay dish and bring the dish azimuth back into tolerance, traceable and on time. Warmly, Dispatch.",
+        "gossamer_link_done": "[PLACEHOLDER] Gossamer link is up on my board. Your rover uplink lag drops an extra 20 % while that Silk-Spinner spool stays whole in the dish. Swap it out or damage it and the link stutters until one is seated again. Warmly, Dispatch."
       }
     },
     "chet": {
@@ -315,7 +317,9 @@
       "name": "Kestrel",
       "quests": {
         "a_quiet_crate_offer": "[PLACEHOLDER] So you made it out to Deimos. There is a warm crate on the pad that does not belong to OIRM and does not open for polite knocking. Take my proof, pop the latch, and keep whatever has eight legs inside. No certificate.",
-        "a_quiet_crate_done": "[PLACEHOLDER] Latch off, stock moved, nobody filed a form. Keep the dome warm for it. We are square."
+        "a_quiet_crate_done": "[PLACEHOLDER] Latch off, stock moved, nobody filed a form. Keep the dome warm for it. We are square.",
+        "test_pod_offer": "[PLACEHOLDER] Polar ice, huh. There was a trial pod down there, heated, sealed, nobody left to sign it off. Open it once a day, take whatever is breathing inside, and do not ask who paid for it. No certificate. If the cold does not suit you, a standard from me counts as a favour too.",
+        "test_pod_done": "[PLACEHOLDER] Seal broken, tenant moved, and your name on nothing. Keep it warm. That is the last of my favours for the year."
       }
     }
   }

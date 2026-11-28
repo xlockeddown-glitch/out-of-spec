@@ -14,6 +14,7 @@ signal sentinel_changed
 signal strays_changed  # a Phobos service-tunnel stray was caught today
 signal phobos_finds_changed  # a Phobos depth-1 find was taken today
 signal deimos_cache_changed  # the Deimos smuggler cache was opened today
+signal test_pod_changed  # the Ice Caves test pod was opened today (feat/test-pod)
 signal deimos_crates_changed  # a Deimos depth-1 crate was opened today
 signal rover_lights_changed
 ## A beacon was set down in the Lava Tubes.
@@ -154,7 +155,7 @@ const PRE_MOLT_AT: float = 0.8
 ## burrow (hidden) until then, since the two can't share the tank floor.
 const EXUVIA_LINGER_DAYS: int = 1
 ## Tarantulas that can be caught. Each has a tank waiting in the dome.
-const CATCHABLE: Array[StringName] = [&"cobalt_sentinel", &"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace"]
+const CATCHABLE: Array[StringName] = [&"cobalt_sentinel", &"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace", &"rime_carapace_spinner"]
 ## The Banded Regolith Runner: station stock that got loose in Phobos's warm service
 ## tunnels, caught there (catch_stray). Its tank record stays the three-field molt
 ## record every tank has (_is_tank), so the marker that it is station stock is kept
@@ -173,9 +174,21 @@ const DEIMOS_CACHE_FALLBACK_CREDITS: int = 30
 const DEIMOS_CACHE_EMPTY_LINE: String = "Empty but for straw and a forged manifest."
 const DEIMOS_CACHE_WRONG_LABEL_MOD: int = 3
 const DEIMOS_CACHE_LABEL_TAG: int = 701
+## The terraform test pod under the polar ice (Ice Caves hub): the last moon-tarantula hook.
+## Opens once a day for the farm and gives the Rime Carapace Spinner through catch_species when
+## the farm does not hold it; else a one-time credit fallback, then an empty line. All [PLACEHOLDER].
+const TEST_POD_SPECIES: StringName = &"rime_carapace_spinner"
+const TEST_POD_ORIGIN: String = "test_pod"
+const TEST_POD_LINE: String = "A heated terraform test pod under the polar ice"
+const TEST_POD_FALLBACK_CREDITS: int = 30
+const TEST_POD_EMPTY_LINE: String = "Empty but for a warm film of condensation."
+## Quest counters that finish The Test Pod (the quest counts test_pod:*): the pod opened, or the
+## non-zone way, a purchase from Kestrel.
+const TEST_POD_COUNT: String = "test_pod:open"
+const TEST_POD_KESTREL_COUNT: String = "test_pod:kestrel"
 ## Species caught with a tank record but no dome tank yet: they sit out the molt and the
 ## lab sitter's round until the tank exists (nothing could show or collect them).
-const NO_DOME_TANK: Array[StringName] = [&"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace"]
+const NO_DOME_TANK: Array[StringName] = [&"rime_carapace_spinner", &"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace"]
 const STATION_LINE: String = "Station stock, caught in a Phobos service tunnel"
 ## What a catch is counted under in action_counts (the Strays quest reads it), and the
 ## prefix of a count of arriving on a moon ("reached_phobos"): both with no XP.
@@ -248,6 +261,9 @@ var _on_phobos_deck: Dictionary = {}
 ## Today's Deimos smuggler cache state: { "day": int, "opened": true }, or {} when not
 ## opened today. Pruned to today on save and load. Host-run, saved, shown to guests.
 var deimos_cache: Dictionary = {}
+## Today's Ice Caves test pod state: { "day", "opened", "fallback_paid" } as deimos_cache has it.
+## Pruned to today on save and load (fallback_paid stays); host-run, saved, shown to guests.
+var test_pod: Dictionary = {}
 ## Deimos depth-1 crates opened today: { "day": int, "ids": Array of crate ids } (DeimosDepth).
 ## Pruned to today on save and load; host-run, synced via deimos_crates_changed.
 var deimos_crates_opened: Dictionary = {}
@@ -845,7 +861,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "test_pod", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -877,6 +893,7 @@ func farm_to_dict() -> Dictionary:
 	out["strays_caught"] = _strays_today()
 	out["phobos_finds_taken"] = _phobos_finds_today()
 	out["deimos_cache"] = _deimos_cache_today()
+	out["test_pod"] = _test_pod_today()
 	out["deimos_crates_opened"] = _deimos_crates_today()
 	out["cold_since"] = _cold_in_caves()  # the stamps of whoever is in the caves: the rest are stale
 	return out
@@ -1038,6 +1055,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var phobos_finds_problem: String = PhobosDepth.taken_problem(data.get("phobos_finds_taken", {}))
 	if phobos_finds_problem != "":
 		return phobos_finds_problem
+	var pod_problem: String = _test_pod_problem(data.get("test_pod", {}))
+	if pod_problem != "":
+		return pod_problem
 	var cache_problem: String = _deimos_cache_problem(data.get("deimos_cache", {}))
 	if cache_problem != "":
 		return cache_problem
@@ -1242,30 +1262,31 @@ static func _stray_problem(strays: Variant, origins: Variant, tanks: Dictionary)
 	for id: Variant in origins:
 		var ok_station: bool = id is String and id == String(RUNNER) and origins[id] is String and origins[id] == STATION_ORIGIN
 		var ok_cache: bool = id is String and StringName(id) in DEIMOS_CACHE_SPECIES and origins[id] is String and origins[id] == CACHE_ORIGIN
-		if not (ok_station or ok_cache) or not tanks.has(id):
+		var ok_pod: bool = id is String and StringName(id) == TEST_POD_SPECIES and origins[id] is String and origins[id] == TEST_POD_ORIGIN
+		if not (ok_station or ok_cache or ok_pod) or not tanks.has(id):
 			return "'enclosure_origins' has an entry that is not a caught tarantula's origin."
 	return ""
 
 
 ## Why a save's deimos_cache can't load, or "".
-static func _deimos_cache_problem(cache: Variant) -> String:
+static func _deimos_cache_problem(cache: Variant, field: String = "deimos_cache") -> String:
 	if not cache is Dictionary:
-		return "'deimos_cache' must be a dictionary."
+		return "'%s' must be a dictionary." % field
 	var dict: Dictionary = cache as Dictionary
 	for key: Variant in dict:
 		if not key in ["day", "opened", "fallback_paid"]:
-			return "'deimos_cache' has an unknown field."
+			return "'%s' has an unknown field." % field
 	var has_day: bool = dict.has("day")
 	var has_opened: bool = dict.has("opened")
 	if has_day != has_opened:
-		return "'deimos_cache' is not a day and its opened state."
+		return "'%s' is not a day and its opened state." % field
 	if has_day:
 		var day: Variant = dict.get("day")
 		var opened: Variant = dict.get("opened")
 		if not day is int or day < 0 or not opened is bool:
-			return "'deimos_cache' is not a day and its opened state."
+			return "'%s' is not a day and its opened state." % field
 	if dict.has("fallback_paid") and not dict.get("fallback_paid") is bool:
-		return "'deimos_cache' fallback_paid must be a bool."
+		return "'%s' fallback_paid must be a bool." % field
 	return ""
 
 
@@ -1305,6 +1326,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	_phobos_wiped.clear()
 	_on_phobos_deck.clear()
 	deimos_cache = _deimos_cache_today()
+	test_pod = _test_pod_today()
 	deimos_crates_opened = _deimos_crates_today()
 	_deimos_wiped.clear()
 	_on_deimos_deck.clear()
@@ -1330,6 +1352,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
 	deimos_cache_changed.emit()
+	test_pod_changed.emit()
 	deimos_crates_changed.emit()
 	phobos_finds_changed.emit()
 	silk_changed.emit(optical_silk_spools)
@@ -2129,6 +2152,7 @@ func buy_from_kestrel(standard_id: String, player_id: String = "") -> String:
 		credibility_changed.emit(credibility)
 		post_phone("OIRM CONTRACT closed: the %s is already on the colony." % instrument_name(standard_id))
 	_award_lab_xp("buy_standard", player_id, calibration_xp_scale(standard_id))
+	_count_test_pod(_player(player_id), TEST_POD_KESTREL_COUNT)
 	upgrades_changed.emit()
 	oirm_changed.emit()
 	return ""
@@ -6622,9 +6646,9 @@ func _take_spool(damaged_first: bool) -> Array:
 
 
 func _is_taken_before(index: int, other: int, least_first: bool) -> bool:
-	var cut: float = _species_lag_pct(_spool_species[index])
-	var other_cut: float = _species_lag_pct(_spool_species[other])
-	return cut < other_cut if least_first else cut > other_cut
+	var mult: float = _lag_mult_for(_spool_species[index], _is_spool_damaged(index))
+	var other_mult: float = _lag_mult_for(_spool_species[other], _is_spool_damaged(other))
+	return mult > other_mult if least_first else mult < other_mult
 
 
 # --- Caught tarantulas ----------------------------------------------------------
@@ -6870,6 +6894,77 @@ func open_cache(player_id: String = "") -> String:
 		done["count"] = int(done["count"]) + 1
 	deimos_cache_changed.emit()
 	return reply
+
+
+## Why a save's test_pod can't load, or "": the Deimos cache's rules, in this field's words.
+static func _test_pod_problem(pod: Variant) -> String:
+	return _deimos_cache_problem(pod, "test_pod")
+
+
+## Today's Ice Caves test pod state (opened today, and the farm-wide fallback_paid if set), or
+## {} when unopened today and the fallback not yet paid.
+func _test_pod_today() -> Dictionary:
+	var out: Dictionary = {}
+	if int(test_pod.get("day", -1)) == GameClock.get_day_index() and bool(test_pod.get("opened", false)):
+		out["day"] = int(test_pod["day"])
+		out["opened"] = true
+	if bool(test_pod.get("fallback_paid", false)):
+		out["fallback_paid"] = true
+	return out
+
+
+## Whether today's Ice Caves test pod has already been opened by the farm.
+func test_pod_opened_today() -> bool:
+	return bool(_test_pod_today().get("opened", false))
+
+
+## Whether the one-time all-held credit fallback has already been paid for this farm.
+func test_pod_fallback_paid() -> bool:
+	return bool(test_pod.get("fallback_paid", false))
+
+
+## Host: `player_id` opens the terraform test pod in the Ice Caves hub. The id is the
+## connection's (FarmCommands), and the player must be in the Ice Caves. One opening a day for
+## the farm [PLACEHOLDER]. Gives the Rime Carapace Spinner through catch_species with origin
+## `test_pod` when the farm does not hold it; else a one-time credit sum on the first all-held
+## opening, then an empty line. Counts `test_pod:open` per player (no XP; the quest counts it).
+## Returns "" on a catch, a reply string on fallback/empty, or the refusal reason.
+func open_test_pod(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host opens the test pod."
+	var who: String = _player(player_id)
+	if place_of(who) != IceDepth.ZONE:
+		return "The test pod is in the Ice Caves."
+	if depth_of(who) != 0:
+		return "The test pod is in the hub."
+	if test_pod_opened_today():
+		return "Today's opening is already used."
+	var paid: bool = test_pod_fallback_paid()
+	test_pod = { "day": GameClock.get_day_index(), "opened": true }
+	if paid:
+		test_pod["fallback_paid"] = true
+	var reply: String = ""
+	if catch_species(String(TEST_POD_SPECIES)):
+		enclosure_origins[String(TEST_POD_SPECIES)] = TEST_POD_ORIGIN
+		var display_name: String = str(DataManager.get_record(SPECIES_TABLE, TEST_POD_SPECIES).get("common_name", TEST_POD_SPECIES))
+		post_phone("A %s. %s. It is kept for the dome." % [display_name, TEST_POD_LINE])
+	elif not paid:
+		test_pod["fallback_paid"] = true
+		add_credits(TEST_POD_FALLBACK_CREDITS)
+		reply = "The pod held nothing new: its Spinner is already in the dome. Found %s CR in the pod's spares." % SP811.integer(TEST_POD_FALLBACK_CREDITS)
+	else:
+		reply = TEST_POD_EMPTY_LINE
+	_count_test_pod(who, TEST_POD_COUNT)
+	test_pod_changed.emit()
+	return reply
+
+
+## One count of a test-pod quest counter for a player (not the manager); no XP.
+func _count_test_pod(who: String, counter: String) -> void:
+	if who == MANAGER_ID:
+		return
+	var done: Dictionary = (action_counts.get_or_add(who, {}) as Dictionary).get_or_add(counter, { "count": 0, "xp": 0 })
+	done["count"] = int(done["count"]) + 1
 
 
 ## Today's opened Deimos depth-1 crates as { "day", "ids" }, or {} when another day's.
@@ -7483,6 +7578,8 @@ func enclosure_text(species_id: String) -> String:
 	var origin: String = str(enclosure_origins.get(species_id, ""))
 	if origin == STATION_ORIGIN:
 		return line + ". " + STATION_LINE
+	if origin == TEST_POD_ORIGIN:
+		return line + ". " + TEST_POD_LINE
 	if origin == CACHE_ORIGIN:
 		return line + ". " + CACHE_LINE
 	return line
@@ -7514,15 +7611,77 @@ func collect_enclosure_spool(species_id: String, player_id: String = "") -> bool
 
 # --- Relay ----------------------------------------------------------------------
 
+const GOSSAMER_QUEST_ID: String = "gossamer_link"
+const GOSSAMER_SEAT_STEP_ID: String = "seat_silk"
+const GOSSAMER_SPECIES: StringName = &"orbital_silk_spinner"
+## Extra multiplicative lag cut while the Gossamer link is up [PLACEHOLDER].
+const GOSSAMER_LAG_CUT_PCT: float = 20.0
+
+
+## True while the relay holds a whole spool from `species_id` (or any whole spool if empty).
+func has_relay_spool(species_id: StringName = &"") -> bool:
+	return relay_slotted and not slotted_spool_damaged and (species_id == &"" or slotted_spool_species == species_id)
+
+
+## True once The Gossamer Link lab quest is done (derived from quest_state, no saved flag).
+func gossamer_link_unlocked() -> bool:
+	return QuestEngine.is_done(self, GOSSAMER_QUEST_ID)
+
+
+## True when the Gossamer link is active: quest done AND a whole Silk-Spinner spool seated.
+func gossamer_link_up() -> bool:
+	return gossamer_link_unlocked() and has_relay_spool(GOSSAMER_SPECIES)
+
+
+## Phone/HUD status text for the Gossamer link once unlocked, or "" before then.
+func gossamer_status_text() -> String:
+	if not gossamer_link_unlocked():
+		return ""
+	return "Gossamer link: up" if has_relay_spool(GOSSAMER_SPECIES) else "Gossamer link: stuttering"
+
+
+func _wants_gossamer_spool() -> bool:
+	if not quest_state.has(GOSSAMER_QUEST_ID) or gossamer_link_unlocked():
+		return false
+	var entry: Variant = quest_state[GOSSAMER_QUEST_ID]
+	if typeof(entry) != TYPE_DICTIONARY:
+		return false
+	var steps_done: Variant = (entry as Dictionary).get("steps_done", [])
+	if typeof(steps_done) == TYPE_ARRAY and GOSSAMER_SEAT_STEP_ID in (steps_done as Array):
+		return false
+	return not has_relay_spool(GOSSAMER_SPECIES)
+
+
+func _find_whole_spool(species_id: StringName) -> int:
+	for i: int in _spool_species.size():
+		if _spool_species[i] == species_id and not _is_spool_damaged(i):
+			return i
+	return -1
+
+
+func _take_spool_at(index: int) -> Array:
+	optical_silk_spools -= 1
+	var taken: Array = [_spool_species[index], _is_spool_damaged(index)]
+	_spool_species.remove_at(index)
+	if index < _spool_damaged.size():
+		_spool_damaged.remove_at(index)
+	return taken
+
+
 ## A whole spool may take the place of a damaged one, which is thrown away, or of a
-## whole one that cuts the lag less, which goes back into stock [ASSUMPTION].
+## whole one whose resulting lag multiplier is strictly higher, which goes back into
+## stock [ASSUMPTION]. While The Gossamer Link is open and its seat_silk step is not
+## done yet, a whole Silk-Spinner spool may also be seated to complete that step.
 func can_slot_spool() -> bool:
 	if not relay_slotted:
 		return optical_silk_spools > 0
 	if slotted_spool_damaged:
 		return optical_silk_spools > damaged_spools()
+	if _wants_gossamer_spool() and _find_whole_spool(GOSSAMER_SPECIES) >= 0:
+		return true
+	var current_mult: float = _lag_mult_for(slotted_spool_species, false)
 	for i: int in _spool_species.size():
-		if not _is_spool_damaged(i) and _species_lag_pct(_spool_species[i]) > _species_lag_pct(slotted_spool_species):
+		if not _is_spool_damaged(i) and _lag_mult_for(_spool_species[i], false) < current_mult:
 			return true
 	return false
 
@@ -7534,7 +7693,8 @@ func can_slot_spool() -> bool:
 func slot_spool_into_relay(player_id: String = "", score: int = MinigameScore.SKIPPED) -> bool:
 	if not can_slot_spool():
 		return false
-	var taken: Array = _take_spool(false)
+	var gossamer_idx: int = _find_whole_spool(GOSSAMER_SPECIES) if _wants_gossamer_spool() else -1
+	var taken: Array = _take_spool_at(gossamer_idx) if gossamer_idx >= 0 else _take_spool(false)
 	if relay_slotted and not slotted_spool_damaged:
 		_add_spool(slotted_spool_species)
 	slotted_spool_species = taken[0]
@@ -7548,18 +7708,27 @@ func slot_spool_into_relay(player_id: String = "", score: int = MinigameScore.SK
 	return true
 
 
+## Resulting uplink lag multiplier if `species_id` (whole or damaged) is seated in the relay.
+func _lag_mult_for(species_id: StringName, damaged: bool) -> float:
+	var spool_pct: float = DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/relay_lag_reduction_pct", 0.0)
+	if damaged:
+		spool_pct *= DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/damaged_reduction_share", 1.0)
+	var species_pct: float = _species_lag_pct(species_id)
+	var mult: float = (1.0 - spool_pct / 100.0) * (1.0 - species_pct / 100.0)
+	if gossamer_link_unlocked() and not damaged and species_id == GOSSAMER_SPECIES:
+		mult *= (1.0 - GOSSAMER_LAG_CUT_PCT / 100.0)
+	return clampf(mult, 0.0, 1.0)
+
+
 ## Multiplier applied to rover uplink lag (1.0 = no upgrade). The spool's base
 ## cut and the spinning species' lag_reduction_pct stack multiplicatively:
 ## (1 - spool%) * (1 - species%). Curlyhair: 0.40 * 0.95 = 0.38. A damaged spool
-## gives only part of the base cut.
+## gives only part of the base cut. Once The Gossamer Link is done and a whole
+## Silk-Spinner spool stays seated, an extra 20 % cut stacks multiplicatively.
 func get_relay_lag_multiplier() -> float:
 	if not relay_slotted:
 		return 1.0
-	var spool_pct: float = DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/relay_lag_reduction_pct", 0.0)
-	if slotted_spool_damaged:
-		spool_pct *= DataManager.get_number(ITEMS_TABLE, "optical_silk_spool/damaged_reduction_share", 1.0)
-	var species_pct: float = _species_lag_pct(slotted_spool_species)
-	return clampf((1.0 - spool_pct / 100.0) * (1.0 - species_pct / 100.0), 0.0, 1.0)
+	return _lag_mult_for(slotted_spool_species, slotted_spool_damaged)
 
 
 ## The species' own cut. One not set (an undesigned morph) cuts nothing.

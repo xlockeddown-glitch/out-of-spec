@@ -9,6 +9,7 @@ const ROVER_KEYS: Array[StringName] = [
 	&"rover_forward", &"rover_reverse", &"rover_till", &"rover_zero_steering", &"rover_dig", &"rover_fill", &"rover_lights"]
 
 var _had_los: bool = true
+var _gossamer_up: bool = false
 var _last_band: int = DriftingSensor.Band.IN_BAND
 ## This player asked to move the rover; the host said yes.
 var _moving: bool = false
@@ -73,6 +74,7 @@ func _ready() -> void:
 	# Bound methods so the autoloads drop them when this scene is freed.
 	GameState.silk_changed.connect(_on_silk_changed)
 	GameState.relay_changed.connect(_on_relay_changed)
+	GameState.quests_changed.connect(_on_quests_changed)
 	GameState.phone_message.connect(_hud.push_log)
 	GameState.skill_leveled.connect(_on_skill_leveled)
 	SaveGame.save_failed.connect(_hud.push_log)
@@ -89,6 +91,7 @@ func _ready() -> void:
 		_hud.push_log(line)
 	_hud.configure(_rover.satellite_relay.relay_name, _rover.steering.mpe, _rover.steering.acceptance_ratio)
 	_last_band = _rover.get_drift_band()
+	_gossamer_up = GameState.gossamer_link_up()
 	_rover.broadcast_state()
 	_refresh_relay_hud()
 	_hud.set_credits(GameState.credits)
@@ -628,12 +631,21 @@ func _on_silk_changed(_spools: int) -> void:
 
 
 func _on_relay_changed(_slotted: bool) -> void:
+	_gossamer_up = GameState.gossamer_link_up()
 	_refresh_relay_hud()
 	_rover.broadcast_state()
 
 
+func _on_quests_changed() -> void:
+	_refresh_relay_hud()
+	var up: bool = GameState.gossamer_link_up()
+	if up != _gossamer_up:
+		_gossamer_up = up
+		_rover.broadcast_state()
+
+
 func _refresh_relay_hud() -> void:
-	_hud.set_relay(GameState.relay_slotted, GameState.slotted_spool_damaged, GameState.spool_count_text(), GameState.can_slot_spool())
+	_hud.set_relay(GameState.relay_slotted, GameState.slotted_spool_damaged, GameState.spool_count_text(), GameState.can_slot_spool(), GameState.gossamer_status_text(), GameState.gossamer_link_up())
 
 
 func _on_till_rejected(reason: String) -> void:
