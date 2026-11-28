@@ -12,6 +12,7 @@ signal enclosures_changed
 ## The Cobalt Sentinel came out in the tunnels, or is gone.
 signal sentinel_changed
 signal strays_changed  # a Phobos service-tunnel stray was caught today
+signal phobos_finds_changed  # a Phobos depth-1 find was taken today
 signal deimos_cache_changed  # the Deimos smuggler cache was opened today
 signal rover_lights_changed
 ## A beacon was set down in the Lava Tubes.
@@ -236,6 +237,13 @@ var enclosure_origins: Dictionary = {}
 ## stray spot indices (PhobosServiceTunnel) }. Only today's count; another day's
 ## record is dropped. Host-run, saved, shown to guests.
 var strays_caught: Dictionary = {}
+## Phobos depth-1 finds taken today: { "day": int, "ids": Array of find ids } (PhobosDepth).
+## Pruned to today on save and load; host-run, synced via phobos_finds_changed.
+var phobos_finds_taken: Dictionary = {}
+## Host-only per-trip dust wipe flags: player_id -> true while wiped on the current trip down.
+var _phobos_wiped: Dictionary = {}
+## Host-only per-player deck flags: player_id -> true while down on Phobos Station deck 1.
+var _on_phobos_deck: Dictionary = {}
 ## Today's Deimos smuggler cache state: { "day": int, "opened": true }, or {} when not
 ## opened today. Pruned to today on save and load. Host-run, saved, shown to guests.
 var deimos_cache: Dictionary = {}
@@ -827,7 +835,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "ice_cores_held"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "ice_cores_held", "phobos_finds_taken"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -835,7 +843,7 @@ const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
 	"rover_place_scope", "_skid_last", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_expedition_warned_day", "_expedition_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers", "_cold_kept",
-	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip",
+	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip", "_phobos_wiped", "_on_phobos_deck",
 ]
 
 
@@ -857,6 +865,7 @@ func farm_to_dict() -> Dictionary:
 	out["packs_wet"] = AquiferDepth.prune_packs_wet(packs_wet, GameClock.get_day_index())
 	out["rooms_shored"] = ZoneDepth.prune(rooms_shored, GameClock.get_day_index())
 	out["strays_caught"] = _strays_today()
+	out["phobos_finds_taken"] = _phobos_finds_today()
 	out["deimos_cache"] = _deimos_cache_today()
 	out["cold_since"] = _cold_in_caves()  # the stamps of whoever is in the caves: the rest are stale
 	return out
@@ -1015,6 +1024,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var stray_problem: String = _stray_problem(data.get("strays_caught", {}), data.get("enclosure_origins", {}), tanks)
 	if stray_problem != "":
 		return stray_problem
+	var phobos_finds_problem: String = PhobosDepth.taken_problem(data.get("phobos_finds_taken", {}))
+	if phobos_finds_problem != "":
+		return phobos_finds_problem
 	var cache_problem: String = _deimos_cache_problem(data.get("deimos_cache", {}))
 	if cache_problem != "":
 		return cache_problem
@@ -1275,6 +1287,9 @@ func farm_from_dict(data: Dictionary) -> String:
 	_prune_cold()
 	_cold_kept.clear()
 	strays_caught = _strays_today()
+	phobos_finds_taken = _phobos_finds_today()
+	_phobos_wiped.clear()
+	_on_phobos_deck.clear()
 	deimos_cache = _deimos_cache_today()
 	_settle_trips_on_load()
 	_recall_warned_day = 0
@@ -1298,6 +1313,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
 	deimos_cache_changed.emit()
+	phobos_finds_changed.emit()
 	silk_changed.emit(optical_silk_spools)
 	relay_changed.emit(relay_slotted)
 	credits_changed.emit(credits)
@@ -4152,6 +4168,8 @@ func _return_traveller(player_id: String, line: String, completed: bool = false)
 	shuttle_trips.erase(player_id)
 	_beds().get_up(player_id)  # up from the camp's bed, if they slept there
 	_campers.erase(player_id)
+	_phobos_wiped.erase(player_id)
+	_on_phobos_deck.erase(player_id)
 	_set_place(player_id, ZonePresence.FARM, 0)
 	_stand_at_pad(player_id)
 	shuttle_trips_changed.emit()
@@ -4263,6 +4281,8 @@ func _on_day_started(day: int) -> void:
 	_warm_ice_campers()
 	_campers.clear()  # the night at a camp is over: they wake there, and the recall is theirs again
 	_cold_kept.clear()  # yesterday's cold never comes back, whatever the grace
+	_phobos_wiped.clear()
+	_on_phobos_deck.clear()
 	# A rover below stands on the new day's floor.
 	settle_rover_depth()
 	zone_heat_trip = false  # a heat trip is one day's trip
@@ -5233,6 +5253,8 @@ func forget_place(player_id: String) -> void:
 	_campers.erase(player_id)  # a camper who drops is out of bed (CoopBeds drops them too)
 	_console_arrivals.erase(player_id)
 	_trip_players.erase(player_id)
+	_phobos_wiped.erase(player_id)
+	_on_phobos_deck.erase(player_id)
 	# Gone mid-trip: the day trip is over with them, and nothing is charged. The shuttle
 	# is not the farm's rover, so nothing is sent home.
 	if not FarmCommands.guest and shuttle_trips.has(player_id):
@@ -6563,6 +6585,84 @@ func catch_stray(stray_index: int, layout_day: int, player_id: String = "") -> S
 		var done: Dictionary = (action_counts.get_or_add(who, {}) as Dictionary).get_or_add(STRAY_COUNT, { "count": 0, "xp": 0 })
 		done["count"] = int(done["count"]) + 1
 	strays_changed.emit()
+	return ""
+
+
+## Today's taken Phobos depth-1 finds as { "day", "ids" }, or {} when another day's.
+func _phobos_finds_today() -> Dictionary:
+	return PhobosDepth.prune(phobos_finds_taken, GameClock.get_day_index())
+
+
+## The ids of Phobos depth-1 finds taken today.
+func phobos_finds_taken_today() -> Array[String]:
+	return PhobosDepth.taken_today(phobos_finds_taken, GameClock.get_day_index())
+
+
+## True while `player_id` has Phobos dust clogging optics on their current trip down.
+func is_phobos_dusty(player_id: String = "") -> bool:
+	return not bool(_phobos_wiped.get(_player(player_id), false))
+
+
+## Host: marks a player's new trip down to Phobos depth 1 as dusty until wiped.
+func enter_phobos_deep(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host tracks Phobos trips."
+	var who: String = _player(player_id)
+	if place_of(who) != Shuttle.PHOBOS:
+		return "Station deck 1 is on Phobos."
+	_on_phobos_deck[who] = true
+	_phobos_wiped.erase(who)
+	return ""
+
+
+## Host: clears a player's Phobos depth-1 deck flag when they climb up the hatch.
+func leave_phobos_deep(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host tracks Phobos trips."
+	var who: String = _player(player_id)
+	_on_phobos_deck.erase(who)
+	_phobos_wiped.erase(who)
+	return ""
+
+
+## Host: wipes Phobos dust for `player_id` on the current trip down, restoring full pay.
+func wipe_phobos_dust(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host decides dust wipes."
+	var who: String = _player(player_id)
+	if place_of(who) != Shuttle.PHOBOS:
+		return "The wipe stop is on Phobos."
+	if not bool(_on_phobos_deck.get(who, false)):
+		return "Go down to Station deck 1 first."
+	_phobos_wiped[who] = true
+	return ""
+
+
+## Host: takes one of today's finds on Phobos depth 1 (Station deck 1). Pays credits
+## into the shared wallet (cut by PhobosDepth.DUST_CUT_PCT while dusty). One take per
+## find per day, gone for everyone, pruned to today and synced via phobos_finds_changed.
+func take_phobos_find(find_id: String, layout_day: int, player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host decides a find."
+	var who: String = _player(player_id)
+	var day: int = GameClock.get_day_index()
+	if place_of(who) != Shuttle.PHOBOS:
+		return "Finds lie in Phobos Station deck 1."
+	if not bool(_on_phobos_deck.get(who, false)):
+		return "Go down to Station deck 1 first."
+	if layout_day != day:
+		return "That was yesterday's deck. Look again."
+	var today: Dictionary = PhobosDepth.layout(world_seed, day)
+	var find: Dictionary = PhobosDepth.find_in(today, find_id)
+	if find.is_empty():
+		return "There is no '%s' here today." % find_id
+	if find_id in phobos_finds_taken_today():
+		return "That has been taken already."
+	phobos_finds_taken = PhobosDepth.with_taken(phobos_finds_taken, day, find_id)
+	var pay: int = PhobosDepth.reward_credits(str(find["kind"]), is_phobos_dusty(who))
+	if pay > 0:
+		add_credits(pay)
+	phobos_finds_changed.emit()
 	return ""
 
 

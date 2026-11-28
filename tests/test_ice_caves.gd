@@ -449,7 +449,7 @@ func test_a_host_who_joins_a_rover_already_in_the_caves_gets_a_cold_stamp() -> S
 
 
 func test_the_protocol_is_the_current_one() -> String:
-	return "" if CoopSession.PROTOCOL == 45 else "The protocol is %d, not 45." % CoopSession.PROTOCOL
+	return "" if CoopSession.PROTOCOL == 46 else "The protocol is %d, not 46." % CoopSession.PROTOCOL
 
 
 # --- Presence and recall -------------------------------------------------------------
