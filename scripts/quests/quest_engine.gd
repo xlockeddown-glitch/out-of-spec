@@ -114,7 +114,7 @@ const PROMPT_KEY: String = "prompt"
 const NOT_PREFIX: String = "not_"
 ## The checks check_value() knows: what a step's `check` may be, and with
 ## `always`, `day_at_least` and `day_at_most` (WHENS) what a `when` may be.
-const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due", "beacons_placed", "relay_spool"]
+const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due", "beacons_placed", "relay_spool", "master_audit_passed", "silk_stock"]
 ## A `when` that is not a step check (offer_holds).
 const WHENS: Array[String] = ["always", "day_at_least", "day_at_most"]
 ## A reward of skill XP is "xp_<skill id>".
@@ -150,6 +150,8 @@ const ANY_SUFFIX: String = "*"
 const SHUTTLE_LICENSE: String = "shuttle_license"
 ## A reward that opens the Colony Mine's gate for the farm (GameState.open_mine_gate). Farm quests only.
 const MINE_GATE: String = "mine_gate"
+## A reward that grants the farm the intrinsic silk standard (GameState.grant_intrinsic_standard). Farm quests only.
+const INTRINSIC_STANDARD: String = "intrinsic_standard"
 ## A reward of a keepsake: its id in the data's KEEPSAKES. Cosmetic only.
 const KEEPSAKE: String = "keepsake"
 const KEEPSAKES: String = "keepsakes"
@@ -510,6 +512,8 @@ static func _finish(farm: Node, quest: Dictionary, entry: Dictionary, present: A
 		farm.grant_shuttle_license()
 	if rewards.get(MINE_GATE, false) is bool and rewards.get(MINE_GATE, false) and farm.has_method("open_mine_gate"):
 		farm.open_mine_gate()
+	if rewards.get(INTRINSIC_STANDARD, false) is bool and rewards.get(INTRINSIC_STANDARD, false) and farm.has_method("grant_intrinsic_standard"):
+		farm.grant_intrinsic_standard()
 	# One each, held until its player spends it (GameState.spend_xp_certificate).
 	# A player who holds or has spent this quest's certificate, here or on another
 	# farm, is not given it again.
@@ -592,6 +596,8 @@ static func reward_text(quest: Dictionary) -> String:
 		parts.append("the shuttle license")
 	if rewards.get(MINE_GATE, false) is bool and rewards.get(MINE_GATE, false):
 		parts.append("the key to the Mine's gate")
+	if rewards.get(INTRINSIC_STANDARD, false) is bool and rewards.get(INTRINSIC_STANDARD, false):
+		parts.append("the intrinsic silk standard")
 	if keepsake_name(str(rewards.get(KEEPSAKE, ""))) != "":
 		parts.append("a keepsake (%s)" % keepsake_name(str(rewards[KEEPSAKE])))
 	if one_use_name(str(rewards.get(ONE_USE, ""))) != "":
@@ -737,6 +743,8 @@ static func data_problem(quest: Dictionary) -> String:
 			return "step '%s' looks for a quest's job and names no quest." % id
 		if str(step.get("check", "")) == "relay_spool" and (not step.get("species") is String or step["species"] == ""):
 			return "step '%s' checks the relay spool and names no species." % id
+		if str(step.get("check", "")) == "silk_stock" and (not step.get("species") is String or step["species"] == ""):
+			return "step '%s' checks silk stock and names no species." % id
 		if step.has(MINIGAME_LINE) and not step.has("minigame"):
 			return "step '%s' has a mini-game line and no mini-game." % id
 		if step.has("minigame"):
@@ -797,6 +805,12 @@ static func data_problem(quest: Dictionary) -> String:
 			return "its mine_gate reward is not true."
 		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_FARM or is_daily(quest):
 			return "the Mine's gate is the farm's: a farm quest that is not a daily ask."
+	if (quest.get("rewards", {}) as Dictionary).has(INTRINSIC_STANDARD):
+		var intrinsic_flag: Variant = (quest["rewards"] as Dictionary)[INTRINSIC_STANDARD]
+		if typeof(intrinsic_flag) != TYPE_BOOL or not intrinsic_flag:
+			return "its intrinsic_standard reward is not true."
+		if str(quest.get("scope", SCOPE_FARM)) != SCOPE_FARM or is_daily(quest):
+			return "the intrinsic silk standard is the farm's: a farm quest that is not a daily ask."
 	var keepsake: Variant = (quest.get("rewards", {}) as Dictionary).get(KEEPSAKE)
 	if keepsake != null:
 		if not keepsake is String or not DataManager.has_record(TABLE, keepsake, KEEPSAKES):
@@ -1100,6 +1114,10 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 			return (farm.beacons_placed as Array).size()
 		"relay_spool":
 			return int(farm.has_relay_spool(StringName(str(step.get("species", "")))))
+		"master_audit_passed":
+			return int(bool(farm.master_audit_passed))
+		"silk_stock":
+			return farm.whole_spools_of(StringName(str(step.get("species", ""))))
 	return 0
 
 

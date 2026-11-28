@@ -98,7 +98,7 @@ func _is_done(gs: GameStateScript, id: String) -> bool:
 # --- The shipped quests ---------------------------------------------------------
 
 func test_shipped_quests_are_readable() -> String:
-	var known: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "beacons_placed", "relay_spool"]
+	var known: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "beacons_placed", "relay_spool", "master_audit_passed", "silk_stock"]
 	var ids: Array[String] = []
 	for quest: Dictionary in QuestEngine.quests():
 		ids.append(str(quest["id"]))

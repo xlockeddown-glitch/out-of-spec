@@ -62,6 +62,7 @@ func _ready() -> void:
 	farm.quests_changed.connect(refresh)
 	farm.farm_loaded.connect(refresh)
 	farm.lab_xp_changed.connect(refresh)
+	farm.oirm_changed.connect(refresh)
 	farm.audit_completed.connect(_on_audit_completed)
 	refresh()
 
@@ -132,6 +133,24 @@ static func earned_from(farm: Node) -> Array[Dictionary]:
 			"gold_border": bool(entry.get("gold_border", false)),
 			"_order": 1,
 			"_index": i,
+		})
+	var has_master_quest: bool = false
+	for item: Dictionary in entries:
+		if str(item["id"]) == "quest_master_audit":
+			has_master_quest = true
+			break
+	if bool(farm.get("master_audit_passed")) and not has_master_quest:
+		var ma: Variant = farm.get("master_audit")
+		var passed_day: int = int((ma as Dictionary).get("passed_day", 0)) if ma is Dictionary else 0
+		# OIRM-issued master audit certificate: never gets lab-printed gold_border (slice 35 rule).
+		entries.append({
+			"id": "master_audit",
+			"kind": "audit",
+			"title": "OIRM Master Audit",
+			"day": maxi(passed_day, 0),
+			"gold_border": false,
+			"_order": 0,
+			"_index": audits.size(),
 		})
 	entries.sort_custom(_sort_oldest_first)
 	var out: Array[Dictionary] = []

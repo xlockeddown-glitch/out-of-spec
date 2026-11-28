@@ -371,7 +371,7 @@ func test_the_new_camps_save_and_an_old_save_loads() -> String:
 
 
 func test_the_protocol_is_48_after_deimos_deep() -> String:
-	return "" if CoopSession.PROTOCOL == 53 else "The camps added no command; cosmetics took 53, not %d" % CoopSession.PROTOCOL
+	return "" if CoopSession.PROTOCOL == 54 else "The camps added no command; master audit took 54, not %d" % CoopSession.PROTOCOL
 
 
 # --- The counters and a whole run -------------------------------------------------------

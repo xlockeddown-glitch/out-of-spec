@@ -47,6 +47,8 @@ var _limit: float = 0.0
 var _send_button := Button.new()
 ## Sends a held ice core sample from the cold box on the OIRM pod.
 var _send_core_button := Button.new()
+## Requests the OIRM two-morning master audit (lab 52, Accredited).
+var _master_audit_button := Button.new()
 
 ## After the U and TUR of a record a Hold the Reading score made smaller.
 const STEADY_HOLD_NOTE: String = "U and TUR with your steady hold"
@@ -103,6 +105,11 @@ func _ready() -> void:
 	_send_core_button.hide()
 	_send_button.add_sibling(_send_core_button)
 	_send_core_button.pressed.connect(_on_send_core_pressed)
+	_master_audit_button.custom_minimum_size = _calibrate_button.custom_minimum_size
+	_master_audit_button.size_flags_horizontal = _calibrate_button.size_flags_horizontal
+	_master_audit_button.hide()
+	_send_core_button.add_sibling(_master_audit_button)
+	_master_audit_button.pressed.connect(_on_master_audit_pressed)
 	_close_button.pressed.connect(close)
 	for mode: int in MinigameSettings.MODE_NAMES:
 		_game_option.add_item(MinigameSettings.MODE_NAMES[mode], mode)
@@ -116,6 +123,8 @@ func _ready() -> void:
 	_careful_check.toggled.connect(_on_careful_toggled)
 	GameState.drop_pod_changed.connect(_on_pod_or_oirm_changed.unbind(1))
 	GameState.oirm_changed.connect(_on_pod_or_oirm_changed)
+	GameState.lab_xp_changed.connect(_on_master_audit_state_changed)
+	GameState.credibility_changed.connect(_on_master_audit_state_changed.unbind(1))
 	GameState.jobs_changed.connect(_on_jobs_changed)
 	GameState.upgrades_changed.connect(_on_upgrades_changed)
 	GameClock.time_advanced.connect(_on_time_advanced.unbind(1))
@@ -165,7 +174,7 @@ func _dress() -> void:
 	stamp.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_seal.add_child(stamp)
 	_seal.pivot_offset = _seal.custom_minimum_size * 0.5
-	for pair: Array in [[_calibrate_button, &"ui_accept"], [_close_button, &"ui_cancel"], [_send_button, &"ui_accept"], [_send_core_button, &"ui_accept"]]:
+	for pair: Array in [[_calibrate_button, &"ui_accept"], [_close_button, &"ui_cancel"], [_send_button, &"ui_accept"], [_send_core_button, &"ui_accept"], [_master_audit_button, &"ui_accept"]]:
 		var glyph: Label = ScopeTheme.badge(pair[1])
 		(pair[0] as Button).add_child(glyph)
 		_glyphs.append(glyph)
@@ -237,14 +246,17 @@ func _bench_focus(on: bool) -> void:
 		control.focus_mode = mode
 		if not on and control.has_focus():
 			control.release_focus()
+	_master_audit_button.focus_mode = mode if not _master_audit_button.disabled else Control.FOCUS_NONE
+	if (not on or _master_audit_button.disabled) and _master_audit_button.has_focus():
+		_master_audit_button.release_focus()
 
 
-## A pad moves along the button row (CALIBRATE, SEND, SEND CORE, CLOSE, whichever show) and up
-## to the pickers. Never points at a hidden button.
+## A pad moves along the button row (CALIBRATE, SEND, SEND CORE, MASTER AUDIT, CLOSE, whichever show) and up
+## to the pickers. Never points at a hidden button or a gated-shut master audit button.
 func _wire_focus() -> void:
 	var row: Array[Control] = []
-	for button: Button in [_calibrate_button, _send_button, _send_core_button, _close_button]:
-		if button.visible:
+	for button: Button in [_calibrate_button, _send_button, _send_core_button, _master_audit_button, _close_button]:
+		if button.visible and (button != _master_audit_button or not button.disabled):
 			row.append(button)
 	for i: int in row.size():
 		var at: Control = row[i]
@@ -336,8 +348,17 @@ func _on_pod_or_oirm_changed() -> void:
 			if _calibrated:
 				_show_finished()
 			_show_send()
+		_show_chain(_current_id)
 		_show_send_core()
+		_show_master_audit()
 		_wire_focus()
+
+
+func _on_master_audit_state_changed() -> void:
+	if not visible:
+		return
+	_show_master_audit()
+	_wire_focus()
 
 
 ## What keeps the selected instrument off the bench, or "".
@@ -415,6 +436,7 @@ func _select(index: int) -> void:
 	_calibrate_button.show()
 	_send_button.hide()
 	_show_send_core()
+	_show_master_audit()
 	if _current_id.begins_with(JOB_PREFIX):
 		_show_job(GameState.active_job(_current_id.trim_prefix(JOB_PREFIX)))
 		return
@@ -479,6 +501,21 @@ func _show_send_core() -> void:
 		return
 	_send_core_button.text = "Send an ice core (%d held)" % held
 	_send_core_button.disabled = false
+
+
+func _show_master_audit() -> void:
+	var show_button: bool = not GameState.master_audit_passed
+	var problem: String = GameState.master_audit_problem() if show_button else "passed"
+	var can_ask: bool = show_button and problem == ""
+	if (not show_button or not can_ask) and _master_audit_button.has_focus():
+		_calibrate_button.grab_focus()
+	_master_audit_button.visible = show_button
+	if not show_button:
+		_master_audit_button.focus_mode = Control.FOCUS_NONE
+		return
+	_master_audit_button.text = GameState.master_audit_button_text()
+	_master_audit_button.disabled = not can_ask
+	_master_audit_button.focus_mode = Control.FOCUS_ALL if can_ask else Control.FOCUS_NONE
 
 
 ## A standard with no reference on this bench: its error is unknown until OIRM
@@ -799,6 +836,21 @@ func _on_send_core_pressed() -> void:
 		return
 	_send_core_button.disabled = false
 	_show_refusal("NOT SENT: ", sent)
+
+
+func _on_master_audit_pressed() -> void:
+	var visit: int = _visit
+	_master_audit_button.disabled = true
+	var err: String = await FarmCommands.request(&"ask_master_audit", [])
+	if _visit != visit:
+		return
+	_show_master_audit()
+	_wire_focus()
+	if err == "":
+		_result_label.text = "MASTER AUDIT BOOKED: starts day %s at 06:00." % SP811.integer(int(GameState.master_audit.get("start_day", 0)))
+		_paint_result(DriftingSensor.band_color(DriftingSensor.Band.IN_BAND))
+		return
+	_show_refusal("NOT BOOKED: ", { "reason": err })
 
 
 ## A refusal is no finding: amber, and the button stays for another try.
