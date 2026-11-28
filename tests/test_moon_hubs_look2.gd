@@ -189,8 +189,8 @@ func test_pinned_collisions_areas_spots_arrive_and_click_targets_unchanged() -> 
 	var tunnel: PhobosServiceTunnel = _open(PhobosServiceTunnel.SCENE_PATH) as PhobosServiceTunnel
 	if _count_type(tunnel, "StaticBody3D") != 5:
 		problem = "PhobosServiceTunnel StaticBody3D count changed: expected 5, got %d." % _count_type(tunnel, "StaticBody3D")
-	elif _count_type(tunnel, "Area3D") != 4:
-		problem = "PhobosServiceTunnel Area3D count changed: expected 4, got %d." % _count_type(tunnel, "Area3D")
+	elif _count_type(tunnel, "Area3D") != 5:
+		problem = "PhobosServiceTunnel Area3D count changed: expected 5, got %d." % _count_type(tunnel, "Area3D")
 	elif PhobosServiceTunnel.ARRIVE_AT != Vector3(-9.5, 0.0, 0.0) or PhobosServiceTunnel.LADDER_AT != Vector3(-11.8, 0.0, -2.5):
 		problem = "PhobosServiceTunnel ARRIVE_AT or LADDER_AT changed."
 	elif not is_equal_approx(PhobosServiceTunnel.REACH_M, 6.5):

@@ -328,6 +328,10 @@ static func _carve(cells: Array, area: Rect2i) -> void:
 			_put(cells, Vector2i(x, y), ".")
 
 
+static func floor_cells(grid: PackedStringArray, area: Rect2i) -> Array[Vector2i]:
+	return _floor_cells(grid, area)
+
+
 static func _floor_cells(grid: PackedStringArray, area: Rect2i) -> Array[Vector2i]:
 	var found: Array[Vector2i] = []
 	for y: int in range(area.position.y, area.end.y):

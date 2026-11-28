@@ -418,7 +418,7 @@ func test_old_save_loads_and_guest_receives_ice_cores_held() -> String:
 	return run if run != "" else "\n".join(problems)
 
 
-func test_protocol_is_45_and_command_is_registered() -> String:
+func test_protocol_is47and_command_is_registered() -> String:
 	if CoopSession.PROTOCOL != 47:
 		return "CoopSession.PROTOCOL is %d, expected 47." % CoopSession.PROTOCOL
 	if not &"send_ice_core" in FarmCommands.ACTIONS:

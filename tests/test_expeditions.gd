@@ -588,7 +588,7 @@ func test_book_expedition_is_a_host_run_command_a_moon_traveller_cannot_use() ->
 	return "\n".join(problems)
 
 
-func test_the_protocol_is_45_for_the_new_command_and_row() -> String:
+func test_the_protocol_is47for_the_new_command_and_row() -> String:
 	return "" if CoopSession.PROTOCOL == 47 else "PROTOCOL is %d, not 47." % CoopSession.PROTOCOL
 
 

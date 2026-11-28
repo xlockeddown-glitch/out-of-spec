@@ -13,6 +13,7 @@ const SCENE_PATH: String = "res://scenes/phobos_service_tunnel.tscn"
 const TITLE_TEXT: String = "PHOBOS // SERVICE TUNNEL"
 const AMBIENT_HINT: String = "Warm station conduit. Click the ladder to climb back up, or inspect a stray."
 const LADDER_HINT: String = "Ladder up to Phobos hub"
+const DEEP_HATCH_HINT: String = "Hatch down to Station deck 1"
 const STRAY_HINT: String = "Banded Regolith Runner (stray). %s"
 const STRAY_CAUGHT_TEXT: String = "Caught. A Banded Regolith Runner. %s. Odalys will want to hear."
 const STRAY_LET_GO_TEXT: String = "Caught, and let go: the dome already has its Runner."
@@ -26,6 +27,10 @@ const WALL_HEIGHT_M: float = 3.6
 const REACH_M: float = 6.5
 const ARRIVE_AT := Vector3(-9.5, 0.0, 0.0)
 const LADDER_AT := Vector3(-11.8, 0.0, -2.5)
+const DEEP_HATCH_AT := Vector3(12.4, 0.0, -1.8)
+const DEEP_HATCH_ARRIVE_OFFSET := Vector3(-1.8, 0.0, 0.4)
+## Set by PhobosDeep when climbing back up from Station deck 1.
+static var arrive_at_deep_hatch: bool = false
 const GRACE_S: float = PhobosHub.GRACE_S
 const TOAST_SECONDS: float = PhobosHub.TOAST_SECONDS
 
@@ -48,6 +53,7 @@ const STRAY_SPOTS: Array[Vector3] = [
 var walker: PhobosWalker
 var camera: IsoCamera
 var ladder_click: Clickable
+var deep_hatch_click: Clickable
 var stray_clicks: Array[Clickable] = []
 var stray_nodes: Array[Node3D] = []
 ## The spot index (STRAY_SPOTS) of each stray node, in the same order.
@@ -192,6 +198,8 @@ func _build_world() -> void:
 	MoonLook.add_service_tunnel_mouth_detail(self, LADDER_AT, WALL_HEIGHT_M)
 	ladder_click = _build_ladder()
 	ladder_click.clicked.connect(_on_ladder)
+	deep_hatch_click = _build_deep_hatch()
+	deep_hatch_click.clicked.connect(_on_deep_hatch)
 	_build_strays(GameClock.get_day_index())
 
 
@@ -304,6 +312,34 @@ func _build_ladder() -> Clickable:
 	return click
 
 
+func _build_deep_hatch() -> Clickable:
+	var root := Node3D.new()
+	root.name = "DeepHatchProp"
+	root.position = DEEP_HATCH_AT
+	add_child(root)
+	var rim_mat: Material = TunnelLook.flat_mat(MoonLook.HATCH_RIM)
+	var lid_mat: Material = TunnelLook.flat_mat(MoonLook.PHOBOS_BOULDER)
+	var stripe_mat: Material = TunnelLook.flat_mat(MoonLook.PAD_STRIPE)
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.8, 0.10, 1.8)), Vector3(0.0, 0.05, 0.0), rim_mat))
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.4, 0.06, 1.4)), Vector3(0.0, 0.11, 0.0), lid_mat))
+	root.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.85, 0.04, 0.14)), Vector3(0.0, 0.08, 0.96), stripe_mat))
+	root.add_child(TunnelLook.label("DECK 1", Vector3(0.0, 1.4, 0.0), MoonLook.SCREEN_GLOW))
+
+	var click := Clickable.new()
+	click.name = "DeepHatch"
+	click.collision_layer = 8
+	click.collision_mask = 0
+	click.hint = DEEP_HATCH_HINT
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = Vector3(2.0, 1.2, 2.0)
+	shape.shape = box
+	click.add_child(shape)
+	click.position = DEEP_HATCH_AT + Vector3(0.0, 0.5, 0.0)
+	add_child(click)
+	return click
+
+
 func _build_strays(day: int) -> void:
 	var group := Node3D.new()
 	group.name = "Strays"
@@ -363,7 +399,11 @@ func _build_walker() -> void:
 	walker.moon = Shuttle.PHOBOS
 	walker.camera = camera
 	add_child(walker)
-	walker.position = ARRIVE_AT
+	if arrive_at_deep_hatch:
+		arrive_at_deep_hatch = false
+		walker.position = DEEP_HATCH_AT + DEEP_HATCH_ARRIVE_OFFSET
+	else:
+		walker.position = ARRIVE_AT
 	_dress_walker()
 	GameState.loadouts_changed.connect(_dress_walker)
 	camera.target = walker
@@ -412,6 +452,13 @@ func _on_ladder() -> void:
 	_leaving = true
 	PhobosHub.arrive_at_hatch = true
 	_swap_to(SceneSwitcher.PHOBOS_SCENE)
+
+
+func _on_deep_hatch() -> void:
+	if _leaving or not _near(DEEP_HATCH_AT):
+		return
+	_leaving = true
+	_swap_to(PhobosDeep.SCENE_PATH)
 
 
 func _on_stray_clicked(at: Vector3, stray_index: int, layout_day: int) -> void:
