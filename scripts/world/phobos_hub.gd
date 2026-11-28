@@ -3,7 +3,7 @@ extends Node3D
 ## The Phobos hub (docs/design/zones.md section 13, step 17, first half): a small
 ## dark grey cratered deck under a black sky with Mars large on the horizon, the
 ## parked shuttle, a station module, the return-shuttle console, the notice board and
-## a shut service-tunnel hatch. On foot only, and no low-gravity physics yet. Every
+## a shut service-tunnel hatch. On foot only, in the moon's low gravity. Every
 ## shape, colour and line is a [PLACEHOLDER]; there are no art files, only boxes.
 ##
 ## The escapee hook (zones section 10): the board's station log says stock escaped

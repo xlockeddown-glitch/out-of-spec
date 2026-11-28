@@ -1,5 +1,5 @@
 extends RefCounted
-## Low gravity on Phobos and Deimos (zones section 7, step 17): each moon's pull, pace,
+## Low gravity on Phobos and Deimos (zones sections 2 and 13, step 17): each moon's pull, pace,
 ## hop and jump, a jump that goes farther than the farm's, little steering in the air,
 ## the tether's flat steps and full steering, the deck's edge and walls holding, and the
 ## three moon scenes still building. Nothing is saved or bought, so there is no save test:
@@ -13,6 +13,7 @@ func _tree() -> SceneTree:
 
 
 func test_each_moons_numbers_are_as_set_and_deimos_is_slower() -> String:
+	PhobosWalker.tethered = false
 	var problems: Array[String] = []
 	var p: String = Shuttle.PHOBOS
 	var d: String = Shuttle.DEIMOS
@@ -38,6 +39,7 @@ func test_each_moons_numbers_are_as_set_and_deimos_is_slower() -> String:
 
 
 func test_the_hop_is_small_never_below_the_deck_and_flat_on_a_tether() -> String:
+	PhobosWalker.tethered = false
 	var problems: Array[String] = []
 	for moon: String in [Shuttle.PHOBOS, Shuttle.DEIMOS]:
 		var top: float = 0.0
@@ -57,6 +59,7 @@ func test_the_hop_is_small_never_below_the_deck_and_flat_on_a_tether() -> String
 
 
 func test_a_moon_jump_goes_farther_than_the_same_jump_on_the_farm() -> String:
+	PhobosWalker.tethered = false
 	var problems: Array[String] = []
 	for moon: String in [Shuttle.PHOBOS, Shuttle.DEIMOS]:
 		var speed: float = MoonGravity.speed_mps(moon)
@@ -71,6 +74,7 @@ func test_a_moon_jump_goes_farther_than_the_same_jump_on_the_farm() -> String:
 
 
 func test_air_steering_is_limited_and_a_tether_steers_fully() -> String:
+	PhobosWalker.tethered = false
 	var problems: Array[String] = []
 	var speed: float = MoonGravity.speed_mps(Shuttle.PHOBOS)
 	var run := Vector3(0.0, 0.0, -speed)
@@ -151,6 +155,7 @@ func _jump_run(walker: PhobosWalker, heading: Vector3, ticks: int) -> float:
 
 
 func test_a_jump_on_a_moon_lands_past_a_step_and_a_tether_gives_no_jump() -> String:
+	PhobosWalker.tethered = false
 	var problems: Array[String] = []
 	var go := Vector3(0.0, 0.0, -1.0)
 	for moon: String in [Shuttle.PHOBOS, Shuttle.DEIMOS]:
@@ -176,6 +181,7 @@ func test_a_jump_on_a_moon_lands_past_a_step_and_a_tether_gives_no_jump() -> Str
 
 
 func test_the_walker_never_passes_the_deck_edge_or_a_wall() -> String:
+	PhobosWalker.tethered = false
 	var problems: Array[String] = []
 	var holder: Node3D = _stage(0.0)
 	var walker: PhobosWalker = _walker(holder, Shuttle.PHOBOS, false, Vector3(PhobosWalker.EDGE_M - 3.0, 0.0, 0.0))
@@ -207,6 +213,7 @@ func test_the_walker_never_passes_the_deck_edge_or_a_wall() -> String:
 
 
 func test_the_moon_scenes_still_build_and_their_walkers_know_their_moon() -> String:
+	PhobosWalker.tethered = false
 	var problems: Array[String] = []
 	var scenes: Dictionary = {SceneSwitcher.PHOBOS_SCENE: Shuttle.PHOBOS, SceneSwitcher.DEIMOS_SCENE: Shuttle.DEIMOS}
 	for path: String in scenes:
@@ -243,8 +250,45 @@ func test_the_hint_names_the_jump_the_tether_and_its_state() -> String:
 	PhobosWalker.tethered = false
 	if not off.contains(Controls.prompt(&"rover_till")) or not off.contains(Controls.prompt(&"moon_tether")):
 		problems.append("The hint names the jump and tether keys.")
+	if off.contains("%s") or on.contains("%s"):
+		problems.append("The hint has no format slot left over.")
 	if off == on or not off.contains("off,") or not on.contains("on,"):
 		problems.append("The hint tells whether the tether is on.")
 	if not InputMap.has_action(&"moon_tether"):
 		problems.append("The tether action is in the InputMap.")
 	return "\n".join(problems)
+
+
+func test_an_open_panel_stops_the_jump_and_the_tether_toggle() -> String:
+	PhobosWalker.tethered = false
+	var problems: Array[String] = []
+	var holder: Node3D = _stage(0.0)
+	var walker: PhobosWalker = _walker(holder, Shuttle.PHOBOS, false)
+	var camera := Camera3D.new()
+	holder.add_child(camera)
+	walker.camera = camera
+	await _tree().physics_frame
+	await _settle(walker)
+	var panel := Control.new()
+	panel.add_to_group(QuestsUI.MODAL_GROUP)
+	_tree().root.add_child(panel)
+	Input.action_press(&"rover_till")
+	walker._physics_process(1.0 / 60.0)
+	Input.action_release(&"rover_till")
+	if walker.velocity.y > 0.1:
+		problems.append("A jump started behind an open panel.")
+	var toggle := InputEventAction.new()
+	toggle.action = &"moon_tether"
+	toggle.pressed = true
+	walker._unhandled_input(toggle)
+	if PhobosWalker.tethered:
+		problems.append("The tether toggled behind an open panel.")
+	panel.free()
+	walker.set_tether(false)
+	walker._unhandled_input(toggle)
+	if not PhobosWalker.tethered:
+		problems.append("With no panel open the toggle works.")
+	PhobosWalker.tethered = false
+	holder.free()
+	return "
+".join(problems)

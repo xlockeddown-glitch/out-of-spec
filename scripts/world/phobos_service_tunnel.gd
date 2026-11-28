@@ -389,7 +389,7 @@ func _build_hud() -> void:
 	_hint = Label.new()
 	_hint.name = "HintLabel"
 	_hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	_hint.offset_top = -64.0
+	_hint.offset_top = -96.0
 	_hint.offset_left = 16.0
 	_hint.add_theme_font_size_override(&"font_size", 20)
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
