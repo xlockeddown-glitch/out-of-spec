@@ -2,6 +2,18 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-28: Ice Caves slick ice, studs and white-out (feat/ice-slick)
+
+Slice 14. Every number and word below is a [PLACEHOLDER].
+
+- **Slick ice [PLACEHOLDER]:** about 1 floor cell in 7 (`IceSlick.SLICK_ONE_IN`) on Ice Caves depth 1 is slick, picked from the layout's own hash (`ZoneDepth.stream`, tags 400 and up). Never on the start, the way up, the hub hatch, a find, or any cell touching one of those. A slick cell is still floor, so the layout stays reachable (tested over 20 days). The hub has no patches (open choice: skipped).
+- **Skid [PLACEHOLDER]:** rolling onto a slick cell slides the rover one more cell the way it was going (four sides only, a diagonal does not skid) if that cell is open floor. Never into rock, off the map, onto a find, the start, the way up or the hatch. The target is a pure function of the grid (`IceSlick.skid_target`). The client sees the cell and asks the host (`ice_skid`: cell, direction, day); the host checks the day, that the cell is slick today, no studs, and that its copy of the rover is within 2.1 m. Then it adds 6 m of wear through `add_rover_usage`, the same place the Lava vents and the cold multiply it (so a skid in the drift wears 1.5 times as much). Wear only, no game minutes (open choice). The slide is a teleport with a log line, no animation (open choice).
+- **Studs [PLACEHOLDER]:** Bram sells ice studs for 60 credits from the shared wallet, once (`buy_ice_studs`, host-run, refused without credits or when fitted). With studs there is no skid and no wear (open choice: no skid at all, not a reduced one). `has_ice_studs` is saved (`SAVED_LATER`, old saves have none) and shown to guests (`FarmSync`, `upgrades_changed`). The studs button has no number key, and the tier-1 note line is not shown while Bram has offers (open choices).
+- **White-out [PLACEHOLDER]:** about 1 day in 3 has a spell, starting 08:00 to 16:00, lasting 60 to 120 game minutes (so over by 18:00, far from the 00:00 warning and the 02:00 recall). A pure function of the world seed and the shared clock (`IceSlick.spell_of`, `whiteout_active`), so every PC agrees with nothing synced. Effect: fog on the scene's Environment (density 0.06, pale ice colour), and finds more than 9 m from the rover are not drawn. The hatch, the entry, the way up and every other prop are never hidden. A HUD log line at the start and the end. Recalls and rescues do not read it.
+- **Protocol:** `CoopSession.PROTOCOL` 42 to 43, once, for the two commands and the new synced field. Test pins updated.
+- **Unchanged:** Lava Tubes, Aquifer and Mine (no slick cells, `ice_skid` refuses them), the cold and heater.
+- **Tests:** `tests/test_ice_slick.gd`.
+
 ## 2026-11-27: Aquifer depths 2 to 6 (feat/aquifer-deep)
 
 Slice 12. Every number and word below is a [PLACEHOLDER].

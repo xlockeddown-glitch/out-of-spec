@@ -726,7 +726,7 @@ func test_a_refused_service_takes_no_score() -> String:
 
 
 func test_no_save_or_message_changed() -> String:
-	if SessionScript.PROTOCOL != 42:
+	if SessionScript.PROTOCOL != 43:
 		return "The score rides as a scored action's last argument: the protocol is still 18."
 	if SaveGame.VERSION != 1:
 		return "Nothing new is saved: the save version is still 1."

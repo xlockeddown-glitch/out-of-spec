@@ -27,7 +27,7 @@ const SHOWN_BY: Dictionary = {
 	&"drop_pod_changed": ["drop_pod_present"],
 	&"ore_changed": ["crystal_ore"],
 	&"fissures_changed": ["mined_fissures"],
-	&"upgrades_changed": ["has_wide_treads", "owned_standards", "tier1_unlocked", "traceable_lab"],
+	&"upgrades_changed": ["has_wide_treads", "has_ice_studs", "owned_standards", "tier1_unlocked", "traceable_lab"],
 	&"oirm_changed": ["at_oirm", "oirm_trips", "certificate_log", "suspect_units", "_untraceable_since_cal"],
 	&"credibility_changed": ["credibility", "_best_band", "contract_state", "contract_run"],
 	&"crops_changed": ["plantings", "harvest_bin"],

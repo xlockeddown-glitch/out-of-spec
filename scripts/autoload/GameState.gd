@@ -344,6 +344,8 @@ var _drop_pod_departure_at: float = 0.0
 var crystal_ore: int = 0
 var mined_fissures: Dictionary = {}
 var has_wide_treads: bool = false
+## Ice studs on the rover (Bram, credits): slick ice no longer skids it. Saved; an old save has none.
+var has_ice_studs: bool = false
 
 ## One-time grace: the first audit that would fine you becomes a warning,
 ## because your manager recalibrated the offenders before Vance got in.
@@ -807,7 +809,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -885,6 +887,8 @@ func farm_dict_problem(data: Dictionary) -> String:
 		return "'mine_gate_open' is not a yes or no."
 	if data.has("pump_owned") and not data["pump_owned"] is bool:
 		return "'pump_owned' is not a yes or no."
+	if data.has("has_ice_studs") and not data["has_ice_studs"] is bool:
+		return "'has_ice_studs' is not a yes or no."
 	if data.has("camps_open") and Camp.open_problem(data["camps_open"]) != "":
 		return Camp.open_problem(data["camps_open"])
 	if data.has("camp_supplies") and Camp.supplies_problem(data["camp_supplies"]) != "":
@@ -6530,6 +6534,43 @@ func buy_heater(player_id: String = "") -> String:
 	add_credits(-IceDepth.HEATER_COST_CREDITS)
 	cold_since[who] = GameClock.elapsed_days
 	ice_changed.emit()
+	return ""
+
+
+## Host: the farm buys ice studs at Bram's bay: IceSlick.STUD_COST_CREDITS from the shared
+## wallet [PLACEHOLDER], charged once, for the rover. Returns "" or why not.
+@warning_ignore("unused_parameter")
+func buy_ice_studs(player_id: String = "") -> String:
+	var reason: String = IceSlick.studs_problem(has_ice_studs, credits)
+	if reason != "":
+		return reason
+	add_credits(-IceSlick.STUD_COST_CREDITS)
+	has_ice_studs = true
+	upgrades_changed.emit()
+	post_phone(IceSlick.WORDS["studs"])
+	return ""
+
+
+## Host: the rover rolled onto a slick cell of the Ice Caves' floor going (dx, dy) and skids.
+## The host decides from its own state: the day, that the cell is one of today's slick cells,
+## no studs, and its copy of the rover is at that cell. Returns "" when the skid is on (the
+## client then slides to IceSlick.skid_target); its wear is added here, once, through
+## add_rover_usage, so the Ice cold and anything else that multiplies wear applies to it.
+func ice_skid(cell_x: int, cell_y: int, dx: int, dy: int, layout_day: int, player_id: String = "") -> String:
+	var day: int = GameClock.get_day_index()
+	if layout_day != day:
+		return "That was yesterday's floor. Look again."
+	var who: String = _player(player_id)
+	var cell := Vector2i(cell_x, cell_y)
+	var slick: Array[Vector2i] = IceSlick.slick_cells(world_seed, rover_depth, day)
+	var reason: String = IceSlick.skid_problem(slick, cell, Vector2i(dx, dy), has_ice_studs, place_of(who), depth_of(who), rover_zone, rover_depth)
+	if reason == "":
+		var today: Dictionary = IceDepth.layout(world_seed, rover_depth, day)
+		var at: Variant = _rover_pose_now(TUNNEL_ROVER)
+		reason = IceSlick.reach_problem(TunnelRock.at_in(today["grid"], cell), at != null, at if at != null else Vector3.ZERO)
+	if reason != "":
+		return reason
+	add_rover_usage(IceSlick.SKID_WEAR_M, who, TUNNEL_ROVER)
 	return ""
 
 

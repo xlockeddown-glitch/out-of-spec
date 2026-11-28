@@ -30,6 +30,7 @@ func _build_zone() -> void:
 	_decor = Node3D.new()
 	_decor.name = "IceDecor"
 	_rover.get_parent().add_child(_decor)
+	_build_ice_hazards()
 	if _below:
 		_depth_props.build_finds(ZoneDepth.local_layout, _taken_today())
 		_build_depth_decor()
@@ -92,6 +93,104 @@ func _draw_sign() -> void:
 	IceLook.add_sign_trim(board)
 
 
+# --- Slick ice and white-out (IceSlick holds the rules) ----------------------------
+
+## Today's slick cells (depth 1), the cell the rover was last seen on, and whether a skid is being asked.
+var _slick: Array[Vector2i] = []
+var _slick_last: Vector2i = Vector2i(-1, -1)
+var _skid_asking: bool = false
+var _whiteout_on: bool = false
+var _environment: Environment
+
+
+## Draws the day's slick cells and takes a private copy of the Environment, so fog can come and go.
+func _build_ice_hazards() -> void:
+	var holder := get_node_or_null("WorldView/WorldViewport/World/WorldEnvironment") as WorldEnvironment
+	if holder != null and holder.environment != null:
+		_environment = holder.environment.duplicate() as Environment
+		holder.environment = _environment
+	if not _below:
+		return
+	_slick = IceSlick.slick_cells(GameState.world_seed, _built_depth, _built_day)
+	var grid: PackedStringArray = ZoneDepth.local_layout["grid"]
+	for cell: Vector2i in _slick:
+		IceLook.add_slick_patch(_decor, TunnelRock.at_in(grid, cell))
+
+
+## The rover rolling onto a slick cell asks the host for the skid (wear, studs, the cell are
+## the host's to check) and, if it is on, slides on one more cell if that is open.
+func _watch_ice() -> void:
+	if not _below or _slick.is_empty():
+		return
+	var free: bool = _rover.away_text() == "" and not SceneSwitcher.is_busy() and not _moving \
+			and CoopRovers.driver(GameState.TUNNEL_ROVER) in ["", GameState.local_player_id]
+	if not free:
+		return
+	var cell: Vector2i = ZoneHazards.cell_of(_rover.global_position)
+	if cell == _slick_last:
+		return
+	var dir: Vector2i = IceSlick.step_between(_slick_last, cell)
+	_slick_last = cell
+	if dir == Vector2i.ZERO or _skid_asking or GameState.has_ice_studs or not IceSlick.is_slick(_slick, cell):
+		return
+	_skid(cell, dir)
+
+
+func _skid(cell: Vector2i, dir: Vector2i) -> void:
+	_skid_asking = true
+	var problem: String = await FarmCommands.request(&"ice_skid", [cell.x, cell.y, dir.x, dir.y, _built_day])
+	_skid_asking = false
+	if not is_inside_tree():
+		return
+	if problem == "Still waiting for the host.":
+		_slick_last = Vector2i(-1, -1)  # ask again if the rover is still on the ice
+		return
+	if problem != "":
+		_hud.push_log("ICE: " + problem)
+		return
+	var grid: PackedStringArray = ZoneDepth.local_layout["grid"]
+	var target: Vector2i = IceSlick.skid_target(grid, _find_cells(), cell, dir)
+	if target != cell:
+		_rover.skid_to(TunnelRock.at_in(grid, target))
+		_slick_last = target
+	_hud.push_log("ICE: " + IceSlick.WORDS["skid"])
+
+
+func _find_cells() -> Array:
+	var out: Array = []
+	for find: Variant in ZoneDepth.local_layout.get("finds", []):
+		out.append((find as Dictionary)["cell"])
+	return out
+
+
+## Fog by the synced clock and the seed (a pure function: every PC agrees); finds beyond
+## IceSlick.SEE_FINDS_M are not drawn while it lasts. Props that are not finds are never touched,
+## so the hatch, the entry and the way out stay in view. A log line when it starts and ends.
+func _watch_whiteout() -> void:
+	var on: bool = IceSlick.whiteout_active(GameState.world_seed, GameClock.elapsed_days)
+	if on != _whiteout_on:
+		_whiteout_on = on
+		if _environment != null:
+			_environment.fog_enabled = on
+			_environment.fog_light_color = IceLook.ICE_PALE
+			_environment.fog_density = IceSlick.FOG_DENSITY
+		_hud.push_log("WHITE-OUT: " + IceSlick.WORDS["in" if on else "out"])
+		if not on and _below:
+			_depth_props.show_taken(_taken_today())
+	if on and _below:
+		_hide_far_finds()
+
+
+func _hide_far_finds() -> void:
+	var taken: Array = _taken_today()
+	for find: Variant in ZoneDepth.local_layout.get("finds", []):
+		var id: String = str((find as Dictionary)["id"])
+		var node: Node3D = _depth_props.find_node(id)
+		if node != null:
+			var distance: float = node.global_position.distance_to(_rover.global_position)
+			node.visible = not id in taken and IceSlick.shown_in_whiteout(true, distance)
+
+
 func _process(_delta: float) -> void:
 	_resync_depth()
 	_hud.set_clock(GameClock.format_now())
@@ -100,6 +199,8 @@ func _process(_delta: float) -> void:
 	_hub_near = _ice_near() if _rover.away_text() == "" else {}
 	_tell_hub()
 	_tell_cold()
+	_watch_ice()
+	_watch_whiteout()
 
 
 ## The way down, the crate or the sign at the hub; below, the nearest find: or {}.

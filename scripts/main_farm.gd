@@ -1102,13 +1102,53 @@ func _refresh_bram() -> void:
 				"text": text,
 				"disabled": owned or gate != "" or GameState.credits < GameState.standard_price_credits(id) or GameState.crystal_ore < sensor.price_ore,
 			})
+	offers.append(_studs_offer())
 	_hud.show_standards(offers, "" if GameState.tier1_unlocked else "Tier 1 standards: pass one audit clean and Bram will sell them.")
+
+
+## Bram's ice studs, as a button among the standards (no number key: those are the catalog's).
+const STUDS_OFFER_ID: String = "ice_studs"
+
+
+func _studs_offer() -> Dictionary:
+	var text: String = "ICE STUDS: ON THE ROVER"
+	if not GameState.has_ice_studs:
+		var verb: String = "CONFIRM: BUY " if _armed_standard == STUDS_OFFER_ID else "BUY "
+		text = verb + IceSlick.studs_offer_text().to_upper()
+	return {
+		"id": STUDS_OFFER_ID,
+		"text": text,
+		"disabled": GameState.has_ice_studs or GameState.credits < IceSlick.STUD_COST_CREDITS,
+	}
+
+
+func _try_buy_studs() -> void:
+	var problem: String = IceSlick.studs_problem(GameState.has_ice_studs, GameState.credits)
+	if problem.is_empty() and _armed_standard != STUDS_OFFER_ID:
+		_armed_standard = STUDS_OFFER_ID
+		_bram_line = "Ice studs are %d credits. Press again to buy them." % IceSlick.STUD_COST_CREDITS
+		_refresh_bram()
+		return
+	_armed_standard = ""
+	if problem.is_empty():
+		problem = await FarmCommands.request(&"buy_ice_studs", [])
+		if not is_inside_tree() or not _bram_bay.rover_inside:
+			return
+	if problem.is_empty():
+		_bram_line = "Studs bite. The ice won't take you anywhere now."
+	else:
+		_bram_line = problem
+		_hud.push_log("BRAM: " + problem)
+	_refresh_bram()
 
 
 func _try_buy_standard(standard_id: String) -> void:
 	if _refuse_on_foot():
 		return
 	if not _bram_bay.rover_inside:
+		return
+	if standard_id == STUDS_OFFER_ID:
+		_try_buy_studs()
 		return
 	var problem: String = GameState.standard_purchase_problem(standard_id)
 	if problem.is_empty() and _armed_standard != standard_id:

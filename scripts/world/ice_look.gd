@@ -181,6 +181,21 @@ static func add_icicle_cluster(parent: Node3D, at: Vector3, width_m: float = 2.2
 	return cluster
 
 
+## A slick cell: one glassy cyan slab, a little under a cell, flush to the floor (visual only,
+## no collision) [PLACEHOLDER].
+static func add_slick_patch(parent: Node3D, at: Vector3) -> Node3D:
+	var patch := Node3D.new()
+	patch.name = &"SlickPatch"
+	patch.position = at
+	patch.add_child(TunnelLook.part(
+		TunnelLook.box(Vector3(2.7, 0.03, 2.7)),
+		Vector3(0.0, 0.015, 0.0),
+		ice_mat(GLACIER_CYAN, 0.06, 0.6)
+	))
+	parent.add_child(patch, true)
+	return patch
+
+
 ## Thin glazed frost & rime patch flush to the floor (visual only, no
 ## collision, safe for the rover to drive over) [PLACEHOLDER].
 static func add_frost_patch(parent: Node3D, at: Vector3, size: Vector2, rot_y_deg: float = 0.0) -> Node3D:
