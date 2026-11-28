@@ -89,6 +89,8 @@ const MARS_GLOW_PHOBOS := Color(0.42, 0.17, 0.11)
 const MARS_GLOW_DEIMOS := Color(0.32, 0.16, 0.12)
 const MARS_GLOW_ALPHA_PHOBOS: float = 0.22
 const MARS_GLOW_ALPHA_DEIMOS: float = 0.16
+const MARS_HALO_SCALES: Array[float] = [1.08, 1.18, 1.30]
+const MARS_HALO_ALPHA_WEIGHTS: Array[float] = [0.85, 0.45, 0.20]
 
 const PAD_EDGE_LIGHT_ENERGY: float = 0.85
 const PAD_EDGE_AMBER: Color = ScopeTheme.AMBER
@@ -506,8 +508,12 @@ static func add_pod_detail(parent: Node3D, at: Vector3) -> Node3D:
 
 
 ## Cached translucent unshaded material for faint sky/horizon glow [PLACEHOLDER].
-static func unshaded_alpha_mat(color: Color, alpha: float) -> StandardMaterial3D:
-	var key: String = "%s|%.3f" % [color.to_html(false), alpha]
+static func unshaded_alpha_mat(
+	color: Color,
+	alpha: float,
+	cull_mode: BaseMaterial3D.CullMode = BaseMaterial3D.CULL_BACK
+) -> StandardMaterial3D:
+	var key: String = "%s|%.3f|%d" % [color.to_html(false), alpha, int(cull_mode)]
 	if _unshaded_alpha_cache.has(key):
 		return _unshaded_alpha_cache[key] as StandardMaterial3D
 	var material := StandardMaterial3D.new()
@@ -516,6 +522,8 @@ static func unshaded_alpha_mat(color: Color, alpha: float) -> StandardMaterial3D
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
 	material.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	material.no_depth_test = false
+	material.cull_mode = cull_mode
 	_unshaded_alpha_cache[key] = material
 	return material
 
@@ -542,31 +550,26 @@ static func add_starfield(parent: Node3D, seed_value: int, count: int) -> Node3D
 	return sky
 
 
-## Faint translucent unshaded Mars glow halo and horizon haze on the Mars side (zero collision, zero lights) [PLACEHOLDER].
+## Faint translucent unshaded Mars rim halo built from nested CULL_FRONT shells
+## so opaque Mars hides the middle and only a soft stepped rim shows (zero
+## collision, zero lights; no flat horizon box) [PLACEHOLDER].
 static func add_mars_horizon_glow(parent: Node3D, mars_at: Vector3, mars_radius: float, glow_col: Color, alpha: float) -> Node3D:
 	var group := Node3D.new()
 	group.name = "MarsHorizonGlow"
 	parent.add_child(group)
-	var dir_flat := Vector3(mars_at.x, 0.0, mars_at.z)
-	if dir_flat.length_squared() < 0.01:
-		dir_flat = Vector3(0.0, 0.0, -1.0)
-	dir_flat = dir_flat.normalized()
-	var halo_mesh := SphereMesh.new()
-	halo_mesh.radius = mars_radius * 1.28
-	halo_mesh.height = mars_radius * 2.56
-	halo_mesh.radial_segments = 24
-	halo_mesh.rings = 12
-	var halo_pos: Vector3 = mars_at + dir_flat * (mars_radius * 0.14)
-	group.add_child(TunnelLook.part(halo_mesh, halo_pos, unshaded_alpha_mat(glow_col, alpha)))
-	# Soft low horizon band behind the deck rim on the Mars side.
-	var yaw_deg: float = rad_to_deg(atan2(dir_flat.x, dir_flat.z))
-	var band_pos: Vector3 = dir_flat * 76.0 + Vector3(0.0, 2.5, 0.0)
-	group.add_child(TunnelLook.part(
-		TunnelLook.box(Vector3(mars_radius * 2.4, 9.0, 0.4)),
-		band_pos,
-		unshaded_alpha_mat(glow_col, alpha * 0.65),
-		Vector3(0.0, yaw_deg, 0.0)
-	))
+	for i: int in MARS_HALO_SCALES.size():
+		var shell_radius: float = mars_radius * MARS_HALO_SCALES[i]
+		var halo_mesh := SphereMesh.new()
+		halo_mesh.radius = shell_radius
+		halo_mesh.height = shell_radius * 2.0
+		halo_mesh.radial_segments = 24
+		halo_mesh.rings = 12
+		var shell_mat: Material = unshaded_alpha_mat(
+			glow_col,
+			alpha * MARS_HALO_ALPHA_WEIGHTS[i],
+			BaseMaterial3D.CULL_FRONT
+		)
+		group.add_child(TunnelLook.part(halo_mesh, mars_at, shell_mat))
 	return group
 
 

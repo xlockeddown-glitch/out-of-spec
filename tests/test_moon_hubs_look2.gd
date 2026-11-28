@@ -337,3 +337,62 @@ func test_light_budget_and_pad_edge_lights_have_no_omnilights() -> String:
 		problem = "PhobosServiceTunnel TunnelMouthDetail must not add OmniLight3Ds."
 	_drop(tunnel)
 	return problem
+
+
+func test_mars_halo_culls_front_faces_and_has_no_wide_box() -> String:
+	var back_mat: StandardMaterial3D = MoonLook.unshaded_alpha_mat(MoonLook.MARS_GLOW_PHOBOS, 0.2, BaseMaterial3D.CULL_BACK)
+	var front_mat: StandardMaterial3D = MoonLook.unshaded_alpha_mat(MoonLook.MARS_GLOW_PHOBOS, 0.2, BaseMaterial3D.CULL_FRONT)
+	var front_mat_again: StandardMaterial3D = MoonLook.unshaded_alpha_mat(MoonLook.MARS_GLOW_PHOBOS, 0.2, BaseMaterial3D.CULL_FRONT)
+	if back_mat == front_mat:
+		return "unshaded_alpha_mat cache must separate CULL_BACK and CULL_FRONT."
+	if front_mat != front_mat_again:
+		return "unshaded_alpha_mat must return the cached material for identical args."
+
+	var problem: String = ""
+	for scene_path: String in [SceneSwitcher.PHOBOS_SCENE, SceneSwitcher.DEIMOS_SCENE]:
+		var hub: Node = _open(scene_path)
+		var glow: Node = hub.get_node_or_null("MarsHorizonGlow")
+		if glow == null:
+			problem = "%s missing MarsHorizonGlow." % scene_path
+		else:
+			var meshes: Array[MeshInstance3D] = []
+			_collect_meshes(glow, meshes)
+			if meshes.size() != MoonLook.MARS_HALO_SCALES.size():
+				problem = "%s MarsHorizonGlow expected %d halo shells, got %d." % [scene_path, MoonLook.MARS_HALO_SCALES.size(), meshes.size()]
+			var prev_radius: float = 0.0
+			var prev_alpha: float = 2.0
+			for mi: MeshInstance3D in meshes:
+				if problem != "":
+					break
+				if mi.mesh is BoxMesh:
+					var b := mi.mesh as BoxMesh
+					if maxf(b.size.x, b.size.z) > 20.0:
+						problem = "%s MarsHorizonGlow has a box wider than 20 m: %s." % [scene_path, b.size]
+						break
+				var mat := mi.material_override as StandardMaterial3D
+				if mat == null:
+					problem = "%s MarsHorizonGlow mesh missing StandardMaterial3D." % scene_path
+					break
+				if mat.cull_mode != BaseMaterial3D.CULL_FRONT:
+					problem = "%s MarsHorizonGlow shell must use CULL_FRONT." % scene_path
+					break
+				if mat.no_depth_test:
+					problem = "%s MarsHorizonGlow shell must keep depth test enabled." % scene_path
+					break
+				if mat.depth_draw_mode != BaseMaterial3D.DEPTH_DRAW_DISABLED:
+					problem = "%s MarsHorizonGlow shell must disable depth draw." % scene_path
+					break
+				if mi.mesh is SphereMesh:
+					var r: float = (mi.mesh as SphereMesh).radius
+					if r <= prev_radius:
+						problem = "%s MarsHorizonGlow shell radii must increase." % scene_path
+						break
+					prev_radius = r
+					if mat.albedo_color.a >= prev_alpha:
+						problem = "%s MarsHorizonGlow shell alphas must fall from inner to outer." % scene_path
+						break
+					prev_alpha = mat.albedo_color.a
+		_drop(hub)
+		if problem != "":
+			return problem
+	return ""
