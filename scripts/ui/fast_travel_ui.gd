@@ -57,6 +57,7 @@ func _ready() -> void:
 	_sitter_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_sitter_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sitter.add_child(_sitter_label)
+	sitter.add_child(PlanBoardUI._label(LabSitter.text("days_label"), TEXT, 18))
 	_sitter_days = OptionButton.new()
 	for count: int in range(1, LabSitter.max_days() + 1):
 		_sitter_days.add_item(SP811.integer(count))
@@ -228,7 +229,7 @@ func _refresh_sitter() -> void:
 	if booked:
 		var paid: int = LabSitter.paid_each(booking) * LabSitter.day_count(booking)
 		_sitter_label.text = LabSitter.text("row_booked") % [LabSitter.sitter_name(), LabSitter.days_text(booking),
-			LabSitter.text("total_text") % SP811.integer(paid) if paid > 0 else LabSitter.text("free_text")]
+			LabSitter.text("total_text") % SP811.integer(paid) if paid > 0 else LabSitter.text("no_fee_text")]
 		if LabSitter.future_days(booking, GameClock.get_day_index()) > 0:
 			_sitter_label.text += " " + LabSitter.text("cancel_hint")
 	else:
@@ -240,7 +241,7 @@ func _refresh_sitter() -> void:
 	_sitter_button.disabled = booked or _booking or _going
 	_sitter_days.disabled = booked or _booking or _going
 	_cancel_button.disabled = not booked or _booking or _going or LabSitter.future_days(booking, GameClock.get_day_index()) <= 0
-	if (_sitter_button.disabled and _sitter_button.has_focus()) or (_cancel_button.disabled and _cancel_button.has_focus()):
+	if (_sitter_button.disabled and _sitter_button.has_focus()) or (_sitter_days.disabled and _sitter_days.has_focus()) or (_cancel_button.disabled and _cancel_button.has_focus()):
 		_close_button.grab_focus()
 
 
@@ -265,7 +266,7 @@ func _on_cancel_sitter() -> void:
 		return
 	_booking = true
 	_refresh_sitter()
-	var problem: String = await FarmCommands.request(&"cancel_lab_sitter", [])
+	var problem: String = await FarmCommands.request(&"cancel_lab_sitter", [GameClock.get_day_index()])
 	_booking = false
 	if not is_inside_tree():
 		return

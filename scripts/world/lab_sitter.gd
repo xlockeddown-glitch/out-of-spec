@@ -16,6 +16,10 @@ const KEYS: Array[String] = ["day", "days", "paid", "watered", "spools"]
 const OLD_KEYS: Array[String] = ["day", "watered", "spools"]
 ## The most a count may be in a saved booking: far more than a farm has.
 const MOST: int = 1000
+## Ceilings for a saved booking, fixed so tuning max_days() or the fee never
+## makes a saved booking refuse a whole farm's load.
+const MOST_DAYS: int = 30
+const MOST_PAID: int = 100000
 
 
 static func number(key: String, fallback: float) -> float:
@@ -130,9 +134,9 @@ static func booking_problem(value: Variant) -> String:
 			return "'lab_sitter' has no whole number '%s'." % key
 	if int(booking["day"]) < 1:
 		return "'lab_sitter' works on a day before day 1."
-	if day_count(booking) < 1 or day_count(booking) > max_days():
+	if day_count(booking) < 1 or day_count(booking) > MOST_DAYS:
 		return "'lab_sitter' has a number of days out of range."
-	if paid_each(booking) < 0 or paid_each(booking) > MOST:
+	if paid_each(booking) < 0 or paid_each(booking) > MOST_PAID:
 		return "'lab_sitter' has a payment out of range."
 	for key: String in ["watered", "spools"]:
 		if int(booking[key]) < 0 or int(booking[key]) > MOST:

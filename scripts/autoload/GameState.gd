@@ -3949,20 +3949,23 @@ func book_lab_sitter(for_day: int, days: int = 1, player_id: String = "") -> Str
 
 
 ## Cancels the sitter's days that have not started (a day starts at its 06:00),
-## from the console in the dome. Each cancelled day's fee goes back to the shared
+## from the console in the dome. `for_day` is today as the screen showed it, so a
+## cancel that crosses 06:00 is refused. Each cancelled day's fee goes back to the shared
 ## wallet in full [PLACEHOLDER]; a day already worked is never refunded and a free
 ## reward day is never refunded as credits. Returns "" when done, else why not.
-func cancel_lab_sitter(player_id: String = "") -> String:
+func cancel_lab_sitter(for_day: int, player_id: String = "") -> String:
 	if place_of(_player(player_id)) != ZonePresence.DOME:
 		return LabSitter.text("console_in_dome")
 	if not LabSitter.is_booked(lab_sitter):
 		return LabSitter.text("cancel_nothing")
 	var today: int = GameClock.get_day_index()
+	if for_day != today:
+		return LabSitter.text("new_day")
 	var cancelled: int = LabSitter.future_days(lab_sitter, today)
 	if cancelled <= 0:
 		return LabSitter.text("cancel_started")
 	var refund: int = LabSitter.paid_each(lab_sitter) * cancelled
-	var gone: Dictionary = lab_sitter.duplicate()
+	var gone: Dictionary = LabSitter.new_booking(LabSitter.last_day(lab_sitter) - cancelled + 1, cancelled)
 	lab_sitter = LabSitter.after_cancel(lab_sitter, today)
 	if refund > 0:
 		add_credits(refund)

@@ -101,7 +101,8 @@
     "cancel_started": "The sitter has started her last day. It can't be cancelled.",
     "cancel_text": "[Odalys Brandt, BNH Dispatch] The sitter booking is cancelled for %s. %s. Warmly, Dispatch.",
     "refund_text": "%s CR is back in the shared wallet",
-    "no_refund_text": "Nothing is refunded: that day was free, from a reward",
+    "no_refund_text": "Nothing was paid for those days, so nothing is refunded",
+    "no_fee_text": "nothing paid",
     "bad_days": "The sitter can be booked for 1 to %s days.",
     "new_day": "The day changed while you were booking. Look again.",
     "fee_text": "%s CR from the shared wallet",
@@ -111,7 +112,7 @@
     "booked_text": "[Odalys Brandt, BNH Dispatch] %s is booked to tend the lab on %s (%s). Sitter booked: %s. Warmly, Dispatch.",
     "report_text": "[Odalys Brandt, BNH Dispatch] %s kept the lab in good order on %s. Plots trimmed to their target: %s. Spools collected: %s. Nothing was calibrated and no reading was changed: that is bench work. Warmly, Dispatch.",
     "console_in_dome": "The lab sitter is booked from the console in the dome.",
-    "already": "The lab sitter is booked already. Cancel the days first to change them.",
+    "already": "The lab sitter is booked already. If she is on her last booked day, book again tomorrow.",
     "short": "The lab sitter costs %s CR from the shared wallet for those days. The farm has %s CR.",
     "_note": "Zones doc section 9, build step 11 (Ryan, 2026-11-26: the sitter is a NEW hire, not Lin or Chet; she cannot calibrate). Booked from the dome console for the NEXT day [ASSUMPTION]; she works from 06:00 of that day to 06:00 after, and the report comes then. Free when the farm holds the lab_sitter one-use reward. She waters (trims each growing plot's set point to its crop's target by the plot's own probe reading, as a robot does) and collects the day's spools; she does not feed the spiders (the game has no feeding) and never calibrates. The name, the fee and every word here are [PLACEHOLDER]. Several days (feat/sitter-days): max_days is how many days in a row one booking may cover [PLACEHOLDER 3], the fee is per day and all taken at booking, there is no discount for a longer run [PLACEHOLDER], and cancelling refunds the full fee of each day not yet started [PLACEHOLDER]."
   },
