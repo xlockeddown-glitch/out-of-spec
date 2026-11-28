@@ -71,7 +71,7 @@ func test_the_sitter_is_data_with_a_plain_name_and_a_fee() -> String:
 
 
 func test_a_booking_is_always_the_next_day_with_nothing_done() -> String:
-	if LabSitter.booked_day(3) != 4 or LabSitter.new_booking(4) != { "day": 4, "watered": 0, "spools": 0 }:
+	if LabSitter.booked_day(3) != 4 or LabSitter.new_booking(4) != { "day": 4, "days": 1, "paid": 0, "watered": 0, "spools": 0 }:
 		return "Booked on day 3 she works day 4, with nothing done."
 	return ""
 
@@ -95,7 +95,7 @@ func test_a_saved_booking_is_checked() -> String:
 		return "No booking and a good booking must load."
 	for bad: Variant in [3, [], { "day": 4 }, { "day": 4, "watered": 0, "spools": "0" }, { "day": 0, "watered": 0, "spools": 0 },
 			{ "day": 4, "watered": -1, "spools": 0 }, { "day": 4, "watered": 0, "spools": 5000 },
-			{ "day": 4, "watered": 0, "spools": 0, "extra": 1 }, { "day": 4.0, "watered": 0, "spools": 0 }]:
+			{ "day": 4, "days": 1, "paid": 0, "watered": 0, "spools": 0, "extra": 1 }, { "day": 4.0, "watered": 0, "spools": 0 }]:
 		if LabSitter.booking_problem(bad) == "":
 			return "A bad booking was accepted: %s" % [bad]
 	return ""
@@ -108,7 +108,7 @@ func test_booking_takes_the_fee_once_and_books_the_next_day() -> String:
 	var problems: Array[String] = []
 	if gs.book_lab_sitter(4) != "":
 		problems.append("A booking with enough credits was refused.")
-	if gs.credits != 460 or gs.lab_sitter != { "day": 4, "watered": 0, "spools": 0 }:
+	if gs.credits != 460 or gs.lab_sitter != { "day": 4, "days": 1, "paid": 40, "watered": 0, "spools": 0 }:
 		problems.append("40 CR taken and day 4 booked: %d, %s" % [gs.credits, gs.lab_sitter])
 	if gs.book_lab_sitter(4) == "" or gs.credits != 460:
 		problems.append("A second booking was allowed or took credits again: %d" % gs.credits)
@@ -233,17 +233,17 @@ func test_the_booking_command_runs_for_the_host_and_a_guest() -> String:
 	var commands: Node = CommandsScript.new()
 	commands.state = gs
 	var problems: Array[String] = []
-	if not &"book_lab_sitter" in CommandsScript.ACTIONS or commands.problem(&"book_lab_sitter", [4]) != "":
+	if not &"book_lab_sitter" in CommandsScript.ACTIONS or commands.problem(&"book_lab_sitter", [4, 1]) != "":
 		problems.append("book_lab_sitter must be a farm command that takes the day.")
-	if commands.problem(&"book_lab_sitter", []) == "" or commands.problem(&"book_lab_sitter", ["x"]) == "":
+	if commands.problem(&"book_lab_sitter", [4]) == "" or commands.problem(&"book_lab_sitter", []) == "" or commands.problem(&"book_lab_sitter", ["x"]) == "":
 		problems.append("A booking with no day, or a word for the day, must be refused.")
 	gs.player_places[GUEST] = [ZonePresence.FARM, 0]
-	if commands.execute(GUEST, &"book_lab_sitter", [4]) == "" or not gs.lab_sitter.is_empty():
+	if commands.execute(GUEST, &"book_lab_sitter", [4, 1]) == "" or not gs.lab_sitter.is_empty():
 		problems.append("A guest away from the dome booked her.")
 	gs.player_places[GUEST] = [ZonePresence.DOME, 0]
-	if commands.execute(GUEST, &"book_lab_sitter", [4]) != "" or gs.lab_sitter.is_empty() or gs.credits != 460:
+	if commands.execute(GUEST, &"book_lab_sitter", [4, 1]) != "" or gs.lab_sitter.is_empty() or gs.credits != 460:
 		problems.append("A guest in the dome could not book her from the shared wallet: %d" % gs.credits)
-	if commands.execute(HOST, &"book_lab_sitter", [4]) == "" or gs.credits != 460:
+	if commands.execute(HOST, &"book_lab_sitter", [4, 1]) == "" or gs.credits != 460:
 		problems.append("The host booked her a second time.")
 	commands.free()
 	_done(gs)
@@ -426,12 +426,12 @@ func test_the_booking_is_saved_and_an_old_save_has_none() -> String:
 	gs.lab_sitter["watered"] = 2
 	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
 	var problems: Array[String] = []
-	if data.get("lab_sitter", {}) != { "day": 4, "watered": 2, "spools": 0 }:
+	if data.get("lab_sitter", {}) != { "day": 4, "days": 1, "paid": 40, "watered": 2, "spools": 0 }:
 		problems.append("The save did not hold the booking: %s" % [data.get("lab_sitter")])
 	var back: GameStateScript = _state()
 	var heard: Array[int] = [0]
 	back.lab_sitter_changed.connect(func() -> void: heard[0] += 1)
-	if back.farm_from_dict(data) != "" or back.lab_sitter != { "day": 4, "watered": 2, "spools": 0 }:
+	if back.farm_from_dict(data) != "" or back.lab_sitter != { "day": 4, "days": 1, "paid": 40, "watered": 2, "spools": 0 }:
 		problems.append("The booking was not loaded: %s" % [back.lab_sitter])
 	if heard[0] < 1:
 		problems.append("A load did not tell the screens.")
