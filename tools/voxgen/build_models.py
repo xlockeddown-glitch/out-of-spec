@@ -702,6 +702,11 @@ ANIMALS = {
                     "S": SHADOW},
 }
 
+# The wildlife survey's hanging field scale (Gemini on Ryan's phone, 2026-11-28): 0.1 m voxels,
+# hung from its top ring. N1 is the dial needle and T1 the calibration tag.
+HANGING_SCALE = {"M1": "#6E7681", "M2": "#484F58", "D1": "#EAE3D2", "N1": "#1D222B",
+                 "C1": "#C29B61", "C2": "#9E7B47", "T1": "#38E1C6"}
+
 
 # Ryan's Plateau Clutter pack (2026-11-22): 0.2 m voxels (like the boulders), origin at the
 # footprint center on the ground, palettes as given in his generator script (S is SHADOW; the
@@ -955,6 +960,7 @@ MODELS = [
       for n in (0, 1, 2, 3, "wilted")],
     *[((lambda n=n: prop_sheet(n, *PACK3[n])), 0.1) for n in PACK3],
     *[((lambda n=n: prop_sheet(n, ANIMALS[n], "spider")), 0.1) for n in ANIMALS],
+    (lambda: prop_sheet("field_hanging_scale", HANGING_SCALE), 0.05),  # [PLACEHOLDER] size
     *[((lambda n=n: prop_sheet(n, CLUTTER[n])), 0.2) for n in CLUTTER],
     *[((lambda n=n: prop_sheet(n, LOGISTICS[n])), 0.1) for n in LOGISTICS],
     *[((lambda n=n: prop_sheet(n, GULCH_RIM_COLORS, "rock")), 0.2) for n in GULCH_RIM],
