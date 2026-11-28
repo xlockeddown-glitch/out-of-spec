@@ -35,7 +35,6 @@ func _ids(gs: GameStateScript) -> Array:
 
 func test_board_size_is_3_4_5_at_levels_27_28_65() -> String:
 	var gs: GameStateScript = _state()
-	var saved_xp: int = gs.lab_xp
 	var base: int = int(gs._jobs_number("board_size", 3.0))
 	var problem: String = ""
 	var l4: int = gs.lab_gate_level("board_4_jobs")
@@ -47,7 +46,6 @@ func test_board_size_is_3_4_5_at_levels_27_28_65() -> String:
 		gs.refresh_job_board(3)
 		if problem == "" and (gs.job_board_size() != base + int(pair[1]) or gs.job_board.size() != base + int(pair[1])):
 			problem = "Level %d: board %d (size %d), want %d." % [pair[0], gs.job_board.size(), gs.job_board_size(), base + int(pair[1])]
-	gs.lab_xp = saved_xp
 	gs.free()
 	return problem
 
@@ -67,7 +65,7 @@ func test_the_board_is_capped_by_the_eligible_templates() -> String:
 	gs.refresh_job_board(1)
 	if full != 5:
 		problem = "Lab level 70 should fill five places, got %d." % full
-	elif gs.job_board.size() > 2 or gs.job_board.size() == 0:
+	elif gs.job_board.size() != 2:
 		problem = "Fewer eligible templates than places: the board holds %d." % gs.job_board.size()
 	gs.free()
 	return problem
@@ -130,6 +128,14 @@ func test_the_note_says_when_the_next_slot_opens() -> String:
 	_at(gs, 1)
 	if problem == "" and gs.job_board_slot_note() != "":
 		problem = "A shut board has no slot note: '%s'" % gs.job_board_slot_note()
+	# Lab level 20 with Provisional credibility: the band shuts the board.
+	_at(gs, 20)
+	gs.credibility = 0
+	if problem == "" and (gs.job_board_note() == "" or gs.job_board_slot_note() != ""):
+		problem = "A board shut by credibility has no slot note: '%s'" % gs.job_board_slot_note()
+	gs.credibility = 9999
+	if problem == "" and gs.job_board_slot_note() != "A fourth job at lab level 28.":
+		problem = "Open by band at level 20 names the 4th job: '%s'" % gs.job_board_slot_note()
 	gs.free()
 	return problem
 
@@ -154,6 +160,48 @@ func test_an_old_save_keeps_its_board_of_three() -> String:
 	return problem
 
 
+func test_an_old_save_at_level_28_grows_at_the_next_refresh() -> String:
+	var gs: GameStateScript = _state()
+	_at(gs, 40)
+	gs.refresh_job_board(2)
+	gs.job_board.resize(3)
+	var data: Dictionary = gs.farm_to_dict()
+	data.erase("lab_gates_kept")
+	var loaded: GameStateScript = _state()
+	var problem: String = ""
+	if loaded.farm_from_dict(data) != "":
+		problem = "An old save loads."
+	elif loaded.job_board.size() != 3:
+		problem = "The saved 3 offers stay 3 on load: %d." % loaded.job_board.size()
+	elif "board_5_jobs" in loaded.lab_gates_kept or "board_4_jobs" in loaded.lab_gates_kept:
+		problem = "Neither new row is kept: %s" % [loaded.lab_gates_kept]
+	else:
+		loaded.refresh_job_board(3)
+		if loaded.job_board.size() != 4:
+			problem = "Level 40 grows to 4 at the next refresh: %d." % loaded.job_board.size()
+	gs.free()
+	loaded.free()
+	return problem
+
+
+func test_the_rotation_at_size_5_is_steady_and_moves_by_day() -> String:
+	var gs: GameStateScript = _state()
+	_at(gs, 70)
+	var seen: Dictionary = {}
+	var problem: String = ""
+	for day: int in range(1, 7):
+		gs.refresh_job_board(day)
+		var first: Array = _ids(gs)
+		gs.refresh_job_board(day)
+		if _ids(gs) != first or first.size() != 5:
+			problem = "Day %d is not steady or not five: %s then %s." % [day, first, _ids(gs)]
+		seen[str(first)] = true
+	if problem == "" and seen.size() < 2:
+		problem = "The board never changes across six days."
+	gs.free()
+	return problem
+
+
 func test_the_phone_lists_five_offers_and_scrolls() -> String:
 	var hud: FieldPhoneHUD = HudScene.instantiate() as FieldPhoneHUD
 	(Engine.get_main_loop() as SceneTree).root.add_child(hud)
@@ -174,8 +222,12 @@ func test_the_phone_lists_five_offers_and_scrolls() -> String:
 		problem = "Five offers, five buttons wrapped: %d." % buttons
 	elif scroll.horizontal_scroll_mode != ScrollContainer.SCROLL_MODE_DISABLED:
 		problem = "Offers wrap, never scroll sideways."
-	elif scroll.custom_minimum_size.y > hud.scaled(hud.JOBS_MAX_HEIGHT) + 0.01:
-		problem = "The job list is taller than its box and does not scroll."
+	elif scroll.vertical_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED:
+		problem = "Five offers need the list to scroll up and down."
+	elif hud._jobs_box.get_combined_minimum_size().y <= hud.scaled(hud.JOBS_MAX_HEIGHT):
+		problem = "Five wrapped offers must be taller than the box (%f)." % hud._jobs_box.get_combined_minimum_size().y
+	elif absf(scroll.custom_minimum_size.y - hud.scaled(hud.JOBS_MAX_HEIGHT)) > 0.01:
+		problem = "The box stops at its cap, %f." % scroll.custom_minimum_size.y
 	for old: Node in hud._jobs_box.get_children():
 		hud._jobs_box.remove_child(old)
 		old.free()

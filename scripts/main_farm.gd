@@ -218,6 +218,8 @@ func _ready() -> void:
 	_hud.buy_standard_pressed.connect(_try_buy_standard)
 	_hud.accept_job_pressed.connect(_try_accept_job)
 	GameState.jobs_changed.connect(_refresh_jobs_hud)
+	# The next-slot note on the job list follows the lab level.
+	GameState.lab_xp_changed.connect(_refresh_jobs_hud)
 	# Buying or sending away a standard, or a band change, changes which
 	# offers can be accepted.
 	GameState.upgrades_changed.connect(_refresh_jobs_hud)

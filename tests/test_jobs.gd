@@ -63,6 +63,9 @@ func test_board_closed_until_trusted() -> String:
 	gs.refresh_job_board(1)
 	var size: int = gs.job_board.size()
 	var expected: int = gs.job_board_size()
+	if expected <= 0:
+		_done(gs)
+		return "The board size must be above 0."
 	_done(gs)
 	if not empty or note != "JOB BOARD opens at TRUSTED.":
 		return "A Provisional lab must see no jobs, note was '%s'." % note

@@ -7507,7 +7507,8 @@ func job_board_size() -> int:
 ## When the next slot opens, in the board note's words: "A fourth job at lab
 ## level 28." "" when the board is shut or every slot is open.
 func job_board_slot_note() -> String:
-	if jobs_open_band() == "" or not lab_gate_open("job_board"):
+	var open_band: String = jobs_open_band()
+	if open_band == "" or credibility_band_index() < _band_index_named(open_band) or not lab_gate_open("job_board"):
 		return ""
 	for i: int in BOARD_SLOT_GATES.size():
 		var row: Dictionary = DataManager.get_record(SKILLS_TABLE, StringName(BOARD_SLOT_GATES[i]), "lab_gates")
