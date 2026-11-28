@@ -690,6 +690,19 @@ PACK3 = {
 }
 
 
+# Gemini Neon's feral colony animals (art loop, 2026-11-27/28): 0.1 m voxels, origin at the
+# footprint center on the ground, palettes as given (S is SHADOW). Built and turned like the
+# field props. They roam the farm's outskirts as wild groups (docs/design/farm_animals.md).
+ANIMALS = {
+    "dome_hen": {"R1": "#9C522B", "R2": "#5E2F1A", "C1": "#EAD9B7", "K1": "#B5353B",
+                 "B1": "#C9962E", "S": SHADOW},
+    "dome_goat": {"C1": "#D8DCE0", "C2": "#AEB6BE", "D1": "#555E68", "H1": "#A69276",
+                  "M3": "#2E3844", "B1": "#D9A13B", "S": SHADOW},
+    "dome_rabbit": {"C1": "#C9A472", "C2": "#9E7B4F", "B1": "#EDE4D0", "P1": "#C78A7C",
+                    "S": SHADOW},
+}
+
+
 # Ryan's Plateau Clutter pack (2026-11-22): 0.2 m voxels (like the boulders), origin at the
 # footprint center on the ground, palettes as given in his generator script (S is SHADOW; the
 # cobbles' P1..P4 and the stump's dust P1 are the boulders' PLATEAU colors). Built and turned
@@ -941,6 +954,7 @@ MODELS = [
     *[((lambda n=n: prop_sheet(f"tuber_stage_{n}", CROP_TUBER, "crop")), 0.1)
       for n in (0, 1, 2, 3, "wilted")],
     *[((lambda n=n: prop_sheet(n, *PACK3[n])), 0.1) for n in PACK3],
+    *[((lambda n=n: prop_sheet(n, ANIMALS[n], "spider")), 0.1) for n in ANIMALS],
     *[((lambda n=n: prop_sheet(n, CLUTTER[n])), 0.2) for n in CLUTTER],
     *[((lambda n=n: prop_sheet(n, LOGISTICS[n])), 0.1) for n in LOGISTICS],
     *[((lambda n=n: prop_sheet(n, GULCH_RIM_COLORS, "rock")), 0.2) for n in GULCH_RIM],

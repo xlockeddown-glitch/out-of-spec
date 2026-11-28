@@ -1,0 +1,68 @@
+dome_rabbit - 6 x 6 x 8 (Gemini Neon, art loop 2026-11-28).
+X: left to right, Y: rear (+Y) to front (-Y), first row = highest Y.
+Palette: C1 = #C9A472, C2 = #9E7B4F, B1 = #EDE4D0, P1 = #C78A7C, S = #1D222B
+
+
+Z = 0 (ground layer — tucked front paws, hind feet, grounded underbelly shadow)
+Y=05  .. .. .. .. .. ..
+Y=04  .. C2 C2 C2 C2 ..
+Y=03  .. B1 S  S  B1 ..
+Y=02  .. .. S  S  .. ..
+Y=01  .. B1 S  S  B1 ..
+Y=00  .. .. .. .. .. ..
+
+Z = 1 (lower round body — pale chest & belly flanks, plump sandy haunches, tail base)
+Y=05  .. .. B1 B1 .. ..
+Y=04  C2 C1 C1 C1 C1 C2
+Y=03  C2 C1 B1 B1 C1 C2
+Y=02  .. B1 B1 B1 B1 ..
+Y=01  .. C1 B1 B1 C1 ..
+Y=00  .. .. .. .. .. ..
+
+Z = 2 (mid round body, cotton tail top, lower head cheeks & protruding nose)
+Y=05  .. .. B1 B1 .. ..
+Y=04  .. C1 C1 C1 C1 ..
+Y=03  C1 C1 C1 C1 C1 C1
+Y=02  .. C1 C1 C1 C1 ..
+Y=01  .. C1 C1 C1 C1 ..
+Y=00  .. .. P1 P1 .. ..
+
+Z = 3 (arched upper back & head face with dark eyes)
+Y=05  .. .. .. .. .. ..
+Y=04  .. .. C2 C2 .. ..
+Y=03  .. C1 C1 C1 C1 ..
+Y=02  .. C2 C1 C1 C2 ..
+Y=01  .. S  C1 C1 S  ..
+Y=00  .. .. .. .. .. ..
+
+Z = 4 (rounded head crown & ear root base)
+Y=05  .. .. .. .. .. ..
+Y=04  .. .. .. .. .. ..
+Y=03  .. .. .. .. .. ..
+Y=02  .. C1 C1 C1 C1 ..
+Y=01  .. .. C1 C1 .. ..
+Y=00  .. .. .. .. .. ..
+
+Z = 5 (lower long ears — 2 voxels deep, 2-voxel gap between ears)
+Y=05  .. .. .. .. .. ..
+Y=04  .. .. .. .. .. ..
+Y=03  .. C1 .. .. C1 ..
+Y=02  .. P1 .. .. P1 ..
+Y=01  .. .. .. .. .. ..
+Y=00  .. .. .. .. .. ..
+
+Z = 6 (mid long ears — tall alert silhouette)
+Y=05  .. .. .. .. .. ..
+Y=04  .. .. .. .. .. ..
+Y=03  .. C1 .. .. C1 ..
+Y=02  .. P1 .. .. P1 ..
+Y=01  .. .. .. .. .. ..
+Y=00  .. .. .. .. .. ..
+
+Z = 7 (ear tips — gently swept back with shaded sandy tips)
+Y=05  .. .. .. .. .. ..
+Y=04  .. C2 .. .. C2 ..
+Y=03  .. C1 .. .. C1 ..
+Y=02  .. .. .. .. .. ..
+Y=01  .. .. .. .. .. ..
+Y=00  .. .. .. .. .. ..

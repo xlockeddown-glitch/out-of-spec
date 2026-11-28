@@ -1,0 +1,52 @@
+dome_hen - 5 x 6 x 6 (Gemini Neon, art loop 2026-11-27/28).
+X: left to right, Y: rear (+Y) to front (-Y), first row = highest Y.
+Palette: R1 = #9C522B, R2 = #5E2F1A, C1 = #EAD9B7, K1 = #B5353B, B1 = #C9962E, S = #1D222B
+
+
+Z = 0 (ground layer — two short ochre feet with toes forward toward -Y)
+Y=05  .. .. .. .. ..
+Y=04  .. .. .. .. ..
+Y=03  .. B1 .. B1 ..
+Y=02  .. B1 .. B1 ..
+Y=01  .. .. .. .. ..
+Y=00  .. .. .. .. ..
+
+Z = 1 (short leg shanks lifting the body off the dome floor)
+Y=05  .. .. .. .. ..
+Y=04  .. .. .. .. ..
+Y=03  .. B1 .. B1 ..
+Y=02  .. .. .. .. ..
+Y=01  .. .. .. .. ..
+Y=00  .. .. .. .. ..
+
+Z = 2 (lower chunky body — plump cream breast, rust rump, dark folded wing bottoms)
+Y=05  .. .. .. .. ..
+Y=04  .. R1 R1 R1 ..
+Y=03  R2 R1 R1 R1 R2
+Y=02  R2 C1 C1 C1 R2
+Y=01  .. C1 C1 C1 ..
+Y=00  .. .. .. .. ..
+
+Z = 3 (upper chunky body — cream collar, wing-bar shoulders, rust back, tail base)
+Y=05  .. R2 R2 R2 ..
+Y=04  .. R1 R1 R1 ..
+Y=03  R2 R1 R1 R1 R2
+Y=02  C1 R1 R1 R1 C1
+Y=01  .. C1 C1 C1 ..
+Y=00  .. .. .. .. ..
+
+Z = 4 (head with eyes, protruding beak at Y=0, U-shaped saddle dip, upturned tail fan)
+Y=05  .. R2 C1 R2 ..
+Y=04  .. .. .. .. ..
+Y=03  .. .. .. .. ..
+Y=02  .. R1 R1 R1 ..
+Y=01  .. S  R1 S  ..
+Y=00  .. .. B1 .. ..
+
+Z = 5 (top layer — small muted crimson comb centered on head)
+Y=05  .. .. .. .. ..
+Y=04  .. .. .. .. ..
+Y=03  .. .. .. .. ..
+Y=02  .. .. K1 .. ..
+Y=01  .. .. K1 .. ..
+Y=00  .. .. .. .. ..
