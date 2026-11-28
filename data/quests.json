@@ -32,6 +32,23 @@
       "rewards": { "lab_xp": 400, "phone": "npcs/oirm/quests/first_contract_done" }
     },
     {
+      "id": "second_contract",
+      "kind": "lab",
+      "giver": "oirm",
+      "title": "The Second Contract",
+      "scope": "farm",
+      "gates": { "lab_gate": "second_contract" },
+      "offer": { "when": "state_is", "state": "contract_state", "is": ["complete", "fulfilled"] },
+      "offer_line": "npcs/oirm/quests/second_contract_offer",
+      "steps": [
+        { "id": "calibrations", "text": "Complete 8 traceable, on-time calibrations by your own hand (a unit counts again once half its interval has passed).",
+          "check": "count", "log": "cal_log",
+          "where": { "traceable": true, "on_time": true, "interval_evidence": true, "not_performed_by": "Manager", "programmed_by": "" },
+          "at_least": 8 }
+      ],
+      "rewards": { "credits": 400, "lab_xp": 900, "phone": "npcs/oirm/quests/second_contract_done" }
+    },
+    {
       "id": "first_water", "kind": "story", "giver": "lin", "title": "First Water", "scope": "farm", "board": "farm",
       "gates": {},
       "offer": { "when": "day_at_most", "day": 2, "unless_taken": "thirsty_probe" },
