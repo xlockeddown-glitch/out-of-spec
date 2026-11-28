@@ -4808,9 +4808,10 @@ func _set_place(player_id: String, place: String, depth: int) -> void:
 
 
 ## Host: a player's cold stamp follows where they are. Coming into the caves stamps now (and
-## replaces any stale stamp), unless they left within the grace: then their old stamp comes
-## back. Anywhere else has no stamp; leaving keeps it aside for the grace. Tells the guests
-## when it changed.
+## replaces any stale stamp), unless they left within the grace: then the cold picks up where
+## it was when they left (it pauses outside; Ryan, 2026-11-27), so the stamp moves on by the
+## time they were away. Anywhere else has no stamp; leaving keeps it aside for the grace.
+## Tells the guests when it changed.
 func _track_cold(player_id: String, was_in_caves: bool) -> void:
 	if FarmCommands.guest:
 		return
@@ -4820,7 +4821,7 @@ func _track_cold(player_id: String, was_in_caves: bool) -> void:
 		var kept: Variant = _cold_kept.get(player_id)
 		_cold_kept.erase(player_id)
 		var back: bool = kept is Array and IceDepth.within_grace(float(kept[1]), now)
-		cold_since[player_id] = float(kept[0]) if back else now
+		cold_since[player_id] = now - (float(kept[1]) - float(kept[0])) if back else now
 		ice_changed.emit()
 	elif not in_caves and cold_since.has(player_id):
 		_cold_kept[player_id] = [float(cold_since[player_id]), now]
