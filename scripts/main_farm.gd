@@ -218,6 +218,8 @@ func _ready() -> void:
 	_hud.buy_standard_pressed.connect(_try_buy_standard)
 	_hud.accept_job_pressed.connect(_try_accept_job)
 	GameState.jobs_changed.connect(_refresh_jobs_hud)
+	# The next-slot note on the job list follows the lab level.
+	GameState.lab_xp_changed.connect(_refresh_jobs_hud)
 	# Buying or sending away a standard, or a band change, changes which
 	# offers can be accepted.
 	GameState.upgrades_changed.connect(_refresh_jobs_hud)
@@ -940,7 +942,7 @@ func _refresh_jobs_hud() -> void:
 		var problem: String = GameState.job_accept_problem(job)
 		offers.append({ "text": GameState.job_offer_text(job) + (" (%s)" % problem if problem != "" else ""),
 			"disabled": problem != "", "tooltip": problem })
-	_hud.show_jobs(active, offers, GameState.job_board_note())
+	_hud.show_jobs(active, offers, GameState.job_board_note(), GameState.job_board_slot_note())
 
 
 func _try_accept_job(index: int) -> void:
