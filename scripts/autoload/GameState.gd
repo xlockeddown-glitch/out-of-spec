@@ -254,7 +254,8 @@ var mine_props: int = 0
 ## The Mine's rooms shored today: zone id -> { "day": int, "ids": [rockfall ids] }, like pools_drained.
 var rooms_shored: Dictionary = {}
 ## The Ice Caves' cold, per player: player id -> the GameClock.elapsed_days stamp the cold counts from
-## (when they came in, or last bought a heater). Host-run, saved, synced; IceDepth.cold reads it.
+## (when they came in, or last bought a heater; shifted on a return within the grace so the cold
+## resumes where it paused). Host-run, saved, synced; IceDepth.cold reads it.
 var cold_since: Dictionary = {}
 ## Host only, not saved or synced: the cold of players who left the caves, kept for the grace
 ## (IceDepth.COLD_GRACE_HOURS): player id -> [their cold_since stamp, the elapsed_days they left].
@@ -4821,7 +4822,7 @@ func _track_cold(player_id: String, was_in_caves: bool) -> void:
 		var kept: Variant = _cold_kept.get(player_id)
 		_cold_kept.erase(player_id)
 		var back: bool = kept is Array and IceDepth.within_grace(float(kept[1]), now)
-		cold_since[player_id] = now - (float(kept[1]) - float(kept[0])) if back else now
+		cold_since[player_id] = now - maxf(float(kept[1]) - float(kept[0]), 0.0) if back else now
 		ice_changed.emit()
 	elif not in_caves and cold_since.has(player_id):
 		_cold_kept[player_id] = [float(cold_since[player_id]), now]
@@ -5534,7 +5535,7 @@ func rescue_from_tunnels(player_id: String = "") -> Dictionary:
 	var leaving: String = player_id if player_id != "" else local_player_id
 	if player_places.has(leaving) or rover_zone != "":
 		_set_place(leaving, ZonePresence.FARM, 0)  # carried out, to bed
-		_cold_kept.erase(leaving)  # a rescue ends the cold: no grace
+	_cold_kept.erase(leaving)  # a rescue ends the cold: no grace
 	var ore: int = 0 if _console_arrivals.has(leaving) else ore_carried_in()
 	_console_arrivals.erase(leaving)
 	_trip_players.erase(leaving)  # carried out: off the trip
