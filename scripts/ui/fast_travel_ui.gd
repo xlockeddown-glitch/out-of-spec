@@ -17,6 +17,9 @@ var _status: Label
 ## The lab sitter's line and button (zones section 9, build step 11).
 var _sitter_label: Label
 var _sitter_button: Button
+## How many days in a row to book, and the host-run cancel of the days not yet started.
+var _sitter_days: OptionButton
+var _cancel_button: Button
 var _close_button: Button
 var _focus_before: Control
 ## The zone whose warning was shown, so the next press on it goes.
@@ -54,6 +57,14 @@ func _ready() -> void:
 	_sitter_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_sitter_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	sitter.add_child(_sitter_label)
+	_sitter_days = OptionButton.new()
+	for count: int in range(1, LabSitter.max_days() + 1):
+		_sitter_days.add_item(SP811.integer(count))
+	_sitter_days.item_selected.connect(func(_index: int) -> void: _refresh_sitter())
+	sitter.add_child(_sitter_days)
+	_cancel_button = PlanBoardUI._button(LabSitter.text("cancel"))
+	_cancel_button.pressed.connect(_on_cancel_sitter)
+	sitter.add_child(_cancel_button)
 	_sitter_button = PlanBoardUI._button(LabSitter.text("book"))
 	_sitter_button.pressed.connect(_on_book_sitter)
 	sitter.add_child(_sitter_button)
@@ -202,20 +213,34 @@ func _sitter_day() -> int:
 	return LabSitter.booked_day(GameClock.get_day_index())
 
 
-## What the sitter's line says: she is booked for a day, or what a day of her
-## costs (nothing, if the farm holds the free day).
+## How many days the picker is set to.
+func _picked_days() -> int:
+	return _sitter_days.selected + 1 if is_instance_valid(_sitter_days) and _sitter_days.selected >= 0 else 1
+
+
+## What the sitter's line says: the days she is booked and the total, or what the
+## picked days of her cost (nothing, if the farm holds the free day and one day is picked).
 func _refresh_sitter() -> void:
 	if not is_instance_valid(_sitter_label):
 		return
-	var booked: bool = LabSitter.is_booked(GameState.lab_sitter)
+	var booking: Dictionary = GameState.lab_sitter
+	var booked: bool = LabSitter.is_booked(booking)
 	if booked:
-		_sitter_label.text = LabSitter.text("row_booked") % [LabSitter.sitter_name(), SP811.integer(int(GameState.lab_sitter["day"]))]
+		var paid: int = LabSitter.paid_each(booking) * LabSitter.day_count(booking)
+		_sitter_label.text = LabSitter.text("row_booked") % [LabSitter.sitter_name(), LabSitter.days_text(booking),
+			LabSitter.text("total_text") % SP811.integer(paid) if paid > 0 else LabSitter.text("free_text")]
+		if LabSitter.future_days(booking, GameClock.get_day_index()) > 0:
+			_sitter_label.text += " " + LabSitter.text("cancel_hint")
 	else:
-		var free: bool = GameState.one_use_count(GameState.ONE_USE_SITTER, GameState.local_player_id) > 0
-		var price: String = LabSitter.text("free_text") if free else LabSitter.text("fee_text") % SP811.integer(LabSitter.fee())
-		_sitter_label.text = LabSitter.text("offer_text") % [LabSitter.sitter_name(), SP811.integer(_sitter_day()), price]
+		var days: int = _picked_days()
+		var free: bool = days == 1 and GameState.one_use_count(GameState.ONE_USE_SITTER, GameState.local_player_id) > 0
+		var price: String = LabSitter.text("free_text") if free else LabSitter.text("total_text") % SP811.integer(LabSitter.total_fee(days))
+		var first: Dictionary = LabSitter.new_booking(_sitter_day(), days)
+		_sitter_label.text = LabSitter.text("offer_text") % [LabSitter.sitter_name(), LabSitter.days_text(first), price]
 	_sitter_button.disabled = booked or _booking or _going
-	if _sitter_button.disabled and _sitter_button.has_focus():
+	_sitter_days.disabled = booked or _booking or _going
+	_cancel_button.disabled = not booked or _booking or _going or LabSitter.future_days(booking, GameClock.get_day_index()) <= 0
+	if (_sitter_button.disabled and _sitter_button.has_focus()) or (_cancel_button.disabled and _cancel_button.has_focus()):
 		_close_button.grab_focus()
 
 
@@ -225,7 +250,22 @@ func _on_book_sitter() -> void:
 		return
 	_booking = true
 	_refresh_sitter()
-	var problem: String = await FarmCommands.request(&"book_lab_sitter", [_sitter_day()])
+	var problem: String = await FarmCommands.request(&"book_lab_sitter", [_sitter_day(), _picked_days()])
+	_booking = false
+	if not is_inside_tree():
+		return
+	_warned = ""
+	_status.text = problem
+	_refresh_sitter()
+
+
+## The host cancels the days not yet started; a refusal is shown as it came.
+func _on_cancel_sitter() -> void:
+	if _booking or _going:
+		return
+	_booking = true
+	_refresh_sitter()
+	var problem: String = await FarmCommands.request(&"cancel_lab_sitter", [])
 	_booking = false
 	if not is_inside_tree():
 		return

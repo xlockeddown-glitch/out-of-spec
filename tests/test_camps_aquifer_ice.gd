@@ -371,7 +371,7 @@ func test_the_new_camps_save_and_an_old_save_loads() -> String:
 
 
 func test_the_protocol_is_unchanged_by_the_new_camps() -> String:
-	return "" if CoopSession.PROTOCOL == 45 else "No command or synced field is new: the protocol stays 45, not %d" % CoopSession.PROTOCOL
+	return "" if CoopSession.PROTOCOL == 47 else "No command or synced field is new: the protocol stays 47, not %d" % CoopSession.PROTOCOL
 
 
 # --- The counters and a whole run -------------------------------------------------------

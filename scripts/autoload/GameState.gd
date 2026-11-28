@@ -3896,33 +3896,63 @@ func _grow_pockets(day: int) -> void:
 		pockets_changed.emit()
 
 
-## Books the lab sitter for `for_day`, which must be the next day as the screen
-## showed it (so a booking that crosses the 06:00 rollover is refused, not moved a
-## day). Returns "" when booked, else why not. She is booked from the console in
-## the dome, one day at a time, and costs LabSitter.fee() CR from the shared
-## wallet, or one lab_sitter reward.
-func book_lab_sitter(for_day: int, player_id: String = "") -> String:
+## Books the lab sitter for `days` days in a row (1 to LabSitter.max_days()),
+## starting `for_day`, which must be the next day as the screen showed it (so a
+## booking that crosses the 06:00 rollover is refused, not moved a day). Returns
+## "" when booked, else why not. She is booked from the console in the dome and
+## costs LabSitter.fee() CR a day from the shared wallet, all taken now, or one
+## lab_sitter reward for one free day. Already booked, even for one day: cancel first.
+func book_lab_sitter(for_day: int, days: int = 1, player_id: String = "") -> String:
 	if place_of(_player(player_id)) != ZonePresence.DOME:
 		return LabSitter.text("console_in_dome")
 	var day: int = LabSitter.booked_day(GameClock.get_day_index())
 	if for_day != day:
 		return LabSitter.text("new_day")
+	if days < 1 or days > LabSitter.max_days():
+		return LabSitter.text("bad_days") % SP811.integer(LabSitter.max_days())
 	if LabSitter.is_booked(lab_sitter):
 		return LabSitter.text("already")
 	var fee: int = LabSitter.fee()
-	var free: bool = fee > 0 and one_use_count(ONE_USE_SITTER) > 0
-	if not free and credits < fee:
-		return LabSitter.text("short") % [SP811.integer(fee), SP811.integer(credits)]
+	# The reward is one free day: it never stretches over a longer booking.
+	var free: bool = fee > 0 and days == 1 and one_use_count(ONE_USE_SITTER) > 0
+	var total: int = LabSitter.total_fee(days)
+	if not free and credits < total:
+		return LabSitter.text("short") % [SP811.integer(total), SP811.integer(credits)]
 	# Booked before the money moves, so a screen that hears the charge sees her.
-	lab_sitter = LabSitter.new_booking(day)
+	lab_sitter = LabSitter.new_booking(day, days, 0 if free else fee)
 	if free:
 		_spend_one_use(ONE_USE_SITTER)
 		post_phone(QuestEngine.one_use_used_line(ONE_USE_SITTER))
 	else:
-		add_credits(-fee)
+		add_credits(-total)
 	lab_sitter_changed.emit()
-	post_phone(LabSitter.text("booked_text") % [LabSitter.sitter_name(), SP811.integer(day),
-		LabSitter.text("free_text") if free else LabSitter.text("fee_text") % SP811.integer(fee)])
+	post_phone(LabSitter.text("booked_text") % [LabSitter.sitter_name(), LabSitter.days_text(lab_sitter),
+		LabSitter.text("free_text") if free else LabSitter.text("total_text") % SP811.integer(total),
+		LabSitter.days_text(lab_sitter)])
+	return ""
+
+
+## Cancels the sitter's days that have not started (a day starts at its 06:00),
+## from the console in the dome. Each cancelled day's fee goes back to the shared
+## wallet in full [PLACEHOLDER]; a day already worked is never refunded and a free
+## reward day is never refunded as credits. Returns "" when done, else why not.
+func cancel_lab_sitter(player_id: String = "") -> String:
+	if place_of(_player(player_id)) != ZonePresence.DOME:
+		return LabSitter.text("console_in_dome")
+	if not LabSitter.is_booked(lab_sitter):
+		return LabSitter.text("cancel_nothing")
+	var today: int = GameClock.get_day_index()
+	var cancelled: int = LabSitter.future_days(lab_sitter, today)
+	if cancelled <= 0:
+		return LabSitter.text("cancel_started")
+	var refund: int = LabSitter.paid_each(lab_sitter) * cancelled
+	var gone: Dictionary = lab_sitter.duplicate()
+	lab_sitter = LabSitter.after_cancel(lab_sitter, today)
+	if refund > 0:
+		add_credits(refund)
+	lab_sitter_changed.emit()
+	post_phone(LabSitter.text("cancel_text") % [LabSitter.days_text(gone),
+		LabSitter.text("refund_text") % SP811.integer(refund) if refund > 0 else LabSitter.text("no_refund_text")])
 	return ""
 
 
@@ -4218,14 +4248,14 @@ func standing_at(player_id: String) -> Variant:
 
 ## 06:00 of her day: she does the morning's work, after the robots' cards.
 func _open_lab_sitter(day: int) -> void:
-	if LabSitter.is_booked(lab_sitter) and int(lab_sitter["day"]) == day:
+	if LabSitter.works_on(lab_sitter, day):
 		_sitter_tend()
 
 
 ## 06:00 after her day: the last of the work (anything that came up during the
 ## day), then the Dispatch line, and she is done. Run after the robots' cards.
 func _close_lab_sitter(day: int) -> void:
-	if not LabSitter.is_booked(lab_sitter) or day <= int(lab_sitter["day"]):
+	if not LabSitter.is_booked(lab_sitter) or day <= LabSitter.last_day(lab_sitter):
 		return
 	_sitter_tend()
 	post_phone(LabSitter.report_text(lab_sitter))

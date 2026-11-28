@@ -589,7 +589,7 @@ func test_book_expedition_is_a_host_run_command_a_moon_traveller_cannot_use() ->
 
 
 func test_the_protocol_is_45_for_the_new_command_and_row() -> String:
-	return "" if CoopSession.PROTOCOL == 45 else "PROTOCOL is %d, not 45." % CoopSession.PROTOCOL
+	return "" if CoopSession.PROTOCOL == 47 else "PROTOCOL is %d, not 47." % CoopSession.PROTOCOL
 
 
 func test_an_expedition_and_the_open_camp_are_saved_and_an_old_save_loads() -> String:
