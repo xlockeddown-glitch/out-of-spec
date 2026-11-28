@@ -56,8 +56,8 @@ func _own_standard(gs: GameStateScript, id: String) -> void:
 
 func test_gates_read_built_and_protocol_is_51() -> String:
 	var problem: String = ""
-	if CoopSession.PROTOCOL != 51:
-		return "Expected CoopSession.PROTOCOL == 51, got %d." % CoopSession.PROTOCOL
+	if CoopSession.PROTOCOL != 53:
+		return "Expected CoopSession.PROTOCOL == 53, got %d." % CoopSession.PROTOCOL
 	for pair: Array in [[&"robot_paint", 85], [&"halfway_plaque", 92], [&"gold_border", 99]]:
 		var row: Dictionary = DataManager.get_record(&"skills", pair[0], "lab_gates")
 		if row.is_empty() or not bool(row.get("built", false)) or int(row.get("level", 0)) != int(pair[1]):

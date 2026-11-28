@@ -480,6 +480,17 @@
           "check": "counter", "counter": "valles_new_band", "at_least": 3 }
       ],
       "rewards": { "lab_xp": 400, "phone": "npcs/vance/quests/layer_by_layer_done" }
+    },
+    {
+      "id": "three_veins", "kind": "lab", "giver": "bram", "title": "Three Veins", "scope": "farm", "zone": "olympus_caves",
+      "gates": { "lab_level": 55 },
+      "offer": { "when": "counter", "counter": "reached_olympus_caves", "at_least": 1 },
+      "offer_line": "npcs/bram/quests/three_veins_offer",
+      "steps": [
+        { "id": "veins", "text": "Bring back mineral vein samples from three different kinds of vein in the Olympus Mons tube.",
+          "check": "counter", "counter": "olympus_new_vein", "at_least": 3 }
+      ],
+      "rewards": { "lab_xp": 450, "phone": "npcs/bram/quests/three_veins_done" }
     }
   ],
   "keepsakes": [

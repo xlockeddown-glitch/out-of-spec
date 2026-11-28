@@ -216,7 +216,9 @@
         "old_props_offer": "[PLACEHOLDER] Those first-drift timbers have been holding on habit since the founding crew left. Buy props at the hub crate and shore two rockfalls down there. Do that and I will square Dana Pike for a day in your lab.",
         "old_props_done": "[PLACEHOLDER] Two rooms wedged tight. That roof will outlast the both of us now. Dana Pike has a day on my tab whenever you book her at the console.",
         "colonists_set_offer": "[PLACEHOLDER] The first machinists left latched block cases in the side rooms when they pulled out. Most are behind fallen rock. Open three of those cases yourself, Doc, and keep whatever blocks your set is still short.",
-        "colonists_set_done": "[PLACEHOLDER] Three cases pried open, and good steel back on a bench instead of under rubble. Keep the empty cedar box. The latch still works."
+        "colonists_set_done": "[PLACEHOLDER] Three cases pried open, and good steel back on a bench instead of under rubble. Keep the empty cedar box. The latch still works.",
+        "three_veins_offer": "[PLACEHOLDER] Olympus is one long tube under a hole in the roof, and the veins in its walls are worth a look. Bring me samples from three different kinds of vein. Watch your suit: the tube is hot, and away from the skylight it all looks the same. Leave a marker so the phone can point you home.",
+        "three_veins_done": "[PLACEHOLDER] Three kinds of vein, three clean samples. Good rock. Here is the lab credit."
       }
     },
     "lin": {
