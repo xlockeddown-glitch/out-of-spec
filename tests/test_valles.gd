@@ -33,6 +33,15 @@ func _inside(gs: GameStateScript) -> String:
 	return gs.move_rover_valles(true, HOST)
 
 
+## Opens Layer by Layer for the farm: the players have reached the canyon and the lab is level 50.
+func _open_quest(gs: GameStateScript, who: Array[String]) -> void:
+	gs.lab_xp = gs.xp_for_level(50)
+	for id: String in who:
+		var counts: Dictionary = gs.action_counts.get_or_add(id, {}) as Dictionary
+		counts["reached_valles_marineris"] = { "count": 1, "xp": 0 }
+	QuestEngine.update(gs, who)
+
+
 ## The host's rover on depth 1 at a find of `data`, the host there.
 func _at_find(gs: GameStateScript, data: Dictionary, find: Dictionary) -> void:
 	gs.rover_depth = 1
@@ -229,8 +238,11 @@ func test_thin_air_drains_faster_than_the_base_rate_and_runs_out() -> String:
 			problems.append("Air is used on a farm with nobody in the canyon.")
 		if _inside(gs) != "":
 			return "The rover did not go in."
-		var start: float = GameClock.elapsed_days  # the first drive moved the clock
-		gs.cold_since[HOST] = start
+		if not gs.cold_since.has(HOST):
+			return "Driving in did not stamp the air."
+		var start: float = float(gs.cold_since[HOST])  # stamped on entry, after the first drive moved the clock
+		if not is_equal_approx(start, GameClock.elapsed_days):
+			problems.append("The entry stamp is not the time of arrival.")
 		GameClock.elapsed_days = start + 2.0 * HOUR
 		var two: float = gs.cold_of(HOST)
 		if not is_equal_approx(two, 2.0 * VallesDepth.AIR_PER_HOUR_BASE * VallesDepth.THIN_AIR_MULT):
@@ -246,11 +258,63 @@ func test_thin_air_drains_faster_than_the_base_rate_and_runs_out() -> String:
 		var data: Dictionary = VallesDepth.layout(SEED, 1, GameClock.get_day_index())
 		var find: Dictionary = (data["finds"] as Array)[0]
 		_at_find(gs, data, find)
-		gs.cold_since[HOST] = GameClock.elapsed_days - 40.0 * HOUR
 		if gs.take_find(str(find["id"]), GameClock.get_day_index(), HOST) != VallesDepth.air_out_reply():
 			problems.append("A find was taken with the suit out of air.")
 		gs.free()
 		return "")
+	return run if run != "" else "\n".join(problems)
+
+
+func test_thin_air_grace_is_the_zones_own_and_never_carries_between_zones() -> String:
+	var problems: Array[String] = []
+	var held_guest: bool = FarmCommands.guest
+	FarmCommands.guest = false
+	var rate: float = VallesDepth.AIR_PER_HOUR_BASE * VallesDepth.THIN_AIR_MULT
+	var run: String = _at(3.0, func() -> String:
+		var gs: GameStateScript = _state()
+		if _inside(gs) != "":
+			return "The rover did not go in."
+		var start: float = float(gs.cold_since[HOST])
+		# Out for half an hour: the air picks up where it was.
+		GameClock.elapsed_days = start + 3.0 * HOUR
+		gs._set_place(HOST, ZonePresence.FARM, 0)
+		if gs.cold_since.has(HOST):
+			problems.append("The air stamp stayed outside the canyon.")
+		GameClock.elapsed_days = start + 3.5 * HOUR
+		gs._set_place(HOST, ZONE, 0)
+		if not is_equal_approx(gs.cold_of(HOST), 3.0 * rate):
+			problems.append("A return within the grace did not keep the 3 h of air: %f." % gs.cold_of(HOST))
+		# Out past the grace: a fresh suit.
+		GameClock.elapsed_days = start + 5.0 * HOUR
+		gs._set_place(HOST, ZonePresence.FARM, 0)
+		GameClock.elapsed_days = start + 7.0 * HOUR
+		gs._set_place(HOST, ZONE, 0)
+		if gs.cold_of(HOST) != 0.0:
+			problems.append("A return after the grace kept the air.")
+		# Ice, then the canyon within the grace of leaving Ice: nothing carries over.
+		GameClock.elapsed_days = start + 9.0 * HOUR
+		gs._set_place(HOST, IceDepth.ZONE, 0)
+		GameClock.elapsed_days = start + 11.0 * HOUR
+		gs._set_place(HOST, ZonePresence.FARM, 0)
+		GameClock.elapsed_days = start + 11.5 * HOUR
+		gs._set_place(HOST, ZONE, 0)
+		if gs.cold_of(HOST) != 0.0:
+			problems.append("Time in the Ice Caves carried into the canyon: %f." % gs.cold_of(HOST))
+		# And the other way round.
+		GameClock.elapsed_days = start + 13.5 * HOUR
+		gs._set_place(HOST, ZonePresence.FARM, 0)
+		GameClock.elapsed_days = start + 14.0 * HOUR
+		gs._set_place(HOST, IceDepth.ZONE, 0)
+		if gs.cold_of(HOST) != 0.0:
+			problems.append("Time in the canyon carried into the Ice Caves: %f." % gs.cold_of(HOST))
+		# Straight from one to the other (no farm between): a new stamp.
+		GameClock.elapsed_days = start + 16.0 * HOUR
+		gs._set_place(HOST, ZONE, 0)
+		if gs.cold_of(HOST) != 0.0:
+			problems.append("A direct move between zones kept the stamp.")
+		gs.free()
+		return "")
+	FarmCommands.guest = held_guest
 	return run if run != "" else "\n".join(problems)
 
 
@@ -280,6 +344,43 @@ func test_the_first_drive_costs_time_and_a_later_one_and_fast_travel_do_not() ->
 			problems.append("A later drive cost time.")
 		if VallesDepth.drive_hours(true) != 0.0 or VallesDepth.drive_hours(false) <= 0.0:
 			problems.append("drive_hours is not the first-trip cost.")
+		# Fast travel from the dome is free.
+		gs.rover_zone = ""
+		gs.rover_lent = false
+		gs.player_places[HOST] = [ZonePresence.DOME, 0]
+		var travel_at: float = GameClock.elapsed_days
+		var travelled: String = gs.fast_travel(ZONE, HOST)
+		if travelled != "":
+			problems.append("Fast travel was refused: %s" % travelled)
+		if GameClock.elapsed_days != travel_at:
+			problems.append("Fast travel cost time.")
+		gs.free()
+		return "")
+	FarmCommands.guest = held_guest
+	return run if run != "" else "\n".join(problems)
+
+
+func test_a_first_drive_that_would_end_after_the_closing_hour_is_refused() -> String:
+	var problems: Array[String] = []
+	var held_guest: bool = FarmCommands.guest
+	FarmCommands.guest = false
+	var one_before_close: float = TunnelRecall.at_hour(4, 2.0) - HOUR
+	var run: String = _at(one_before_close, func() -> String:
+		var gs: GameStateScript = _state()
+		var before: float = GameClock.elapsed_days
+		var refused: String = _inside(gs)
+		if refused != VallesDepth.drive_too_late_text():
+			problems.append("A first drive an hour before closing was not refused: %s" % refused)
+		if GameClock.elapsed_days != before or gs.zones_unlocked.has(ZONE) or gs.rover_lent:
+			problems.append("The refused drive still moved the clock, the unlock or the rover.")
+		# Closed outright: the existing closing message, for a drive and for fast travel.
+		GameClock.elapsed_days = TunnelRecall.at_hour(4, 2.0) + HOUR
+		if _inside(gs) != TunnelRecall.text("closed_text"):
+			problems.append("The mouth was open after the closing hour.")
+		gs.zones_unlocked.append(ZONE)
+		gs.player_places[HOST] = [ZonePresence.DOME, 0]
+		if gs.fast_travel(ZONE, HOST) != TunnelRecall.text("closed_text"):
+			problems.append("Fast travel was open after the closing hour.")
 		gs.free()
 		return "")
 	FarmCommands.guest = held_guest
@@ -297,9 +398,9 @@ func test_layer_by_layer_counts_only_new_bands_completes_at_three_and_pays_once(
 	if quest.is_empty() or QuestEngine.data_problem(quest) != "":
 		return "Layer by Layer is missing or has a data problem."
 	var gs: GameStateScript = _state()
-	gs.lab_xp = gs.xp_for_level(50)
-	gs.action_counts[HOST] = { "reached_valles_marineris": { "count": 1, "xp": 0 } }
-	QuestEngine.update(gs, [HOST] as Array[String])
+	_open_quest(gs, [HOST] as Array[String])
+	if not gs.quest_state.has("layer_by_layer"):
+		problems.append("The quest did not open.")
 	var fresh: Callable = func() -> int:
 		return int(((gs.action_counts[HOST] as Dictionary).get(VallesDepth.NEW_BAND, { "count": 0 }) as Dictionary)["count"])
 	gs._note_valles_band(HOST, 2)
@@ -323,6 +424,53 @@ func test_layer_by_layer_counts_only_new_bands_completes_at_three_and_pays_once(
 	return "\n".join(problems)
 
 
+func test_layer_by_layer_counts_distinct_bands_across_all_players() -> String:
+	var problems: Array[String] = []
+	var both: Array[String] = [HOST, GUEST]
+	var gs: GameStateScript = _state()
+	_open_quest(gs, both)
+	gs._note_valles_band(HOST, 2)
+	gs._note_valles_band(GUEST, 2)  # the same band, by someone else: not new
+	gs._note_valles_band(GUEST, 2)
+	QuestEngine.update(gs, both)
+	if QuestEngine.is_done(gs, "layer_by_layer"):
+		problems.append("Two players coring one band completed the quest.")
+	gs._note_valles_band(GUEST, 4)
+	QuestEngine.update(gs, both)
+	if QuestEngine.is_done(gs, "layer_by_layer"):
+		problems.append("Two distinct bands completed the quest.")
+	gs._note_valles_band(HOST, 0)
+	QuestEngine.update(gs, both)
+	if not QuestEngine.is_done(gs, "layer_by_layer"):
+		problems.append("Three distinct bands between two players did not complete the quest.")
+	gs.free()
+	return "\n".join(problems)
+
+
+func test_cores_taken_before_the_quest_opens_do_not_count_or_block() -> String:
+	var problems: Array[String] = []
+	var who: Array[String] = [HOST]
+	var gs: GameStateScript = _state()
+	gs._note_valles_band(HOST, 2)  # before the quest: leaves no mark
+	gs._note_valles_band(HOST, 2)
+	gs._note_valles_band(HOST, 0)
+	if (gs.action_counts.get(HOST, {}) as Dictionary).has(VallesDepth.NEW_BAND):
+		problems.append("Cores before the quest opened were counted.")
+	_open_quest(gs, who)
+	gs._note_valles_band(HOST, 2)  # the same band as before: it still counts, once
+	gs._note_valles_band(HOST, 2)
+	QuestEngine.update(gs, who)
+	if QuestEngine.is_done(gs, "layer_by_layer"):
+		problems.append("Early cores shifted the count: bands 2, 2, 0 completed the quest.")
+	gs._note_valles_band(HOST, 0)
+	gs._note_valles_band(HOST, 5)
+	QuestEngine.update(gs, who)
+	if not QuestEngine.is_done(gs, "layer_by_layer"):
+		problems.append("Three bands cored after it opened did not complete it.")
+	gs.free()
+	return "\n".join(problems)
+
+
 func test_a_sediment_find_counts_its_band_for_the_player_who_took_it() -> String:
 	var problems: Array[String] = []
 	var day: int = 7
@@ -340,7 +488,7 @@ func test_a_sediment_find_counts_its_band_for_the_player_who_took_it() -> String
 		if core.is_empty():
 			return "Depth 1 has no sediment core today."
 		_at_find(gs, data, core)
-		gs.cold_since[HOST] = GameClock.elapsed_days
+		_open_quest(gs, [HOST] as Array[String])
 		var why: String = gs.take_find(str(core["id"]), day, HOST)
 		if why != "":
 			return "The core was refused: '%s'." % why
@@ -379,8 +527,8 @@ func test_the_fields_round_trip_sync_to_a_guest_and_a_late_joiner_and_an_old_sav
 			problems.append("The fast-travel unlock was not saved.")
 		# Old saves load: no Valles anything.
 		var old: Dictionary = host.farm_to_dict()
-		old["zones_unlocked"] = []
-		old["finds_taken"] = {}
+		old.erase("zones_unlocked")
+		old.erase("finds_taken")
 		var fresh: GameStateScript = _state()
 		if fresh.farm_from_dict(old) != "" or not ZoneDepth.taken_today(fresh.finds_taken, ZONE, day).is_empty():
 			problems.append("A save with no Valles state did not load clean.")

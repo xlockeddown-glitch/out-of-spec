@@ -66,6 +66,8 @@ const FIRST_DRIVE_HOURS: float = 2.0
 
 ## The quest "Layer by Layer": distinct wall bands per set [PLACEHOLDER 3]; the per-player counters.
 const QUEST_BANDS: int = 3
+## The quest this zone has (data/quests.json).
+const QUEST_ID: String = "layer_by_layer"
 const BAND_MASK: String = "valles_bands"
 const NEW_BAND: String = "valles_new_band"
 
@@ -273,6 +275,10 @@ static func within_grace(left: float, now: float) -> bool:
 ## first visit has opened it (zones_unlocked), none after: fast travel and later drives are free.
 static func drive_hours(visited: bool) -> float:
 	return 0.0 if visited else FIRST_DRIVE_HOURS
+
+
+static func drive_too_late_text() -> String:
+	return "It is too late to start the long drive down the canyon road. Try again in the morning."
 
 
 static func first_drive_text() -> String:

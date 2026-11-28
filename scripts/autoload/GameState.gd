@@ -5234,9 +5234,9 @@ func report_place(place: String, depth: int, player_id: String = "") -> String:
 
 ## Host: puts a player at [place, depth], and starts or ends their cold with it.
 func _set_place(player_id: String, place: String, depth: int) -> void:
-	var was_cold: bool = player_places.has(player_id) and _is_cold_place(place_of(player_id))
+	var was_place: String = place_of(player_id) if player_places.has(player_id) else ""
 	player_places[player_id] = [place, depth]
-	_track_cold(player_id, was_cold)
+	_track_cold(player_id, was_place)
 
 
 ## Host: a player's cold stamp follows where they are. Coming into the caves stamps now (and
@@ -5244,19 +5244,24 @@ func _set_place(player_id: String, place: String, depth: int) -> void:
 ## it was when they left (it pauses outside; Ryan, 2026-11-27), so the stamp moves on by the
 ## time they were away. Anywhere else has no stamp; leaving keeps it aside for the grace.
 ## Tells the guests when it changed.
-func _track_cold(player_id: String, was_in_caves: bool) -> void:
+func _track_cold(player_id: String, was_place: String) -> void:
 	if FarmCommands.guest:
 		return
 	var now: float = GameClock.elapsed_days
-	var in_caves: bool = player_places.has(player_id) and _is_cold_place(place_of(player_id))
-	if in_caves and (not was_in_caves or not cold_since.has(player_id)):
+	var here: String = place_of(player_id) if player_places.has(player_id) else ""
+	var in_caves: bool = _is_cold_place(here)
+	var was_in_caves: bool = _is_cold_place(was_place)
+	# Straight from one cold zone to the other: the cold is the zone's own, so it starts again.
+	var switched: bool = in_caves and was_in_caves and here != was_place
+	if in_caves and (not was_in_caves or not cold_since.has(player_id) or switched):
 		var kept: Variant = _cold_kept.get(player_id)
 		_cold_kept.erase(player_id)
-		var back: bool = kept is Array and IceDepth.within_grace(float(kept[1]), now)
+		# The grace is the zone's own: a stamp kept from the other zone does not carry over.
+		var back: bool = kept is Array and not switched and str(kept[2]) == here and _grace_of(here, float(kept[1]), now)
 		cold_since[player_id] = now - maxf(float(kept[1]) - float(kept[0]), 0.0) if back else now
 		ice_changed.emit()
 	elif not in_caves and cold_since.has(player_id):
-		_cold_kept[player_id] = [float(cold_since[player_id]), now]
+		_cold_kept[player_id] = [float(cold_since[player_id]), now, was_place]
 		cold_since.erase(player_id)
 		ice_changed.emit()
 
@@ -5330,7 +5335,7 @@ func forget_place(player_id: String) -> void:
 	var was: String = place_of(player_id) if player_places.has(player_id) else ""
 	var on_trip: bool = _trip_players.has(player_id)
 	player_places.erase(player_id)
-	_track_cold(player_id, _is_cold_place(was))
+	_track_cold(player_id, was)
 	_campers.erase(player_id)  # a camper who drops is out of bed (CoopBeds drops them too)
 	_console_arrivals.erase(player_id)
 	_trip_players.erase(player_id)
@@ -5727,6 +5732,13 @@ func move_rover_valles(into: bool, player_id: String = "") -> String:
 
 # --- Valles Marineris (zones doc section 11; slice 30) ----------------------------
 
+## Whether leaving a cold zone at `left` is still within that zone's own grace at `now`.
+func _grace_of(zone: String, left: float, now: float) -> bool:
+	if zone == VallesDepth.ZONE:
+		return VallesDepth.within_grace(left, now)
+	return IceDepth.within_grace(left, now)
+
+
 ## Thin air shares the cold stamp: a place where time in the zone is the clock.
 func _is_cold_place(place: String) -> bool:
 	return place == IceDepth.ZONE or place == VallesDepth.ZONE
@@ -5737,25 +5749,42 @@ func _is_cold_place(place: String) -> bool:
 func _charge_first_drive(zone: String) -> void:
 	if zone != VallesDepth.ZONE or FarmCommands.guest:
 		return
-	GameClock.advance(VallesDepth.drive_hours(false) / 24.0)
+	GameClock.advance(VallesDepth.drive_hours(zones_unlocked.has(zone)) / 24.0)
 
 
-## Host: a sediment core of wall band `band` counts for the quest when this player has not
-## cored that band since their last full set: a per-player bitmask in a counter, and
-## `valles_new_band` counts the new ones (QuestEngine counter step).
+## True when a first drive would end after the closing hour or past the end of the day
+## (the clock must not cross midnight inside a command).
+func _first_drive_too_late(zone: String) -> bool:
+	if zone != VallesDepth.ZONE or zones_unlocked.has(zone):
+		return false
+	var now: float = GameClock.elapsed_days
+	var arrive: float = now + VallesDepth.drive_hours(false) / 24.0
+	return TunnelRecall.closed(arrive) or floori(arrive) != floori(now)
+
+
+## Host: a sediment core of wall band `band` counts for Layer by Layer when no one on the farm has
+## cored that band since the quest opened (it is one set for the whole farm: the quest's counter
+## adds every player's, so each band is credited once, to whoever cored it first). Only while the
+## quest is open: cores taken before it was accepted, or after it is done, leave no mark.
 func _note_valles_band(who: String, band: int) -> void:
-	if who == MANAGER_ID or band < 0:
+	if who == MANAGER_ID or band < 0 or not _valles_quest_open():
 		return
+	var bit: int = 1 << band
+	for other: Variant in action_counts:
+		var other_mask: Variant = (action_counts[other] as Dictionary).get(VallesDepth.BAND_MASK)
+		if other_mask is Dictionary and int((other_mask as Dictionary)["count"]) & bit != 0:
+			return
 	var counts: Dictionary = action_counts.get_or_add(who, {}) as Dictionary
 	var mask: Dictionary = counts.get_or_add(VallesDepth.BAND_MASK, { "count": 0, "xp": 0 })
-	var bit: int = 1 << band
-	if int(mask["count"]) & bit != 0:
-		return
 	mask["count"] = int(mask["count"]) | bit
 	var fresh: Dictionary = counts.get_or_add(VallesDepth.NEW_BAND, { "count": 0, "xp": 0 })
 	fresh["count"] = int(fresh["count"]) + 1
-	if int(fresh["count"]) % VallesDepth.QUEST_BANDS == 0:
-		mask["count"] = 0  # a full set: the next set starts clean
+
+
+## Whether Layer by Layer has been accepted and is not done.
+func _valles_quest_open() -> bool:
+	var entry: Variant = quest_state.get(VallesDepth.QUEST_ID)
+	return entry is Dictionary and int((entry as Dictionary).get("done", -1)) < 0
 
 
 ## Where a zone's mouth is on the farm.
@@ -5780,6 +5809,8 @@ func _move_rover(zone: String, into_tunnels: bool, player_id: String) -> String:
 		return "The rover is in another zone."
 	if into_tunnels and TunnelRecall.closed(GameClock.elapsed_days):
 		return TunnelRecall.text("closed_text")
+	if into_tunnels and _first_drive_too_late(zone):
+		return VallesDepth.drive_too_late_text()
 	# Players in there on it, or still on the trip (a guest up in the dome): the mouth stays shut.
 	if into_tunnels and rover_zone != "" and not (_places_in(rover_zone).is_empty() and _trip_players.is_empty()):
 		return FastTravel.text("field_rover_out")

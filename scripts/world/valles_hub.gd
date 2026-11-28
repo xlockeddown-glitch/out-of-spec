@@ -7,6 +7,8 @@ extends "res://scripts/basalt_tunnels.gd"
 ## GameState's (`cold_since`, read through `cold_of`). A look [PLACEHOLDER]: no art yet.
 
 const SIGN: String = "sign"
+## The stem's x range (columns 10 to 12), kept clear of walls and talus.
+const STEM_X: Vector2 = Vector2(-7.0, 4.0)
 
 ## The air reading last told, in steps of AIR_STEP percent, and whether it was past the warning.
 const AIR_STEP: int = 10
@@ -46,7 +48,9 @@ func _build_zone() -> void:
 ## The canyon's two walls: a banded face along the north and the south edge of the floor [PLACEHOLDER].
 func _draw_walls() -> void:
 	VallesLook.add_band_wall(_depth_props, Vector3(0.0, 0.0, -18.6), Vector2(66.0, 1.2))
-	VallesLook.add_band_wall(_depth_props, Vector3(0.0, 0.0, 3.6), Vector2(66.0, 1.2))
+	# The south wall stops short of the stem (x -7 to 4) that the rover drives through.
+	VallesLook.add_band_wall(_depth_props, Vector3(-20.0, 0.0, 3.6), Vector2(26.0, 1.2))
+	VallesLook.add_band_wall(_depth_props, Vector3(18.5, 0.0, 3.6), Vector2(29.0, 1.2))
 
 
 ## Talus heaps along each wall foot, a core rack and a banded post pair at the way down
@@ -55,7 +59,8 @@ func _build_hub_decor() -> void:
 	var salt: int = 0
 	for x: float in [-27.0, -17.0, -6.0, 5.0, 16.0, 27.0]:
 		VallesLook.add_talus(_decor, Vector3(x, 0.0, -17.0), 5.0, salt)
-		VallesLook.add_talus(_decor, Vector3(x + 2.5, 0.0, 2.3), 4.0, salt + 50)
+		if x + 2.5 < STEM_X.x - 2.0 or x + 2.5 > STEM_X.y + 2.0:  # none in the stem
+			VallesLook.add_talus(_decor, Vector3(x + 2.5, 0.0, 2.3), 4.0, salt + 50)
 		salt += 3
 	var sign_pos: Vector3 = VallesDepth.sign_position()
 	for i: int in 3:
