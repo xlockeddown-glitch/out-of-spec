@@ -19,12 +19,13 @@ const REWARD_CR: int = 400
 func _run(body: Callable) -> String:
 	var saved_day: float = GameClock.elapsed_days
 	var saved_players: Array[String] = CoopSession.players.duplicate()
+	var saved_guest: bool = FarmCommands.guest
 	GameClock.elapsed_days = 10.0
 	CoopSession.players.clear()
 	var gs: GameStateScript = _farm()
 	var out: Variant = body.call(gs)
 	gs.free()
-	FarmCommands.guest = false
+	FarmCommands.guest = saved_guest
 	CoopSession.players.assign(saved_players)
 	GameClock.elapsed_days = saved_day
 	return out if out is String else "The test stopped early or did not return a String."
@@ -185,7 +186,7 @@ func _check_progress_and_payout(gs: GameStateScript) -> String:
 	gs.update_quests(none, false)
 	row = _open_row(gs, HOST, QUEST_ID)
 	if int(row["have"]) != 0:
-		return "Late, untraceable, manager, robot, or same-day repeat calibrations must not count: %s" % [row]
+		return "Late, untraceable, manager, robot, or no-interval-evidence calibrations must not count: %s" % [row]
 	# 3 valid calibrations -> QuestLog shows "3 of 8" and phone posts progress.
 	for _i: int in 3:
 		gs.cal_log.append(_cal_row())
