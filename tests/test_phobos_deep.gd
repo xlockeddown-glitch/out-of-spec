@@ -488,6 +488,6 @@ func test_protocol_and_commands_registered() -> String:
 	for cmd: StringName in [&"enter_phobos_deep", &"leave_phobos_deep", &"take_phobos_find", &"wipe_phobos_dust"]:
 		if not cmd in FarmCommands.ACTIONS or not cmd in FarmCommands.ON_A_MOON:
 			return "%s must be in FarmCommands.ACTIONS and ON_A_MOON." % cmd
-	if CoopSession.PROTOCOL != 48:
+	if CoopSession.PROTOCOL != 51:
 		return "CoopSession.PROTOCOL must be 48, got %d." % CoopSession.PROTOCOL
 	return ""

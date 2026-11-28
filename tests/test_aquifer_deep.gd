@@ -794,6 +794,6 @@ func test_each_depth_is_a_little_darker_with_no_new_lights() -> String:
 # --- Nothing new on the wire ------------------------------------------------------------
 
 func test_the_protocol_did_not_move_for_depths_two_to_six() -> String:
-	if CoopSession.PROTOCOL != 48:
+	if CoopSession.PROTOCOL != 51:
 		return "PROTOCOL is %d; depths 2 to 6 add no command or synced field, so it stays at the current 48." % CoopSession.PROTOCOL
 	return ""

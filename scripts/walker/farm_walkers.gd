@@ -65,6 +65,8 @@ func _physics_process(_delta: float) -> void:
 		_own.leave_deep_water()
 	_own.model.set_suit(WalkerModel.suit_for(own, CoopSession.players))
 	_own.model.set_loadout(_parts_of(own))
+	_own.model.set_coat_color(GameState.lab_coat_color(own))
+	_own.model.set_name_tag(Cosmetics.name_tag_text(GameState, own) if CoopSession.players.size() > 1 else "")
 
 
 ## After a dig or a stone changed the water: this screen's walker, if it is in deep
@@ -100,6 +102,8 @@ func _show_friend(player_id: String, pose: Array, delta: float) -> void:
 	var model: WalkerModel = _friends[player_id]
 	model.set_suit(WalkerModel.suit_for(player_id, CoopSession.players))
 	model.set_loadout(_parts_of(player_id))
+	model.set_coat_color(GameState.lab_coat_color(player_id))
+	model.set_name_tag(Cosmetics.name_tag_text(GameState, player_id))
 	if model.position.distance_to(at) > JUMP_M:
 		share = 1.0
 	model.position = model.position.lerp(at, share)

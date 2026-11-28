@@ -9,6 +9,7 @@ const TEXT: Color = ScopeTheme.INK
 const DIM: Color = ScopeTheme.INK_MUTED
 
 var _rows: VBoxContainer
+var _total_label: Label
 var _close_button: Button
 var _picker: XpCertificateUI
 var _glyph: Label
@@ -31,11 +32,18 @@ func _ready() -> void:
 	panel.add_child(column)
 	var header := PanelContainer.new()
 	header.theme_type_variation = ScopeTheme.HEADER
+	var header_row := HBoxContainer.new()
+	header.add_child(header_row)
 	var title := Label.new()
 	title.text = "SKILLS"
 	title.theme_type_variation = ScopeTheme.TITLE
 	title.add_theme_font_size_override(&"font_size", 30)
-	header.add_child(title)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header_row.add_child(title)
+	_total_label = ScopeTheme.label("", ScopeTheme.ENAMEL_TOP, 20)
+	_total_label.name = &"TotalLevelLabel"
+	_total_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	header_row.add_child(_total_label)
 	column.add_child(header)
 	var glass := PanelContainer.new()
 	glass.theme_type_variation = ScopeTheme.GLASS
@@ -108,6 +116,8 @@ func _refresh() -> void:
 	for child: Node in _rows.get_children():
 		_rows.remove_child(child)
 		child.queue_free()
+	if _total_label != null:
+		_total_label.text = total_level_text()
 	_rows.add_child(_skill_card(GameState.lab_text(), GameState.lab_effects_text(), ScopeTheme.TEAL))
 	for id: String in GameState.skill_ids():
 		_rows.add_child(_skill_card(GameState.skill_text(id), GameState.skill_effects_text(id)))
@@ -120,6 +130,13 @@ func _refresh() -> void:
 		spend.focus_mode = under
 		spend.pressed.connect(_picker.open)
 		_rows.add_child(spend)
+
+
+## Formatted total-level heading for the SKILLS view, including milestone title when reached.
+static func total_level_text(farm: Node = GameState, player_id: String = "") -> String:
+	var total: int = Cosmetics.total_level(farm, player_id)
+	var title: String = Cosmetics.total_level_title(total)
+	return "Total level %s  ·  %s" % [SP811.integer(total), title] if title != "" else "Total level %s" % SP811.integer(total)
 
 
 func _skill_card(heading: String, detail: String, edge: Color = ScopeTheme.GLASS_LINE) -> PanelContainer:

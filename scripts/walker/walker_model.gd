@@ -32,6 +32,9 @@ var _walked_m: float = 0.0
 ## The picker's parts, and the boxes they add (Loadout). The defaults add none.
 var _parts: Dictionary = Loadout.default_parts()
 var _dressing: Array[MeshInstance3D] = []
+var _coat_color_id: String = ""
+var _coat_mesh: MeshInstance3D = null
+var _name_tag: Label3D = null
 
 
 func _init() -> void:
@@ -113,6 +116,53 @@ func loadout() -> Dictionary:
 
 func suit() -> Color:
 	return _suit
+
+
+## Applies a personal lab coat color (Cosmetics.COAT_COLORS, unlocked at any skill 50).
+## Empty string clears the custom coat mesh.
+func set_coat_color(color_id: String) -> void:
+	var clean: String = color_id if Cosmetics.is_coat_color(color_id) else ""
+	if clean == _coat_color_id:
+		return
+	_coat_color_id = clean
+	if _coat_mesh != null:
+		if _coat_mesh.get_parent() != null:
+			_coat_mesh.get_parent().remove_child(_coat_mesh)
+		_coat_mesh.free()
+		_coat_mesh = null
+	if clean == "":
+		return
+	_coat_mesh = _made(Vector3(0.0, 3.9, 0.0), Vector3(3.0, 3.25, 1.9), Cosmetics.coat_color(clean))
+	_coat_mesh.name = "LabCoatColor"
+	add_child(_coat_mesh)
+
+
+func coat_color() -> String:
+	return _coat_color_id
+
+
+## Sets the floating co-op name tag above the character (name + total-level title).
+## Empty string hides it.
+func set_name_tag(text: String) -> void:
+	if text == "":
+		if _name_tag != null:
+			_name_tag.visible = false
+		return
+	if _name_tag == null:
+		_name_tag = Label3D.new()
+		_name_tag.name = "NameTag"
+		_name_tag.pixel_size = 0.004
+		_name_tag.font_size = 28
+		_name_tag.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		_name_tag.modulate = ScopeTheme.INK
+		_name_tag.position = Vector3(0.0, 9.6, 0.0) * VOXEL_M
+		add_child(_name_tag)
+	_name_tag.text = text
+	_name_tag.visible = true
+
+
+func name_tag_text() -> String:
+	return _name_tag.text if _name_tag != null and _name_tag.visible else ""
 
 
 ## The suit for a player, from the roster as every screen has it (the host first,

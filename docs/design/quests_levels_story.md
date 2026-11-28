@@ -278,9 +278,9 @@ Built mostly from things that exist or are already designed in `docs/design/equi
 | 60 | The Larder | | NEW |
 | 65 | Third robot; job board shows 5 jobs | | NEW |
 | 75 | Fourth robot | | NEW |
-| 85 | Robot paint and nameplates | | NEW, cosmetic |
-| 92 | A plaque for the wall: "HALFWAY THERE" | | NEW, cosmetic |
-| 99 | Gold border on every certificate the lab prints; Odalys sends her mug | | NEW, cosmetic |
+| 85 | Robot paint and nameplates | | built (cosmetic) |
+| 92 | A plaque for the wall: "HALFWAY THERE" | | built (cosmetic) |
+| 99 | Gold border on every certificate the lab prints; Odalys sends her mug | | built (cosmetic) |
 
 Every story beat is at or below 60 (§3.2.1). The game already lets a farm hold more than one accepted job (`active_jobs` is a list), so no row is spent on that.
 
@@ -319,10 +319,10 @@ One or two per row so the table stays readable. Levels are [PLACEHOLDER]. Items 
 | 20 | | guard band shown on the bench (NEW) | | | second card slot per robot (NEW) | | dig two cells deep in one go (NEW) |
 | 30 | 50 % of effects | 50 % of effects | 50 % of effects | 50 % of effects | 50 % of effects | 50 % of effects | 50 % of effects |
 | 40 | sign a job as "expedited" for more pay (NEW) | | | spools one grade finer (NEW) | | a second harvest from some crops (NEW) | |
-| 50 | half-way cape: a lab coat color (NEW, cosmetic) | same | same | same | same | same | same |
+| 50 | half-way cape: a lab coat color (built, cosmetic) | same | same | same | same | same | same |
 | 60 | 75 % of effects | 75 % of effects | 75 % of effects | 75 % of effects | 75 % of effects | 75 % of effects | 75 % of effects |
-| 75 | your initials stamped on the units you calibrate (NEW, cosmetic) | | | | | | |
-| 99 | 100 % of effects; a title on your certificates (NEW, cosmetic) | same | same | same | same | same | same |
+| 75 | your initials stamped on the units you calibrate (built, cosmetic) | | | | | | |
+| 99 | 100 % of effects; a title on your certificates (built, cosmetic) | same | same | same | same | same | same |
 
 A personal skill never locks a room, a tier or a contract. It makes the player quicker, cleaner or better paid. [ASSUMPTION]
 
@@ -330,8 +330,8 @@ A personal skill never locks a room, a tier or a contract. It makes the player q
 
 Total level = the sum of a player's skill levels. Seven skills gives 7 to 693.
 
-- Shown on the SKILLS view and next to the player's name in co-op.
-- Milestones give titles and cosmetics only [ASSUMPTION]: 50 "Apprentice", 150 "Technician", 300 "Metrologist", 500 "Principal", 693 "In Spec" [PLACEHOLDER].
+- Shown on the SKILLS view and next to the player's name in co-op (built).
+- Milestones give titles and cosmetics only [ASSUMPTION] (built): 50 "Apprentice", 150 "Technician", 300 "Metrologist", 500 "Principal", 693 "In Spec" [PLACEHOLDER].
 - A few personal quests use total level as a gate, so a player who spreads out is not shut out of quests meant for specialists.
 
 ### 4.4 Friends who play less

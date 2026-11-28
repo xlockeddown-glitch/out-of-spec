@@ -363,7 +363,7 @@ func test_command_wiring_prefer_seal_and_open_seal_drawing() -> String:
 		return "shut_valve must be in FarmCommands.ACTIONS and BELOW_ONLY."
 	if not "valves_shut" in (FarmSync.SHOWN_BY.get(&"pump_changed", []) as Array):
 		return "valves_shut must be shown by FarmSync."
-	if CoopSession.PROTOCOL != 48:
+	if CoopSession.PROTOCOL != 51:
 		return "CoopSession.PROTOCOL is %d, not 48." % CoopSession.PROTOCOL
 
 	var day: int = 5

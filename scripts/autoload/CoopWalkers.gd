@@ -34,7 +34,7 @@ const GRACE_MS: int = 1500
 const STOPPED_MPS: float = 0.05
 const FARTHEST_M: float = 500.0
 ## What someone on foot may still ask for [ASSUMPTION].
-const ON_FOOT: Array[StringName] = [&"get_into_rover", &"get_up", &"book_expedition", &"book_shuttle", &"go_to_bed", &"read_probe", &"report_place", &"set_loadout", &"shuttle_home", &"spend_xp_certificate"]
+const ON_FOOT: Array[StringName] = [&"get_into_rover", &"get_up", &"book_expedition", &"book_shuttle", &"go_to_bed", &"read_probe", &"report_place", &"set_loadout", &"shuttle_home", &"spend_xp_certificate", &"set_lab_coat_color"]
 const REFUSAL: String = "On foot. Get in the rover first."
 
 ## Player -> pose.

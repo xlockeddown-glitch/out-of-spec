@@ -322,7 +322,7 @@ func test_the_license_is_saved_and_an_old_save_loads_unlicensed() -> String:
 	junk["shuttle_licensed"] = 1
 	if gs.farm_dict_problem(junk) == "":
 		problems.append("A license that is no bool was accepted.")
-	if CoopSession.PROTOCOL != 48:
+	if CoopSession.PROTOCOL != 51:
 		problems.append("The protocol is %d, not 48." % CoopSession.PROTOCOL)
 	back.free()
 	old.free()

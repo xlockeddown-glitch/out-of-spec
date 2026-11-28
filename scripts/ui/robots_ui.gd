@@ -111,20 +111,60 @@ func _add_robot_rows(id: String) -> void:
 	match robot["state"]:
 		"assembling":
 			_rows.add_child(PlanBoardUI._label("%s: assembling, ready the morning of day %s" % [
-				robot["name"], SP811.integer(robot["done_day"])], TEXT, 20))
+				GameState.robot_display_name(id), SP811.integer(robot["done_day"])], TEXT, 20))
 		"released":
 			_add_interlock_rows(id)
 			_add_card_rows(id)
 		_:
-			_rows.add_child(PlanBoardUI._label("%s: commissioning" % robot["name"], AMBER, 20))
+			_rows.add_child(PlanBoardUI._label("%s: commissioning" % GameState.robot_display_name(id), AMBER, 20))
 			for sensor_id: String in GameState.robot_sensor_ids(id):
 				var problem: String = GameState.robot_sensor_problem(sensor_id)
 				_rows.add_child(PlanBoardUI._label("    %s: %s" % [GameState.instrument_name(sensor_id, true),
 					"ready" if problem == "" else problem], DIM if problem == "" else AMBER, 18))
-			var release: Button = PlanBoardUI._button("RELEASE %s" % robot["name"])
+			var release: Button = PlanBoardUI._button("RELEASE %s" % GameState.robot_display_name(id))
 			release.set_meta(&"row", id)
 			release.pressed.connect(_on_release_pressed.bind(id))
 			_rows.add_child(release)
+	if GameState.lab_gate_open(Cosmetics.GATE_ROBOT_PAINT):
+		_add_cosmetic_rows(id)
+
+
+func _add_cosmetic_rows(id: String) -> void:
+	var paint_id: String = GameState.robot_paint(id)
+	var plate: String = str(GameState.robots[id].get("nameplate", ""))
+	var next_paint: String = Cosmetics.next_robot_paint(paint_id)
+	var paint_btn: Button = PlanBoardUI._button("PAINT %s: %s -> %s" % [
+		GameState.robot_display_name(id), Cosmetics.robot_paint_name(paint_id), Cosmetics.robot_paint_name(next_paint)])
+	paint_btn.set_meta(&"row", id + " paint")
+	paint_btn.pressed.connect(_on_paint_pressed.bind(id, next_paint, plate))
+	_rows.add_child(paint_btn)
+	var bar := HBoxContainer.new()
+	bar.add_theme_constant_override(&"separation", 8)
+	var field := LineEdit.new()
+	field.max_length = Cosmetics.MAX_NAMEPLATE
+	field.placeholder_text = "Nameplate (max 12)"
+	field.text = plate
+	field.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.add_child(field)
+	var save_btn: Button = PlanBoardUI._button("SET NAMEPLATE")
+	save_btn.set_meta(&"row", id + " plate")
+	save_btn.pressed.connect(_on_nameplate_pressed.bind(id, paint_id, field))
+	bar.add_child(save_btn)
+	_rows.add_child(bar)
+
+
+func _on_paint_pressed(id: String, next_paint: String, plate: String) -> void:
+	_armed_id = ""
+	_show_result(await FarmCommands.request(&"set_robot_cosmetic", [id, next_paint, plate]), "Paint updated.")
+	_refresh()
+	_focus_row(id + " paint", id + " ")
+
+
+func _on_nameplate_pressed(id: String, paint_id: String, field: LineEdit) -> void:
+	_armed_id = ""
+	_show_result(await FarmCommands.request(&"set_robot_cosmetic", [id, paint_id, field.text]), "Nameplate updated.")
+	_refresh()
+	_focus_row(id + " plate", id + " ")
 
 
 ## A released robot's state and, with its interlock tripped, the button for it.
@@ -136,7 +176,7 @@ func _add_interlock_rows(id: String) -> void:
 		state = "INTERLOCK OVERRIDDEN" + (", %s out of tolerance" % bad if bad != "" else "")
 	elif bad != "":
 		state = "%s out of tolerance. Holding." % bad
-	_rows.add_child(PlanBoardUI._label("%s: %s" % [GameState.robots[id]["name"], state], TEAL if state == "released" else AMBER, 20))
+	_rows.add_child(PlanBoardUI._label("%s: %s" % [GameState.robot_display_name(id), state], TEAL if state == "released" else AMBER, 20))
 	if state == "released":
 		return
 	var row: String = id + " interlock"

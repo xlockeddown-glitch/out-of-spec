@@ -152,7 +152,7 @@ func _count_type(node: Node, class_text: String) -> int:
 # --- Shipped data & repo checks -----------------------------------------------------
 
 func test_both_quests_keepsake_and_dialogue_load_and_validate() -> String:
-	if CoopSession.PROTOCOL != 48:
+	if CoopSession.PROTOCOL != 51:
 		return "Mine quests add no command or synced field; PROTOCOL must be 48 (got %d)." % CoopSession.PROTOCOL
 	var old_q: Dictionary = _shipped(OLD_PROPS)
 	var set_q: Dictionary = _shipped(COLONISTS_SET)

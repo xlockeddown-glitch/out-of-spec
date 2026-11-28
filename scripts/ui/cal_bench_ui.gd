@@ -574,9 +574,16 @@ func _certificate_text(instrument_id: String) -> String:
 			else "new from %s, no as-found on file" % cert.get("issuer", "the maker")) if cert["as_found"] == null
 		else "as-found %s (%s)" % [sensor.format_value(float(cert["as_found"]), maxi(3, sensor.display_decimals)),
 			"in tolerance" if cert["as_found_in_tolerance"] else "OUT OF TOLERANCE"])
-	return "Certificate %s, day %d: %s, U ±%s (k = %s)" % [
+	var out: String = "Certificate %s, day %d: %s, U ±%s (k = %s)" % [
 		cert["id"], cert["day"], found, _unsigned_precise(sensor, cert["expanded_uncertainty"]),
 		SP811.number(cert["k"], 0)]
+	if str(cert.get("cal_initials", "")) != "":
+		out += ", by %s" % str(cert["cal_initials"])
+	if str(cert.get("cert_title", "")) != "":
+		out += " [%s]" % str(cert["cert_title"])
+	if bool(cert.get("gold_border", false)):
+		out += " (gold border)"
+	return out
 
 
 func _on_calibrate_pressed() -> void:
@@ -697,7 +704,12 @@ func _on_calibrate_pressed() -> void:
 		_result_label.text = "AS-FOUND WITHIN ACCEPTANCE LIMIT: PASS. Too soon after the last calibration to change the interval. " + interval_note
 	else:
 		_result_label.text = "AS-FOUND WITHIN ACCEPTANCE LIMIT, LATE: PASS. Interval unchanged. " + interval_note
-	_paint_result(DriftingSensor.band_color(band))
+	if str(record.get("cal_initials", "")) != "":
+		_result_label.text += " Calibrated by %s." % str(record["cal_initials"])
+	var border_color: Color = DriftingSensor.band_color(band)
+	if sensor.role == "standard" and bool(GameState.certificates.get(id, {}).get("gold_border", false)):
+		border_color = ScopeTheme.GOLD
+	_paint_result(border_color)
 	# The score the host counted. If one was sent and the host counted none (the
 	# kind was no longer new by the time it arrived), that is said too.
 	var zero_text: String = MinigameScore.result_text(int(record.get(MinigameScore.RECORD_KEY, MinigameScore.SKIPPED)),
