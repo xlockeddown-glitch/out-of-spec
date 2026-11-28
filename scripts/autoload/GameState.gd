@@ -1221,6 +1221,8 @@ func farm_from_dict(data: Dictionary) -> String:
 	_recall_rescued_day = 0
 	_guest_warned_day.clear()
 	_guest_rescued_day.clear()
+	_expedition_warned_day.clear()
+	_expedition_rescued_day.clear()
 	_console_arrivals.clear()
 	_trip_players.clear()
 	_campers.clear()
@@ -4016,6 +4018,10 @@ func book_expedition(moon: String, party_ids: Array, shown_total: int, player_id
 	var party: Array[String] = shuttle_party(id)
 	var hub_ready: bool = Shuttle.is_moon(moon) and ZoneData.is_playable(StringName(moon))
 	var permit: String = "expedition_permit"
+	# The camp is open whenever the quest is held, a brought, finished one too (the update
+	# that opens it has not necessarily run since it was taken): never a booking to a shut camp.
+	if expedition_quest_taken(id):
+		open_camp(moon)
 	var reason: String = Shuttle.expedition_problem(moon, lab_level(), shuttle_licensed, credits, party.size(), GameClock.elapsed_days,
 		hub_ready, lab_gate_level(permit), lab_gate_open(permit), expedition_quest_taken(id), camp_supplies)
 	if reason != "":
@@ -5521,9 +5527,10 @@ func _release_field_rover() -> void:
 ## The day the warning, and the rescue, were last given for. Not saved: a farm
 ## that loads in the tunnels late in the night is warned, or rescued, once more.
 var _recall_warned_day: int = 0
-## The day an expedition traveller was last warned, and last put to bed or flown home.
-var _expedition_warned_day: int = 0
-var _expedition_rescued_day: int = 0
+## The day each expedition traveller (player -> day) was last warned, and last put to bed or
+## flown home, marked only when it happened to them. Not saved, like the tunnels' days.
+var _expedition_warned_day: Dictionary = {}
+var _expedition_rescued_day: Dictionary = {}
 var _recall_rescued_day: int = 0
 ## The same for each guest (player -> day), for the guests the host sees below.
 var _guest_warned_day: Dictionary = {}
@@ -5581,29 +5588,36 @@ func _guests_below() -> Array[String]:
 func _tick_expeditions() -> void:
 	if FarmCommands.guest or shuttle_trips.is_empty():
 		return
-	var awake: Array[String] = []
-	for id: String in shuttle_trips:
-		if Shuttle.is_expedition(shuttle_trips[id]) and Shuttle.is_moon(place_of(id)) and not is_camping(id):
-			awake.append(id)
-	if awake.is_empty():
-		return
 	var day: int = GameClock.get_day_index()
-	match TunnelRecall.phase(GameClock.elapsed_days, _expedition_warned_day, _expedition_rescued_day):
-		TunnelRecall.WARN:
-			_expedition_warned_day = day
-			post_phone(Shuttle.text("expedition_warn_text"))
-		TunnelRecall.RESCUE:
-			_expedition_warned_day = day
-			_expedition_rescued_day = day
-			if recall_beds != null:
-				_expedition_recall(awake)
-			else:
-				_expedition_recall.call_deferred(awake)  # not inside the clock's own signal
+	var warned: bool = false
+	var due: Array[String] = []
+	var ids: Array = shuttle_trips.keys()
+	ids.sort()
+	for id: String in ids:
+		if not Shuttle.is_expedition(shuttle_trips[id]) or not Shuttle.is_moon(place_of(id)) or is_camping(id):
+			continue  # not away on one, or asleep at the camp: nothing for them
+		match TunnelRecall.phase(GameClock.elapsed_days, int(_expedition_warned_day.get(id, 0)), int(_expedition_rescued_day.get(id, 0))):
+			TunnelRecall.WARN:
+				_expedition_warned_day[id] = day
+				warned = true
+			TunnelRecall.RESCUE:
+				due.append(id)  # their day is used up in _expedition_recall, when it happens to them
+	if warned:
+		post_phone(Shuttle.text("expedition_warn_text"))  # one shared line, as the phone is shared
+	if due.is_empty():
+		return
+	if recall_beds != null:
+		_expedition_recall(due)
+	else:
+		_expedition_recall.call_deferred(due)  # not inside the clock's own signal
 
 
 ## Host: the 02:00 step for the awake expedition travellers `ids` (see _tick_expeditions).
 ## All the bookkeeping first, then every bed, so the last into bed ends the day with the
-## others already counted (as _carry_out does).
+## others already counted (as _carry_out does). One who turned in at the camp earlier tonight
+## and got up (a paid night, `_campers`) is put back to bed free: no second supply, no second
+## night counted, no fee. A traveller's day is used up only when they are put to bed or flown
+## home, so one who slept through the hour is recalled if they get up after it.
 func _expedition_recall(ids: Array[String]) -> void:
 	var to_bed: Array[String] = []
 	for id: String in ids:
@@ -5611,7 +5625,11 @@ func _expedition_recall(ids: Array[String]) -> void:
 		if not Shuttle.is_expedition(trip) or is_camping(id) or id in _beds().in_bed:
 			continue  # home, asleep or in bed in the moment since the hour
 		var moon: String = str((trip as Dictionary)["moon"])
-		if camps_open.has(moon) and camp_supplies >= 1 and Camp.is_moon_camp(moon):
+		_expedition_warned_day[id] = GameClock.get_day_index()
+		_expedition_rescued_day[id] = GameClock.get_day_index()
+		if _campers.has(id):
+			post_phone(Shuttle.text("expedition_bedded_text"))  # tonight is paid already
+		elif camps_open.has(moon) and camp_supplies >= 1 and Camp.is_moon_camp(moon):
 			update_quests([], false)  # the job's next step opens before the night is counted
 			_camp_night(id, Camp.EXPEDITION_NIGHT_COUNT, false, true)
 			post_phone(Shuttle.text("expedition_camped_text"))

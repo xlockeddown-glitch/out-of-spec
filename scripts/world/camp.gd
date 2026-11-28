@@ -22,6 +22,8 @@ const MOON_SPOTS: Dictionary[String, Vector3] = {
 const MOON_REACH_M: float = 5.0
 ## The most nights of supplies a saved farm may hold [PLACEHOLDER]: an expedition's party
 ## stocks nights for everyone at booking, so it is above MAX_SUPPLIES (the camp hub's cap).
+## Two caps on purpose: MAX_SUPPLIES limits what the hub's Buy button adds (it refuses at 3), while
+## HELD_MOST is only the most a loaded or synced value may be (a 4-night party can hold 8 at booking).
 const HELD_MOST: int = 24
 ## The count a night at an expedition camp adds, for the expedition quest (not NIGHT_COUNT,
 ## so a moon night never counts for Two Sunsets).
@@ -51,8 +53,20 @@ static func is_moon_camp(zone: String) -> bool:
 static func zones() -> Array[String]:
 	var found: Array[String] = []
 	found.assign(CELLS.keys())
+	found.append_array(MOON_SPOTS.keys())
 	found.sort()
 	return found
+
+
+## "" or why a moon camp's hub is not a bed for the local walker now: they are further than
+## MOON_REACH_M from the camp (or the hub has no walker to say). `walker` is the hub's walker
+## node (a Node3D) or null. A zone whose camp is not on a moon deck has no reach rule here.
+static func moon_reach_refusal(zone: String, walker: Variant) -> String:
+	if not is_moon_camp(zone):
+		return ""
+	if not walker is Node3D or not near(zone, (walker as Node3D).global_position):
+		return Shuttle.text("camp_far_text")
+	return ""
 
 
 ## The camp's cell in its zone's hub map, or (-1, -1) for a zone with none.

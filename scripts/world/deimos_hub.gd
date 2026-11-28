@@ -125,8 +125,16 @@ func _build_world() -> void:
 	_refresh_camp_hint()
 
 
+## Whether the local player was in bed when the hint was last worded.
+var _hint_asleep: bool = false
+
+
+## The hint is worded again when the camp opens or shuts (camps_changed) and when the local
+## player's bed changes (watched here, as CoopBeds has no signal for it): no data lookup
+## on the frames between.
 func _process(delta: float) -> void:
-	_refresh_camp_hint()
+	if CoopBeds.in_bed.has(GameState.local_player_id) != _hint_asleep:
+		_refresh_camp_hint()
 	super(delta)
 
 
@@ -135,10 +143,11 @@ func _process(delta: float) -> void:
 func _refresh_camp_hint() -> void:
 	if camp_click == null:
 		return
+	_hint_asleep = CoopBeds.in_bed.has(GameState.local_player_id)
 	if not GameState.camps_open.has(DEIMOS):
 		camp_click.hint = Shuttle.text("camp_shut_hint")
 	else:
-		camp_click.hint = Shuttle.text("camp_hint_up" if CoopBeds.in_bed.has(GameState.local_player_id) else "camp_hint")
+		camp_click.hint = Shuttle.text("camp_hint_up" if _hint_asleep else "camp_hint")
 
 
 ## A click on the camp: turn in for the night, or get up. The host cannot know where a

@@ -370,7 +370,7 @@
         { "id": "nights", "text": "Spend 2 nights at the Deimos camp: turn in there each night.",
           "check": "counter", "counter": "expedition_night", "at_least": 2 },
         { "id": "home", "text": "Come home when the expedition ends. Leaving early does not count.",
-          "check": "counter", "counter": "expedition_done", "ever": true }
+          "check": "counter", "counter": "expedition_done" }
       ],
       "rewards": { "xp_certificate": 40, "phone": "npcs/vance/quests/deimos_survey_done" }
     }

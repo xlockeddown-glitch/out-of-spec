@@ -325,6 +325,93 @@ func test_at_midnight_an_awake_traveller_is_told_and_a_sleeper_is_not() -> Strin
 		return "" if again == warned else "The warning is once a day")
 
 
+func test_at_midnight_with_only_a_sleeper_away_nobody_is_told() -> String:
+	return _bed_farm(true, func(gs: GameStateScript, _beds: Node, _clock: Node) -> String:
+		_away(gs, [GUEST] as Array[String], 99.0, 2)
+		gs.go_to_bed(GUEST)
+		var before: int = gs.phone_log.size()
+		GameClock.elapsed_days = TunnelRecall.at_hour(1, 0.5)
+		gs._tick_expeditions()
+		for i: int in range(before, gs.phone_log.size()):
+			if str(gs.phone_log[i]).contains("RECALL"):
+				return "A sleeper at the camp is not warned"
+		if gs._expedition_warned_day.has(GUEST):
+			return "A warning not given is not marked"
+		return "")
+
+
+func test_a_traveller_who_camped_tonight_and_got_up_is_put_back_to_bed_free_at_two() -> String:
+	return _bed_farm(true, func(gs: GameStateScript, beds: Node, _clock: Node) -> String:
+		var problems: Array[String] = []
+		# One supply held: the night the traveller paid for is the last (the second night's case).
+		_away(gs, [HOST] as Array[String], 99.0, 1)
+		if gs.go_to_bed(HOST) != "" or gs.camp_supplies != 0 or _count(gs, HOST, Camp.EXPEDITION_NIGHT_COUNT) != 1:
+			return "Turned in at the camp: %d supplies" % gs.camp_supplies
+		beds.get_up(HOST)
+		var wallet: int = gs.credits
+		GameClock.elapsed_days = TunnelRecall.at_hour(1, 2.0)
+		gs._tick_expeditions()
+		if not gs.shuttle_trips.has(HOST) or gs.place_of(HOST) != Shuttle.DEIMOS:
+			problems.append("Not flown home for a night already paid: %s" % [gs.shuttle_trips])
+		if gs.credits != wallet or gs.camp_supplies != 0 or _count(gs, HOST, Camp.EXPEDITION_NIGHT_COUNT) != 1:
+			problems.append("No fee, no second supply, no second night: %d vs %d CR, %d supplies, %d nights" % [gs.credits, wallet, gs.camp_supplies, _count(gs, HOST, Camp.EXPEDITION_NIGHT_COUNT)])
+		if not gs.is_camping(HOST):
+			problems.append("They are back in bed at the camp")
+		# And with supplies to spare the same night is not charged twice.
+		var rich: GameStateScript = _state()
+		rich.recall_beds = beds
+		_away(rich, [HOST] as Array[String], 99.0, 3)
+		beds.in_bed.clear()
+		rich.go_to_bed(HOST)
+		beds.get_up(HOST)
+		GameClock.elapsed_days = TunnelRecall.at_hour(1, 2.0)
+		rich._tick_expeditions()
+		if rich.camp_supplies != 2 or _count(rich, HOST, Camp.EXPEDITION_NIGHT_COUNT) != 1:
+			problems.append("A paid night costs one supply and counts once: %d supplies, %d nights" % [rich.camp_supplies, _count(rich, HOST, Camp.EXPEDITION_NIGHT_COUNT)])
+		rich.free()
+		return "\n".join(problems))
+
+
+func test_the_recall_days_are_each_travellers_own_marked_only_when_it_happened_to_them() -> String:
+	return _bed_farm(true, func(gs: GameStateScript, beds: Node, _clock: Node) -> String:
+		var problems: Array[String] = []
+		_away(gs, [HOST, GUEST] as Array[String], 99.0, 4)
+		gs.go_to_bed(GUEST)
+		# Midnight: only the awake host is warned; the sleeper's day is not used up.
+		GameClock.elapsed_days = TunnelRecall.at_hour(1, 0.5)
+		gs._tick_expeditions()
+		if not gs._expedition_warned_day.has(HOST) or gs._expedition_warned_day.has(GUEST):
+			problems.append("Warned days: %s" % [gs._expedition_warned_day])
+		beds.get_up(GUEST)
+		var told: int = gs.phone_log.size()
+		gs._tick_expeditions()
+		var lines: int = 0
+		for i: int in range(told, gs.phone_log.size()):
+			if str(gs.phone_log[i]).contains("RECALL"):
+				lines += 1
+		if lines != 1 or not gs._expedition_warned_day.has(GUEST):
+			problems.append("The sleeper who gets up is warned then, and the host is not warned twice: %d lines" % lines)
+		# Two o'clock: the host is carried to bed, the guest has not been touched yet.
+		gs._campers.erase(GUEST)
+		gs.go_to_bed(GUEST)
+		GameClock.elapsed_days = TunnelRecall.at_hour(1, 2.0)
+		gs._tick_expeditions()
+		if not gs._expedition_rescued_day.has(HOST) or gs._expedition_rescued_day.has(GUEST):
+			problems.append("Rescued days: %s" % [gs._expedition_rescued_day])
+		# The guest gets up after the hour: their own recall is still due.
+		beds.get_up(GUEST)
+		gs._tick_expeditions()
+		if not gs._expedition_rescued_day.has(GUEST) or not gs.is_camping(GUEST):
+			problems.append("The late riser is put back to bed: %s" % [gs._expedition_rescued_day])
+		# A loaded save forgets them like the other recall days.
+		var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
+		var saved: float = GameClock.elapsed_days
+		if gs.farm_from_dict(data) != "" or not gs._expedition_warned_day.is_empty() or not gs._expedition_rescued_day.is_empty():
+			problems.append("farm_from_dict resets the expedition days: %s" % [gs._expedition_rescued_day])
+		GameClock.elapsed_days = saved
+		return "\n".join(problems))
+
+
 func test_all_in_bed_ends_the_day_with_one_in_a_farm_bed_and_one_at_the_camp() -> String:
 	return _bed_farm(true, func(gs: GameStateScript, beds: Node, clock: Node) -> String:
 		_away(gs, [GUEST] as Array[String], 99.0, 2)
@@ -407,8 +494,12 @@ func test_the_quest_completes_after_the_nights_and_the_trip_home_only_for_who_di
 			gs._campers.clear()
 			for id: String in who:
 				beds.get_up(id)
-		if QuestEngine.is_done(gs, QUEST, HOST):
-			problems.append("Not done before the trip home")
+		# The quest looks again after the nights (the test's farm is not wired to a clock).
+		_take(gs, [HOST] as Array[String])
+		if QuestEngine.is_done(gs, QUEST, HOST) or "home" in (gs.player_quest_state[HOST][QUEST]["steps_done"] as Array) or not "nights" in (gs.player_quest_state[HOST][QUEST]["steps_done"] as Array):
+			problems.append("After the nights the quest waits for the trip home: %s" % [gs.player_quest_state[HOST][QUEST]["steps_done"]])
+		if gs.has_had_xp_certificate(QUEST, HOST):
+			problems.append("No certificate before the trip home")
 		GameClock.elapsed_days = Shuttle.expedition_end(day)
 		gs._end_due_trips()
 		_take(gs, [HOST] as Array[String])
@@ -418,6 +509,10 @@ func test_the_quest_completes_after_the_nights_and_the_trip_home_only_for_who_di
 			problems.append("The quest completes for the one who took it")
 		if QuestEngine.is_done(gs, QUEST, GUEST) or (gs.player_quest_state.get(GUEST, {}) as Dictionary).has(QUEST):
 			problems.append("Not for the one who never took it")
+		if not gs.has_had_xp_certificate(QUEST, HOST) or gs.has_had_xp_certificate(QUEST, GUEST):
+			problems.append("The 40 XP certificate goes to the one who did it, not the other")
+		elif not gs.held_xp_certificates(HOST).values().has(40):
+			problems.append("The certificate is worth 40: %s" % [gs.held_xp_certificates(HOST)])
 		return "\n".join(problems))
 
 
@@ -532,4 +627,125 @@ func test_a_guest_sees_the_trip_row_and_the_open_camp_through_the_sync() -> Stri
 		return "The camp reaches a guest"
 	if not FarmSync.SHOWN_BY.get(&"shuttle_trips_changed", []).has("shuttle_trips"):
 		return "The trips reach a guest"
-	return ""
+	# The real round trip: capture on the host, update a playing guest and join a late one,
+	# with an expedition row and more nights held than the camp hub's own cap.
+	var host: GameStateScript = _state()
+	host.shuttle_trips[GUEST] = { "moon": Shuttle.DEIMOS, "ends_at": 6.0, "expedition": true }
+	host.camps_open.append(Shuttle.DEIMOS)
+	host.camp_supplies = Camp.MAX_SUPPLIES + 5
+	var bytes: PackedByteArray = FarmSync.capture(host)
+	var problems: Array[String] = []
+	var held_guest: bool = FarmCommands.guest
+	var elapsed: float = GameClock.elapsed_days
+	var open: bool = SaveGame.farm_open
+	for late: bool in [false, true]:
+		var guest: GameStateScript = _state()
+		guest.local_player_id = GUEST
+		FarmCommands.guest = true
+		var told: String = FarmSync.join(bytes, guest) if late else FarmSync.update(bytes, guest)
+		FarmCommands.guest = held_guest
+		GameClock.elapsed_days = elapsed
+		SaveGame.farm_open = open
+		if told != "":
+			problems.append("%s: '%s'" % ["join" if late else "update", told])
+		elif not Shuttle.is_expedition(guest.shuttle_trips.get(GUEST)) or not guest.camps_open.has(Shuttle.DEIMOS) or guest.camp_supplies != Camp.MAX_SUPPLIES + 5:
+			problems.append("The guest sees the row, the camp and the supplies (%s): %s, %s, %d" % ["join" if late else "update", guest.shuttle_trips, guest.camps_open, guest.camp_supplies])
+		guest.free()
+	# The guest's own booking command is plain, typed list and all, and a well-formed command.
+	var party: Array[String] = [GUEST, HOST]
+	if not CoopSession.plain_arguments([Shuttle.DEIMOS, party, 120]) or not CoopSession.plain_arguments([Shuttle.DEIMOS, [GUEST], 120]):
+		problems.append("A booking's arguments are plain")
+	var commands: Node = CommandsScript.new()
+	if commands.problem(&"book_expedition", [Shuttle.DEIMOS, party, 120]) != "":
+		problems.append("A guest's booking is a well-formed command")
+	commands.free()
+	host.free()
+	return "\n".join(problems)
+
+
+func test_a_survey_brought_finished_opens_the_camp_before_it_books() -> String:
+	var day: float = _fitting_day()
+	var gs: GameStateScript = _state()
+	# A finished Deimos Survey came with the host from another farm; nothing has run since.
+	gs.player_quest_state[HOST] = { QUEST: { "accepted": 1, "steps_done": ["book", "nights", "home"], "base": {}, "shown": {}, "players": [HOST], "done": 1, "carried": {} } }
+	var problems: Array[String] = []
+	if gs.camps_open.has(Shuttle.DEIMOS):
+		problems.append("The camp starts shut")
+	var why: String = _book(gs, [HOST] as Array[String], day)
+	if why != "" or not gs.camps_open.has(Shuttle.DEIMOS):
+		problems.append("A booking is never to a shut camp: '%s', %s" % [why, gs.camps_open])
+	_done(gs)
+	return "\n".join(problems)
+
+
+func test_the_trip_home_does_not_count_an_expedition_done_before_the_quest_was_taken() -> String:
+	var gs: GameStateScript = _state()
+	var own: Dictionary = gs.action_counts.get_or_add(HOST, {}) as Dictionary
+	own["expedition_done"] = { "count": 1, "xp": 0 }
+	own[Camp.EXPEDITION_NIGHT_COUNT] = { "count": 5, "xp": 0 }
+	_take(gs, [HOST] as Array[String])
+	var problems: Array[String] = []
+	own["expedition_booked"] = { "count": int(((own.get("expedition_booked", {}) as Dictionary).get("count", 0))) + 1, "xp": 0 }
+	_take(gs, [HOST] as Array[String])
+	own[Camp.EXPEDITION_NIGHT_COUNT]["count"] = 7
+	_take(gs, [HOST] as Array[String])
+	var done_steps: Array = gs.player_quest_state[HOST][QUEST]["steps_done"]
+	if not "nights" in done_steps or "home" in done_steps or QuestEngine.is_done(gs, QUEST, HOST):
+		problems.append("Two new nights do not finish an old trip home: %s" % [done_steps])
+	own["expedition_done"]["count"] = 2
+	_take(gs, [HOST] as Array[String])
+	if not QuestEngine.is_done(gs, QUEST, HOST):
+		problems.append("A trip run to its end after the nights does")
+	_done(gs)
+	return "\n".join(problems)
+
+
+func test_the_words_say_the_day_the_close_day_and_the_real_supply_numbers() -> String:
+	var problems: Array[String] = []
+	var short: String = Shuttle.expedition_problem(Shuttle.DEIMOS, 30, true, 0, 2, _fitting_day(), true, 30, true, true, 1)
+	var cost: Dictionary = Shuttle.expedition_cost(2, 1)
+	var bought: String = "%d bought of the %d needed" % [int(cost["buy"]), int(cost["needed"])]
+	if not short.contains(bought) or not short.contains("supplies %d CR" % int(cost["supplies"])):
+		problems.append("The short-wallet line gives the real supply numbers (%s): %s" % [bought, short])
+	var at: float = _short_day()
+	if at >= 0.0:
+		var window: String = Shuttle.expedition_problem(Shuttle.DEIMOS, 30, true, 9999, 1, at, true, 30, true, true, 0)
+		var back: float = Shuttle.expedition_end(at)
+		var shuts: float = Shuttle.closes_at(Shuttle.DEIMOS, at)
+		if not window.contains("home day %d at" % (floori(back) + 1)) or not window.contains("closes day %d at" % (floori(shuts) + 1)):
+			problems.append("The window line says the days: %s" % window)
+	return "\n".join(problems)
+
+
+func test_an_expedition_row_must_be_to_deimos_and_the_camp_list_has_it() -> String:
+	var problems: Array[String] = []
+	if Shuttle.trip_shape_problem({ "moon": Shuttle.PHOBOS, "ends_at": 6.0, "expedition": true }) == "":
+		problems.append("An expedition to Phobos (no camp) is refused")
+	if Shuttle.trip_shape_problem({ "moon": Shuttle.DEIMOS, "ends_at": 6.0, "expedition": true }) != "" or Shuttle.trip_shape_problem({ "moon": Shuttle.PHOBOS, "ends_at": 6.0 }) != "":
+		problems.append("A Deimos expedition and a Phobos day trip stay well-formed")
+	for zone: String in Camp.zones():
+		if not Camp.has_camp(zone):
+			problems.append("%s is listed but has no camp" % zone)
+	if not Shuttle.DEIMOS in Camp.zones() or not Camp.zones().has("lava_tubes"):
+		problems.append("zones() lists both camps: %s" % [Camp.zones()])
+	return "\n".join(problems)
+
+
+func test_the_deimos_bed_needs_the_camp_within_reach_not_the_whole_moon() -> String:
+	var near: Node3D = Node3D.new()
+	var far: Node3D = Node3D.new()
+	var root: Node = Engine.get_main_loop().root  # global_position needs a walker in the tree
+	root.add_child(near)
+	root.add_child(far)
+	near.position = Camp.position(Shuttle.DEIMOS) + Vector3(Camp.MOON_REACH_M - 1.0, 0.0, 0.0)
+	far.position = Camp.position(Shuttle.DEIMOS) + Vector3(Camp.MOON_REACH_M + 1.0, 0.0, 0.0)
+	var problems: Array[String] = []
+	if Camp.moon_reach_refusal(Shuttle.DEIMOS, near) != "":
+		problems.append("Near the camp the bed is open")
+	if Camp.moon_reach_refusal(Shuttle.DEIMOS, far) == "" or Camp.moon_reach_refusal(Shuttle.DEIMOS, null) == "":
+		problems.append("Far from it, or with no walker to say, the bed is refused")
+	if Camp.moon_reach_refusal("lava_tubes", far) != "":
+		problems.append("A rover camp has its own reach rule, not this one")
+	near.free()
+	far.free()
+	return "\n".join(problems)

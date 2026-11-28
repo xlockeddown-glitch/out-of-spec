@@ -187,6 +187,8 @@ static func trip_shape_problem(trip: Variant) -> String:
 	var shaped: bool = row.size() == 2 or (row.size() == 3 and row.get("expedition") == true)
 	if not shaped or not row.get("moon") is String or not is_moon(row["moon"]) 			or not ZoneData.is_playable(StringName(row["moon"])):
 		return "has a moon with no hub"
+	if row.get("expedition") == true and row["moon"] != DEIMOS:
+		return "has an expedition to a moon with no camp"
 	var ends: Variant = row.get("ends_at")
 	if not ends is float or not is_finite(ends) or ends < 0.0:
 		return "has an end that is not a time"
@@ -255,11 +257,11 @@ static func expedition_problem(moon: String, lab_level: int, licensed: bool, cre
 	var back: float = expedition_end(elapsed_days)
 	var shuts: float = closes_at(moon, elapsed_days)
 	if shuts < back - EPSILON_H / 24.0:
-		return text("expedition_window_text") % [SP811.integer(expedition_nights()), SP811.integer(floori(back) + 1), clock_text(back), clock_text(shuts)]
+		return text("expedition_window_text") % [SP811.integer(expedition_nights()), SP811.integer(floori(back) + 1), clock_text(back), SP811.integer(floori(shuts) + 1), clock_text(shuts)]
 	var cost: Dictionary = expedition_cost(people, held)
 	if credits < int(cost["total"]):
 		return text("expedition_short_text") % [moon_name(moon), SP811.integer(int(cost["total"])), SP811.integer(int(cost["fare"])),
-			SP811.integer(people), SP811.integer(int(cost["supplies"])), SP811.integer(expedition_nights()), SP811.integer(credits)]
+			SP811.integer(people), SP811.integer(int(cost["supplies"])), SP811.integer(int(cost["buy"])), SP811.integer(int(cost["needed"])), SP811.integer(credits)]
 	if not hub_ready:
 		return text("no_hub_text") % moon_name(moon)
 	return ""
