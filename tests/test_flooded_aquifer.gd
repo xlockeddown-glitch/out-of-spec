@@ -71,8 +71,8 @@ func test_depth_one_is_the_same_for_the_same_seed_and_day_and_new_the_next_day()
 		return "The floor changed on only %d of 10 days." % changed
 	if AquiferDepth.layout(SEED + 1, 1, 5)["finds"] == a["finds"] and AquiferDepth.layout(SEED + 2, 1, 5)["finds"] == a["finds"]:
 		return "Another seed made the same floor."
-	if not AquiferDepth.layout(SEED, 0, 5).is_empty() or not AquiferDepth.layout(SEED, 2, 5).is_empty():
-		return "Only depth 1 exists: there is no depth 0 floor and no depth 2."
+	if not AquiferDepth.layout(SEED, 0, 5).is_empty() or not AquiferDepth.layout(SEED, 7, 5).is_empty():
+		return "Depths 1 to 6 exist: there is no depth 0 floor and no depth 7."
 	if a["finds"].size() != AquiferDepth.find_count():
 		return "The floor has %d finds, not %d." % [a["finds"].size(), AquiferDepth.find_count()]
 	return ""
@@ -572,12 +572,12 @@ func test_the_midnight_warning_covers_the_aquifer_once() -> String:
 	return "" if warned == 1 and rescued == 0 else "One warning, no rescue yet: %d warnings, rescued day %d." % [warned, rescued]
 
 
-func test_zone_presence_accepts_depth_one_in_the_aquifer() -> String:
-	for depth: int in [0, 1]:
+func test_zone_presence_accepts_depths_to_six_in_the_aquifer() -> String:
+	for depth: int in [0, 1, 2, 3, 4, 5, 6]:
 		if ZonePresence.place_problem(ZONE, depth) != "":
 			return "Depth %d in the Aquifer was refused: %s" % [depth, ZonePresence.place_problem(ZONE, depth)]
-	if ZonePresence.place_problem(ZONE, 2) == "":
-		return "Depth 2 in the Aquifer was accepted: there is none."
+	if ZonePresence.place_problem(ZONE, 7) == "":
+		return "Depth 7 in the Aquifer was accepted: there is none."
 	return ""
 
 
@@ -594,7 +594,7 @@ func test_the_hatch_takes_the_rover_down_and_back_up() -> String:
 		gs.player_places[HOST] = [ZONE, 1]
 		gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.ascent_position())
 		if gs.change_depth(2, HOST) == "" or gs.rover_depth != 1:
-			problems.append("The Aquifer has no depth 2.")
+			problems.append("Depth 2 is down the trunk hatch, not from the way up.")
 		why = gs.change_depth(0, HOST)
 		if why != "" or gs.rover_depth != 0:
 			problems.append("The way up must bring the rover back: '%s', depth %d." % [why, gs.rover_depth])

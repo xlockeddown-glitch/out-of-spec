@@ -138,7 +138,7 @@ func _build_zone() -> void:
 		GameState.beacons_changed.connect(_on_beacons_changed)
 	# The lift station: at the hub, and at the depth that has one. Broken until repaired.
 	if ZoneDepth.is_lift_depth(_built_depth) or _built_depth == 0:
-		_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth()))
+		_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(_zone_id(), _lift_depth()))
 		GameState.lifts_changed.connect(_on_lifts_changed)
 
 
@@ -271,7 +271,7 @@ func _tell_hub() -> void:
 		LavaHub.SPOT:
 			_hud.push_log("BEACON SPOT: press " + Controls.prompt(&"interact") + " to set a beacon down.")
 		HATCH:
-			var shut: String = GameState.lava_deep_problem() if ZoneDepth.is_deep(_built_depth + 1) else ""
+			var shut: String = GameState.deep_problem(_zone_id()) if ZoneDepth.is_deep(_built_depth + 1) else ""
 			_hud.push_log("WAY DOWN: press " + Controls.prompt(&"interact") + " to go down." if shut == "" else "WAY DOWN: " + shut)
 		LIFT:
 			_hud.push_log(_lift_prompt())
@@ -383,7 +383,7 @@ func _use_find(find_id: String) -> void:
 ## The depth whose lift this screen shows: the hub's (0) goes to the deepest repaired
 ## one; below, the depth's own.
 func _lift_depth() -> int:
-	return GameState.repaired_lift_depth(ZoneDepth.ZONE) if _built_depth == 0 else _built_depth
+	return GameState.repaired_lift_depth(_zone_id()) if _built_depth == 0 else _built_depth
 
 
 ## The way down or the lift the rover is by (below: only if the depth has one), or {}.
@@ -392,7 +392,7 @@ func _station_near() -> Dictionary:
 	if ZoneDepth.has_way_down(_built_depth) and ZoneDepth.near_descent(at, _built_depth):
 		return { "kind": HATCH, "id": "" }
 	if (_built_depth == 0 or ZoneDepth.is_lift_depth(_built_depth)) and ZoneDepth.near_lift(at, _built_depth):
-		return { "kind": LIFT, "id": "repaired" if GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth()) else "broken" }
+		return { "kind": LIFT, "id": "repaired" if GameState.is_lift_repaired(_zone_id(), _lift_depth()) else "broken" }
 	return {}
 
 
@@ -429,9 +429,9 @@ func _use_camp() -> void:
 
 
 func _lift_prompt() -> String:
-	var repaired: bool = GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth())
+	var repaired: bool = GameState.is_lift_repaired(_zone_id(), _lift_depth())
 	if repaired:
-		var shut: String = GameState.lava_deep_problem() if _built_depth == 0 and ZoneDepth.is_deep(_lift_depth()) else ""
+		var shut: String = GameState.deep_problem(_zone_id()) if _built_depth == 0 and ZoneDepth.is_deep(_lift_depth()) else ""
 		if shut != "":
 			return "LIFT: " + shut
 		return "LIFT: press " + Controls.prompt(&"interact") + " to ride it %s." % ("up to the hub" if _built_depth > 0 else "down to depth %d" % _lift_depth())
@@ -442,7 +442,7 @@ func _lift_prompt() -> String:
 
 ## E at a lift: repair it where it is broken (below), or ride it. The host decides.
 func _use_lift() -> void:
-	if _built_depth > 0 and not GameState.is_lift_repaired(ZoneDepth.ZONE, _built_depth):
+	if _built_depth > 0 and not GameState.is_lift_repaired(_zone_id(), _built_depth):
 		var problem: String = await FarmCommands.request(&"repair_lift", [])
 		if not is_inside_tree():
 			return
@@ -454,7 +454,7 @@ func _use_lift() -> void:
 
 ## The lift was repaired, here or by a friend: draw it so.
 func _on_lifts_changed() -> void:
-	_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(ZoneDepth.ZONE, _lift_depth()))
+	_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(_zone_id(), _lift_depth()))
 	_told_hub = ""  # the prompt changed
 	_hud.set_credibility(GameState.credibility_text(), GameState.contract_phone_text(), GameState.lab_phone_text())  # the deepest depth
 

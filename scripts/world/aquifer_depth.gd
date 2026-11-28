@@ -13,11 +13,17 @@ extends RefCounted
 ## Pressure drop & wet pack: each day one side room has an open seal at its doorway
 ## (`valves_shut` shuts it for today), and taking a find that could only be reached by
 ## wading wets the taker's pack (`packs_wet`), spoiling one camp ration once per day.
-## Not built here (later PRs): Vance's quests, depth 2 and below, a lift, a camp.
+## Depths 2 to 6 (slice 12): the same hazards on each, a hatch down from every depth but
+## the last, a lift at depths 3 and 6 (the Lava Tubes' pattern), and the pools, seals and
+## valves stored by depth (storage_id), so draining a pool on depth 2 leaves depth 5 wet.
+## Not built here (later PRs): Vance's quests, a camp.
 
 const ZONE: String = "flooded_aquifer"
-## One depth below the hub: no lift, no depth 2.
-const MAX_DEPTH: int = 1
+## Six depths below the hub, as the Lava Tubes [PLACEHOLDER]: lifts at 3 and 6, and 4 to 6
+## behind the `aquifer_deep` gate (GameState.aquifer_deep_problem).
+const MAX_DEPTH: int = 6
+## The gate row of data/skills.json that holds the lab level for the deep depths.
+const DEEP_GATE: String = "aquifer_deep"
 ## The hub's way down, and what the hub's crate and board stand at (all floor in HUB).
 const HATCH_CELL := Vector2i(8, 16)
 const CRATE_CELL := Vector2i(14, 16)
@@ -36,6 +42,11 @@ const RATIONS_SPOILED: int = 1
 ## (Terrain.WASH_BLOCK_M), 0.1 and up is waded (PitWater.WADE_MIN_M).
 const SHALLOW_M: Array[float] = [0.3, 0.5]
 const DEEP_M: Array[float] = [0.9, 1.1]
+## Deeper down the water is deeper and more common [PLACEHOLDER]: below depth 1 each level
+## adds one more pair of deep depths to the hash's choice (a pool in a passage is deep
+## 50 % of the time at depth 1, 67 % at depth 2, 75 % at depth 3, up to 86 % at depth 6),
+## and 0.1 m to a deep pool's depth.
+const DEEP_EXTRA_M_PER_LEVEL: float = 0.1
 ## The rooms (top left), as the Lava Tubes' ROOM_SLOTS, open floor [PLACEHOLDER].
 const ROOMS: Array[Rect2i] = [Rect2i(2, 8, 7, 5), Rect2i(15, 8, 7, 5), Rect2i(8, 1, 7, 5)]
 const CARVES: Array[Rect2i] = [Rect2i(8, 15, 7, 4), Rect2i(10, 13, 3, 8), Rect2i(11, 6, 2, 8)]
@@ -53,12 +64,19 @@ const WET_PACK_SPOILED_TEXT: String = "Your pack got wet wading. One camp ration
 const WET_PACK_TEXT: String = "Your pack got wet wading."
 ## What a find is, by kind, and what it pays [PLACEHOLDER].
 const KINDS: Array[String] = ["water", "water", "brine", "gear", "gear"]
+## The deep depths (4 to 6) add the sealed gauge-block case (docs/design/zones.md) to the kinds.
+const KINDS_DEEP: Array[String] = ["water", "water", "brine", "gear", "gear", "case", "case"]
 const REWARDS: Dictionary = {
 	"water": { "credits": 10 },
 	"brine": { "crystal_ore": 1, "credits": 4 },
 	"gear": { "credits": 18 },
+	"case": { "crystal_ore": 2, "credits": 40 },
 }
-const NAMES: Dictionary = { "water": "a water sample", "brine": "a brine sample", "gear": "drowned gear" }
+## What a find pays more for each level below depth 1 [PLACEHOLDER]: credits by kind, and
+## a crystal ore on a brine sample every second level.
+const CREDITS_PER_LEVEL: Dictionary = { "water": 4, "brine": 3, "gear": 6, "case": 10 }
+const NAMES: Dictionary = { "water": "a water sample", "brine": "a brine sample", "gear": "drowned gear",
+		"case": "a sealed gauge-block case" }
 
 static var _hub: PackedStringArray = PackedStringArray()
 
@@ -107,13 +125,47 @@ static func _near(there: Vector3, at: Vector3) -> bool:
 	return Vector2(there.x - at.x, there.z - at.z).length() <= ZoneDepth.REACH_M
 
 
-# --- Depth 1 --------------------------------------------------------------------
+# --- The hazards, by depth ------------------------------------------------------
+
+## The id a pool or a seal is stored under in `pools_drained` and `valves_shut` (one
+## record per zone, ids inside it): the plain id at depth 1 (so a save from before depths
+## 2 to 6 reads as it did), "d<depth>_<id>" below, so one depth's pool is not another's.
+static func storage_id(depth: int, plain: String) -> String:
+	return plain if depth <= 1 else "d%d_%s" % [depth, plain]
+
+
+## Every id a saved `pools_drained` or `valves_shut` may hold for `plain_ids`.
+static func storage_ids(plain_ids: Array[String]) -> Array[String]:
+	var out: Array[String] = []
+	for depth: int in range(1, MAX_DEPTH + 1):
+		for plain: String in plain_ids:
+			out.append(storage_id(depth, plain))
+	return out
+
+
+## The pool depths a pool in a passage may have at `depth` (the hash picks one): the
+## deep ones first (deeper by DEEP_EXTRA_M_PER_LEVEL a level), then the shallow, then one
+## more pair of deep ones for each level below depth 1.
+static func pool_choices(depth: int) -> Array[float]:
+	var extra: float = DEEP_EXTRA_M_PER_LEVEL * maxi(depth - 1, 0)
+	var deeper: Array[float] = []
+	for metres: float in DEEP_M:
+		deeper.append(snappedf(metres + extra, 0.01) if extra > 0.0 else metres)
+	var out: Array[float] = deeper.duplicate()
+	out.append_array(SHALLOW_M)
+	for level: int in maxi(depth - 1, 0):
+		out.append_array(deeper)
+	return out
+
+
+# --- Depths 1 to 6 --------------------------------------------------------------
 
 ## Depth `depth` on `day`, with the pools in `drained` (ids) dry and the seals in `shut`
 ## (ids) closed: { "depth", "day", "grid" (the water as it is: `w` where a deep pool still
 ## stands), "start", "rooms", "finds" (Array of { "id", "kind", "cell", "room" }),
 ## "pools" (Array of { "id", "rect" (Rect2i), "depth_m", "drained" }), "seals" (Array of
-## { "id", "room", "cell", "shut" }) }. Only depth 1 exists: any other asks for {}.
+## { "id", "room", "cell", "shut" }) }. `drained` and `shut` hold storage ids (storage_id).
+## Only depths 1 to MAX_DEPTH exist: any other asks for {}.
 static func layout(world_seed: int, depth: int, day: int, drained: Array = [], shut: Array = []) -> Dictionary:
 	if depth < 1 or depth > MAX_DEPTH:
 		return {}
@@ -131,16 +183,18 @@ static func layout(world_seed: int, depth: int, day: int, drained: Array = [], s
 	var rects: Array[Rect2i] = [Rect2i(11, 6, 2, 2), Rect2i(9, west_y, 2, 2), Rect2i(13, east_y, 2, 2)]
 	var pools: Array = []
 	for index: int in rects.size():
-		var metres: float = DEEP_M[ZoneDepth.draw(base, 40, DEEP_M.size())] if index == 0 \
-				else (DEEP_M + SHALLOW_M)[ZoneDepth.draw(base, 40 + index, DEEP_M.size() + SHALLOW_M.size())]
-		pools.append({ "id": POOL_IDS[index], "rect": rects[index], "depth_m": metres, "drained": POOL_IDS[index] in drained })
+		var choices: Array[float] = pool_choices(depth)
+		var metres: float = choices[ZoneDepth.draw(base, 40, DEEP_M.size())] if index == 0 \
+				else choices[ZoneDepth.draw(base, 40 + index, choices.size())]
+		pools.append({ "id": POOL_IDS[index], "rect": rects[index], "depth_m": metres,
+				"drained": storage_id(depth, POOL_IDS[index]) in drained })
 	var mouths: Array[Vector2i] = [Vector2i(8, west_y), Vector2i(15, east_y), Vector2i(11, 5)]
 	var open_room: int = seal_room(base)
-	var seals: Array = [{ "id": SEAL_IDS[open_room], "room": open_room, "cell": mouths[open_room], "shut": SEAL_IDS[open_room] in shut }]
+	var seals: Array = [{ "id": SEAL_IDS[open_room], "room": open_room, "cell": mouths[open_room], "shut": storage_id(depth, SEAL_IDS[open_room]) in shut }]
 	var dry: PackedStringArray = _join(cells)
 	var rooms: Array[Rect2i] = ROOMS.duplicate()
 	var out: Dictionary = { "depth": depth, "day": day, "grid": dry, "start": ZoneDepth.START_CELL, "rooms": rooms,
-			"finds": _finds(base, dry, rooms, pools, seals), "pools": pools, "seals": seals }
+			"finds": _finds(base, dry, rooms, pools, seals, depth), "pools": pools, "seals": seals }
 	# The water, as it stands: a deep pool that is not drained is `w`.
 	for pool: Dictionary in pools:
 		if is_deep(pool) and not bool(pool["drained"]):
@@ -207,9 +261,11 @@ static func pool_gap_m(pool: Dictionary, at: Vector3) -> float:
 ## The finds: PER_ROOM in each room and ON_LANDING on the landing, never on a pool, an
 ## open seal's valve cell, the start or the way up. Ids are "d1_f<number>" in this order
 ## (as the Lava Tubes' are); "room" is 0..2 for the side rooms, or -1 on the landing.
-static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], pools: Array, seals: Array = []) -> Array:
+static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], pools: Array, seals: Array = [], depth: int = 1) -> Array:
 	var finds: Array = []
 	var used: Array[Vector2i] = [ZoneDepth.START_CELL, ZoneDepth.UP_CELL]
+	used.append_array(ZoneDepth._kept_clear(depth))  # the hatch and the lift, and the cell beside each
+	var kinds: Array[String] = KINDS_DEEP if ZoneDepth.is_deep(depth) else KINDS
 	for pool: Dictionary in pools:
 		var rect: Rect2i = pool["rect"]
 		for y: int in range(rect.position.y, rect.end.y):
@@ -233,7 +289,7 @@ static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i], poo
 			var index: int = finds.size()
 			var cell: Vector2i = free[ZoneDepth.draw(base, 100 + index, free.size())]
 			used.append(cell)
-			finds.append({ "id": ZoneDepth.find_id(index, 1), "kind": KINDS[ZoneDepth.draw(base, 200 + index, KINDS.size())],
+			finds.append({ "id": ZoneDepth.find_id(index, depth), "kind": kinds[ZoneDepth.draw(base, 200 + index, kinds.size())],
 					"cell": cell, "room": int(area[2]) })
 	return finds
 
@@ -242,14 +298,21 @@ static func find_count() -> int:
 	return PER_ROOM * ROOMS.size() + ON_LANDING
 
 
-## What a find pays: { "crystal_ore": n, "credits": n }, only what it has.
-static func reward(kind: String) -> Dictionary:
-	return (REWARDS.get(kind, {}) as Dictionary).duplicate()
+## What a find pays at `depth`: { "crystal_ore": n, "credits": n }, only what it has. More
+## for each level below depth 1 (CREDITS_PER_LEVEL), so a deeper find is always worth more.
+static func reward(kind: String, depth: int = 1) -> Dictionary:
+	var pay: Dictionary = (REWARDS.get(kind, {}) as Dictionary).duplicate()
+	var levels: int = maxi(depth - 1, 0)
+	if levels > 0 and pay.has("credits"):
+		pay["credits"] = int(pay["credits"]) + int(CREDITS_PER_LEVEL.get(kind, 0)) * levels
+	if levels > 1 and kind == "brine":
+		pay["crystal_ore"] = int(pay.get("crystal_ore", 0)) + (levels >> 1)
+	return pay
 
 
-static func reward_text(kind: String) -> String:
+static func reward_text(kind: String, depth: int = 1) -> String:
 	var parts: PackedStringArray = []
-	var pay: Dictionary = reward(kind)
+	var pay: Dictionary = reward(kind, depth)
 	if pay.has("crystal_ore"):
 		parts.append("%d crystal ore" % int(pay["crystal_ore"]))
 	if pay.has("credits"):
@@ -293,7 +356,7 @@ static func pump_problem(layout_data: Dictionary, pool_id: String, drained: Arra
 	var pool: Dictionary = pool_in(layout_data, pool_id)
 	if pool.is_empty():
 		return "There is no pool '%s' here today." % pool_id
-	if pool_id in drained:
+	if storage_id(int(layout_data.get("depth", 1)), pool_id) in drained:
 		return "That pool is drained already."
 	if pool_gap_m(pool, at) > PUMP_REACH_M + ZoneDepth.HOST_REACH_SLACK_M:
 		return "The rover is too far from that pool."
@@ -321,7 +384,7 @@ static func drained_problem(drained: Variant) -> String:
 			return "'pools_drained' has ids that are not a list."
 		var seen: Array[String] = []
 		for id: Variant in ids:
-			if not id is String or not id in POOL_IDS or id in seen:
+			if not id is String or not id in storage_ids(POOL_IDS) or id in seen:
 				return "'pools_drained' has an id that is not a pool's, or has it twice."
 			seen.append(id)
 	return ""
@@ -376,7 +439,7 @@ static func valve_problem(layout_data: Dictionary, seal_id: String, shut: Array,
 	var seal: Dictionary = seal_in(layout_data, seal_id)
 	if seal.is_empty():
 		return "There is no open seal '%s' here today." % seal_id
-	if seal_id in shut or bool(seal.get("shut", false)):
+	if storage_id(int(layout_data.get("depth", 1)), seal_id) in shut or bool(seal.get("shut", false)):
 		return "That valve is shut already."
 	var there: Vector3 = seal_position(seal)
 	if Vector2(there.x - at.x, there.z - at.z).length() > VALVE_REACH_M + ZoneDepth.HOST_REACH_SLACK_M:
@@ -405,7 +468,7 @@ static func shut_problem(shut: Variant) -> String:
 			return "'valves_shut' has ids that are not a list."
 		var seen: Array[String] = []
 		for id: Variant in ids:
-			if not id is String or not id in SEAL_IDS or id in seen:
+			if not id is String or not id in storage_ids(SEAL_IDS) or id in seen:
 				return "'valves_shut' has an id that is not a seal's, or has it twice."
 			seen.append(id)
 	return ""

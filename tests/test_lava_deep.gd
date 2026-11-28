@@ -363,7 +363,7 @@ func test_a_deep_save_round_trips_and_an_old_save_loads() -> String:
 
 func test_each_zone_has_its_own_most_depth_and_the_moons_have_none() -> String:
 	var problems: Array[String] = []
-	var limits: Dictionary = {"lava_tubes": 6, "flooded_aquifer": 1, "colony_mine": 1, "ice_caves": 1, "phobos": 0, "deimos": 0}
+	var limits: Dictionary = {"lava_tubes": 6, "flooded_aquifer": 6, "colony_mine": 1, "ice_caves": 1, "phobos": 0, "deimos": 0}
 	for zone: String in limits:
 		var most: int = limits[zone]
 		if ZoneDepth.max_depth_of(zone) != most:
@@ -377,7 +377,11 @@ func test_each_zone_has_its_own_most_depth_and_the_moons_have_none() -> String:
 	# Finds: depth 4's and 6's ids belong to the Lava Tubes alone.
 	if ZoneDepth.taken_problem({"lava_tubes": {"day": 1, "ids": ["d6_f0"]}}) != "":
 		problems.append("The Lava Tubes' depth 6 find was refused.")
-	for zone: String in ["flooded_aquifer", "colony_mine", "ice_caves"]:
+	if ZoneDepth.taken_problem({"flooded_aquifer": {"day": 1, "ids": ["d6_f0"]}}) != "":
+		problems.append("The Aquifer's depth 6 find was refused.")
+	if ZoneDepth.taken_problem({"flooded_aquifer": {"day": 1, "ids": ["d7_f0"]}}) == "":
+		problems.append("The Aquifer took a find id from depth 7.")
+	for zone: String in ["colony_mine", "ice_caves"]:
 		if ZoneDepth.taken_problem({zone: {"day": 1, "ids": ["d4_f0"]}}) == "":
 			problems.append("%s took a find id from depth 4." % zone)
 	# Lifts: 6 needs 3, in either order; no lift is deeper than the zone.
