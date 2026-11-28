@@ -27,6 +27,10 @@ var cache_click: Inspectable
 var pod_click: Inspectable
 ## The expedition camp's click target (zones step 18): no collision body, layer 8 only.
 var camp_click: Clickable
+var _cache_padlock: Node3D
+var _cache_lid_shut: Node3D
+var _cache_open_group: Node3D
+var _cache_day: int = -1
 
 
 func _moon() -> String:
@@ -135,8 +139,10 @@ func _build_world() -> void:
 	pod_click = _make_pod()
 	console_click.clicked.connect(_on_console)
 	board_click.clicked.connect(_on_board)
-	cache_click.inspected.connect(_toast)
+	cache_click.clicked.connect(_on_cache)
 	pod_click.inspected.connect(_toast)
+	GameState.deimos_cache_changed.connect(_refresh_cache)
+	_refresh_cache()
 	# The expedition camp (Camp.MOON_SPOTS): the camp props show once a quest opens it.
 	add_child(CampProps.new(DEIMOS))
 	camp_click = _clickable(Clickable.new(), Camp.position(DEIMOS) + Vector3(0.0, 0.6, 0.0), Vector3(4.0, 1.4, 3.0), "")
@@ -156,6 +162,8 @@ var _hint_asleep: bool = false
 func _process(delta: float) -> void:
 	if CoopBeds.in_bed.has(GameState.local_player_id) != _hint_asleep:
 		_refresh_camp_hint()
+	if GameClock.get_day_index() != _cache_day:
+		_refresh_cache()
 	super(delta)
 
 
@@ -214,6 +222,8 @@ func _drum(part_name: String, at: Vector3, radius: float, height: float, colour:
 
 
 ## The cache: ochre crates in a tidy stack with a small padlock, on a swept square.
+## Has a shut look (padlock + flush lid) and an opened look (propped lid, warm liner,
+## unlatched padlock on the deck); zero extra colliders, palette constants only.
 func _make_cache() -> Inspectable:
 	var at: Vector3 = DEIMOS_SPOTS["Cache"]
 	var ochre: Color = MoonLook.DEIMOS_CACHE
@@ -221,11 +231,61 @@ func _make_cache() -> Inspectable:
 	add_child(_part("CrateA", at + Vector3(-0.7, 0.5, 0.0), Vector3(1.2, 1.0, 1.0), ochre, true))
 	add_child(_part("CrateB", at + Vector3(0.7, 0.45, 0.2), Vector3(1.0, 0.9, 1.0), ochre.darkened(0.15), true))
 	add_child(_part("CrateC", at + Vector3(0.0, 1.4, 0.0), Vector3(1.1, 0.8, 0.9), ochre.lightened(0.1)))
-	add_child(_part("CachePadlock", at + Vector3(-0.7, 0.7, 0.55), Vector3(0.22, 0.28, 0.1), MoonLook.SCREEN_GLOW))
+	_cache_padlock = _part("CachePadlock", at + Vector3(-0.7, 0.7, 0.55), Vector3(0.22, 0.28, 0.1), MoonLook.SCREEN_GLOW)
+	add_child(_cache_padlock)
+	_cache_lid_shut = _part("CacheLidShut", at + Vector3(-0.7, 1.04, 0.0), Vector3(1.26, 0.08, 1.06), ochre.lightened(0.1))
+	add_child(_cache_lid_shut)
+	_cache_open_group = Node3D.new()
+	_cache_open_group.name = "CacheOpened"
+	var lid_open: Node3D = _part("CacheLidOpen", at + Vector3(-0.7, 1.15, -0.58), Vector3(1.26, 0.08, 1.06), ochre.lightened(0.1))
+	lid_open.rotation_degrees = Vector3(58.0, 0.0, 0.0)
+	_cache_open_group.add_child(lid_open)
+	_cache_open_group.add_child(_part("CacheWarmLiner", at + Vector3(-0.7, 0.98, 0.0), Vector3(1.06, 0.08, 0.86), MoonLook.WINDOW_GLOW))
+	_cache_open_group.add_child(_part("CacheLatchOpen", at + Vector3(-0.9, 0.09, 0.85), Vector3(0.22, 0.1, 0.28), MoonLook.DARK_METAL))
+	_cache_open_group.visible = false
+	add_child(_cache_open_group)
 	MoonLook.add_cache_detail(self, at)
 	var click: Inspectable = get_node("CacheSign") as Inspectable
 	_clickable(click, at + Vector3(0.0, 0.9, 0.0), Vector3(3.2, 2.0, 2.4), "")
 	return click
+
+
+## Updates the cache's shut/opened look and hover hint for today's state and label.
+func _refresh_cache() -> void:
+	var day: int = GameClock.get_day_index()
+	_cache_day = day
+	var opened: bool = GameState.deimos_cache_opened_today()
+	if _cache_padlock != null:
+		_cache_padlock.visible = not opened
+	if _cache_lid_shut != null:
+		_cache_lid_shut.visible = not opened
+	if _cache_open_group != null:
+		_cache_open_group.visible = opened
+	if cache_click == null:
+		return
+	var mislabeled: bool = GameState.is_deimos_cache_mislabeled(day)
+	if opened:
+		cache_click.hint = "Smuggler Cache (wrong label, opened today)" if mislabeled else "Smuggler Cache (opened today)"
+	elif mislabeled:
+		cache_click.hint = "Smuggler Cache — label says 'DRILL SPARES' (wrong label)"
+	else:
+		cache_click.hint = "Smuggler Cache"
+
+
+## Clicking the smuggler cache asks the host to open it (open_cache). On a wrong-label
+## day the refusal or notice notes the mislabeled stencil; opening still works.
+func _on_cache() -> void:
+	if _busy or not _near("Cache"):
+		return
+	var mislabeled: bool = GameState.is_deimos_cache_mislabeled()
+	_busy = true
+	var reply: String = await FarmCommands.request(&"open_cache", [])
+	_busy = false
+	if not is_inside_tree():
+		return
+	_refresh_cache()
+	if reply != "":
+		_toast(("Wrong label (marked 'DRILL SPARES'). " + reply) if mislabeled else reply)
 
 
 ## The test pod: a pale capsule box with a fogged window, a warm glow at its foot.
