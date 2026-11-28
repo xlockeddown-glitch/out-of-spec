@@ -41,6 +41,7 @@ func _build_zone() -> void:
 		_draw_walls()
 		_draw_sign()
 		_build_hub_decor()
+		_rover.get_parent().add_child(CampProps.new(IceDepth.ZONE))
 
 
 ## Hub dressing: hanging icicles along wall tops and the north arch, flush
@@ -193,7 +194,7 @@ func _ice_near() -> Dictionary:
 		return { "kind": CRATE, "id": "" }
 	if IceDepth.near_sign(at):
 		return { "kind": SIGN, "id": "" }
-	return {}
+	return _camp_near()
 
 
 ## The HUD has no status line, so the cold is told in the log: when the player comes in, every
@@ -227,6 +228,8 @@ func _tell_hub() -> void:
 				IceDepth.HEATER_COST_CREDITS, Controls.prompt(&"interact")])
 		SIGN:
 			_hud.push_log("NOTICE SIGN: press " + Controls.prompt(&"interact") + " to read it.")
+		CAMP:
+			_tell_camp()
 
 
 func _use_hub(target: Dictionary) -> void:

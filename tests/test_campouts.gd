@@ -76,8 +76,8 @@ func test_the_camp_cell_is_free_floor_in_the_hub() -> String:
 	for other: Vector2i in used:
 		if absi(other.x - cell.x) + absi(other.y - cell.y) < 2:
 			return "The camp's cell %s is on or beside %s." % [cell, other]
-	if Camp.position(ZONE) == Vector3.ZERO or not Camp.has_camp(ZONE) or Camp.has_camp("flooded_aquifer"):
-		return "Only the Lava Tubes have a camp this build, and it has a place."
+	if Camp.position(ZONE) == Vector3.ZERO or not Camp.has_camp(ZONE) or Camp.has_camp("colony_mine"):
+		return "The Lava Tubes camp has a place, and a zone with none has no camp."
 	return ""
 
 
@@ -488,7 +488,7 @@ func test_two_sunsets_data_is_clean_and_names_a_real_camp() -> String:
 	if quest.is_empty() or QuestEngine.data_problem(quest) != "":
 		return "Two Sunsets is shipped and has no problem: '%s'" % QuestEngine.data_problem(quest)
 	var odd: Dictionary = quest.duplicate(true)
-	odd["camp"] = "flooded_aquifer"
+	odd["camp"] = "colony_mine"
 	if QuestEngine.data_problem(odd) == "":
 		return "A camp in a zone with none is a data problem"
 	return ""
@@ -532,7 +532,7 @@ func test_a_camp_stays_shut_for_a_farm_that_took_no_quest() -> String:
 func test_open_camp_is_host_run_and_checks_the_zone() -> String:
 	var gs: GameStateScript = _state()
 	var problems: Array[String] = []
-	if gs.open_camp("flooded_aquifer") == "" or not gs.camps_open.is_empty():
+	if gs.open_camp("colony_mine") == "" or not gs.camps_open.is_empty():
 		problems.append("A zone with no camp opens nothing")
 	if gs.open_camp(ZONE) != "" or gs.open_camp(ZONE) != "" or gs.camps_open != [ZONE]:
 		problems.append("Opening twice holds the zone once: %s" % [gs.camps_open])
