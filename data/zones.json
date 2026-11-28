@@ -101,10 +101,10 @@
       "band": [55, 70],
       "hazards": ["heat", "scale", "getting_lost"],
       "finds": ["minerals", "ore"],
-      "hub_scene": "",
-      "entrance": "Not designed yet (section 11).",
+      "hub_scene": "res://scenes/olympus_caves.tscn",
+      "entrance": "A long climb up the shield volcano's flank to a collapsed skylight.",
       "tarantula_hook": "",
-      "notes": "Sketched only; a larger cousin of the Lava Tubes."
+      "notes": "Built (slice 31): a huge lava tube hall under a skylight, two depths, heat and getting lost [PLACEHOLDER]; a larger cousin of the Lava Tubes."
     },
     {
       "id": "polar_caps",

@@ -49,6 +49,7 @@ const GROUPS: Array[Dictionary] = [
 		{ "verb": "Dig the ground in front", "action": &"rover_dig" },
 		{ "verb": "Fill the ground in front", "action": &"rover_fill" },
 		{ "verb": "Place or take up a stone piece", "action": &"place_stone" },
+		{ "verb": "Leave a marker (in the caves)", "action": &"leave_marker" },
 		{ "verb": "Next stone piece", "action": &"stone_kind" },
 	] },
 	{ "title": "MENUS", "lines": [

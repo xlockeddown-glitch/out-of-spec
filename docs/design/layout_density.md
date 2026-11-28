@@ -74,7 +74,7 @@ Today every depth is the same 24 by 22 grid with three rooms. Proposal: **each z
 | **Phobos** | 3 Broken | Built hub; low gravity (slice 17) | Service crates, cable, regolith piles | The landing apron | Odalys's desk (built) |
 | **Deimos** | 2 Scattered | Built hub, quieter and older | Abandoned kit, a few pods | Wide dusty floor | Kestrel's camp (built) |
 | **Valles Marineris** (built, slice 30; layout and look are [PLACEHOLDER]) | 1 Open floor, 4 at the walls | A canyon: open floor, cluttered talus at the foot of each wall | Talus, fallen layers | The canyon floor | The canyon wall itself |
-| **Olympus Mons caves** (later, slice 31) | 2 Scattered, at scale | Lava tubes at a larger scale: huge, mostly empty | Huge breakdown blocks, few and far | Big skylit halls | A skylight shaft |
+| **Olympus Mons caves** (built, slice 31; layout and look are [PLACEHOLDER]) | 2 Scattered, at scale | Lava tubes at a larger scale: huge, mostly empty | Huge breakdown blocks, few and far | Big skylit halls | A skylight shaft |
 
 **The Mine and the Ice Caves are the clearest pair.** Packed against open, and both reuse the Lava hub today, so they get their own hubs first (§8).
 
@@ -113,6 +113,6 @@ Today every depth is the same 24 by 22 grid with three rooms. Proposal: **each z
 5. **Colony Mine hub and shafts.** Its own head-frame yard hub and packed shaft-grid room pieces for depths 2 to 6 (after slice 13 lands). PROTOCOL bump.
 6. **Ice Caves hub and caverns.** Its own ice-hall hub and open cavern pieces for depths 2 and down (fits with slice 14, slick ice and white-out). PROTOCOL bump.
 7. **Aquifer chambers.** Flooded-chamber pieces for depths 2 and down and a pump-house hub. PROTOCOL bump.
-8. **Later areas** (Valles Marineris, Olympus Mons) are laid out to this doc when their slices come up (30, 31).
+8. **Later areas** (Valles Marineris, Olympus Mons) are laid out to this doc when their slices come up (30, 31, both built). Olympus: one huge hall, four breakdown blocks in 66 m, a skylight shaft, and depths of two huge halls with two finds each.
 
 Every number in these PRs is a [PLACEHOLDER], recorded in `docs/decisions.md`.
