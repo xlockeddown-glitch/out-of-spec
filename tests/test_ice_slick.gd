@@ -601,7 +601,7 @@ func test_the_commands_are_listed_there_is_no_skid_request_and_the_protocol_is_t
 		return "The studs are bought on the farm."
 	if &"ice_skid" in FarmCommands.ACTIONS or &"ice_skid" in FarmCommands.BELOW_ONLY:
 		return "The host decides the skid: there is no ice_skid request."
-	return "" if CoopSession.PROTOCOL == 44 else "The protocol is %d, not 44." % CoopSession.PROTOCOL
+	return "" if CoopSession.PROTOCOL == 45 else "The protocol is %d, not 45." % CoopSession.PROTOCOL
 
 
 func test_the_lava_aquifer_and_mine_floors_have_no_slick_ice() -> String:

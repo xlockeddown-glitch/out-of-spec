@@ -2,6 +2,18 @@
 
 Short log of calls that shape code and data. Newest first.
 
+## 2026-11-28: Ice core samples and Vance's "A Core to Certify" (feat/ice-cores)
+
+Every new number and line of text below is a [PLACEHOLDER].
+
+- **Held stock (`GameState.ice_cores_held`):** taking an Ice Caves `"core"` find in `take_find` now stores it in the farm's cold box (`ice_cores_held`, `int`, saved in `SAVED_LATER` so old saves load as `0`, synced to guests under `oirm_changed`) instead of paying credits on the spot, and replies `"Took an ice core. It goes in the cold box for OIRM."` [PLACEHOLDER]. Cap `ICE_CORES_CAP = 5` [PLACEHOLDER]: at the cap, taking a core pays its old `IceDepth` credits (`10 CR`) and replies that the cold box is full. Minerals and probes pay unchanged.
+- **Sending to OIRM (`send_ice_core`):** host-run command in `FarmCommands.ACTIONS` (`player_id` filled from the connection, never the payload). Refuses with none held, without an OIRM account (`has_oirm_account()` or `lab_gate_open("oirm_account")`, matching `send_to_oirm`'s rule and refusal line), or without credits (`ICE_CORE_OIRM_FEE = 50 CR` [PLACEHOLDER] on the drop pod, plus `oirm_courier_surcharge()` when no pod is on the pad), changing nothing on refusal. Uses the pod's/courier's return day (`next_audit_day` or `today + oirm_courier_days()`). Records a trip in `oirm_trips` with `standard_id: ""`, `sample_kind: "ice_core"`, and `returned: false`. Every `oirm_trips` reader (`_excused_units`, `_trip_is_open`, `oirm_calibrate`, `has_oirm_account`, `_excused_until_audit`, and `paperwork_from_orbit`'s `where: { "not_standard_id": "" }`) ignores sample trips so they are never mistaken for standards.
+- **OIRM bench button (`scripts/ui/cal_bench_ui.gd`):** added one button `"Send an ice core (N held)"` beside the existing OIRM send button on the calibration bench (visible whenever cores are held), calling `FarmCommands.request(&"send_ice_core", [])`.
+- **Certified return (`_receive_ice_core_returns`):** runs in `_receive_oirm_returns(day)` on the same morning pass as standards. Marks `trip["returned"] = true` before paying `ICE_CORE_RETURN_CREDITS = 140 CR` [PLACEHOLDER] and `ICE_CORE_RETURN_LAB_XP = 80` [PLACEHOLDER], posts an OIRM certification phone line, and increments the host-recorded farm counter `ice_core_certified` by 1. Marking `returned = true` keeps returns idempotent across reloads.
+- **Vance's quest (`a_core_to_certify`):** `kind: "lab"`, `giver: "vance"`, `scope: "farm"`, `zone: "ice_caves"` in `data/quests.json`, offered once the farm has visited the Ice Caves (`reached_ice_caves >= 1`, recorded on entering the Ice Caves via `_move_rover` or `fast_travel`). Two ordered steps: take an ice core (`take_ice_core`) then get one certified (`ice_core_certified`). Rewards `lab_xp: 300` [PLACEHOLDER], `xp_certificate: 50` [PLACEHOLDER], and Vance's phone lines (`data/dialogue_dispatches.json`). The Ice Caves hub notice board (`scripts/world/ice_caves.gd`) now reads `NoticeBoard.lines(...)` for `zone == "ice_caves"` instead of `"Vance: [later]"`.
+- **Protocol:** `CoopSession.PROTOCOL` bumped 44 to 45 once for `send_ice_core` and `ice_cores_held`; all protocol-44 test pins updated.
+- **Tests:** `tests/test_ice_cores.gd`.
+
 ## 2026-11-28: Ice Caves slick ice, studs and white-out (feat/ice-slick)
 
 Slice 14. Every number and word below is a [PLACEHOLDER].
