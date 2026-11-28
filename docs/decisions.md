@@ -2535,3 +2535,9 @@ Built the remaining two Flooded Aquifer hazards from `docs/design/zones.md` §2 
 - **Protocol:** `CoopSession.PROTOCOL` bumped once from 39 to 40 for the `shut_valve` command and synced `valves_shut`.
 - **[PLACEHOLDER]:** One open seal per day (`SEALS_PER_DAY = 1`, hash tag `300`), valve reach `4.0` m (`VALVE_REACH_M`) + `1.5` m host slack (`HOST_REACH_SLACK_M`), one camp ration spoiled per player per day (`RATIONS_SPOILED = 1`), all valve/jet/floor-sheet primitive dimensions, colours and alpha (`SEAL_SHEET_ALPHA = 0.45`), and all refusal/log/reply wording.
 - **Left out on purpose:** Vance's quests, depth 2 and below, a lift, an Aquifer camp, walkers in the Aquifer, and a find drifting to the floor or clock-advancing time cost.
+
+## Ice Caves cold: a grace on leaving and a heater floor (2026-11-27, feat/ice-cold-grace)
+
+Ryan said yes to both. Back in the caves within `IceDepth.COLD_GRACE_HOURS` (1 game hour [PLACEHOLDER]) of leaving keeps the old cold stamp, so a quick hop out to the farm no longer resets the cold; later than that, the cold starts from 0 as before. The crate refuses a heater below `IceDepth.HEATER_MIN_COLD` (10 % [PLACEHOLDER]). The kept stamp is host-only (`GameState._cold_kept`): not saved, not synced, dropped on load and when a guest is forgotten. `cold_since` keeps its shape, so the protocol stays at 40.
+
+The old stamp comes back as it was, so time spent outside still counts toward the cold (never worse than staying in). Freezing the cold while away is the alternative if Ryan prefers it. The 02:00 rescue and the new day both drop the kept stamp, so yesterday's cold never returns whatever the grace is tuned to.

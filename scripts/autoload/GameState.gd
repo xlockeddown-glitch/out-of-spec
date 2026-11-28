@@ -252,6 +252,9 @@ var rooms_shored: Dictionary = {}
 ## The Ice Caves' cold, per player: player id -> the GameClock.elapsed_days stamp the cold counts from
 ## (when they came in, or last bought a heater). Host-run, saved, synced; IceDepth.cold reads it.
 var cold_since: Dictionary = {}
+## Host only, not saved or synced: the cold of players who left the caves, kept for the grace
+## (IceDepth.COLD_GRACE_HOURS): player id -> [their cold_since stamp, the elapsed_days they left].
+var _cold_kept: Dictionary = {}
 ## The lift stations repaired, for good: zone id -> Array of the depths (ZoneDepth).
 ## Never reset, never expires. Shared by the farm.
 var lifts_repaired: Dictionary = {}
@@ -801,7 +804,7 @@ const NOT_SAVED: Array[String] = [
 	"_pad_problems",
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
-	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers",
+	"rover_place_scope", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers", "_cold_kept",
 	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip",
 ]
 
@@ -1201,6 +1204,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	sentinel_sighted = false
 	player_places.clear()
 	_prune_cold()
+	_cold_kept.clear()
 	strays_caught = _strays_today()
 	_settle_trips_on_load()
 	_recall_warned_day = 0
@@ -2194,6 +2198,7 @@ func _forget_a_guest(players: Array[String]) -> void:
 			one_use_held.erase(player_id)
 			player_loadouts.erase(player_id)
 			packs_wet.erase(player_id)
+			_cold_kept.erase(player_id)
 			for entry: Variant in quest_state.values():
 				if entry is Dictionary and entry.get("players") is Array:
 					(entry["players"] as Array).erase(player_id)
@@ -3989,6 +3994,7 @@ func _sitter_tend() -> void:
 
 func _on_day_started(day: int) -> void:
 	_campers.clear()  # the night at a camp is over: they wake there, and the recall is theirs again
+	_cold_kept.clear()  # yesterday's cold never comes back, whatever the grace
 	# A rover below stands on the new day's floor.
 	settle_rover_depth()
 	zone_heat_trip = false  # a heat trip is one day's trip
@@ -4753,15 +4759,22 @@ func _set_place(player_id: String, place: String, depth: int) -> void:
 
 
 ## Host: a player's cold stamp follows where they are. Coming into the caves stamps now (and
-## replaces any stale stamp); anywhere else has none. Tells the guests when it changed.
+## replaces any stale stamp), unless they left within the grace: then their old stamp comes
+## back. Anywhere else has no stamp; leaving keeps it aside for the grace. Tells the guests
+## when it changed.
 func _track_cold(player_id: String, was_in_caves: bool) -> void:
 	if FarmCommands.guest:
 		return
+	var now: float = GameClock.elapsed_days
 	var in_caves: bool = player_places.has(player_id) and place_of(player_id) == IceDepth.ZONE
 	if in_caves and (not was_in_caves or not cold_since.has(player_id)):
-		cold_since[player_id] = GameClock.elapsed_days
+		var kept: Variant = _cold_kept.get(player_id)
+		_cold_kept.erase(player_id)
+		var back: bool = kept is Array and IceDepth.within_grace(float(kept[1]), now)
+		cold_since[player_id] = float(kept[0]) if back else now
 		ice_changed.emit()
 	elif not in_caves and cold_since.has(player_id):
+		_cold_kept[player_id] = [float(cold_since[player_id]), now]
 		cold_since.erase(player_id)
 		ice_changed.emit()
 
@@ -5471,6 +5484,7 @@ func rescue_from_tunnels(player_id: String = "") -> Dictionary:
 	var leaving: String = player_id if player_id != "" else local_player_id
 	if player_places.has(leaving) or rover_zone != "":
 		_set_place(leaving, ZonePresence.FARM, 0)  # carried out, to bed
+		_cold_kept.erase(leaving)  # a rescue ends the cold: no grace
 	var ore: int = 0 if _console_arrivals.has(leaving) else ore_carried_in()
 	_console_arrivals.erase(leaving)
 	_trip_players.erase(leaving)  # carried out: off the trip
@@ -6163,7 +6177,7 @@ func buy_heater(player_id: String = "") -> String:
 	var at: Variant = _rover_pose_now(TUNNEL_ROVER)
 	var near: bool = rover_zone == IceDepth.ZONE and rover_depth == 0 and at != null and IceDepth.near_crate(at)
 	var here: String = place_of(who) if rover_zone == IceDepth.ZONE else ""
-	var reason: String = IceDepth.heater_problem(here, depth_of(who), credits, near)
+	var reason: String = IceDepth.heater_problem(here, depth_of(who), credits, near, cold_of(who))
 	if reason != "":
 		return reason
 	add_credits(-IceDepth.HEATER_COST_CREDITS)
