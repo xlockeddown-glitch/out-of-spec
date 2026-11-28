@@ -317,14 +317,15 @@ func _poll_host() -> void:
 
 
 ## True if a guest's command `arguments` are plain: a few booleans, numbers (finite),
-## short texts and grid cells, or a short untyped list of short texts (a shuttle
-## party's player ids, at most MAX_PLAYERS). Nothing nested deeper.
+## short texts and grid cells, or a short list of short texts (a shuttle party's
+## player ids, at most MAX_PLAYERS; typed Array[String] or not). Nothing nested deeper.
 static func plain_arguments(arguments: Array) -> bool:
 	if arguments.size() > MAX_ARGUMENTS or arguments.is_typed():
 		return false
 	for argument: Variant in arguments:
 		if argument is Array:
-			if (argument as Array).is_typed() or (argument as Array).size() > MAX_PLAYERS:
+			var list: Array = argument
+			if (list.is_typed() and list.get_typed_builtin() != TYPE_STRING) or list.size() > MAX_PLAYERS:
 				return false
 			for item: Variant in argument:
 				if not item is String or (item as String).length() > MAX_TEXT:

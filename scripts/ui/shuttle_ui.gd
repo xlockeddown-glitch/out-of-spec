@@ -159,7 +159,10 @@ func _on_book(moon: String) -> void:
 	if _busy:
 		return
 	_busy = true
-	var problem: String = await FarmCommands.request(&"book_shuttle", [moon, _party_ids.duplicate()])
+	# A plain list on the wire: the host takes texts, typed or not.
+	var ids: Array = []
+	ids.assign(_party_ids)
+	var problem: String = await FarmCommands.request(&"book_shuttle", [moon, ids])
 	_busy = false
 	if not is_inside_tree():
 		return

@@ -198,8 +198,11 @@ func test_a_short_list_of_ids_is_a_plain_argument() -> String:
 	if SessionScript.plain_arguments([["x".repeat(SessionScript.MAX_TEXT + 1)]]):
 		return "Each id is short"
 	var typed: Array[String] = ["player_1"]
-	if SessionScript.plain_arguments([typed]):
-		return "A typed list is not plain"
+	if not SessionScript.plain_arguments([typed]):
+		return "A list typed to texts is plain"
+	var numbers: Array[int] = [1]
+	if SessionScript.plain_arguments([numbers]):
+		return "A list typed to anything else is not"
 	if SessionScript.plain_arguments([{}]) or SessionScript.plain_arguments([NAN]):
 		return "The old refusals stand"
 	return ""
@@ -208,8 +211,15 @@ func test_a_short_list_of_ids_is_a_plain_argument() -> String:
 func test_a_guest_booking_with_ids_is_answered_not_dropped() -> String:
 	var host: Node = _host()
 	var peer: MultiplayerPeerExtension = _raw_peer(host, true)
-	peer.put_packet(var_to_bytes([SessionScript.COMMAND, 1, "none", ["phobos", ["player_2"]]]))
-	# WELCOME, then the answer.
-	if not _until(func() -> bool: return peer.get_available_packet_count() == 2):
+	# Both the panel's plain copy and a typed list, as the wire carries them.
+	var typed: Array[String] = ["player_2"]
+	var plain: Array = []
+	plain.assign(typed)
+	if plain.is_typed():
+		return _finish("The plain copy is untyped")
+	peer.put_packet(var_to_bytes([SessionScript.COMMAND, 1, "none", ["phobos", plain]]))
+	peer.put_packet(var_to_bytes([SessionScript.COMMAND, 2, "none", ["phobos", typed]]))
+	# WELCOME, then the two answers.
+	if not _until(func() -> bool: return peer.get_available_packet_count() == 3):
 		return _finish("A command with a list of ids must be answered")
 	return _finish("" if host._links.size() == 1 else "A list of ids must not end the link")
