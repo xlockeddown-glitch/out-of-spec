@@ -12,6 +12,9 @@ const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
 func _make_state(points: int = 30) -> GameStateScript:
 	var gs: GameStateScript = GameStateScript.new()
 	gs.lab_gates_kept = gs.all_lab_gate_ids()  # these tests are not about the lab-level gates
+	# Nor about the extra board slots (tests/test_board_jobs.gd): the board stays at its base size.
+	for slot: String in gs.BOARD_SLOT_GATES:
+		gs.lab_gates_kept.erase(slot)
 	gs.build_registry()
 	gs.reset_credibility()
 	gs.credibility = points
@@ -59,7 +62,10 @@ func test_board_closed_until_trusted() -> String:
 	gs.credibility = 30
 	gs.refresh_job_board(1)
 	var size: int = gs.job_board.size()
-	var expected: int = _cfg(gs, "board_size")
+	var expected: int = gs.job_board_size()
+	if expected <= 0:
+		_done(gs)
+		return "The board size must be above 0."
 	_done(gs)
 	if not empty or note != "JOB BOARD opens at TRUSTED.":
 		return "A Provisional lab must see no jobs, note was '%s'." % note

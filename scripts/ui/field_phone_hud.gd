@@ -25,7 +25,7 @@ const BASE_WIDTH_FRACTION: float = 0.32
 const LEFT_ANCHOR: float = 1.0 - BASE_WIDTH_FRACTION * PHONE_SCALE
 const MAX_LOG_LINES: int = 8
 ## Tallest the job list grows before it scrolls, px.
-const JOBS_MAX_HEIGHT: float = 130.0 # before PHONE_SCALE; [PLACEHOLDER] room for three offers
+const JOBS_MAX_HEIGHT: float = 130.0 # before PHONE_SCALE; [PLACEHOLDER] five offers scroll
 ## The dispatch log always keeps room for this many lines, px (before PHONE_SCALE).
 const LOG_MIN_HEIGHT: float = 80.0
 const COLOR_BAR_ON := DriftingSensor.COLOR_IN_BAND
@@ -466,7 +466,7 @@ func show_standards(offers: Array[Dictionary], note: String) -> void:
 
 ## Accepted jobs as lines, today's offers as ACCEPT buttons. Each offer is
 ## { "text", "disabled" }; `note` shows when there are no offers.
-func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: String) -> void:
+func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: String, slot_note: String = "") -> void:
 	for child: Node in _jobs_box.get_children():
 		_jobs_box.remove_child(child)
 		child.queue_free()
@@ -496,6 +496,9 @@ func show_jobs(active: PackedStringArray, offers: Array[Dictionary], note: Strin
 		var index: int = i
 		button.pressed.connect(func() -> void: accept_job_pressed.emit(index))
 		_jobs_box.add_child(button)
+	# When the next board slot opens: a muted caption under the offers.
+	if slot_note != "":
+		_add_jobs_label(slot_note, true)
 
 
 func _add_jobs_label(text: String, muted: bool) -> void:

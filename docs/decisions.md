@@ -2697,6 +2697,17 @@ Built the dome's `CertificateWall` (`scripts/dome/certificate_wall.gd`), turning
 - **Read-only:** No new save fields, no new commands, no `CoopSession.PROTOCOL` change. Guests see the same wall from the synced `audit_log`, `quest_state`, and `lab_xp`.
 - **[PLACEHOLDER]:** Earned criteria (clean audits + done farm lab quests), `COLS = 4` / `ROWS = 3` / `MAX_SHOWN = 12`, showing the newest 12 when over cap, all mesh dimensions and spacing (`BOARD_SIZE`, `PLAQUE_SIZE`, `FRAME_SIZE`, `PAPER_SIZE`, `SEAL_SIZE`, `COL_STEP`, `ROW_STEP`), wall position `(5.05, 2.25, -2.05)`, `ScopeTheme` colour assignments, and all hover/plaque/label wording (`"Certificate wall: lab level 8"`, `"Certificate wall: no certificates yet"`, `"Clean Audit"`, `"<Title> (Day N)"`, `"+N more"`).
 
+## Fourth and fifth board job (2026-11-28, feat/board-jobs)
+
+Turned on the `board_4_jobs` (lab level 28) and `board_5_jobs` (lab level 65) rows of `lab_gates` in `data/skills.json` (`built: true`). Both levels are [PLACEHOLDER].
+
+- **The rule:** `GameState.job_board_size()` is `jobs/board_size` in `data/economy.json` (3), plus 1 when `board_4_jobs` is open, plus 1 when `board_5_jobs` is open, both through `lab_gate_open` (a kept row counts). A row missing from the table or not built adds nothing. `refresh_job_board` still caps it by the eligible templates and picks by the same deterministic rotation (day times count; no `randf`), so the same day gives the same board.
+- **When:** the extra jobs appear at the next board refresh (the morning, or a band change), never mid-day. The lab-level-up refresh in `give_lab_xp` still names only `job_board` and `accredited_jobs`; the new rows are not added to it. A board of 3 stays 3 until then.
+- **The phone:** the job list is the existing scroll box (`JOBS_MAX_HEIGHT` 130, offers wrap), so five offers scroll and nothing clips. `show_jobs` takes a fourth, optional `slot_note`; `GameState.job_board_slot_note()` gives a muted caption under the offers when a slot is still shut: "A fourth job at lab level 28." then "A fifth job at lab level 65." It is empty when the board itself is shut or both slots are open. The existing board note is as it was.
+- **Old saves and co-op:** a save from before the rows does not keep them (`_keep_open_gates` only keeps what the old conditions had), so it waits for level 28 like any new farm, and its saved board of 3 loads as it was. Host-run as before; a guest sees the same board through `job_board` in the farm snapshot. No new field, command or message: `SaveGame.VERSION` 1, `CoopSession.PROTOCOL` stays 42.
+- **Tests:** `tests/test_board_jobs.gd`. `tests/test_jobs.gd`'s helper drops the two new rows from the kept set so its day-rotation tests keep a board of 3.
+- **Open [PLACEHOLDER]:** the levels, and whether five jobs should pay or crowd the lab's spaces differently (the lab's space limit still caps what can be accepted).
+
 
 ## Deimos smuggler cache and Kestrel's "A Quiet Crate" (2026-11-28, feat/deimos-cache)
 
