@@ -419,8 +419,8 @@ func test_old_save_loads_and_guest_receives_ice_cores_held() -> String:
 
 
 func test_protocol_is_48_and_command_is_registered() -> String:
-	if CoopSession.PROTOCOL != 49:
-		return "CoopSession.PROTOCOL is %d, expected 49." % CoopSession.PROTOCOL
+	if CoopSession.PROTOCOL != 50:
+		return "CoopSession.PROTOCOL is %d, expected 50." % CoopSession.PROTOCOL
 	if not &"send_ice_core" in FarmCommands.ACTIONS:
 		return "send_ice_core is not in FarmCommands.ACTIONS."
 	if not "ice_cores_held" in GameStateScript.SAVED_LATER:

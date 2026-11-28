@@ -427,8 +427,8 @@ func test_the_pump_commands_are_on_the_list_and_the_protocol_moved() -> String:
 	for action: StringName in [&"buy_pump", &"use_pump", &"move_rover_aquifer"]:
 		if not action in FarmCommands.ACTIONS:
 			return "%s is not a command." % action
-	if CoopSession.PROTOCOL != 49:
-		return "The protocol is %d, not 49." % CoopSession.PROTOCOL
+	if CoopSession.PROTOCOL != 50:
+		return "The protocol is %d, not 50." % CoopSession.PROTOCOL
 	var gs: GameStateScript = _state()
 	gs.credits = 500
 	_at_crate(gs)

@@ -1,0 +1,253 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scripts/world/valles_hub.gd" id="1_main"]
+[ext_resource type="Script" path="res://scripts/rover/rover_controller.gd" id="2_rover"]
+[ext_resource type="Script" path="res://scripts/world/satellite_relay.gd" id="3_relay"]
+[ext_resource type="Script" path="res://scripts/world/valles_rock.gd" id="4_rock"]
+[ext_resource type="Script" path="res://scripts/camera/iso_camera.gd" id="5_cam"]
+[ext_resource type="PackedScene" path="res://ui/field_phone_hud.tscn" id="6_hud"]
+[ext_resource type="Script" path="res://scripts/world/model_slot.gd" id="12_slot"]
+[ext_resource type="Script" path="res://scripts/world/uplink_beam.gd" id="13_beam"]
+[ext_resource type="Script" path="res://scripts/rover/cab_readout.gd" id="15_readout"]
+[ext_resource type="Script" path="res://scripts/world/parking_pad.gd" id="16_pad"]
+[ext_resource type="Script" path="res://scripts/rover/rover_lights.gd" id="18_lights"]
+
+[sub_resource type="Environment" id="Env"]
+background_mode = 1
+background_color = Color(0.09, 0.05, 0.04, 1)
+ambient_light_source = 2
+ambient_light_color = Color(1, 0.84, 0.7, 1)
+ambient_light_energy = 0.52
+tonemap_mode = 2
+glow_enabled = true
+glow_intensity = 0.9
+glow_bloom = 0.05
+
+[sub_resource type="StandardMaterial3D" id="MatRelay"]
+albedo_color = Color(0.85, 0.87, 0.9, 1)
+
+[sub_resource type="StandardMaterial3D" id="MatRover"]
+albedo_color = Color(0.9, 0.55, 0.12, 1)
+
+[sub_resource type="StandardMaterial3D" id="MatDark"]
+albedo_color = Color(0.12, 0.12, 0.13, 1)
+
+[sub_resource type="StandardMaterial3D" id="MatCyanGlow"]
+albedo_color = Color(0, 0, 0, 1)
+emission_enabled = true
+emission = Color(0.2196, 0.8824, 0.7765, 1)
+emission_energy_multiplier = 1.2
+
+[sub_resource type="StandardMaterial3D" id="MatCalPad"]
+albedo_color = Color(0.1137, 0.1333, 0.1686, 1)
+roughness = 0.9
+
+[sub_resource type="BoxShape3D" id="CalPadShape"]
+size = Vector3(4, 3, 4)
+
+[sub_resource type="BoxShape3D" id="RoverShape"]
+size = Vector3(1.6, 1, 2.4)
+
+[sub_resource type="BoxMesh" id="CabReadoutMesh"]
+size = Vector3(0.2, 0.1, 0.1)
+
+[sub_resource type="BoxShape3D" id="MastShape"]
+size = Vector3(0.8, 3, 0.8)
+
+[node name="VallesMarineris" type="Node"]
+script = ExtResource("1_main")
+
+[node name="WorldView" type="SubViewportContainer" parent="."]
+anchors_preset = -1
+anchor_right = 0.744
+anchor_bottom = 1.0
+grow_vertical = 2
+stretch = true
+
+[node name="WorldViewport" type="SubViewport" parent="WorldView"]
+handle_input_locally = false
+physics_object_picking = true
+msaa_3d = 2
+size = Vector2i(1305, 1080)
+render_target_update_mode = 4
+
+[node name="World" type="Node3D" parent="WorldView/WorldViewport"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="WorldView/WorldViewport/World"]
+environment = SubResource("Env")
+
+[node name="Lamp" type="DirectionalLight3D" parent="WorldView/WorldViewport/World"]
+transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
+light_color = Color(0.78, 0.92, 1, 1)
+light_energy = 0.6
+shadow_enabled = true
+
+[node name="IsoCamera" type="Camera3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("target")]
+current = true
+script = ExtResource("5_cam")
+target = NodePath("../Rover")
+
+[node name="Rock" type="Node3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("rover")]
+script = ExtResource("4_rock")
+rover = NodePath("../Rover")
+
+[node name="Beacon" type="Node3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("uplink_point", "beacon")]
+position = Vector3(-5, 0, 24.6)
+script = ExtResource("3_relay")
+relay_name = "ICE BEACON 01"
+uplink_point = NodePath("Dish")
+beacon = NodePath("Dish/Light")
+beacon_energy_base = 1.5
+
+[node name="Dish" type="Marker3D" parent="WorldView/WorldViewport/World/Beacon"]
+position = Vector3(0, 4.6, 0)
+
+[node name="Light" type="OmniLight3D" parent="WorldView/WorldViewport/World/Beacon/Dish"]
+light_color = Color(0.2196, 0.8824, 0.7765, 1)
+omni_range = 10.0
+
+[node name="Body" type="StaticBody3D" parent="WorldView/WorldViewport/World/Beacon"]
+collision_mask = 0
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Beacon/Body"]
+position = Vector3(0, 1.5, 0)
+shape = SubResource("MastShape")
+
+[node name="Mast" type="Node3D" parent="WorldView/WorldViewport/World/Beacon"]
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/relay_mast.glb"
+model_scale = 0.14
+
+[node name="Greybox" type="CSGBox3D" parent="WorldView/WorldViewport/World/Beacon/Mast"]
+position = Vector3(0, 2.2, 0)
+size = Vector3(0.4, 4.4, 0.4)
+material = SubResource("MatRelay")
+
+[node name="ExitPad" type="Area3D" parent="WorldView/WorldViewport/World"]
+unique_name_in_owner = true
+position = Vector3(-1.5, 0, 27.4)
+collision_layer = 0
+collision_mask = 2
+script = ExtResource("16_pad")
+
+[node name="Shape" type="CollisionShape3D" parent="WorldView/WorldViewport/World/ExitPad"]
+position = Vector3(0, 1.5, 0)
+shape = SubResource("CalPadShape")
+
+[node name="Slab" type="CSGBox3D" parent="WorldView/WorldViewport/World/ExitPad"]
+position = Vector3(0, 0.02, 0)
+size = Vector3(4, 0.04, 4)
+material = SubResource("MatCalPad")
+
+[node name="EdgeN" type="CSGBox3D" parent="WorldView/WorldViewport/World/ExitPad"]
+position = Vector3(0, 0.05, -1.9)
+size = Vector3(4, 0.03, 0.2)
+material = SubResource("MatCyanGlow")
+
+[node name="EdgeS" type="CSGBox3D" parent="WorldView/WorldViewport/World/ExitPad"]
+position = Vector3(0, 0.05, 1.9)
+size = Vector3(4, 0.03, 0.2)
+material = SubResource("MatCyanGlow")
+
+[node name="EdgeW" type="CSGBox3D" parent="WorldView/WorldViewport/World/ExitPad"]
+position = Vector3(-1.9, 0.05, 0)
+size = Vector3(0.2, 0.03, 3.6)
+material = SubResource("MatCyanGlow")
+
+[node name="EdgeE" type="CSGBox3D" parent="WorldView/WorldViewport/World/ExitPad"]
+position = Vector3(1.9, 0.05, 0)
+size = Vector3(0.2, 0.03, 3.6)
+material = SubResource("MatCyanGlow")
+
+[node name="Daylight" type="OmniLight3D" parent="WorldView/WorldViewport/World/ExitPad"]
+position = Vector3(0, 3, 1.5)
+light_color = Color(0.95, 0.97, 1, 1)
+light_energy = 2.5
+omni_range = 9.0
+
+[node name="Rover" type="CharacterBody3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("satellite_relay", "antenna")]
+unique_name_in_owner = true
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.5, 0.05, 22.5)
+collision_layer = 2
+script = ExtResource("2_rover")
+rover_id = "rover_1_tunnels"
+satellite_relay = NodePath("../Beacon")
+antenna = NodePath("Antenna")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="WorldView/WorldViewport/World/Rover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+shape = SubResource("RoverShape")
+
+[node name="VisualRoot" type="Node3D" parent="WorldView/WorldViewport/World/Rover"]
+script = ExtResource("12_slot")
+model_path = "res://assets/voxels/tractor.glb"
+model_scale = 0.1
+
+[node name="Chassis" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+size = Vector3(1.4, 0.5, 2.4)
+material = SubResource("MatRover")
+
+[node name="Cab" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.25, 0.5)
+size = Vector3(1.2, 0.8, 1)
+material = SubResource("MatRover")
+
+[node name="Grille" type="CSGBox3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, -1.25)
+size = Vector3(1, 0.3, 0.12)
+material = SubResource("MatDark")
+
+[node name="WheelFL" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.85, 0.45, -0.8)
+radius = 0.45
+height = 0.3
+material = SubResource("MatDark")
+
+[node name="WheelFR" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0.85, 0.45, -0.8)
+radius = 0.45
+height = 0.3
+material = SubResource("MatDark")
+
+[node name="WheelRL" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, -0.85, 0.45, 0.8)
+radius = 0.45
+height = 0.3
+material = SubResource("MatDark")
+
+[node name="WheelRR" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
+transform = Transform3D(-4.371139e-08, -1, 0, 1, -4.371139e-08, 0, 0, 0, 1, 0.85, 0.45, 0.8)
+radius = 0.45
+height = 0.3
+material = SubResource("MatDark")
+
+[node name="AntennaMast" type="CSGCylinder3D" parent="WorldView/WorldViewport/World/Rover/VisualRoot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.4, 1.9, 0.8)
+radius = 0.04
+height = 0.6
+material = SubResource("MatDark")
+
+[node name="CabReadout" type="MeshInstance3D" parent="WorldView/WorldViewport/World/Rover" node_paths=PackedStringArray("model_slot")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 1.55, -0.2)
+cast_shadow = 0
+mesh = SubResource("CabReadoutMesh")
+script = ExtResource("15_readout")
+model_slot = NodePath("../VisualRoot")
+
+[node name="Antenna" type="Marker3D" parent="WorldView/WorldViewport/World/Rover"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.22, 1.88, 0.38)
+
+[node name="UplinkBeam" type="MeshInstance3D" parent="WorldView/WorldViewport/World/Rover/Antenna" node_paths=PackedStringArray("rover")]
+script = ExtResource("13_beam")
+rover = NodePath("../..")
+
+[node name="Headlights" type="Node3D" parent="WorldView/WorldViewport/World/Rover" node_paths=PackedStringArray("model_slot")]
+position = Vector3(0, 0.85, -1.3)
+script = ExtResource("18_lights")
+model_slot = NodePath("../VisualRoot")
+
+[node name="HUDLayer" type="CanvasLayer" parent="."]
+
+[node name="FieldPhoneHUD" parent="HUDLayer" instance=ExtResource("6_hud")]
+unique_name_in_owner = true

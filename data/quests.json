@@ -469,6 +469,17 @@
           "at_least": 1 }
       ],
       "rewards": { "credits": 500, "lab_xp": 1000, "phone": "npcs/odalys/quests/gossamer_link_done" }
+    },
+    {
+      "id": "layer_by_layer", "kind": "lab", "giver": "vance", "title": "Layer by Layer", "scope": "farm", "zone": "valles_marineris",
+      "gates": { "lab_level": 50 },
+      "offer": { "when": "counter", "counter": "reached_valles_marineris", "at_least": 1 },
+      "offer_line": "npcs/vance/quests/layer_by_layer_offer",
+      "steps": [
+        { "id": "bands", "text": "Take layered cores from three different bands of the Valles Marineris walls.",
+          "check": "counter", "counter": "valles_new_band", "at_least": 3 }
+      ],
+      "rewards": { "lab_xp": 400, "phone": "npcs/vance/quests/layer_by_layer_done" }
     }
   ],
   "keepsakes": [

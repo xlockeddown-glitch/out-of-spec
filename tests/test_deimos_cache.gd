@@ -309,8 +309,8 @@ func test_command_registration_protocol_and_guest_loopback() -> String:
 		return "open_cache must be in FarmCommands.ACTIONS and ON_A_MOON."
 	if FarmCommands.problem(&"open_cache", []) != "" or FarmCommands.problem(&"open_cache", ["player_1"]) == "":
 		return "open_cache takes no client arguments."
-	if CoopSession.PROTOCOL != 49:
-		return "PROTOCOL must be 49, got %d." % CoopSession.PROTOCOL
+	if CoopSession.PROTOCOL != 50:
+		return "PROTOCOL must be 50, got %d." % CoopSession.PROTOCOL
 	var held: float = GameClock.elapsed_days
 	GameClock.elapsed_days = 5.2
 	var host: Node = _host()
