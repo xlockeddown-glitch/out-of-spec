@@ -14,6 +14,7 @@ signal sentinel_changed
 signal strays_changed  # a Phobos service-tunnel stray was caught today
 signal phobos_finds_changed  # a Phobos depth-1 find was taken today
 signal deimos_cache_changed  # the Deimos smuggler cache was opened today
+signal deimos_crates_changed  # a Deimos depth-1 crate was opened today
 signal rover_lights_changed
 ## A beacon was set down in the Lava Tubes.
 signal beacons_changed
@@ -247,6 +248,13 @@ var _on_phobos_deck: Dictionary = {}
 ## Today's Deimos smuggler cache state: { "day": int, "opened": true }, or {} when not
 ## opened today. Pruned to today on save and load. Host-run, saved, shown to guests.
 var deimos_cache: Dictionary = {}
+## Deimos depth-1 crates opened today: { "day": int, "ids": Array of crate ids } (DeimosDepth).
+## Pruned to today on save and load; host-run, synced via deimos_crates_changed.
+var deimos_crates_opened: Dictionary = {}
+## Host-only per-trip Deimos dust wipe flags: player_id -> true while wiped on the current trip down.
+var _deimos_wiped: Dictionary = {}
+## Host-only per-player Deimos deck flags: player_id -> true while down in Deimos Deep stores.
+var _on_deimos_deck: Dictionary = {}
 ## The wild Cobalt Sentinel: out by the sump today, and the mornings since it was
 ## last scared off.
 var sentinel_out: bool = false
@@ -835,7 +843,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "ice_cores_held", "phobos_finds_taken"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -843,7 +851,7 @@ const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
 	"rover_place_scope", "_skid_last", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_expedition_warned_day", "_expedition_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers", "_cold_kept",
-	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip", "_phobos_wiped", "_on_phobos_deck",
+	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip", "_phobos_wiped", "_on_phobos_deck", "_deimos_wiped", "_on_deimos_deck",
 ]
 
 
@@ -867,6 +875,7 @@ func farm_to_dict() -> Dictionary:
 	out["strays_caught"] = _strays_today()
 	out["phobos_finds_taken"] = _phobos_finds_today()
 	out["deimos_cache"] = _deimos_cache_today()
+	out["deimos_crates_opened"] = _deimos_crates_today()
 	out["cold_since"] = _cold_in_caves()  # the stamps of whoever is in the caves: the rest are stale
 	return out
 
@@ -1030,6 +1039,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var cache_problem: String = _deimos_cache_problem(data.get("deimos_cache", {}))
 	if cache_problem != "":
 		return cache_problem
+	var deimos_crates_problem: String = DeimosDepth.opened_problem(data.get("deimos_crates_opened", {}))
+	if deimos_crates_problem != "":
+		return deimos_crates_problem
 	if not _optional_fields(data["lab_build"], ["kind", "discipline"], ["size", "done_day"]):
 		return "'lab_build' has a field of the wrong type."
 	for list: String in ["job_board", "active_jobs"]:
@@ -1291,6 +1303,9 @@ func farm_from_dict(data: Dictionary) -> String:
 	_phobos_wiped.clear()
 	_on_phobos_deck.clear()
 	deimos_cache = _deimos_cache_today()
+	deimos_crates_opened = _deimos_crates_today()
+	_deimos_wiped.clear()
+	_on_deimos_deck.clear()
 	_settle_trips_on_load()
 	_recall_warned_day = 0
 	_recall_rescued_day = 0
@@ -1313,6 +1328,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
 	deimos_cache_changed.emit()
+	deimos_crates_changed.emit()
 	phobos_finds_changed.emit()
 	silk_changed.emit(optical_silk_spools)
 	relay_changed.emit(relay_slotted)
@@ -4170,6 +4186,8 @@ func _return_traveller(player_id: String, line: String, completed: bool = false)
 	_campers.erase(player_id)
 	_phobos_wiped.erase(player_id)
 	_on_phobos_deck.erase(player_id)
+	_deimos_wiped.erase(player_id)
+	_on_deimos_deck.erase(player_id)
 	_set_place(player_id, ZonePresence.FARM, 0)
 	_stand_at_pad(player_id)
 	shuttle_trips_changed.emit()
@@ -4283,6 +4301,8 @@ func _on_day_started(day: int) -> void:
 	_cold_kept.clear()  # yesterday's cold never comes back, whatever the grace
 	_phobos_wiped.clear()
 	_on_phobos_deck.clear()
+	_deimos_wiped.clear()
+	_on_deimos_deck.clear()
 	# A rover below stands on the new day's floor.
 	settle_rover_depth()
 	zone_heat_trip = false  # a heat trip is one day's trip
@@ -5255,6 +5275,8 @@ func forget_place(player_id: String) -> void:
 	_trip_players.erase(player_id)
 	_phobos_wiped.erase(player_id)
 	_on_phobos_deck.erase(player_id)
+	_deimos_wiped.erase(player_id)
+	_on_deimos_deck.erase(player_id)
 	# Gone mid-trip: the day trip is over with them, and nothing is charged. The shuttle
 	# is not the farm's rover, so nothing is sent home.
 	if not FarmCommands.guest and shuttle_trips.has(player_id):
@@ -6769,6 +6791,93 @@ func open_cache(player_id: String = "") -> String:
 		done["count"] = int(done["count"]) + 1
 	deimos_cache_changed.emit()
 	return reply
+
+
+## Today's opened Deimos depth-1 crates as { "day", "ids" }, or {} when another day's.
+func _deimos_crates_today() -> Dictionary:
+	return DeimosDepth.prune(deimos_crates_opened, GameClock.get_day_index())
+
+
+## The ids of Deimos depth-1 crates opened today.
+func deimos_crates_opened_today() -> Array[String]:
+	return DeimosDepth.opened_today(deimos_crates_opened, GameClock.get_day_index())
+
+
+## True while `player_id` has Deimos dust clogging optics on their current trip down.
+func is_deimos_dusty(player_id: String = "") -> bool:
+	return not bool(_deimos_wiped.get(_player(player_id), false))
+
+
+## Host: marks a player's new trip down to Deimos depth 1 as dusty until wiped.
+func enter_deimos_deep(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host tracks Deimos trips."
+	var who: String = _player(player_id)
+	if place_of(who) != Shuttle.DEIMOS:
+		return "Deep stores is on Deimos."
+	_on_deimos_deck[who] = true
+	_deimos_wiped.erase(who)
+	return ""
+
+
+## Host: clears a player's Deimos depth-1 deck flag when they climb up the hatch.
+func leave_deimos_deep(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host tracks Deimos trips."
+	var who: String = _player(player_id)
+	_on_deimos_deck.erase(who)
+	_deimos_wiped.erase(who)
+	return ""
+
+
+## Host: wipes Deimos dust for `player_id` on the current trip down, restoring full pay.
+func wipe_deimos_dust(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host decides dust wipes."
+	var who: String = _player(player_id)
+	if place_of(who) != Shuttle.DEIMOS:
+		return "The wipe stop is on Deimos."
+	if not bool(_on_deimos_deck.get(who, false)):
+		return "Go down to Deep stores first."
+	_deimos_wiped[who] = true
+	return ""
+
+
+## Host: opens one of today's crates in Deimos depth 1 (Deep stores). Locked crates
+## require Kestrel's proof (`has_kestrel_proof`); mislabelled crates pay less; dust cuts
+## pay by DeimosDepth.DUST_CUT_PCT until wiped. One open per crate per day, gone for
+## everyone, pruned to today and synced via deimos_crates_changed.
+func open_deimos_crate(crate_id: String, layout_day: int, player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host opens a crate."
+	var who: String = _player(player_id)
+	var day: int = GameClock.get_day_index()
+	if place_of(who) != Shuttle.DEIMOS:
+		return "Crates lie in Deimos Deep stores."
+	if not bool(_on_deimos_deck.get(who, false)):
+		return "Go down to Deep stores first."
+	if layout_day != day:
+		return "That was yesterday's deck. Look again."
+	var today: Dictionary = DeimosDepth.layout(world_seed, day)
+	var crate: Dictionary = DeimosDepth.crate_in(today, crate_id)
+	if crate.is_empty():
+		return "There is no '%s' here today." % crate_id
+	if crate_id in deimos_crates_opened_today():
+		return "That crate has been opened already."
+	var locked: bool = bool(crate.get("locked", false))
+	if locked and not has_kestrel_proof(who):
+		return DeimosDepth.LOCKED_REFUSAL_TEXT
+	deimos_crates_opened = DeimosDepth.with_opened(deimos_crates_opened, day, crate_id)
+	var pay: int = DeimosDepth.reward_credits(
+		str(crate["kind"]),
+		locked,
+		bool(crate.get("mislabeled", false)),
+		is_deimos_dusty(who)
+	)
+	if pay > 0:
+		add_credits(pay)
+	deimos_crates_changed.emit()
+	return ""
 
 
 func is_caught(species_id: String) -> bool:

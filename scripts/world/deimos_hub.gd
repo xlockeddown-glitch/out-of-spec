@@ -25,11 +25,17 @@ const DEIMOS_SPOTS: Dictionary[String, Vector3] = {
 }
 
 const CACHE_OPENED_TEXT: String = "The crate is open. Something warm inside."
+## Hatch down to Deimos depth 1 ("Deep stores"), clear of the camp, cache, pod, and shuttle pad [PLACEHOLDER].
+const DEEP_HATCH_AT := Vector3(15.0, 0.0, 6.0)
+const DEEP_HATCH_ARRIVE_OFFSET := Vector3(-2.0, 0.0, 0.0)
+## Set by DeimosDeep when climbing back up the ladder to the hub.
+static var arrive_at_deep_hatch: bool = false
 
 var cache_click: Inspectable
 var pod_click: Inspectable
 ## The expedition camp's click target (zones step 18): no collision body, layer 8 only.
 var camp_click: Clickable
+var deep_hatch_click: Clickable
 var _cache_padlock: Node3D
 var _cache_trim_lock: Node3D
 var _cache_lid_shut: Node3D
@@ -120,7 +126,14 @@ func _build_world() -> void:
 	MoonLook.add_deimos_hab_detail(self, hab)
 	MoonLook.add_utility_props(self, true)
 	var camp_at: Vector3 = Camp.position(DEIMOS)
-	var clear_spots: Array[Vector3] = [ARRIVE_AT, camp_at, camp_at + Vector3(-1.8, 0.0, -1.6), camp_at + Vector3(1.8, 0.0, 1.6)]
+	var clear_spots: Array[Vector3] = [
+		ARRIVE_AT,
+		camp_at,
+		camp_at + Vector3(-1.8, 0.0, -1.6),
+		camp_at + Vector3(1.8, 0.0, 1.6),
+		DEEP_HATCH_AT,
+		DEEP_HATCH_AT + DEEP_HATCH_ARRIVE_OFFSET,
+	]
 	for spot: Vector3 in DEIMOS_SPOTS.values():
 		clear_spots.append(spot)
 	MoonLook.add_regolith_scatter(
@@ -154,6 +167,39 @@ func _build_world() -> void:
 	camp_click.clicked.connect(_on_camp)
 	GameState.camps_changed.connect(_refresh_camp_hint)
 	_refresh_camp_hint()
+	deep_hatch_click = _make_deep_hatch()
+	deep_hatch_click.clicked.connect(_on_deep_hatch)
+
+
+func _build_walker() -> void:
+	super()
+	if arrive_at_deep_hatch:
+		arrive_at_deep_hatch = false
+		walker.position = DEEP_HATCH_AT + DEEP_HATCH_ARRIVE_OFFSET
+
+
+func _make_deep_hatch() -> Clickable:
+	var at: Vector3 = DEEP_HATCH_AT
+	add_child(_part("DeepHatchPlate", at + Vector3(0.0, 0.06, 0.0), Vector3(2.4, 0.12, 2.4), MoonLook.HATCH_RIM))
+	add_child(_part("DeepHatchLid", at + Vector3(0.0, 0.14, 0.0), Vector3(2.0, 0.06, 2.0), MoonLook.DEIMOS_CRATER))
+	add_child(_drum("DeepHatchCollar", at + Vector3(0.0, 0.10, 0.0), 0.72, 0.12, MoonLook.DEIMOS_HAB_SKIRT, 12))
+	add_child(_label("DEEP STORES", at + Vector3(0.0, 0.95, 0.0), 28, MoonLook.SCREEN_GLOW))
+	var click: Clickable = _clickable(Clickable.new(), at + Vector3(0.0, 0.35, 0.0), Vector3(2.6, 0.9, 2.6), DeimosDepth.HUB_HATCH_HINT)
+	click.name = "DeepHatch"
+	return click
+
+
+func _on_deep_hatch() -> void:
+	if _leaving:
+		return
+	if Vector2(walker.global_position.x - DEEP_HATCH_AT.x, walker.global_position.z - DEEP_HATCH_AT.z).length() > REACH_M:
+		_toast(Shuttle.text("hub_too_far"))
+		return
+	_leaving = true
+	if change_scene.is_valid():
+		change_scene.call(DeimosDeep.SCENE_PATH)
+	else:
+		SceneSwitcher.go_to(DeimosDeep.SCENE_PATH)
 
 
 ## Whether the local player was in bed when the hint was last worded.

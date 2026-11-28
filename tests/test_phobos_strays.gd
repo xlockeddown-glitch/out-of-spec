@@ -111,8 +111,8 @@ func test_it_is_a_farm_command_a_moon_player_may_use() -> String:
 		return "catch_stray must be a command, and one a player on a moon may use."
 	if FarmCommands.problem(&"catch_stray", [1, 5]) != "" or FarmCommands.problem(&"catch_stray", []) == "":
 		return "catch_stray takes the stray and the day."
-	if CoopSession.PROTOCOL != 46:
-		return "A new command raises the protocol to 46."
+	if CoopSession.PROTOCOL != 48:
+		return "A new command raises the protocol to 48."
 	return ""
 
 
