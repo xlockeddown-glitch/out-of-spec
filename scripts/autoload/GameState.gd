@@ -1551,10 +1551,21 @@ func get_sensor(instrument_id: String) -> DriftingSensor:
 ## Ids of the instruments Vance audits and the bench calibrates, in data order:
 ## the units in service, whose standard is on the colony. An unreleased robot's
 ## sensors are not among them (see bench_unit_ids), and the hanging field scale
-## stays out of audits until the colony wildlife survey quest is offered.
+## stays out of audits until the colony wildlife survey quest is offered and the
+## scale has had its first calibration (it drifts from day 0, so auditing it at
+## the offer would fine the farm for an instrument it was never told about).
 func unit_ids() -> Array[String]:
 	return bench_unit_ids().filter(func(id: String) -> bool:
-		return not is_commissioning(id) and (id != HANGING_SCALE_ID or quest_state.has(WILDLIFE_SURVEY_QUEST)))
+		return not is_commissioning(id) and (id != HANGING_SCALE_ID or hanging_scale_in_service()))
+
+
+## The hanging field scale is audited once the survey quest is offered and the
+## scale has been calibrated at least once.
+func hanging_scale_in_service() -> bool:
+	if not quest_state.has(WILDLIFE_SURVEY_QUEST):
+		return false
+	var scale: DriftingSensor = sensors.get(HANGING_SCALE_ID) as DriftingSensor
+	return scale != null and scale.last_cal_day >= 0
 
 
 ## unit_ids() and the sensors of robots not released yet, in data order.
@@ -10336,6 +10347,11 @@ func max_animal_trust() -> int:
 
 func animal_weighed_today() -> bool:
 	return animal_weighed_day == GameClock.get_day_index()
+
+
+## The survey quest has been offered (active or done): weighing is open from then on.
+func wildlife_survey_offered() -> bool:
+	return quest_state.has(WILDLIFE_SURVEY_QUEST)
 
 
 func wildlife_survey_active() -> bool:

@@ -230,10 +230,12 @@ func _weigh_verb(group_id: String) -> String:
 
 
 ## Returns { kind, group_id, at, verb } for the closest trusting animal group
-## within INTERACT_REACH_M of `player_pos` while the wildlife survey quest is
-## active and today's weighing has not yet been logged, or {} otherwise.
+## within INTERACT_REACH_M of `player_pos` once the wildlife survey quest has
+## been offered (active or done: weighing after the quest is allowed) and today's
+## weighing has not yet been logged, or {} otherwise. The prompt itself shows only
+## while the quest is active (main_farm._weigh_prompt).
 func weigh_target(player_pos: Vector3) -> Dictionary:
-	if not GameState.wildlife_survey_active() or GameState.animal_weighed_today():
+	if not GameState.wildlife_survey_offered() or GameState.animal_weighed_today():
 		return {}
 	var approach_min: int = int(GameState.animal_trust_rule("approach_min", 1.0))
 	var best: Dictionary = {}

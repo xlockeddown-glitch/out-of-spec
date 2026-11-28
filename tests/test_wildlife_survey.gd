@@ -307,8 +307,29 @@ func test_scale_instrument_lists_budget_drift_and_audit_gating() -> String:
 	if problem == "":
 		gs.animal_groups["dome_hen"] = { "trust": 1, "fed_today": false, "unfed_streak": 0, "gifts": 0, "find_pending": false }
 		gs.update_quests()
+		if not gs.quest_state.has(gs.WILDLIFE_SURVEY_QUEST):
+			problem = "Survey quest must be offered at trust 1."
+		elif gs.unit_ids().has(gs.HANGING_SCALE_ID):
+			problem = "field_hanging_scale must stay out of audits at the offer, until its first calibration."
+
+	# Positive control: once offered AND calibrated once, a drifted, overdue scale is fined.
+	if problem == "":
+		var audit_day: int = 6
+		GameClock.elapsed_days = float(audit_day - 1)
+		scale.last_cal_day = 1
 		if not gs.unit_ids().has(gs.HANGING_SCALE_ID):
-			problem = "field_hanging_scale must enter unit_ids() once survey quest is offered."
+			problem = "field_hanging_scale must enter unit_ids() once offered and calibrated."
+		else:
+			for id: String in gs.unit_ids():
+				if id != gs.HANGING_SCALE_ID:
+					gs.get_sensor(id).error = 0.0
+					gs.get_sensor(id).cal_due_day = audit_day + 5
+			scale.error = scale.mpe * 3.0
+			scale.cal_due_day = 0
+			var credits_before_fine: int = gs.credits
+			gs._run_audit(audit_day)
+			if gs.credits >= credits_before_fine:
+				problem = "Audit must fine for a drifted, overdue field_hanging_scale once it is in service (credits %d -> %d)." % [credits_before_fine, gs.credits]
 
 	_done(gs)
 	return problem
@@ -345,6 +366,14 @@ func test_world_weigh_prompt_and_scale_prop() -> String:
 			problem = "Weigh prompt must not steal the collect interact target, got %s." % [t_interact]
 		elif t_weigh.get("kind", "") != "weigh" or t_weigh.get("verb", "") != "Weigh hen":
 			problem = "Expected 'Weigh hen' target, got %s." % [t_weigh]
+
+	# Quest done -> weighing still allowed (designer's decision), so the V path keeps a target.
+	if problem == "":
+		GameState.quest_state[GameState.WILDLIFE_SURVEY_QUEST]["done"] = 3
+		if wa.weigh_target(hen_spot).get("kind", "") != "weigh":
+			problem = "weigh_target must stay available after the survey quest is done."
+		elif GameState.wildlife_survey_active():
+			problem = "A done survey quest must not count as active (prompt hides)."
 
 	wa.free()
 	GameState.animal_groups = saved_groups

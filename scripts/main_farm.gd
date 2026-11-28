@@ -318,7 +318,7 @@ func verb_target() -> Dictionary:
 	if not animal.is_empty():
 		return {"at": animal["at"], "verb": animal["verb"], "action": &"interact"}
 	var weigh: Dictionary = _weigh_animal_in_reach()
-	if not weigh.is_empty():
+	if not weigh.is_empty() and GameState.wildlife_survey_active():
 		return {"at": weigh["at"], "verb": weigh["verb"], "action": &"survey"}
 	if CoopWalkers.on_foot():
 		if _walkers != null and _walkers.rover_in_reach():
@@ -812,7 +812,7 @@ func _weigh_animal_in_reach() -> Dictionary:
 
 func _weigh_prompt() -> String:
 	var weigh: Dictionary = _weigh_animal_in_reach()
-	if weigh.is_empty() or _animal_in_reach().is_empty():
+	if weigh.is_empty() or _animal_in_reach().is_empty() or not GameState.wildlife_survey_active():
 		return ""
 	return "%s: press %s." % [String(weigh["verb"]), Controls.prompt(&"survey")]
 
