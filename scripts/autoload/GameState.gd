@@ -4785,6 +4785,8 @@ func _receive_ice_core_returns(day: int) -> void:
 		trip["return_day"] = day
 		add_credits(ICE_CORE_RETURN_CREDITS)
 		give_lab_xp(ICE_CORE_RETURN_LAB_XP)
+		# Counted on the host whoever sent it: right for the farm quest a_core_to_certify,
+		# wrong for any future player-scope quest reading ice_core_certified.
 		var done: Dictionary = (action_counts.get_or_add(local_player_id, {}) as Dictionary).get_or_add(ICE_CORE_CERTIFIED_COUNT, { "count": 0, "xp": 0 })
 		done["count"] = int(done["count"]) + 1
 		post_phone("OIRM: Ice core certified. Credited %s CR and %s lab XP." % [

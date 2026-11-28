@@ -471,6 +471,9 @@ func _show_send() -> void:
 func _show_send_core() -> void:
 	var held: int = GameState.ice_cores_held
 	var show_button: bool = held > 0
+	if not show_button and _send_core_button.has_focus():
+		# A pad must not lose focus with the last core gone.
+		_calibrate_button.grab_focus()
 	_send_core_button.visible = show_button
 	if not show_button:
 		return
@@ -600,6 +603,7 @@ func _on_calibrate_pressed() -> void:
 	var arguments: Array = [id]
 	if _zero_game_due(id):
 		_calibrate_button.disabled = true
+		_send_core_button.disabled = true
 		# While a game is up, A and the D-pad are the game's, not the bench's.
 		_bench_focus(false)
 		# The clock is in the seed: opening the bench again is not the same sweep.
@@ -627,6 +631,7 @@ func _on_calibrate_pressed() -> void:
 		if _visit != visit:
 			return
 		_calibrate_button.disabled = false
+		_send_core_button.disabled = false
 		_bench_focus(true)
 		_calibrate_button.grab_focus()
 		# A skip sends no score: the command as it always was.
@@ -769,6 +774,8 @@ func _on_send_pressed() -> void:
 
 func _on_send_core_pressed() -> void:
 	var visit: int = _visit
+	# One core per press: a double click must not send two and pay two fees.
+	_send_core_button.disabled = true
 	var sent: Dictionary = await FarmCommands.request(&"send_ice_core", [])
 	if _visit != visit:
 		return
@@ -778,6 +785,7 @@ func _on_send_core_pressed() -> void:
 		_result_label.text = "ICE CORE SENT: back on day %d (%s CR)." % [int(sent["return_day"]), SP811.integer(int(sent["fee"]))]
 		_paint_result(DriftingSensor.band_color(DriftingSensor.Band.IN_BAND))
 		return
+	_send_core_button.disabled = false
 	_show_refusal("NOT SENT: ", sent)
 
 
