@@ -45,6 +45,8 @@ var _budget: Dictionary = {}
 var _limit: float = 0.0
 ## Standards only: sends the selected one to OIRM.
 var _send_button := Button.new()
+## Sends a held ice core sample from the cold box on the OIRM pod.
+var _send_core_button := Button.new()
 
 ## After the U and TUR of a record a Hold the Reading score made smaller.
 const STEADY_HOLD_NOTE: String = "U and TUR with your steady hold"
@@ -96,6 +98,11 @@ func _ready() -> void:
 	_send_button.hide()
 	_calibrate_button.add_sibling(_send_button)
 	_send_button.pressed.connect(_on_send_pressed)
+	_send_core_button.custom_minimum_size = _calibrate_button.custom_minimum_size
+	_send_core_button.size_flags_horizontal = _calibrate_button.size_flags_horizontal
+	_send_core_button.hide()
+	_send_button.add_sibling(_send_core_button)
+	_send_core_button.pressed.connect(_on_send_core_pressed)
 	_close_button.pressed.connect(close)
 	for mode: int in MinigameSettings.MODE_NAMES:
 		_game_option.add_item(MinigameSettings.MODE_NAMES[mode], mode)
@@ -158,7 +165,7 @@ func _dress() -> void:
 	stamp.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_seal.add_child(stamp)
 	_seal.pivot_offset = _seal.custom_minimum_size * 0.5
-	for pair: Array in [[_calibrate_button, &"ui_accept"], [_close_button, &"ui_cancel"], [_send_button, &"ui_accept"]]:
+	for pair: Array in [[_calibrate_button, &"ui_accept"], [_close_button, &"ui_cancel"], [_send_button, &"ui_accept"], [_send_core_button, &"ui_accept"]]:
 		var glyph: Label = ScopeTheme.badge(pair[1])
 		(pair[0] as Button).add_child(glyph)
 		_glyphs.append(glyph)
@@ -226,17 +233,17 @@ func _show_chain(instrument_id: String) -> void:
 ## The bench's own controls take focus, except while a game is up.
 func _bench_focus(on: bool) -> void:
 	var mode: Control.FocusMode = Control.FOCUS_ALL if on else Control.FOCUS_NONE
-	for control: Control in [_instrument_option, _careful_check, _game_option, _calibrate_button, _send_button, _close_button]:
+	for control: Control in [_instrument_option, _careful_check, _game_option, _calibrate_button, _send_button, _send_core_button, _close_button]:
 		control.focus_mode = mode
 		if not on and control.has_focus():
 			control.release_focus()
 
 
-## A pad moves along the button row (CALIBRATE, SEND, CLOSE, whichever show) and up
+## A pad moves along the button row (CALIBRATE, SEND, SEND CORE, CLOSE, whichever show) and up
 ## to the pickers. Never points at a hidden button.
 func _wire_focus() -> void:
 	var row: Array[Control] = []
-	for button: Button in [_calibrate_button, _send_button, _close_button]:
+	for button: Button in [_calibrate_button, _send_button, _send_core_button, _close_button]:
 		if button.visible:
 			row.append(button)
 	for i: int in row.size():
@@ -324,10 +331,13 @@ func _on_pod_or_oirm_changed() -> void:
 	# With no reference there is no reading to keep.
 	if not _calibrated and (_away_text() != _away or (standard and (not _has_reference or not GameState.has_bench_reference(_current_id)))):
 		_on_instrument_selected(index)
-	elif standard:
-		if _calibrated:
-			_show_finished()
-		_show_send()
+	else:
+		if standard:
+			if _calibrated:
+				_show_finished()
+			_show_send()
+		_show_send_core()
+		_wire_focus()
 
 
 ## What keeps the selected instrument off the bench, or "".
@@ -404,6 +414,7 @@ func _select(index: int) -> void:
 	_has_reference = GameState.has_bench_reference(_current_id)
 	_calibrate_button.show()
 	_send_button.hide()
+	_show_send_core()
 	if _current_id.begins_with(JOB_PREFIX):
 		_show_job(GameState.active_job(_current_id.trim_prefix(JOB_PREFIX)))
 		return
@@ -455,6 +466,19 @@ func _show_send() -> void:
 	_send_button.text = ("SEND TO OIRM (%s CR)" % SP811.integer(GameState.oirm_fee()) if GameState.drop_pod_present
 		else "SEND BY COURIER (%s CR)" % SP811.integer(GameState.oirm_fee() + GameState.oirm_courier_surcharge()))
 	_send_button.disabled = GameState.at_oirm.has(_current_id)
+
+
+func _show_send_core() -> void:
+	var held: int = GameState.ice_cores_held
+	var show_button: bool = held > 0
+	if not show_button and _send_core_button.has_focus():
+		# A pad must not lose focus with the last core gone.
+		_calibrate_button.grab_focus()
+	_send_core_button.visible = show_button
+	if not show_button:
+		return
+	_send_core_button.text = "Send an ice core (%d held)" % held
+	_send_core_button.disabled = false
 
 
 ## A standard with no reference on this bench: its error is unknown until OIRM
@@ -579,6 +603,7 @@ func _on_calibrate_pressed() -> void:
 	var arguments: Array = [id]
 	if _zero_game_due(id):
 		_calibrate_button.disabled = true
+		_send_core_button.disabled = true
 		# While a game is up, A and the D-pad are the game's, not the bench's.
 		_bench_focus(false)
 		# The clock is in the seed: opening the bench again is not the same sweep.
@@ -606,6 +631,7 @@ func _on_calibrate_pressed() -> void:
 		if _visit != visit:
 			return
 		_calibrate_button.disabled = false
+		_send_core_button.disabled = false
 		_bench_focus(true)
 		_calibrate_button.grab_focus()
 		# A skip sends no score: the command as it always was.
@@ -743,6 +769,23 @@ func _on_send_pressed() -> void:
 	if sent["ok"]:
 		_on_instrument_selected(_ids.find(_current_id))
 		return
+	_show_refusal("NOT SENT: ", sent)
+
+
+func _on_send_core_pressed() -> void:
+	var visit: int = _visit
+	# One core per press: a double click must not send two and pay two fees.
+	_send_core_button.disabled = true
+	var sent: Dictionary = await FarmCommands.request(&"send_ice_core", [])
+	if _visit != visit:
+		return
+	if sent["ok"]:
+		_show_send_core()
+		_wire_focus()
+		_result_label.text = "ICE CORE SENT: back on day %d (%s CR)." % [int(sent["return_day"]), SP811.integer(int(sent["fee"]))]
+		_paint_result(DriftingSensor.band_color(DriftingSensor.Band.IN_BAND))
+		return
+	_send_core_button.disabled = false
 	_show_refusal("NOT SENT: ", sent)
 
 
