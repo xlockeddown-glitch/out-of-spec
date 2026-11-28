@@ -115,6 +115,7 @@ func _ready() -> void:
 	for prop: Inspectable in get_tree().get_nodes_in_group(Inspectable.GROUP):
 		prop.inspected.connect(_toast)
 	($KeepsakeShelf as KeepsakeShelf).inspected.connect(_toast)
+	($CertificateWall as CertificateWall).inspected.connect(_toast)
 	GameState.calibration_recorded.connect(_on_calibration_recorded)
 	GameState.phone_message.connect(_on_phone_message)
 	GameState.skill_leveled.connect(_on_skill_leveled)
