@@ -33,6 +33,8 @@ const GROUPS: Array[Dictionary] = [
 		{ "verb": "Get out of the rover, or back in", "action": &"get_out_in" },
 		{ "verb": "Walk (forward, left, back, right)", "move": [
 			&"rover_forward", &"rover_steer_left", &"rover_reverse", &"rover_steer_right"] },
+		{ "verb": "Jump (on Phobos and Deimos)", "action": &"rover_till" },
+		{ "verb": "Tether on or off (moons: flat steps, no jump)", "action": &"moon_tether" },
 	] },
 	{ "title": "FARMING", "lines": [
 		{ "verb": "Drill, till, plant or harvest", "action": &"rover_till" },

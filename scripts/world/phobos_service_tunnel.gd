@@ -115,7 +115,7 @@ func _process(delta: float) -> void:
 		_toast_left -= delta
 	else:
 		var hovered: Clickable = Clickable.hovered
-		_hint.text = hovered.hint if hovered != null and hovered.hint != "" else AMBIENT_HINT
+		_hint.text = hovered.hint if hovered != null and hovered.hint != "" else AMBIENT_HINT + "  " + PhobosWalker.hint_text()
 	if not _seen_trip and not _asking:
 		_since_s += delta
 		if _since_s > GRACE_S:
@@ -360,6 +360,7 @@ func _build_walker() -> void:
 	add_child(camera)
 	walker = PhobosWalker.new()
 	walker.name = "Walker"
+	walker.moon = Shuttle.PHOBOS
 	walker.camera = camera
 	add_child(walker)
 	walker.position = ARRIVE_AT
@@ -388,7 +389,7 @@ func _build_hud() -> void:
 	_hint = Label.new()
 	_hint.name = "HintLabel"
 	_hint.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
-	_hint.offset_top = -64.0
+	_hint.offset_top = -96.0
 	_hint.offset_left = 16.0
 	_hint.add_theme_font_size_override(&"font_size", 20)
 	_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

@@ -4,8 +4,9 @@ extends PhobosHub
 ## and a little odd, a place hidden on purpose. A smoother, paler, dustier deck than
 ## Phobos under a black sky with Mars, the parked shuttle, a small cream outpost hab, the
 ## return-shuttle console, the notice board, one locked smuggler cache and the terraform
-## test pod. Kestrel's trade is the cache's story. Walking only, no low gravity yet; every
-## shape, colour and line is a [PLACEHOLDER], boxes and drums only, no art files.
+## test pod. Kestrel's trade is the cache's story. Walking has Deimos' low gravity
+## (MoonGravity); every shape, colour and line is a [PLACEHOLDER], boxes and drums only,
+## no art files.
 ##
 ## The cache and the pod are signs to inspect, nothing more: no crate opens, there is no
 ## new species, find or quest (later PRs). Booking, the way home, the trip's end and the
