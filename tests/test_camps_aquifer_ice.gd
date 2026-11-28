@@ -370,8 +370,8 @@ func test_the_new_camps_save_and_an_old_save_loads() -> String:
 	return "\n".join(problems)
 
 
-func test_the_protocol_is_46_after_phobos_deep() -> String:
-	return "" if CoopSession.PROTOCOL == 46 else "The camps added no command; Phobos deep took 46, not %d" % CoopSession.PROTOCOL
+func test_the_protocol_is_47_after_phobos_deep_and_sitter_days() -> String:
+	return "" if CoopSession.PROTOCOL == 47 else "The camps added no command; Phobos deep and the sitter days took 47, not %d" % CoopSession.PROTOCOL
 
 
 # --- The counters and a whole run -------------------------------------------------------
