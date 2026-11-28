@@ -29,6 +29,11 @@ const COLD_MAX: float = 100.0
 const DRIFT_MULTIPLIER: float = 1.5
 ## A heater cartridge costs this many credits [PLACEHOLDER]; it resets the cold.
 const HEATER_COST_CREDITS: int = 40
+## Below this much cold the crate won't sell a heater, in percent [PLACEHOLDER].
+const HEATER_MIN_COLD: float = 10.0
+## Back in the caves within this many game hours of leaving keeps the old cold [PLACEHOLDER];
+## later than that, the cold starts again from 0.
+const COLD_GRACE_HOURS: float = 1.0
 ## The rooms (top left), as the Mine has them: west, east, north.
 const ROOMS: Array[Rect2i] = [Rect2i(2, 8, 7, 5), Rect2i(15, 8, 7, 5), Rect2i(8, 1, 7, 5)]
 const CARVES: Array[Rect2i] = [Rect2i(8, 15, 7, 4), Rect2i(10, 13, 3, 8), Rect2i(11, 6, 2, 8)]
@@ -172,14 +177,21 @@ static func cold_text(cold_percent: float) -> String:
 
 
 ## Why a farm can't buy a heater cartridge, or "". Pure: GameState passes what it has.
-static func heater_problem(place: String, depth: int, credits: int, near_crate_now: bool) -> String:
+static func heater_problem(place: String, depth: int, credits: int, near_crate_now: bool, cold_now: float = COLD_MAX) -> String:
 	if place != ZONE or depth != 0:
 		return "Heater cartridges are sold at the crate in the Ice Caves' hub."
 	if not near_crate_now:
 		return "The rover is too far from the crate."
 	if credits < HEATER_COST_CREDITS:
 		return "A heater cartridge costs %d credits." % HEATER_COST_CREDITS
+	if cold_now < HEATER_MIN_COLD:
+		return "You're not cold enough for a heater cartridge yet."
 	return ""
+
+
+## Whether a player who left the caves at `left` and is back at `now` keeps their old cold.
+static func within_grace(left: float, now: float) -> bool:
+	return now >= left and (now - left) * 24.0 <= COLD_GRACE_HOURS
 
 
 ## Why a saved `cold_since` can't be, or "". Shape only: a player id to a finite stamp.

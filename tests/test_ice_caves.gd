@@ -271,6 +271,64 @@ func test_leaving_the_caves_resets_the_cold() -> String:
 	return run if run != "" else "\n".join(problems)
 
 
+func test_back_within_the_grace_keeps_the_cold_and_later_starts_from_nothing() -> String:
+	var problems: Array[String] = []
+	var run: String = _at(3.0, func() -> String:
+		var gs: GameStateScript = _state()
+		if _inside(gs) != "":
+			return "The rover did not go in."
+		GameClock.elapsed_days = 3.0 + 5.0 * HOUR
+		if gs.move_rover_ice(false, HOST) != "":
+			return "The rover could not come out."
+		if gs.cold_since.has(HOST) or gs.cold_of(HOST) != 0.0:
+			problems.append("Outside the caves there is still a stamp: %s." % [gs.cold_since])
+		GameClock.elapsed_days = 3.0 + 5.5 * HOUR
+		if _inside(gs) != "":
+			return "The rover did not go in again."
+		if not is_equal_approx(gs.cold_of(HOST), 5.5 * IceDepth.COLD_PER_HOUR):
+			problems.append("Back within the grace did not keep the old cold: %f." % gs.cold_of(HOST))
+		GameClock.elapsed_days = 3.0 + 6.0 * HOUR
+		gs.move_rover_ice(false, HOST)
+		GameClock.elapsed_days = 3.0 + (6.0 + IceDepth.COLD_GRACE_HOURS + 0.5) * HOUR
+		if _inside(gs) != "" or gs.cold_of(HOST) != 0.0:
+			problems.append("Back after the grace did not start from 0: %f." % gs.cold_of(HOST))
+		GameClock.elapsed_days = 3.0 + 10.0 * HOUR
+		gs.move_rover_ice(false, HOST)
+		gs.farm_from_dict(gs.farm_to_dict())
+		GameClock.elapsed_days = 3.0 + 10.2 * HOUR
+		if _inside(gs) != "" or gs.cold_of(HOST) != 0.0:
+			problems.append("A load kept the grace: %f." % gs.cold_of(HOST))
+		gs.free()
+		return "")
+	return run if run != "" else "
+".join(problems)
+
+
+func test_the_crate_refuses_a_heater_below_the_cold_floor() -> String:
+	var problems: Array[String] = []
+	var run: String = _at(3.0, func() -> String:
+		var gs: GameStateScript = _state()
+		gs.credits = IceDepth.HEATER_COST_CREDITS
+		if _inside(gs) != "":
+			return "The rover did not go in."
+		gs.rover_depth = 0
+		_at_crate(gs)
+		GameClock.elapsed_days = 3.0 + 0.5 * HOUR
+		var early: String = gs.buy_heater(HOST)
+		if not early.contains("not cold enough") or gs.credits != IceDepth.HEATER_COST_CREDITS:
+			problems.append("A heater was sold below %f %% cold: '%s' (%d credits)." % [IceDepth.HEATER_MIN_COLD, early, gs.credits])
+		GameClock.elapsed_days = 3.0 + (IceDepth.HEATER_MIN_COLD / IceDepth.COLD_PER_HOUR + 0.1) * HOUR
+		var later: String = gs.buy_heater(HOST)
+		if later != "" or gs.credits != 0:
+			problems.append("A heater was refused at the floor: '%s' (%d credits)." % [later, gs.credits])
+		if IceDepth.heater_problem(ZONE, 0, 100, true, IceDepth.HEATER_MIN_COLD) != "":
+			problems.append("The floor itself must be enough cold.")
+		gs.free()
+		return "")
+	return run if run != "" else "
+".join(problems)
+
+
 func test_a_guest_sees_the_cold_and_only_the_hosts_copy_is_stamped() -> String:
 	var problems: Array[String] = []
 	var held_guest: bool = FarmCommands.guest
