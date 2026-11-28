@@ -4368,7 +4368,10 @@ func _on_day_started(day: int) -> void:
 	_warm_ice_campers()
 	_campers.clear()  # the night at a camp is over: they wake there, and the recall is theirs again
 	_cold_kept.clear()  # yesterday's cold never comes back, whatever the grace
+	var markers_before: int = olympus_markers.size()
 	olympus_markers = OlympusDepth.prune_markers(olympus_markers, day)
+	if olympus_markers.size() != markers_before:
+		olympus_changed.emit()
 	_phobos_wiped.clear()
 	_on_phobos_deck.clear()
 	_deimos_wiped.clear()

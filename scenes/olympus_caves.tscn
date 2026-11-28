@@ -94,7 +94,7 @@ rover = NodePath("../Rover")
 [node name="Beacon" type="Node3D" parent="WorldView/WorldViewport/World" node_paths=PackedStringArray("uplink_point", "beacon")]
 position = Vector3(-5, 0, 24.6)
 script = ExtResource("3_relay")
-relay_name = "ICE BEACON 01"
+relay_name = "OLYMPUS BEACON 01"
 uplink_point = NodePath("Dish")
 beacon = NodePath("Dish/Light")
 beacon_energy_base = 1.5

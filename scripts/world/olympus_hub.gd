@@ -5,7 +5,7 @@ extends "res://scripts/basalt_tunnels.gd"
 ## depths (further along the tube: rooms, finds, a skylight each). Built in code from primitives
 ## (OlympusLook); the rules are OlympusDepth's and the host's. Heat is told on the HUD; it is
 ## GameState's (`cold_since`, read through `cold_of`). Below, the phone points back to the skylight
-## once the player has left a marker (place_stone key). A look [PLACEHOLDER]: no art yet.
+## once the player has left a marker (leave_marker: B, or D-pad right). A look [PLACEHOLDER]: no art yet.
 
 const SIGN: String = "sign"
 ## Cells of the hall (OlympusDepth.HALL) the huge breakdown blocks stand in, with their sizes in
@@ -22,6 +22,7 @@ const HEAT_STEP: int = 10
 var _told_heat_step: int = -1
 var _told_warn: bool = false
 var _decor: Node3D
+var _beacons: Node3D
 
 
 func _zone_id() -> String:
@@ -43,6 +44,11 @@ func _build_zone() -> void:
 		if _built_depth < OlympusDepth.MAX_DEPTH:
 			_depth_props.build_hatch(_built_depth)
 		GameState.finds_changed.connect(_on_finds_changed)
+		_beacons = Node3D.new()
+		_beacons.name = "MarkerBeacons"
+		_rover.get_parent().add_child(_beacons)
+		GameState.olympus_changed.connect(_draw_markers)
+		_draw_markers()
 		var sky: Vector3 = skylight_position()
 		OlympusLook.add_skylight(_decor, sky)
 	else:
@@ -70,6 +76,23 @@ func _build_hub_decor() -> void:
 	var hatch: Vector3 = OlympusDepth.hatch_position()
 	for side: float in [-2.2, 2.2]:
 		OlympusLook.add_pillar(_decor, Vector3(hatch.x + side, 0.0, hatch.z - 1.6), 2.4)
+
+
+## A small beacon at the marker each player left on this depth today (every marker is shown).
+func _draw_markers() -> void:
+	if _beacons == null or not is_instance_valid(_beacons):
+		return
+	for child: Node in _beacons.get_children():
+		_beacons.remove_child(child)
+		child.queue_free()
+	var day: int = GameClock.get_day_index()
+	for key: Variant in GameState.olympus_markers:
+		var entry: Variant = GameState.olympus_markers[key]
+		if not entry is Array or (entry as Array).size() < 3 or int(entry[0]) != day:
+			continue
+		if not str(key).ends_with(":%d" % _built_depth):
+			continue
+		OlympusLook.add_marker_beacon(_beacons, TunnelRock.at(Vector2i(int(entry[1]), int(entry[2]))))
 
 
 ## The notice board with an ember cap and the tube's notices [PLACEHOLDER].
@@ -147,7 +170,7 @@ func _tell_hub() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _below and event.is_action_pressed(&"place_stone") and _rover.away_text() == "":
+	if _below and event.is_action_pressed(&"leave_marker") and _rover.away_text() == "":
 		get_viewport().set_input_as_handled()
 		_place_marker()
 		return
@@ -188,7 +211,7 @@ func _use_find(find_id: String) -> void:
 
 
 func _on_rover_entered_exit() -> void:
-	var marker: String = " Press " + Controls.prompt(&"place_stone") + " to leave a marker." if _below else ""
+	var marker: String = " Press " + Controls.prompt(&"leave_marker") + " to leave a marker." if _below else ""
 	_hud.push_log(("WAY UP: press " + Controls.prompt(&"interact") + " to go up." + marker) if _below else "CLIMB TRACK: press " + Controls.prompt(&"interact") + " to drive down to the farm.")
 
 

@@ -32,8 +32,8 @@ const KINDS: Array[String] = ["mineral", "mineral", "ore"]
 
 ## The halls of each depth [PLACEHOLDER]: two huge halls and the trunk, mostly empty.
 const ROOMS: Dictionary = {
-	1: [Rect2i(1, 3, 9, 6), Rect2i(14, 8, 9, 6)],
-	2: [Rect2i(2, 8, 9, 6), Rect2i(14, 2, 8, 7)],
+	1: [Rect2i(1, 3, 9, 9), Rect2i(14, 8, 9, 6)],
+	2: [Rect2i(2, 8, 9, 6), Rect2i(14, 2, 8, 10)],
 }
 const CARVES: Array[Rect2i] = [Rect2i(8, 15, 7, 4), Rect2i(10, 13, 3, 8), Rect2i(11, 6, 2, 8)]
 const LANDING := Rect2i(8, 15, 7, 4)

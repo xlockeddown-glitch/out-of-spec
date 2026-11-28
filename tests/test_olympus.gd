@@ -65,9 +65,10 @@ func test_the_hub_scene_loads_and_the_zone_row_points_to_it() -> String:
 	var shaft: Node3D = OlympusLook.add_skylight(holder, Vector3.ZERO)
 	var block: Node3D = OlympusLook.add_breakdown_block(holder, Vector3(5.0, 0.0, 0.0), Vector3(4.0, 3.0, 3.0))
 	var lamp: bool = shaft.get_node_or_null("SkylightLamp") != null
-	var blocks: int = block.get_child_count()
+	var blocks: int = block.get_child_count()  # two slabs and the solid body
+	var solid: bool = block.get_node_or_null("BlockBody") is StaticBody3D
 	holder.free()
-	if not lamp or blocks != 2:
+	if not lamp or blocks != 3 or not solid:
 		return "The skylight or the breakdown block did not build (lamp %s, %d slabs)." % [lamp, blocks]
 	return ""
 
@@ -126,6 +127,26 @@ func test_depths_are_the_same_for_the_same_seed_and_day_and_differ_by_depth_and_
 			return "A mineral find has no vein kind: %s" % [find]
 	if (a["finds"] as Array).size() != OlympusDepth.find_count():
 		return "Depth 1 has %d finds (want %d)." % [(a["finds"] as Array).size(), OlympusDepth.find_count()]
+	return ""
+
+
+func test_every_find_the_skylight_and_the_start_are_reachable_every_day() -> String:
+	for day: int in range(1, 61):
+		for depth: int in range(1, OlympusDepth.MAX_DEPTH + 1):
+			var today: Dictionary = OlympusDepth.layout(SEED, depth, day)
+			var reach: Array[Vector2i] = ZoneDepth.reachable(today["grid"], ZoneDepth.START_CELL)
+			if not today["skylight"] in reach:
+				return "Day %d depth %d: the skylight is cut off." % [day, depth]
+			if not (today["start"] as Vector2i) in reach:
+				return "Day %d depth %d: the start is not on its own floor." % [day, depth]
+			for find: Dictionary in today["finds"]:
+				if not find["cell"] in reach:
+					return "Day %d depth %d: find %s at %s is cut off." % [day, depth, find["id"], find["cell"]]
+			var floor_cells: int = 0
+			for line: String in today["grid"]:
+				floor_cells += line.count(".")
+			if reach.size() != floor_cells:
+				return "Day %d depth %d: only %d of %d floor cells reach the start (a room is sealed)." % [day, depth, reach.size(), floor_cells]
 	return ""
 
 

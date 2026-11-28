@@ -26,7 +26,7 @@ const SHAFT_LIGHT_RANGE_M: float = 22.0
 ## Deterministic integer hash from coordinates and salt (no global RNG) [PLACEHOLDER].
 static func hash_int(x: int, y: int, salt: int = 0) -> int:
 	var h: int = (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
-	h = ((h >> 16) ^ h) * 0x45d9f3b
+	h = ((h >> 16) ^ h) * 73244475  # the usual 0x45d9f3b integer-hash multiplier, as a decimal
 	return absi((h >> 16) ^ h)
 
 
@@ -71,7 +71,8 @@ static func add_skylight(parent: Node3D, at: Vector3) -> Node3D:
 
 
 ## A huge breakdown block: a big slab and a smaller one leaning on it, `size` wide, deep and tall
-## (visual only, no collision; the open middle of the hall stays clear).
+## (the big slab is solid, so the rover cannot drive through it; the stem, the landing and the open
+## middle of the hall stay clear of the blocks).
 static func add_breakdown_block(parent: Node3D, at: Vector3, size: Vector3, salt: int = 0) -> Node3D:
 	var block := Node3D.new()
 	block.name = "BreakdownBlock"
@@ -84,6 +85,18 @@ static func add_breakdown_block(parent: Node3D, at: Vector3, size: Vector3, salt
 		rock_mat(BLOCK_TONES[h % BLOCK_TONES.size()]),
 		Vector3(0.0, float(h % 90), 0.0)
 	))
+	var body := StaticBody3D.new()
+	body.name = "BlockBody"
+	body.collision_layer = 1
+	body.collision_mask = 0
+	body.position = Vector3(0.0, size.y * 0.5, 0.0)
+	body.rotation_degrees = Vector3(0.0, float(h % 90), 0.0)
+	var shape := CollisionShape3D.new()
+	var box := BoxShape3D.new()
+	box.size = size
+	shape.shape = box
+	body.add_child(shape)
+	block.add_child(body)
 	var lean: Vector3 = size * 0.55
 	block.add_child(TunnelLook.part(
 		TunnelLook.box(lean),
@@ -92,6 +105,24 @@ static func add_breakdown_block(parent: Node3D, at: Vector3, size: Vector3, salt
 		Vector3(float((h / 7) % 14), float((h / 5) % 90), float((h / 11) % 12))
 	))
 	return block
+
+
+## A small beacon a player left on the floor at `at`: a dark post with an ember-lit cap and a pale
+## foot ring. Visual only [PLACEHOLDER].
+static func add_marker_beacon(parent: Node3D, at: Vector3) -> Node3D:
+	var beacon := Node3D.new()
+	beacon.name = "MarkerBeacon"
+	beacon.position = at
+	parent.add_child(beacon)
+	beacon.add_child(TunnelLook.part(TunnelLook.cylinder(0.35, 0.06), Vector3(0.0, 0.03, 0.0), rock_mat(EMBER_PALE)))
+	beacon.add_child(TunnelLook.part(TunnelLook.cylinder(0.08, 1.1), Vector3(0.0, 0.55, 0.0), rock_mat(BASALT_GREY)))
+	var cap_mat := StandardMaterial3D.new()
+	cap_mat.albedo_color = EMBER_ORANGE
+	cap_mat.emission_enabled = true
+	cap_mat.emission = EMBER_ORANGE
+	cap_mat.emission_energy_multiplier = 1.5
+	beacon.add_child(TunnelLook.part(TunnelLook.sphere(0.16), Vector3(0.0, 1.2, 0.0), cap_mat))
+	return beacon
 
 
 ## A basalt pillar `height` tall, with an ember-lit band near its top (visual only).
