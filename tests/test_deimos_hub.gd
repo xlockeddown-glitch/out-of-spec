@@ -196,9 +196,10 @@ func test_the_hub_scene_builds_with_its_console_board_cache_and_pod_signs() -> S
 	if problems.is_empty():
 		if hub._moon() != Shuttle.DEIMOS or hub._title() != Shuttle.text("deimos_hub_title"):
 			problems.append("The hub is Deimos and says so.")
-		for sign_click: Inspectable in [hub.cache_click, hub.pod_click]:
-			if not Inspectable.inspect_text(sign_click.prop_id).contains("[later]"):
-				problems.append("%s has an inspect line marked [later]." % sign_click.prop_id)
+		if Inspectable.inspect_text(hub.cache_click.prop_id) == "" or Inspectable.inspect_text(hub.cache_click.prop_id).contains("[later]"):
+			problems.append("%s has a live inspect line without [later]." % hub.cache_click.prop_id)
+		if not Inspectable.inspect_text(hub.pod_click.prop_id).contains("[later]"):
+			problems.append("%s has an inspect line marked [later]." % hub.pod_click.prop_id)
 		var board: String = hub._board_text()
 		if not board.contains(Shuttle.window_line(Shuttle.DEIMOS, GameClock.elapsed_days)):
 			problems.append("The board says where the shuttle window stands: %s" % board)
