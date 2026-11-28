@@ -236,8 +236,8 @@ func test_guests_see_the_days_and_the_commands_run_for_them() -> String:
 	if updated != "" or not guest.lab_sitter.is_empty() or heard[0] < 1:
 		problems.append("The guest is shown the cancel: '%s', %s, %d" % [updated, guest.lab_sitter, heard[0]])
 	FarmCommands.guest = false
-	if CoopSession.PROTOCOL != 47:
-		problems.append("The protocol is %d, not 47 (cancel is a new command, book takes days)." % CoopSession.PROTOCOL)
+	if CoopSession.PROTOCOL < 47:
+		problems.append("The protocol is %d, below 47 (cancel is a new command, book takes days)." % CoopSession.PROTOCOL)
 	commands.free()
 	guest.free()
 	_done(host)

@@ -157,10 +157,10 @@ func test_pinned_collisions_areas_spots_arrive_and_click_targets_unchanged() -> 
 	var deimos: DeimosHub = _open(SceneSwitcher.DEIMOS_SCENE) as DeimosHub
 	if _count_type(deimos, "StaticBody3D") != 11:
 		problem = "DeimosHub StaticBody3D count changed: expected 11, got %d." % _count_type(deimos, "StaticBody3D")
-	elif _count_type(deimos, "Area3D") != 5:
-		problem = "DeimosHub Area3D count changed: expected 5, got %d." % _count_type(deimos, "Area3D")
-	elif _count_type(deimos, "CollisionShape3D") != 16:
-		problem = "DeimosHub CollisionShape3D count changed: expected 16, got %d." % _count_type(deimos, "CollisionShape3D")
+	elif _count_type(deimos, "Area3D") != 6:
+		problem = "DeimosHub Area3D count changed: expected 6, got %d." % _count_type(deimos, "Area3D")
+	elif _count_type(deimos, "CollisionShape3D") != 17:
+		problem = "DeimosHub CollisionShape3D count changed: expected 17, got %d." % _count_type(deimos, "CollisionShape3D")
 	elif DeimosHub.ARRIVE_AT != Vector3(-2.0, 0.0, 7.0) or not is_equal_approx(DeimosHub.REACH_M, 9.0):
 		problem = "DeimosHub ARRIVE_AT or REACH_M changed."
 	elif deimos._spots() != {

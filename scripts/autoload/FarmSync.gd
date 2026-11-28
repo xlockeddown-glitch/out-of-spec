@@ -23,6 +23,7 @@ const SHOWN_BY: Dictionary = {
 	&"strays_changed": ["strays_caught"],
 	&"phobos_finds_changed": ["phobos_finds_taken"],
 	&"deimos_cache_changed": ["deimos_cache"],
+	&"deimos_crates_changed": ["deimos_crates_opened"],
 	&"silk_changed": ["optical_silk_spools", "_spool_species", "_spool_damaged"],
 	&"relay_changed": ["relay_slotted", "slotted_spool_species", "slotted_spool_damaged"],
 	&"credits_changed": ["credits"],
