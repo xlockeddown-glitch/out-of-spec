@@ -59,10 +59,10 @@ func _apply_aquifer_rock_look() -> void:
 	for middle: Vector3 in _lintel_trims:
 		var trim: StandardMaterial3D = _lintel_trims[middle]
 		trim.albedo_color = Color(AquiferLook.ARCH_TRIM_TEAL, trim.albedo_color.a)
-		trim.roughness = 0.56
+		trim.roughness = AquiferLook.ARCH_TRIM_ROUGHNESS
 
 	# Tint arch pillars (fresh per-arch material) and swap brass brackets to rusted pipe-green iron.
-	var bracket_mat: Material = AquiferLook.flat_mat(AquiferLook.PIPE_GREEN_DARK, 0.62)
+	var bracket_mat: Material = AquiferLook.flat_mat(AquiferLook.PIPE_GREEN_DARK, AquiferLook.BRACKET_ROUGHNESS)
 	var brass_shared: Material = TunnelLook.flat_mat(TunnelLook.BRASS)
 	for child: Node in get_children():
 		if child is MeshInstance3D:

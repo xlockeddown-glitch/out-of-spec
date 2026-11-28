@@ -66,37 +66,38 @@ func _build_zone() -> void:
 		_build_hub_decor()
 
 
-## Hub dressing: dripping stalactite clusters along the north chamber walls,
-## rusted pipe-green drainage runs along the landing and stem, pale mineral
-## wall streaks, and 1 subtle cavern accent light (visual only, zero collision,
-## rover path clear) [PLACEHOLDER].
+## Hub dressing: dripping stalactite clusters, rusted pipe-green drainage runs,
+## pale mineral wall streaks (strictly on full-height north and west walls so
+## nothing floats over camera cut-away walls), and 1 subtle cavern accent light
+## (visual only, zero collision, rover path clear) [PLACEHOLDER].
 func _build_hub_decor() -> void:
 	AquiferLook.add_stalactite_cluster(_decor, Vector3(-1.5, 3.2, -8.7), 5.2, 0.90, 0.0)
-	AquiferLook.add_stalactite_cluster(_decor, Vector3(8.7, 3.1, -1.5), 4.0, 0.85, -90.0)
 	AquiferLook.add_stalactite_cluster(_decor, Vector3(-11.7, 3.1, -1.5), 4.0, 0.85, 90.0)
-	AquiferLook.add_pipe_run(_decor, Vector3(8.7, 0.0, -1.5), 7.2, 1.70, -90.0)
-	AquiferLook.add_pipe_run(_decor, Vector3(8.7, 0.0, 20.0), 4.6, 1.55, -90.0)
-	AquiferLook.add_pipe_run(_decor, Vector3(-5.7, 0.0, 10.0), 4.2, 1.60, 90.0)
+	AquiferLook.add_stalactite_cluster(_decor, Vector3(-11.7, 3.1, 18.0), 4.0, 0.85, 90.0)
+	AquiferLook.add_pipe_run(_decor, Vector3(-11.7, 0.0, -1.5), 7.2, 1.70, 90.0)
+	AquiferLook.add_pipe_run(_decor, Vector3(-1.5, 0.0, -8.7), 6.4, 1.65, 0.0)
+	AquiferLook.add_pipe_run(_decor, Vector3(-11.7, 0.0, 18.0), 5.6, 1.55, 90.0)
 	AquiferLook.add_mineral_streak(_decor, Vector3(-5.5, 0.0, -8.85), 1.6, 2.5, 0.0)
 	AquiferLook.add_mineral_streak(_decor, Vector3(2.5, 0.0, -8.85), 1.6, 2.4, 0.0)
-	AquiferLook.add_mineral_streak(_decor, Vector3(-11.85, 0.0, 19.5), 1.5, 2.3, 90.0)
+	AquiferLook.add_mineral_streak(_decor, Vector3(-11.85, 0.0, 21.0), 1.5, 2.3, 90.0)
 	_add_cavern_light(Vector3(5.5, 2.3, 16.5), "LandingLamp")
 
 
-## Depth 1 dressing: dripping stalactites along the trunk and side room walls,
-## rusted pipe-green drainage runs, pale mineral streaks, and 2 subtle cavern
-## accent lights (visual only, zero collision, rover path clear) [PLACEHOLDER].
+## Depth 1 dressing: dripping stalactites, rusted pipe-green drainage runs,
+## pale mineral streaks (strictly on full-height north and west walls so
+## nothing floats over camera cut-away walls), and 2 subtle cavern accent
+## lights (visual only, zero collision, rover path clear) [PLACEHOLDER].
 func _build_depth_decor() -> void:
 	AquiferLook.add_stalactite_cluster(_decor, Vector3(-11.7, 3.1, 17.5), 4.2, 0.88, 90.0)
-	AquiferLook.add_stalactite_cluster(_decor, Vector3(-2.7, 3.1, 6.0), 3.4, 0.85, 90.0)
+	AquiferLook.add_stalactite_cluster(_decor, Vector3(-11.7, 3.1, -22.5), 4.0, 0.85, 90.0)
 	AquiferLook.add_stalactite_cluster(_decor, Vector3(-1.5, 3.2, -29.7), 5.0, 0.92, 0.0)
 	AquiferLook.add_stalactite_cluster(_decor, Vector3(-19.5, 3.1, -8.7), 4.4, 0.85, 0.0)
 	AquiferLook.add_stalactite_cluster(_decor, Vector3(19.5, 3.1, -8.7), 4.4, 0.85, 0.0)
-	AquiferLook.add_pipe_run(_decor, Vector3(8.7, 0.0, 17.5), 6.0, 1.65, -90.0)
-	AquiferLook.add_pipe_run(_decor, Vector3(2.7, 0.0, -10.5), 4.4, 1.60, -90.0)
+	AquiferLook.add_pipe_run(_decor, Vector3(-11.7, 0.0, 18.0), 6.0, 1.65, 90.0)
+	AquiferLook.add_pipe_run(_decor, Vector3(-29.7, 0.0, -1.5), 5.4, 1.60, 90.0)
 	AquiferLook.add_pipe_run(_decor, Vector3(-19.5, 0.0, -8.7), 5.6, 1.65, 0.0)
 	AquiferLook.add_pipe_run(_decor, Vector3(19.5, 0.0, -8.7), 5.6, 1.65, 0.0)
-	AquiferLook.add_mineral_streak(_decor, Vector3(8.85, 0.0, 14.5), 1.5, 2.4, -90.0)
+	AquiferLook.add_mineral_streak(_decor, Vector3(-11.85, 0.0, 14.0), 1.5, 2.4, 90.0)
 	AquiferLook.add_mineral_streak(_decor, Vector3(-5.0, 0.0, -29.85), 1.8, 2.6, 0.0)
 	AquiferLook.add_mineral_streak(_decor, Vector3(2.0, 0.0, -29.85), 1.6, 2.4, 0.0)
 	_add_cavern_light(Vector3(0.0, 2.4, 3.0), "TrunkLamp")

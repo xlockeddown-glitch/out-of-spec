@@ -17,6 +17,8 @@ const WET_ROCK_MID := Color(0.16, 0.24, 0.26)
 const WET_ROCK_TEAL := Color(0.14, 0.27, 0.29)
 const ARCH_WET_STONE := Color(0.13, 0.21, 0.23)
 const ARCH_TRIM_TEAL := Color(0.20, 0.34, 0.33)
+const ARCH_TRIM_ROUGHNESS: float = 0.56
+const BRACKET_ROUGHNESS: float = 0.62
 
 const FLOOR_SLICK := Color(0.12, 0.18, 0.20)
 const FLOOR_PUDDLE := Color(0.08, 0.15, 0.18)
@@ -82,7 +84,7 @@ static func hash_int(x: int, y: int, salt: int = 0) -> int:
 
 ## Cached read-only StandardMaterial3D for `color` and `roughness` [PLACEHOLDER].
 static func flat_mat(color: Color, roughness: float = TunnelLook.MATTE_ROUGHNESS) -> StandardMaterial3D:
-	var key: String = "%s|%.2f" % [color.to_html(false), roughness]
+	var key: String = "%s|%.2f" % [color.to_html(true), roughness]
 	if _flat_cache.has(key):
 		return _flat_cache[key] as StandardMaterial3D
 	var material := StandardMaterial3D.new()
@@ -114,7 +116,7 @@ static func water_mat(color: Color, roughness: float, alpha: float) -> StandardM
 
 ## Cached emissive StandardMaterial3D isolated from TunnelLook's cache [PLACEHOLDER].
 static func glow_mat(color: Color, energy: float) -> StandardMaterial3D:
-	var key: String = "%s|%.3f" % [color.to_html(false), energy]
+	var key: String = "%s|%.3f" % [color.to_html(true), energy]
 	if _glow_cache.has(key):
 		return _glow_cache[key] as StandardMaterial3D
 	var material := StandardMaterial3D.new()

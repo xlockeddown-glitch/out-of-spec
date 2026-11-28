@@ -53,6 +53,7 @@ func _save_state() -> Dictionary:
 		"rover_zone": GameState.rover_zone,
 		"rover_depth": GameState.rover_depth,
 		"rover_lent": GameState.rover_lent,
+		"rover_transforms": GameState.rover_transforms.duplicate(true),
 		"world_seed": GameState.world_seed,
 		"pools_drained": GameState.pools_drained.duplicate(true),
 		"valves_shut": GameState.valves_shut.duplicate(true),
@@ -60,6 +61,7 @@ func _save_state() -> Dictionary:
 		"local_zone": ZoneDepth.local_zone,
 		"local_depth": ZoneDepth.local_depth,
 		"local_layout": ZoneDepth.local_layout.duplicate(true),
+		"arrive_at": ZoneDepth.arrive_at,
 		"arrive_pending": ZoneDepth.arrive_pending,
 	}
 
@@ -68,6 +70,7 @@ func _restore_state(saved: Dictionary) -> void:
 	GameState.rover_zone = str(saved["rover_zone"])
 	GameState.rover_depth = int(saved["rover_depth"])
 	GameState.rover_lent = bool(saved["rover_lent"])
+	GameState.rover_transforms = (saved["rover_transforms"] as Dictionary).duplicate(true)
 	GameState.world_seed = int(saved["world_seed"])
 	GameState.pools_drained = (saved["pools_drained"] as Dictionary).duplicate(true)
 	GameState.valves_shut = (saved["valves_shut"] as Dictionary).duplicate(true)
@@ -75,6 +78,7 @@ func _restore_state(saved: Dictionary) -> void:
 	ZoneDepth.local_zone = str(saved["local_zone"])
 	ZoneDepth.local_depth = int(saved["local_depth"])
 	ZoneDepth.local_layout = (saved["local_layout"] as Dictionary).duplicate(true)
+	ZoneDepth.arrive_at = saved["arrive_at"] as Transform3D
 	ZoneDepth.arrive_pending = bool(saved["arrive_pending"])
 
 
@@ -138,6 +142,9 @@ func test_aquifer_look_builders_create_visual_nodes_without_collision() -> Strin
 
 	var flat_a: StandardMaterial3D = AquiferLook.flat_mat(AquiferLook.PIPE_GREEN)
 	var flat_b: StandardMaterial3D = AquiferLook.flat_mat(AquiferLook.PIPE_GREEN)
+	var flat_alpha: StandardMaterial3D = AquiferLook.flat_mat(Color(AquiferLook.PIPE_GREEN, 0.5))
+	var glow_a: StandardMaterial3D = AquiferLook.glow_mat(AquiferLook.BRASS_TARNISHED, 0.45)
+	var glow_alpha: StandardMaterial3D = AquiferLook.glow_mat(Color(AquiferLook.BRASS_TARNISHED, 0.5), 0.45)
 	var water_a: StandardMaterial3D = AquiferLook.water_mat(AquiferLook.WATER_SHALLOW, AquiferLook.WATER_SHALLOW_ROUGHNESS, AquiferLook.WATER_SHALLOW_ALPHA)
 	var water_b: StandardMaterial3D = AquiferLook.water_mat(AquiferLook.WATER_SHALLOW, AquiferLook.WATER_SHALLOW_ROUGHNESS, AquiferLook.WATER_SHALLOW_ALPHA)
 
@@ -154,6 +161,8 @@ func test_aquifer_look_builders_create_visual_nodes_without_collision() -> Strin
 		problem = "Seal valve missing Valve_s0, ValveWheel, or WaterJet."
 	elif flat_a != flat_b:
 		problem = "AquiferLook.flat_mat must cache read-only materials."
+	elif flat_a == flat_alpha or glow_a == glow_alpha:
+		problem = "AquiferLook material cache keys must include alpha."
 	elif water_a == water_b:
 		problem = "AquiferLook.water_mat must return fresh unique materials."
 	elif _has_collision(host):
@@ -176,6 +185,7 @@ func test_builds_are_deterministic_for_hub_and_depth_one() -> String:
 
 	for depth: int in [0, 1]:
 		GameState.rover_depth = depth
+		GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
 		var a: FloodedAquifer = packed.instantiate() as FloodedAquifer
 		_root().add_child(a)
 		var a_world: Node3D = a.get_node("WorldView/WorldViewport/World") as Node3D
@@ -186,6 +196,7 @@ func test_builds_are_deterministic_for_hub_and_depth_one() -> String:
 		var snap_a_blocks: Array[String] = _snapshot_blocks(a_world.get_node("Rock") as Node3D)
 		_free(a)
 
+		GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
 		var b: FloodedAquifer = packed.instantiate() as FloodedAquifer
 		_root().add_child(b)
 		var b_world: Node3D = b.get_node("WorldView/WorldViewport/World") as Node3D
@@ -211,7 +222,7 @@ func test_builds_are_deterministic_for_hub_and_depth_one() -> String:
 
 func test_draining_one_pool_never_changes_other_pools_or_shared_materials() -> String:
 	var full_layout: Dictionary = AquiferDepth.layout(SEED, 1, 5)
-	var drained_layout: Dictionary = AquiferDepth.layout(SEED, 1, 5, ["p0"])
+	var drained_layout: Dictionary = AquiferDepth.layout(SEED, 1, 5, ["p0", "p2"])
 	var full_aq: FloodedAquifer = _make_aquifer_shell()
 	var drained_aq: FloodedAquifer = _make_aquifer_shell()
 	for pool: Dictionary in full_layout["pools"]:
@@ -229,9 +240,9 @@ func test_draining_one_pool_never_changes_other_pools_or_shared_materials() -> S
 		var m0: StandardMaterial3D = p0.material_override as StandardMaterial3D
 		var m1: StandardMaterial3D = p1.material_override as StandardMaterial3D
 		var m2: StandardMaterial3D = p2.material_override as StandardMaterial3D
-		var shared_deep: StandardMaterial3D = AquiferLook.flat_mat(AquiferLook.WATER_DEEP)
-		var shared_shallow: StandardMaterial3D = AquiferLook.flat_mat(AquiferLook.WATER_SHALLOW)
-		var shared_silt: StandardMaterial3D = AquiferLook.flat_mat(AquiferLook.SILT_DAMP)
+		var shared_deep: StandardMaterial3D = AquiferLook.flat_mat(AquiferLook.WATER_DEEP, AquiferLook.WATER_DEEP_ROUGHNESS)
+		var shared_shallow: StandardMaterial3D = AquiferLook.flat_mat(AquiferLook.WATER_SHALLOW, AquiferLook.WATER_SHALLOW_ROUGHNESS)
+		var shared_silt: StandardMaterial3D = AquiferLook.flat_mat(AquiferLook.SILT_DAMP, AquiferLook.SILT_ROUGHNESS)
 		var tunnel_deep: StandardMaterial3D = TunnelLook.flat_mat(TunnelLook.WATER_DEEP)
 		if m0 == m1 or m1 == m2 or m0 == m2:
 			problem = "Pools must never share a material instance."
@@ -252,43 +263,85 @@ func test_draining_one_pool_never_changes_other_pools_or_shared_materials() -> S
 			else:
 				var dp0: StandardMaterial3D = (drained_aq._water.get_node("Pool_p0") as MeshInstance3D).material_override as StandardMaterial3D
 				var dp1: StandardMaterial3D = (drained_aq._water.get_node("Pool_p1") as MeshInstance3D).material_override as StandardMaterial3D
+				var dp2: StandardMaterial3D = (drained_aq._water.get_node("Pool_p2") as MeshInstance3D).material_override as StandardMaterial3D
+				var silt_before_col: Color = shared_silt.albedo_color
 				if dp0.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or not dp0.albedo_color.is_equal_approx(AquiferLook.SILT_DAMP):
 					problem = "Drained Pool_p0 must use opaque damp silt."
+				elif dp2.transparency != BaseMaterial3D.TRANSPARENCY_DISABLED or not dp2.albedo_color.is_equal_approx(AquiferLook.SILT_DAMP):
+					problem = "Drained Pool_p2 must use opaque damp silt."
+				elif dp0 == dp2 or dp0 == shared_silt or dp2 == shared_silt:
+					problem = "Drained pools must each have their own material distinct from each other and cached flat_mat."
 				elif not dp1.albedo_color.is_equal_approx(m1_before_col) or dp1.transparency != m1_before_tr:
-					problem = "Draining p0 altered Pool_p1's material."
+					problem = "Draining p0 and p2 altered Pool_p1's material."
+				else:
+					dp0.albedo_color = AquiferLook.WATER_DEEP
+					if not dp2.albedo_color.is_equal_approx(AquiferLook.SILT_DAMP) or not shared_silt.albedo_color.is_equal_approx(silt_before_col):
+						problem = "Mutating drained Pool_p0's material leaked into Pool_p2 or shared silt cache."
 
 	_free(full_aq)
 	_free(drained_aq)
 	return problem
 
 
+func _wall_decor_problem(decor: Node3D, rock: AquiferRock) -> String:
+	for child: Node in decor.get_children():
+		var cname: String = String(child.name)
+		if not (cname.begins_with("StalactiteCluster") or cname.begins_with("PipeRun") or cname.begins_with("MineralStreak")):
+			continue
+		var prop := child as Node3D
+		# Backing wall direction is local -Z rotated by rotation_degrees.y.
+		var rad: float = deg_to_rad(prop.rotation_degrees.y)
+		var back := Vector3(-sin(rad), 0.0, -cos(rad))
+		var wall_pos: Vector3 = prop.position + back * 1.0
+		var wall_cell: Vector2i = TunnelRock.cell_of(wall_pos)
+		if TunnelRock.tile(wall_cell) != "#" or rock._hides_floor(wall_cell):
+			return "Wall decor %s at %s is mounted on a cut-away or non-wall cell %s." % [cname, str(prop.position), str(wall_cell)]
+	return ""
+
+
 func test_collision_area_positions_and_light_budget_unchanged_in_hub_and_depth_one() -> String:
 	var saved: Dictionary = _save_state()
 	var problem: String = ""
 	var packed: PackedScene = load("res://scenes/flooded_aquifer.tscn") as PackedScene
+	var tubes_packed: PackedScene = load("res://scenes/basalt_tunnels.tscn") as PackedScene
 	var day: int = GameClock.get_day_index()
 	GameState.world_seed = SEED
-	GameState.rover_zone = AquiferDepth.ZONE
 	GameState.rover_lent = true
 	GameState.pools_drained = {}
 	GameState.valves_shut = {}
 	GameState.finds_taken = {}
 
+	# Pre-PR base scene light count (Lamp + Beacon + ExitPad + Rover headlights, excluding Rock crystal/magma lights).
+	GameState.rover_zone = ZoneDepth.ZONE
+	GameState.rover_depth = 0
+	GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
+	var base_tubes: Node = tubes_packed.instantiate()
+	_root().add_child(base_tubes)
+	var base_rock: Node = base_tubes.get_node("WorldView/WorldViewport/World/Rock")
+	var base_scene_lights: int = _count_lights(base_tubes) - _count_lights(base_rock)
+	_free(base_tubes)
+
+	GameState.rover_zone = AquiferDepth.ZONE
+
 	# 1. Hub (depth 0)
 	GameState.rover_depth = 0
+	GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
 	var hub: FloodedAquifer = packed.instantiate() as FloodedAquifer
 	_root().add_child(hub)
 	var hub_world: Node3D = hub.get_node("WorldView/WorldViewport/World") as Node3D
 	var hub_rock: AquiferRock = hub_world.get_node("Rock") as AquiferRock
 	var hub_blocks: MultiMeshInstance3D = hub_rock.get_node("Blocks") as MultiMeshInstance3D
 	var hub_mat: StandardMaterial3D = (hub_blocks.multimesh.mesh as BoxMesh).material as StandardMaterial3D
+	var hub_exit: Area3D = hub_world.get_node_or_null("ExitPad") as Area3D
 	var hub_pool: MeshInstance3D = hub._water.get_node_or_null("Pool_") as MeshInstance3D
 	var hub_crate: Node3D = hub._depth_props.get_node_or_null("PumpCrate") as Node3D
 	var hub_sign: Node3D = hub._depth_props.get_node_or_null("NoticeSign") as Node3D
 	var hub_hatch: Node3D = hub._depth_props.get_node_or_null("Hatch") as Node3D
 	var hub_box: Rect2 = AquiferDepth.pool_metres({ "rect": AquiferDepth.HUB_POOL })
 	var hub_expected_centre: Vector2 = hub_box.get_center()
-	var hub_added_lights: int = _count_lights(hub._water) + _count_lights(hub._decor) + _count_lights(hub._seals) + _count_lights(hub._depth_props)
+	var hub_total_lights: int = _count_lights(hub)
+	var hub_baseline_lights: int = base_scene_lights + 1  # pre-existing hub PoolGlow
+	var hub_grid: PackedStringArray = AquiferDepth.hub_grid()
 
 	# Baseline TunnelRock collider count on the exact same hub grid.
 	var base_hub_rock := TunnelRock.new()
@@ -301,12 +354,14 @@ func test_collision_area_positions_and_light_budget_unchanged_in_hub_and_depth_o
 		problem = "Hub AquiferRock material not styled with AquiferLook."
 	elif _count_type(hub_world, "Area3D") != 1:
 		problem = "Hub Area3D count changed (expected 1 ExitPad, got %d)." % _count_type(hub_world, "Area3D")
+	elif hub_exit == null or hub_exit.position != GameState.TUNNEL_EXIT:
+		problem = "Hub ExitPad missing or moved from GameState.TUNNEL_EXIT."
 	elif _count_type(hub_rock, "CollisionShape3D") != expected_hub_shapes:
 		problem = "Hub Rock CollisionShape3D count changed (%d vs %d)." % [_count_type(hub_rock, "CollisionShape3D"), expected_hub_shapes]
 	elif _has_collision(hub._decor) or _has_collision(hub._water) or _has_collision(hub._seals) or _has_collision(hub._depth_props):
 		problem = "Hub visual nodes added collision bodies or shapes."
-	elif hub_added_lights > 2:
-		problem = "Hub added %d lights (max 2 allowed)." % hub_added_lights
+	elif hub_total_lights > hub_baseline_lights + 2:
+		problem = "Hub total lights %d exceeded baseline %d + 2." % [hub_total_lights, hub_baseline_lights]
 	elif _count_named_prefix(hub._decor, "StalactiteCluster") < 2 or _count_named_prefix(hub._decor, "PipeRun") < 2:
 		problem = "Hub AquiferDecor missing stalactite clusters or pipe runs."
 	elif hub_pool == null or not Vector2(hub_pool.position.x, hub_pool.position.z).is_equal_approx(hub_expected_centre):
@@ -317,18 +372,34 @@ func test_collision_area_positions_and_light_budget_unchanged_in_hub_and_depth_o
 		problem = "Hub NoticeSign missing or moved."
 	elif hub_hatch == null or hub_hatch.position != AquiferDepth.hatch_position():
 		problem = "Hub Hatch missing or moved."
+	elif not TunnelRock.holds_in(hub_grid, AquiferDepth.crate_position()) \
+			or not TunnelRock.holds_in(hub_grid, AquiferDepth.sign_position()) \
+			or not TunnelRock.holds_in(hub_grid, AquiferDepth.hatch_position()):
+		problem = "Hub crate, sign, or hatch is not on walkable floor."
+	else:
+		for py: int in range(AquiferDepth.HUB_POOL.position.y, AquiferDepth.HUB_POOL.end.y):
+			for px: int in range(AquiferDepth.HUB_POOL.position.x, AquiferDepth.HUB_POOL.end.x):
+				if TunnelRock.holds_in(hub_grid, TunnelRock.at_in(hub_grid, Vector2i(px, py))):
+					problem = "Hub HUB_POOL cell (%d, %d) must not hold the rover." % [px, py]
+					break
+			if problem != "":
+				break
+	if problem == "":
+		problem = _wall_decor_problem(hub._decor, hub_rock)
 	_free(hub)
 
 	# 2. Depth 1
 	if problem == "":
 		GameState.rover_depth = 1
+		GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
 		var depth_scene: FloodedAquifer = packed.instantiate() as FloodedAquifer
 		_root().add_child(depth_scene)
 		var d_world: Node3D = depth_scene.get_node("WorldView/WorldViewport/World") as Node3D
 		var d_rock: AquiferRock = d_world.get_node("Rock") as AquiferRock
 		var d_blocks: MultiMeshInstance3D = d_rock.get_node("Blocks") as MultiMeshInstance3D
 		var d_mat: StandardMaterial3D = (d_blocks.multimesh.mesh as BoxMesh).material as StandardMaterial3D
-		var d_added_lights: int = _count_lights(depth_scene._water) + _count_lights(depth_scene._decor) + _count_lights(depth_scene._seals) + _count_lights(depth_scene._depth_props)
+		var d_exit: Area3D = d_world.get_node_or_null("ExitPad") as Area3D
+		var d_total_lights: int = _count_lights(depth_scene)
 		var layout: Dictionary = AquiferDepth.layout(SEED, 1, day)
 
 		var base_d_rock := TunnelRock.new()
@@ -340,15 +411,19 @@ func test_collision_area_positions_and_light_budget_unchanged_in_hub_and_depth_o
 			problem = "Depth 1 AquiferRock material not styled with AquiferLook.ROCK_TINT."
 		elif _count_type(d_world, "Area3D") != 1:
 			problem = "Depth 1 Area3D count changed (expected 1 ExitPad, got %d)." % _count_type(d_world, "Area3D")
+		elif d_exit == null or d_exit.position != GameState.TUNNEL_EXIT:
+			problem = "Depth 1 ExitPad missing or moved from GameState.TUNNEL_EXIT."
 		elif _count_type(d_rock, "CollisionShape3D") != expected_d_shapes:
 			problem = "Depth 1 Rock CollisionShape3D count changed (%d vs %d)." % [_count_type(d_rock, "CollisionShape3D"), expected_d_shapes]
 		elif _has_collision(depth_scene._decor) or _has_collision(depth_scene._water) \
 				or _has_collision(depth_scene._seals) or _has_collision(depth_scene._depth_props):
 			problem = "Depth 1 visual nodes added collision bodies or shapes."
-		elif d_added_lights > 2:
-			problem = "Depth 1 added %d lights (max 2 allowed)." % d_added_lights
+		elif d_total_lights > base_scene_lights + 2:
+			problem = "Depth 1 total lights %d exceeded baseline %d + 2." % [d_total_lights, base_scene_lights]
 		elif _count_named_prefix(depth_scene._decor, "StalactiteCluster") < 2 or _count_named_prefix(depth_scene._decor, "PipeRun") < 2:
 			problem = "Depth 1 AquiferDecor missing stalactite clusters or pipe runs."
+		else:
+			problem = _wall_decor_problem(depth_scene._decor, d_rock)
 
 		if problem == "":
 			# Verify every pool position & size unchanged.
@@ -416,29 +491,84 @@ func test_aquifer_palette_is_distinct_from_mine_and_ice() -> String:
 
 func test_sibling_zones_do_not_get_aquifer_look() -> String:
 	var saved: Dictionary = _save_state()
-	var brass_before: Color = TunnelLook.flat_mat(TunnelLook.BRASS).albedo_color
 	var problem: String = ""
 
+	# Instantiate Flooded Aquifer first so any shared-cache mutation would show up below.
 	GameState.world_seed = SEED
-	GameState.rover_zone = ZoneDepth.ZONE
+	GameState.rover_zone = AquiferDepth.ZONE
 	GameState.rover_depth = 0
 	GameState.rover_lent = true
-	var tubes_packed: PackedScene = load("res://scenes/basalt_tunnels.tscn") as PackedScene
-	var tubes: Node = tubes_packed.instantiate()
-	_root().add_child(tubes)
-	var t_world: Node3D = tubes.get_node("WorldView/WorldViewport/World") as Node3D
-	var t_rock: TunnelRock = t_world.get_node("Rock") as TunnelRock
-	var t_blocks: MultiMeshInstance3D = t_rock.get_node("Blocks") as MultiMeshInstance3D
-	var t_mat: StandardMaterial3D = (t_blocks.multimesh.mesh as BoxMesh).material as StandardMaterial3D
-	if t_rock is AquiferRock:
-		problem = "Lava Tubes Rock must not be an AquiferRock."
-	elif not t_mat.albedo_color.is_equal_approx(Color.WHITE):
-		problem = "Lava Tubes rock material was tinted: %s" % [t_mat.albedo_color]
-	elif t_world.get_node_or_null("AquiferDecor") != null:
-		problem = "Lava Tubes scene must not have AquiferDecor."
-	elif not TunnelLook.flat_mat(TunnelLook.BRASS).albedo_color.is_equal_approx(brass_before):
-		problem = "TunnelLook shared brass material was mutated."
-	_free(tubes)
+	GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
+	var aq_packed: PackedScene = load("res://scenes/flooded_aquifer.tscn") as PackedScene
+	var aq: Node = aq_packed.instantiate()
+	_root().add_child(aq)
+	_free(aq)
+
+	if not TunnelLook.flat_mat(TunnelLook.BRASS).albedo_color.is_equal_approx(TunnelLook.BRASS):
+		problem = "TunnelLook shared brass material was mutated by FloodedAquifer."
+
+	# 1. Lava Tubes (basalt_tunnels.tscn)
+	if problem == "":
+		GameState.rover_zone = ZoneDepth.ZONE
+		GameState.rover_depth = 0
+		GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
+		var tubes_packed: PackedScene = load("res://scenes/basalt_tunnels.tscn") as PackedScene
+		var tubes: Node = tubes_packed.instantiate()
+		_root().add_child(tubes)
+		var t_world: Node3D = tubes.get_node("WorldView/WorldViewport/World") as Node3D
+		var t_rock: TunnelRock = t_world.get_node("Rock") as TunnelRock
+		var t_blocks: MultiMeshInstance3D = t_rock.get_node("Blocks") as MultiMeshInstance3D
+		var t_mat: StandardMaterial3D = (t_blocks.multimesh.mesh as BoxMesh).material as StandardMaterial3D
+		if t_rock is AquiferRock:
+			problem = "Lava Tubes Rock must not be an AquiferRock."
+		elif not t_mat.albedo_color.is_equal_approx(Color.WHITE):
+			problem = "Lava Tubes rock material was tinted: %s" % [t_mat.albedo_color]
+		elif t_world.get_node_or_null("AquiferDecor") != null:
+			problem = "Lava Tubes scene must not have AquiferDecor."
+		_free(tubes)
+
+	# 2. Abandoned Colony Mine (colony_mine.tscn)
+	if problem == "":
+		GameState.rover_zone = MineDepth.ZONE
+		GameState.rover_depth = 0
+		GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
+		var mine_packed: PackedScene = load("res://scenes/colony_mine.tscn") as PackedScene
+		var mine: Node = mine_packed.instantiate()
+		_root().add_child(mine)
+		var m_world: Node3D = mine.get_node("WorldView/WorldViewport/World") as Node3D
+		var m_rock: TunnelRock = m_world.get_node("Rock") as TunnelRock
+		var m_blocks: MultiMeshInstance3D = m_rock.get_node("Blocks") as MultiMeshInstance3D
+		var m_mat: StandardMaterial3D = (m_blocks.multimesh.mesh as BoxMesh).material as StandardMaterial3D
+		if m_rock is AquiferRock or not (m_rock is MineRock):
+			problem = "Colony Mine Rock must be MineRock, not AquiferRock."
+		elif not m_mat.albedo_color.is_equal_approx(MineLook.ROCK_TINT):
+			problem = "Colony Mine rock material was altered: %s" % [m_mat.albedo_color]
+		elif m_world.get_node_or_null("AquiferDecor") != null:
+			problem = "Colony Mine scene must not have AquiferDecor."
+		_free(mine)
+
+	# 3. Polar Ice Caves (ice_caves.tscn)
+	if problem == "":
+		GameState.rover_zone = IceDepth.ZONE
+		GameState.rover_depth = 0
+		GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
+		var ice_packed: PackedScene = load("res://scenes/ice_caves.tscn") as PackedScene
+		var ice: Node = ice_packed.instantiate()
+		_root().add_child(ice)
+		var i_world: Node3D = ice.get_node("WorldView/WorldViewport/World") as Node3D
+		var i_rock: TunnelRock = i_world.get_node("Rock") as TunnelRock
+		var i_blocks: MultiMeshInstance3D = i_rock.get_node("Blocks") as MultiMeshInstance3D
+		var i_mat: StandardMaterial3D = (i_blocks.multimesh.mesh as BoxMesh).material as StandardMaterial3D
+		if i_rock is AquiferRock or not (i_rock is IceRock):
+			problem = "Ice Caves Rock must be IceRock, not AquiferRock."
+		elif not i_mat.albedo_color.is_equal_approx(IceLook.ROCK_TINT):
+			problem = "Ice Caves rock material was altered: %s" % [i_mat.albedo_color]
+		elif i_world.get_node_or_null("AquiferDecor") != null:
+			problem = "Ice Caves scene must not have AquiferDecor."
+		_free(ice)
+
+	if problem == "" and not TunnelLook.flat_mat(TunnelLook.BRASS).albedo_color.is_equal_approx(TunnelLook.BRASS):
+		problem = "TunnelLook shared brass material was mutated after sibling zone loads."
 
 	_restore_state(saved)
 	return problem
