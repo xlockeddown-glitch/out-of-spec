@@ -255,6 +255,8 @@
       "name": "OIRM",
       "quests": {
         "first_contract_done": "Contract on file. A lab that holds a run of on-time calibrations is a lab we can plan around.",
+        "second_contract_offer": "[PLACEHOLDER] Your first contract is on file and your lab is at level 35. OIRM has a longer run for you: 8 traceable, on-time calibrations by your own hand. Complete them for 400 CR and 900 lab XP.",
+        "second_contract_done": "[PLACEHOLDER] Eight traceable, on-time calibrations on file. The second contract is closed; 400 CR is credited to your lab account.",
         "paperwork_from_orbit_offer": "Your lab is of a size we take paperwork from. An account opens when you send us a standard you bought.",
         "paperwork_from_orbit_done": "Account open, one standard received, one certificate issued. 100 CR is credited toward your next trip."
       }
@@ -271,7 +273,9 @@
         "a_clean_line_done": "Your line is on my board and it is holding. I have filed the old static under weather. Warmly, Dispatch.",
         "strays_offer": "Dispatch. You have been on Phobos. The old station kept tarantulas, and when the station was shut a few were never counted out. They have been living in the warm service tunnel since, and the logbook does not know them. Catch one. I have no paperwork for it and would like to have some.",
         "strays_done": "A station tarantula, caught in the tunnel and now in the dome's records. I have filed it as stock, which it was before it was a stray. Warmly, Dispatch.",
-        "a_clean_line_reference": "That went in dead center. I heard the line clear from here, and I am four hundred kilometers up. Warmly, Dispatch."
+        "a_clean_line_reference": "That went in dead center. I heard the line clear from here, and I am four hundred kilometers up. Warmly, Dispatch.",
+        "gossamer_link_offer": "[PLACEHOLDER] Dispatch. The Gossamer relay constellation is overhead, and its ground antenna needs zero-expansion reticle silk. Seat a whole Orbital Silk-Spinner spool in the relay dish and bring the dish azimuth back into tolerance, traceable and on time. Warmly, Dispatch.",
+        "gossamer_link_done": "[PLACEHOLDER] Gossamer link is up on my board. Your rover uplink lag drops an extra 20 % while that Silk-Spinner spool stays whole in the dish. Swap it out or damage it and the link stutters until one is seated again. Warmly, Dispatch."
       }
     },
     "chet": {

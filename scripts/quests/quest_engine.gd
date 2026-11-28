@@ -112,7 +112,7 @@ const PROMPT_KEY: String = "prompt"
 const NOT_PREFIX: String = "not_"
 ## The checks check_value() knows: what a step's `check` may be, and with
 ## `always`, `day_at_least` and `day_at_most` (WHENS) what a `when` may be.
-const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due", "beacons_placed"]
+const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due", "beacons_placed", "relay_spool"]
 ## A `when` that is not a step check (offer_holds).
 const WHENS: Array[String] = ["always", "day_at_least", "day_at_most"]
 ## A reward of skill XP is "xp_<skill id>".
@@ -730,6 +730,8 @@ static func data_problem(quest: Dictionary) -> String:
 		ids.append(id)
 		if str(step.get("check", "")) == "quest_job" and (not step.get("quest") is String or step["quest"] == ""):
 			return "step '%s' looks for a quest's job and names no quest." % id
+		if str(step.get("check", "")) == "relay_spool" and (not step.get("species") is String or step["species"] == ""):
+			return "step '%s' checks the relay spool and names no species." % id
 		if step.has(MINIGAME_LINE) and not step.has("minigame"):
 			return "step '%s' has a mini-game line and no mini-game." % id
 		if step.has("minigame"):
@@ -1091,6 +1093,8 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 			# The farm's, whoever set them down. Not a counting check: with only
 			# three spots, one set down before the quest was offered must count.
 			return (farm.beacons_placed as Array).size()
+		"relay_spool":
+			return int(farm.has_relay_spool(StringName(str(step.get("species", "")))))
 	return 0
 
 
