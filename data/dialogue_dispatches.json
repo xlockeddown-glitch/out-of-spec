@@ -311,7 +311,9 @@
       "name": "Kestrel",
       "quests": {
         "a_quiet_crate_offer": "[PLACEHOLDER] So you made it out to Deimos. There is a warm crate on the pad that does not belong to OIRM and does not open for polite knocking. Take my proof, pop the latch, and keep whatever has eight legs inside. No certificate.",
-        "a_quiet_crate_done": "[PLACEHOLDER] Latch off, stock moved, nobody filed a form. Keep the dome warm for it. We are square."
+        "a_quiet_crate_done": "[PLACEHOLDER] Latch off, stock moved, nobody filed a form. Keep the dome warm for it. We are square.",
+        "test_pod_offer": "[PLACEHOLDER] Polar ice, huh. There was a trial pod down there, heated, sealed, nobody left to sign it off. Open it once a day, take whatever is breathing inside, and do not ask who paid for it. No certificate. If the cold does not suit you, a standard from me counts as a favour too.",
+        "test_pod_done": "[PLACEHOLDER] Seal broken, tenant moved, and your name on nothing. Keep it warm. That is the last of my favours for the year."
       }
     }
   }

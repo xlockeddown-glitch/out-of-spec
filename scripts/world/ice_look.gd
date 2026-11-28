@@ -374,6 +374,39 @@ static func add_heater_crate(parent: Node3D, at: Vector3) -> Node3D:
 	return crate
 
 
+## The terraform test pod: a sealed, heated trial pod left under the ice. A steel skid, a pale
+## hull with rounded ends, a clear port with a warm glow behind it, and frost along the top
+## [PLACEHOLDER]. Primitives only, no collision.
+static func add_test_pod(parent: Node3D, at: Vector3) -> Node3D:
+	var pod := Node3D.new()
+	pod.name = "TestPod"
+	pod.position = at
+	parent.add_child(pod)
+	var steel_mat: Material = matte_mat(HEATER_STEEL, 0.65)
+	var hull_mat: Material = matte_mat(HEATER_BODY, 0.55)
+	var frost_mat: Material = ice_mat(FROST_WHITE, 0.32, 0.92)
+	var port_mat: Material = ice_mat(GLACIER_CYAN, 0.10, 0.55)
+	var warm_mat: Material = glow_mat(HEATER_GLOW, 1.2)
+	for sz: float in [-0.5, 0.5]:
+		pod.add_child(TunnelLook.part(TunnelLook.box(Vector3(2.0, 0.10, 0.20)), Vector3(0.0, 0.05, sz), steel_mat))
+	pod.add_child(TunnelLook.part(TunnelLook.cylinder(0.62, 1.7), Vector3(0.0, 0.78, 0.0), hull_mat, Vector3(0.0, 0.0, 90.0)))
+	for sx: float in [-0.85, 0.85]:
+		pod.add_child(TunnelLook.part(TunnelLook.sphere(0.62), Vector3(sx, 0.78, 0.0), hull_mat))
+	pod.add_child(TunnelLook.part(TunnelLook.box(Vector3(1.5, 0.06, 0.40)), Vector3(0.0, 1.38, 0.0), frost_mat))
+	pod.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.62, 0.36, 0.06)), Vector3(0.0, 0.84, 0.58), steel_mat))
+	pod.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.50, 0.24, 0.05)), Vector3(0.0, 0.84, 0.62), port_mat))
+	pod.add_child(TunnelLook.part(TunnelLook.box(Vector3(0.40, 0.14, 0.04)), Vector3(0.0, 0.84, 0.55), warm_mat))
+	var light := OmniLight3D.new()
+	light.name = &"PodGlow"
+	light.position = Vector3(0.0, 0.9, 0.9)
+	light.light_color = HEATER_GLOW
+	light.light_energy = HEATER_LIGHT_ENERGY
+	light.omni_range = HEATER_LIGHT_RANGE_M
+	pod.add_child(light)
+	pod.add_child(TunnelLook.label("TEST POD", Vector3(0.0, 1.8, 0.0), TunnelLook.FROST))
+	return pod
+
+
 ## Adds a frosted ice cap and glazed frost footplates to NoticeSign without
 ## altering its base structure, position, or label [PLACEHOLDER].
 static func add_sign_trim(board: Node3D) -> void:

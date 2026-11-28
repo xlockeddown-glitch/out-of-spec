@@ -8,6 +8,8 @@ extends "res://scripts/basalt_tunnels.gd"
 
 const CRATE: String = "crate"
 const SIGN: String = "sign"
+const POD: String = "pod"
+const POD_OPENED_TEXT: String = "The pod unseals with a breath of warm air."
 
 ## The cold reading last told, in steps of COLD_STEP percent, and whether it was past the threshold.
 const COLD_STEP: int = 10
@@ -38,6 +40,7 @@ func _build_zone() -> void:
 	else:
 		_depth_props.build_hatch()
 		IceLook.add_heater_crate(_depth_props, IceDepth.crate_position())
+		IceLook.add_test_pod(_depth_props, IceDepth.pod_position())
 		_draw_walls()
 		_draw_sign()
 		_build_hub_decor()
@@ -194,6 +197,8 @@ func _ice_near() -> Dictionary:
 		return { "kind": CRATE, "id": "" }
 	if IceDepth.near_sign(at):
 		return { "kind": SIGN, "id": "" }
+	if IceDepth.near_pod(at):
+		return { "kind": POD, "id": "" }
 	return _camp_near()
 
 
@@ -228,6 +233,8 @@ func _tell_hub() -> void:
 				IceDepth.HEATER_COST_CREDITS, Controls.prompt(&"interact")])
 		SIGN:
 			_hud.push_log("NOTICE SIGN: press " + Controls.prompt(&"interact") + " to read it.")
+		POD:
+			_hud.push_log("TEST POD: " + IceDepth.POD_LINE + " Press " + Controls.prompt(&"interact") + " to open it.")
 		CAMP:
 			_tell_camp()
 
@@ -240,8 +247,19 @@ func _use_hub(target: Dictionary) -> void:
 			for line: String in NoticeBoard.lines(QuestEngine.quests(), GameState.quest_state,
 					GameState.player_quest_state.get(GameState.local_player_id, {}), "zone", IceDepth.ZONE):
 				_hud.push_log(line)
+		POD:
+			_use_pod()
 		_:
 			super._use_hub(target)
+
+
+## Opens the test pod: the host decides (once a day for the farm, only from the Ice Caves).
+func _use_pod() -> void:
+	var reply: String = await FarmCommands.request(&"open_test_pod", [])
+	if not is_inside_tree():
+		return
+	_told_hub = ""
+	_hud.push_log("TEST POD: " + (reply if reply != "" else POD_OPENED_TEXT))
 
 
 func _use_crate() -> void:

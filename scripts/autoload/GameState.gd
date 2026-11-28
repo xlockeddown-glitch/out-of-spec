@@ -14,6 +14,7 @@ signal sentinel_changed
 signal strays_changed  # a Phobos service-tunnel stray was caught today
 signal phobos_finds_changed  # a Phobos depth-1 find was taken today
 signal deimos_cache_changed  # the Deimos smuggler cache was opened today
+signal test_pod_changed  # the Ice Caves test pod was opened today (feat/test-pod)
 signal deimos_crates_changed  # a Deimos depth-1 crate was opened today
 signal rover_lights_changed
 ## A beacon was set down in the Lava Tubes.
@@ -154,7 +155,7 @@ const PRE_MOLT_AT: float = 0.8
 ## burrow (hidden) until then, since the two can't share the tank floor.
 const EXUVIA_LINGER_DAYS: int = 1
 ## Tarantulas that can be caught. Each has a tank waiting in the dome.
-const CATCHABLE: Array[StringName] = [&"cobalt_sentinel", &"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace"]
+const CATCHABLE: Array[StringName] = [&"cobalt_sentinel", &"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace", &"rime_carapace_spinner"]
 ## The Banded Regolith Runner: station stock that got loose in Phobos's warm service
 ## tunnels, caught there (catch_stray). Its tank record stays the three-field molt
 ## record every tank has (_is_tank), so the marker that it is station stock is kept
@@ -173,6 +174,18 @@ const DEIMOS_CACHE_FALLBACK_CREDITS: int = 30
 const DEIMOS_CACHE_EMPTY_LINE: String = "Empty but for straw and a forged manifest."
 const DEIMOS_CACHE_WRONG_LABEL_MOD: int = 3
 const DEIMOS_CACHE_LABEL_TAG: int = 701
+## The terraform test pod under the polar ice (Ice Caves hub): the last moon-tarantula hook.
+## Opens once a day for the farm and gives the Rime Carapace Spinner through catch_species when
+## the farm does not hold it; else a one-time credit fallback, then an empty line. All [PLACEHOLDER].
+const TEST_POD_SPECIES: StringName = &"rime_carapace_spinner"
+const TEST_POD_ORIGIN: String = "test_pod"
+const TEST_POD_LINE: String = "A heated terraform test pod under the polar ice"
+const TEST_POD_FALLBACK_CREDITS: int = 30
+const TEST_POD_EMPTY_LINE: String = "Empty but for a warm film of condensation."
+## Quest counters that finish The Test Pod (the quest counts test_pod:*): the pod opened, or the
+## non-zone way, a purchase from Kestrel.
+const TEST_POD_COUNT: String = "test_pod:open"
+const TEST_POD_KESTREL_COUNT: String = "test_pod:kestrel"
 ## Species caught with a tank record but no dome tank yet: they sit out the molt and the
 ## lab sitter's round until the tank exists (nothing could show or collect them).
 const NO_DOME_TANK: Array[StringName] = [&"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace"]
@@ -248,6 +261,9 @@ var _on_phobos_deck: Dictionary = {}
 ## Today's Deimos smuggler cache state: { "day": int, "opened": true }, or {} when not
 ## opened today. Pruned to today on save and load. Host-run, saved, shown to guests.
 var deimos_cache: Dictionary = {}
+## Today's Ice Caves test pod state: { "day", "opened", "fallback_paid" } as deimos_cache has it.
+## Pruned to today on save and load (fallback_paid stays); host-run, saved, shown to guests.
+var test_pod: Dictionary = {}
 ## Deimos depth-1 crates opened today: { "day": int, "ids": Array of crate ids } (DeimosDepth).
 ## Pruned to today on save and load; host-run, synced via deimos_crates_changed.
 var deimos_crates_opened: Dictionary = {}
@@ -843,7 +859,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "test_pod", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -875,6 +891,7 @@ func farm_to_dict() -> Dictionary:
 	out["strays_caught"] = _strays_today()
 	out["phobos_finds_taken"] = _phobos_finds_today()
 	out["deimos_cache"] = _deimos_cache_today()
+	out["test_pod"] = _test_pod_today()
 	out["deimos_crates_opened"] = _deimos_crates_today()
 	out["cold_since"] = _cold_in_caves()  # the stamps of whoever is in the caves: the rest are stale
 	return out
@@ -1036,6 +1053,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var phobos_finds_problem: String = PhobosDepth.taken_problem(data.get("phobos_finds_taken", {}))
 	if phobos_finds_problem != "":
 		return phobos_finds_problem
+	var pod_problem: String = _test_pod_problem(data.get("test_pod", {}))
+	if pod_problem != "":
+		return pod_problem
 	var cache_problem: String = _deimos_cache_problem(data.get("deimos_cache", {}))
 	if cache_problem != "":
 		return cache_problem
@@ -1240,7 +1260,8 @@ static func _stray_problem(strays: Variant, origins: Variant, tanks: Dictionary)
 	for id: Variant in origins:
 		var ok_station: bool = id is String and id == String(RUNNER) and origins[id] is String and origins[id] == STATION_ORIGIN
 		var ok_cache: bool = id is String and StringName(id) in DEIMOS_CACHE_SPECIES and origins[id] is String and origins[id] == CACHE_ORIGIN
-		if not (ok_station or ok_cache) or not tanks.has(id):
+		var ok_pod: bool = id is String and StringName(id) == TEST_POD_SPECIES and origins[id] is String and origins[id] == TEST_POD_ORIGIN
+		if not (ok_station or ok_cache or ok_pod) or not tanks.has(id):
 			return "'enclosure_origins' has an entry that is not a caught tarantula's origin."
 	return ""
 
@@ -1303,6 +1324,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	_phobos_wiped.clear()
 	_on_phobos_deck.clear()
 	deimos_cache = _deimos_cache_today()
+	test_pod = _test_pod_today()
 	deimos_crates_opened = _deimos_crates_today()
 	_deimos_wiped.clear()
 	_on_deimos_deck.clear()
@@ -1328,6 +1350,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
 	deimos_cache_changed.emit()
+	test_pod_changed.emit()
 	deimos_crates_changed.emit()
 	phobos_finds_changed.emit()
 	silk_changed.emit(optical_silk_spools)
@@ -2127,6 +2150,7 @@ func buy_from_kestrel(standard_id: String, player_id: String = "") -> String:
 		credibility_changed.emit(credibility)
 		post_phone("OIRM CONTRACT closed: the %s is already on the colony." % instrument_name(standard_id))
 	_award_lab_xp("buy_standard", player_id, calibration_xp_scale(standard_id))
+	_count_test_pod(_player(player_id), TEST_POD_KESTREL_COUNT)
 	upgrades_changed.emit()
 	oirm_changed.emit()
 	return ""
@@ -6826,6 +6850,75 @@ func open_cache(player_id: String = "") -> String:
 	return reply
 
 
+## Why a save's test_pod can't load, or "": the Deimos cache's rules, in this field's words.
+static func _test_pod_problem(pod: Variant) -> String:
+	return _deimos_cache_problem(pod).replace("'deimos_cache'", "'test_pod'")
+
+
+## Today's Ice Caves test pod state (opened today, and the farm-wide fallback_paid if set), or
+## {} when unopened today and the fallback not yet paid.
+func _test_pod_today() -> Dictionary:
+	var out: Dictionary = {}
+	if int(test_pod.get("day", -1)) == GameClock.get_day_index() and bool(test_pod.get("opened", false)):
+		out["day"] = int(test_pod["day"])
+		out["opened"] = true
+	if bool(test_pod.get("fallback_paid", false)):
+		out["fallback_paid"] = true
+	return out
+
+
+## Whether today's Ice Caves test pod has already been opened by the farm.
+func test_pod_opened_today() -> bool:
+	return bool(_test_pod_today().get("opened", false))
+
+
+## Whether the one-time all-held credit fallback has already been paid for this farm.
+func test_pod_fallback_paid() -> bool:
+	return bool(test_pod.get("fallback_paid", false))
+
+
+## Host: `player_id` opens the terraform test pod in the Ice Caves hub. The id is the
+## connection's (FarmCommands), and the player must be in the Ice Caves. One opening a day for
+## the farm [PLACEHOLDER]. Gives the Rime Carapace Spinner through catch_species with origin
+## `test_pod` when the farm does not hold it; else a one-time credit sum on the first all-held
+## opening, then an empty line. Counts `test_pod:open` per player (no XP; the quest counts it).
+## Returns "" on a catch, a reply string on fallback/empty, or the refusal reason.
+func open_test_pod(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host opens the test pod."
+	var who: String = _player(player_id)
+	if place_of(who) != IceDepth.ZONE:
+		return "The test pod is in the Ice Caves."
+	if test_pod_opened_today():
+		return "Today's opening is already used."
+	var paid: bool = test_pod_fallback_paid()
+	test_pod = { "day": GameClock.get_day_index(), "opened": true }
+	if paid:
+		test_pod["fallback_paid"] = true
+	var reply: String = ""
+	if catch_species(String(TEST_POD_SPECIES)):
+		enclosure_origins[String(TEST_POD_SPECIES)] = TEST_POD_ORIGIN
+		var display_name: String = str(DataManager.get_record(SPECIES_TABLE, TEST_POD_SPECIES).get("common_name", TEST_POD_SPECIES))
+		post_phone("A %s. %s. It is kept for the dome." % [display_name, TEST_POD_LINE])
+	elif not paid:
+		test_pod["fallback_paid"] = true
+		add_credits(TEST_POD_FALLBACK_CREDITS)
+		reply = "The pod held nothing new: its Spinner is already in the dome. Found %s CR in the pod's spares." % SP811.integer(TEST_POD_FALLBACK_CREDITS)
+	else:
+		reply = TEST_POD_EMPTY_LINE
+	_count_test_pod(who, TEST_POD_COUNT)
+	test_pod_changed.emit()
+	return reply
+
+
+## One count of a test-pod quest counter for a player (not the manager); no XP.
+func _count_test_pod(who: String, counter: String) -> void:
+	if who == MANAGER_ID:
+		return
+	var done: Dictionary = (action_counts.get_or_add(who, {}) as Dictionary).get_or_add(counter, { "count": 0, "xp": 0 })
+	done["count"] = int(done["count"]) + 1
+
+
 ## Today's opened Deimos depth-1 crates as { "day", "ids" }, or {} when another day's.
 func _deimos_crates_today() -> Dictionary:
 	return DeimosDepth.prune(deimos_crates_opened, GameClock.get_day_index())
@@ -7430,6 +7523,8 @@ func enclosure_text(species_id: String) -> String:
 	var origin: String = str(enclosure_origins.get(species_id, ""))
 	if origin == STATION_ORIGIN:
 		return line + ". " + STATION_LINE
+	if origin == TEST_POD_ORIGIN:
+		return line + ". " + TEST_POD_LINE
 	if origin == CACHE_ORIGIN:
 		return line + ". " + CACHE_LINE
 	return line
