@@ -32,6 +32,7 @@ const DATA_FILES: Dictionary = {
 	&"robots": "res://data/robots.json",
 	&"quests": "res://data/quests.json",
 	&"zones": "res://data/zones.json",
+	&"animals": "res://data/animals.json",
 }
 
 ## Table -> { section -> required fields (besides "id") }.
@@ -73,6 +74,9 @@ const RECORD_SECTIONS: Dictionary = {
 	},
 	&"zones": {
 		"zones": ["name", "band", "hazards", "finds", "hub_scene", "entrance"],
+	},
+	&"animals": {
+		"groups": ["group_size", "home_kind", "gift_id", "gift_count", "gift_price", "model_path"],
 	},
 }
 

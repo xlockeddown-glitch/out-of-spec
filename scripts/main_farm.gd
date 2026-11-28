@@ -88,6 +88,7 @@ var _dug_depth: int = 0
 ## When this screen last pressed dig, so a snapshot or the other player's dig isn't ours.
 var _dig_pressed_msec: int = -OWN_DIG_MS
 var _walkers: FarmWalkers
+var _animals: WildAnimals
 var _bram_line: String = ""
 ## Seconds left showing a clicked prop's text in the hover label.
 var _inspect_left: float = 0.0
@@ -251,6 +252,8 @@ func _ready() -> void:
 	_walkers.rover = _rover
 	_walkers.camera = $WorldView/WorldViewport/World/IsoCamera
 	$WorldView/WorldViewport/World.add_child(_walkers)
+	_animals = WildAnimals.new()
+	$WorldView/WorldViewport/World.add_child(_animals)
 	pit_water.changed.connect(_walkers.leave_deep_water)
 	_show_dug()
 	_last_band = _rover.get_drift_band()
@@ -311,6 +314,9 @@ func _setup_hint_and_prompt() -> void:
 func verb_target() -> Dictionary:
 	if _terminal_in_reach():
 		return {"at": _landing.terminal_click.global_position, "verb": VerbPrompt.verb_of(_landing.terminal_click), "action": &"interact"}
+	var animal: Dictionary = _animal_in_reach()
+	if not animal.is_empty():
+		return {"at": animal["at"], "verb": animal["verb"], "action": &"interact"}
 	if CoopWalkers.on_foot():
 		if _walkers != null and _walkers.rover_in_reach():
 			return {"at": _rover.global_position, "verb": VERB_ROVER, "action": &"get_out_in"}
@@ -758,6 +764,8 @@ func _show_dug() -> void:
 	_rover.keep_above_ground()
 	if _walkers != null:
 		_walkers.keep_above_ground()
+	if _animals != null:
+		_animals.keep_above_ground()
 
 
 func _input(event: InputEvent) -> void:
@@ -787,6 +795,38 @@ func _open_shuttle_terminal() -> void:
 		_hud.push_log("SHUTTLE TERMINAL: " + Shuttle.text("far_text"))
 
 
+func _animal_in_reach() -> Dictionary:
+	if _animals == null:
+		return {}
+	return _animals.interact_target(GameState.standing_at(GameState.local_player_id))
+
+
+func _interact_animal(target: Dictionary) -> void:
+	var group_id: String = str(target.get("group_id", ""))
+	if group_id == "":
+		return
+	var spec: Dictionary = GameState.animal_group(group_id)
+	var group_name: String = str(spec.get("name", group_id)).to_lower()
+	match str(target.get("kind", "")):
+		"find":
+			var res: Variant = await FarmCommands.request(&"collect_animal_find", [group_id])
+			if res is Dictionary and res.get("ok", false):
+				var amount: int = int(res.get("amount", 1))
+				var what: String = "crystal ore" if str(res.get("kind", "")) == "crystal_ore" else "CR"
+				_hud.push_log("ANIMALS: Found %s %s." % [SP811.integer(amount), what])
+		"collect":
+			var count: int = int(await FarmCommands.request(&"collect_animal_gifts", [group_id]))
+			if count > 0:
+				var gift_name: String = str(spec.get("gift_name", "gift")).to_lower()
+				_hud.push_log("ANIMALS: Collected %s %s." % [SP811.integer(count), gift_name])
+		"feed":
+			var problem: String = str(await FarmCommands.request(&"feed_animals", [group_id]))
+			if problem == "":
+				_hud.push_log("ANIMALS: Left feed for the %s." % group_name)
+			else:
+				_hud.push_log("ANIMALS: " + problem)
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	# Debug builds only: F8 paints the ground by biome (biomes.md section 6, step 4).
 	# Caught here, outside the world viewport, and handed to the ground.
@@ -804,6 +844,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		# dome's console, handled before the on-foot refusal below.
 		get_viewport().set_input_as_handled()
 		_open_shuttle_terminal()
+	elif event.is_action_pressed(&"interact") and not _animal_in_reach().is_empty():
+		get_viewport().set_input_as_handled()
+		_interact_animal(_animal_in_reach())
 	elif CoopWalkers.on_foot():
 		if (FARM_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key))
 				or ON_FOOT_REFUSED.any(func(key: StringName) -> bool: return event.is_action_pressed(key))):

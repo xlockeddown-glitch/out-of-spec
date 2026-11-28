@@ -51,6 +51,8 @@ signal oirm_changed
 signal credibility_changed(points: int)
 ## A crop was planted, grew, or was harvested (income milestone).
 signal crops_changed
+## Wild animal trust, feed bin, dawn gifts, or a pending find changed.
+signal animals_changed
 ## A soil cell was tilled.
 signal soil_tilled(cell: Vector3i)
 ## Ground was dug or filled.
@@ -599,6 +601,10 @@ var _morning_notes: Array[String] = []
 var plantings: Dictionary = {}
 ## Harvested crops waiting for Lin: { crop_id, in_spec, out_of_band_days }.
 var harvest_bin: Array[Dictionary] = []
+## Shared farm feed bin: leftover id (crop substrate_byproduct) -> count.
+var feed_bin: Dictionary = {}
+## Wild farm animal groups: group_id -> { trust, fed_today, unfed_streak, gifts, find_pending }.
+var animal_groups: Dictionary = {}
 ## The crop the next planting uses ("" = the first in data/crops.json).
 var seed_crop_id: String = ""
 ## Irrigation offset (in SETPOINT_STEP steps) that new plantings start with,
@@ -887,7 +893,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "olympus_markers", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "test_pod", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened", "odalys_mug_sent", "master_audit_passed", "master_audit", "last_interlock_override_day", "intrinsic_standard"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "olympus_markers", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "test_pod", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened", "odalys_mug_sent", "master_audit_passed", "master_audit", "last_interlock_override_day", "intrinsic_standard", "feed_bin", "animal_groups"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -1120,13 +1126,18 @@ func farm_dict_problem(data: Dictionary) -> String:
 			return "'active_jobs' has two jobs from one quest."
 		quests_with_a_job.append(from_quest)
 	for entry: Dictionary in data["harvest_bin"]:
-		if not _optional_fields(entry, [], ["advance"]):
-			return "'harvest_bin' has a field of the wrong type."
+		if entry.has("gift_id"):
+			if not _has_fields(entry, ["gift_id"], ["gift_price"]) or not _optional_fields(entry, ["group_id"], []):
+				return "'harvest_bin' has a gift entry with a field missing or of the wrong type."
+		else:
+			if not _has_fields(entry, ["crop_id"], []):
+				return "'harvest_bin' has an entry with a field missing."
+			if not _optional_fields(entry, [], ["advance"]):
+				return "'harvest_bin' has a field of the wrong type."
 	for cell: Variant in data["plantings"]:
 		if not cell is Vector3i or not _has_fields(data["plantings"][cell], ["crop_id"], ["days_grown", "out_of_band_days", "setpoint"]) or not _optional_fields(data["plantings"][cell], [], ["advance", "planted_day", "planted_at"]):
 			return "'plantings' has an entry that is not a planted cell."
 	for needs: Array in [["active_jobs", ["job_id"], ["due_day"]], ["oirm_trips", ["standard_id"], ["sent_day", "return_day"]],
-			["harvest_bin", ["crop_id"], []],
 			["cal_log", ["instrument_id", "standard_id", "result"], ["day", "as_found", "as_left", "mpe", "acceptance_limit", "due_day"]],
 			["certificate_log", ["id", "standard_id"], ["day", "due_day", "expanded_uncertainty", "k"]]]:
 		for entry: Dictionary in data[needs[0]]:
@@ -4527,6 +4538,7 @@ func _on_day_started(day: int) -> void:
 	# sitter (on her booked day and the one after), so her trims count for the
 	# new day and crops that finish at dawn are ready. Dawn's soil check is last.
 	_grow_crops(watered, false)
+	_step_animals_dawn(day)
 	_run_robot_cards()
 	_close_lab_sitter(day)
 	_open_lab_sitter(day)
@@ -10003,6 +10015,10 @@ func harvest_crop(cell: Vector3i, player_id: String = "") -> Dictionary:
 	}
 	plantings.erase(cell)
 	harvest_bin.append(entry)
+	var byproduct: String = str(crop(planting["crop_id"]).get("substrate_byproduct", ""))
+	if byproduct != "":
+		feed_bin[byproduct] = int(feed_bin.get(byproduct, 0)) + 1
+		animals_changed.emit()
 	if entry["in_spec"]:
 		_award_xp("harvest_in_spec", player_id, crop_sale_price(entry))
 	crops_changed.emit()
@@ -10011,7 +10027,13 @@ func harvest_crop(cell: Vector3i, player_id: String = "") -> Dictionary:
 
 ## What Lin pays for one bin entry: base price in spec, less the crop's
 ## out-of-spec penalty if its soil left the band on any growing day.
+## Animal gift entries pay their fixed gift price from data/animals.json.
 func crop_sale_price(entry: Dictionary) -> int:
+	if entry.has("gift_id"):
+		var group_id: String = str(entry.get("group_id", ""))
+		if group_id != "" and animal_group_exists(group_id):
+			return int(animal_group(group_id).get("gift_price", entry.get("gift_price", 0)))
+		return int(entry.get("gift_price", 0))
 	var spec: Dictionary = crop(entry.get("crop_id", ""))
 	var base: int = int(spec.get("base_sell_credits", 0))
 	if entry.get("in_spec", false):
@@ -10020,8 +10042,10 @@ func crop_sale_price(entry: Dictionary) -> int:
 
 
 ## What Lin pays `player_id` ("" = the local player) for one bin entry: its
-## price, and more with the seller's Agronomy (the lin_price effect).
+## price, and more with the seller's Agronomy (the lin_price effect) for crops.
 func lin_pays(entry: Dictionary, player_id: String = "") -> int:
+	if entry.has("gift_id"):
+		return crop_sale_price(entry)
 	return roundi(crop_sale_price(entry) * skill_factor("lin_price", player_id))
 
 
@@ -10035,16 +10059,23 @@ func harvest_bin_value(player_id: String = "") -> int:
 
 ## Lin buys the whole bin. Returns the credits paid (0 if the bin was empty).
 ## The seller gets XP by the crops' price, before any fronted seed comes out
-## and without what their Agronomy adds.
+## and without what their Agronomy adds. Gift entries pay their gift price and
+## never count toward crops_sold_in_spec.
 func sell_harvest_to_lin(player_id: String = "") -> int:
 	if harvest_bin.is_empty():
 		return 0
 	var total: int = harvest_bin_value(player_id)
 	var count: int = harvest_bin.size()
+	var crop_count: int = 0
+	var gift_count: int = 0
 	var off_spec: int = 0
 	var advanced: int = 0
 	var priced: int = 0
 	for entry: Dictionary in harvest_bin:
+		if entry.has("gift_id"):
+			gift_count += 1
+			continue
+		crop_count += 1
 		priced += crop_sale_price(entry)
 		if not entry.get("in_spec", false):
 			off_spec += 1
@@ -10054,13 +10085,15 @@ func sell_harvest_to_lin(player_id: String = "") -> int:
 		advanced += mini(int(entry.get("advance", 0)), lin_pays(entry, player_id))
 	harvest_bin.clear()
 	add_credits(total)
-	_award_xp("sell_crop", player_id, priced)
+	if priced > 0:
+		_award_xp("sell_crop", player_id, priced)
 	crops_changed.emit()
 	var note: String = ("" if off_spec == 0
 		else " %s off spec, paid at the reduced price." % SP811.integer(off_spec))
 	if advanced > 0:
 		note += " That's after taking out the %s CR of seed I fronted you." % SP811.integer(advanced)
-	post_phone("LIN: Bought %s crops for %s CR.%s" % [SP811.integer(count), SP811.integer(total), note])
+	var what: String = "crops" if gift_count == 0 else ("gifts" if crop_count == 0 else "items")
+	post_phone("LIN: Bought %s %s for %s CR.%s" % [SP811.integer(count), what, SP811.integer(total), note])
 	return total
 
 
@@ -10078,3 +10111,191 @@ func crop_status_text(cell: Vector3i) -> String:
 		crop_name(planting["crop_id"]), stage,
 		SP811.number(float(planting["setpoint"]) * 100.0, 0),
 		SP811.number(float(spec.get("soil_moisture_target", 0.0)) * 100.0, 0)]
+
+
+# --- Wild animals (farm-owned, host-authoritative) ----------------------------
+
+const ANIMALS_TABLE: StringName = &"animals"
+const ANIMAL_FIND_TAG: int = 0x51a7b3
+
+
+func animal_group_ids() -> Array[String]:
+	var out: Array[String] = []
+	for id: StringName in DataManager.get_ids(ANIMALS_TABLE, "groups"):
+		out.append(String(id))
+	return out
+
+
+func animal_group(group_id: String) -> Dictionary:
+	return DataManager.get_record(ANIMALS_TABLE, StringName(group_id), "groups")
+
+
+func animal_group_exists(group_id: String) -> bool:
+	return DataManager.has_record(ANIMALS_TABLE, StringName(group_id), "groups")
+
+
+func animal_trust_rule(key: String, fallback: float) -> float:
+	return DataManager.get_number(ANIMALS_TABLE, "trust/" + key, fallback)
+
+
+func _default_animal_state() -> Dictionary:
+	return {
+		"trust": 0,
+		"fed_today": false,
+		"unfed_streak": 0,
+		"gifts": 0,
+		"find_pending": false,
+	}
+
+
+func _ensure_animal_state(group_id: String) -> Dictionary:
+	if not animal_groups.has(group_id) or not animal_groups[group_id] is Dictionary:
+		animal_groups[group_id] = _default_animal_state()
+	return animal_groups[group_id] as Dictionary
+
+
+func animal_state(group_id: String) -> Dictionary:
+	if animal_groups.has(group_id) and animal_groups[group_id] is Dictionary:
+		return (animal_groups[group_id] as Dictionary).duplicate()
+	return _default_animal_state()
+
+
+func animal_trust(group_id: String) -> int:
+	return int(animal_state(group_id).get("trust", 0))
+
+
+func animal_fed_today(group_id: String) -> bool:
+	return bool(animal_state(group_id).get("fed_today", false))
+
+
+func animal_unfed_streak(group_id: String) -> int:
+	return int(animal_state(group_id).get("unfed_streak", 0))
+
+
+func animal_gifts_waiting(group_id: String) -> int:
+	return int(animal_state(group_id).get("gifts", 0))
+
+
+func animal_find_pending(group_id: String) -> bool:
+	return bool(animal_state(group_id).get("find_pending", false))
+
+
+func feed_bin_total() -> int:
+	var total: int = 0
+	for count: Variant in feed_bin.values():
+		total += maxi(0, int(count))
+	return total
+
+
+## Pure deterministic roll for a group's trust-4+ dawn find on `day`.
+## Same world seed, group id and day always produce the same result.
+static func animal_find_roll(seed_value: int, group_id: String, day: int, denom: int = 5) -> bool:
+	if denom <= 0:
+		return false
+	var h: int = (seed_value ^ (day * 0x9e3779b1) ^ (hash(group_id) * 0x85ebca6b) ^ ANIMAL_FIND_TAG) & 0x7fffffff
+	return h % denom == 0
+
+
+## Takes 1 leftover from the shared feed bin and marks `group_id` fed today.
+## Returns "" on success, or a short refusal reason.
+func feed_animals(group_id: String, player_id: String = "") -> String:
+	var _actor: String = _player(player_id)
+	if not animal_group_exists(group_id):
+		return "Unknown animal group."
+	var st: Dictionary = _ensure_animal_state(group_id)
+	if bool(st.get("fed_today", false)):
+		return "Already fed today."
+	var keys: Array = feed_bin.keys()
+	keys.sort()
+	var chosen: String = ""
+	for key: Variant in keys:
+		if int(feed_bin[key]) > 0:
+			chosen = str(key)
+			break
+	if chosen == "":
+		return "No feed in the bin."
+	var remaining: int = int(feed_bin[chosen]) - 1
+	if remaining <= 0:
+		feed_bin.erase(chosen)
+	else:
+		feed_bin[chosen] = remaining
+	st["fed_today"] = true
+	animals_changed.emit()
+	return ""
+
+
+## Dawn step for wild animals: updates trust from yesterday's feeding, places
+## dawn gifts at trust >= gifts_min, rolls a deterministic find at trust >= finds_min,
+## and clears the fed-today flags.
+func _step_animals_dawn(day: int) -> void:
+	var max_trust: int = int(animal_trust_rule("max", 5.0))
+	var gain: int = int(animal_trust_rule("gain_per_fed_day", 1.0))
+	var unfed_days: int = maxi(1, int(animal_trust_rule("unfed_days_to_drop", 3.0)))
+	var drop: int = int(animal_trust_rule("drop_per_streak", 1.0))
+	var gifts_min: int = int(animal_trust_rule("gifts_min", 2.0))
+	var finds_min: int = int(animal_trust_rule("finds_min", 4.0))
+	var find_denom: int = maxi(1, int(animal_trust_rule("find_chance_denom", 5.0)))
+	for group_id: String in animal_group_ids():
+		var st: Dictionary = _ensure_animal_state(group_id)
+		var trust: int = int(st.get("trust", 0))
+		if bool(st.get("fed_today", false)):
+			trust = mini(max_trust, trust + gain)
+			st["unfed_streak"] = 0
+		else:
+			var streak: int = int(st.get("unfed_streak", 0)) + 1
+			if streak >= unfed_days:
+				trust = maxi(0, trust - drop)
+				streak = 0
+			st["unfed_streak"] = streak
+		st["trust"] = trust
+		st["fed_today"] = false
+		var spec: Dictionary = animal_group(group_id)
+		st["gifts"] = int(spec.get("gift_count", 1)) if trust >= gifts_min else 0
+		st["find_pending"] = animal_find_roll(world_seed, group_id, day, find_denom) if trust >= finds_min else false
+	animals_changed.emit()
+
+
+## Moves waiting gifts for `group_id` into harvest_bin and awards Agronomy XP
+## to `player_id`. Returns the number of gifts collected (0 if none waiting).
+func collect_animal_gifts(group_id: String, player_id: String = "") -> int:
+	if not animal_group_exists(group_id):
+		return 0
+	var st: Dictionary = _ensure_animal_state(group_id)
+	var count: int = int(st.get("gifts", 0))
+	if count <= 0:
+		return 0
+	st["gifts"] = 0
+	var spec: Dictionary = animal_group(group_id)
+	var gift_id: String = str(spec.get("gift_id", ""))
+	var gift_price: int = int(spec.get("gift_price", 0))
+	for i: int in count:
+		harvest_bin.append({
+			"gift_id": gift_id,
+			"group_id": group_id,
+			"gift_price": gift_price,
+		})
+	_award_xp("collect_animal_gift", player_id)
+	animals_changed.emit()
+	crops_changed.emit()
+	return count
+
+
+## Collects a pending trust-4+ find for `group_id`. Pays once (crystal_ore [PLACEHOLDER]).
+## Returns { ok, kind, amount } on success, or {} if no find is waiting.
+func collect_animal_find(group_id: String, player_id: String = "") -> Dictionary:
+	var _actor: String = _player(player_id)
+	if not animal_group_exists(group_id):
+		return {}
+	var st: Dictionary = _ensure_animal_state(group_id)
+	if not bool(st.get("find_pending", false)):
+		return {}
+	st["find_pending"] = false
+	var kind: String = str(DataManager.get_value(ANIMALS_TABLE, "find_reward/kind", "crystal_ore"))
+	var amount: int = maxi(1, int(DataManager.get_number(ANIMALS_TABLE, "find_reward/amount", 1.0)))
+	if kind == "crystal_ore":
+		crystal_ore += amount
+		ore_changed.emit(crystal_ore)
+	else:
+		add_credits(amount)
+	animals_changed.emit()
+	return { "ok": true, "kind": kind, "amount": amount }
