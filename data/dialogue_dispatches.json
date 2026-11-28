@@ -266,7 +266,9 @@
         "master_audit_offer": "[PLACEHOLDER] Your lab holds Accredited standing at level 52. Request the two-morning master audit from the bench when your chain, climate, interlocks and robots are in order.",
         "master_audit_done": "[PLACEHOLDER] Two clean mornings on file. The master audit certificate is issued. Mars has a surface lab we can cross-examine without wincing.",
         "intrinsic_silk_offer": "[PLACEHOLDER] Your master audit is on file at level 56. OIRM is ready to recognize a surface primary: seat an Orbital Silk-Spinner spool in the relay dish, hold 3 whole Crystal Weaver silk spools, and log 5 traceable, on-time calibrations by hand.",
-        "intrinsic_silk_done": "[PLACEHOLDER] Intrinsic silk standard recognized. Your traceability chain now ends at your conservatory. 800 CR and 2 000 lab XP credited."
+        "intrinsic_silk_done": "[PLACEHOLDER] Intrinsic silk standard recognized. Your traceability chain now ends at your conservatory. 800 CR and 2 000 lab XP credited.",
+        "colony_wildlife_survey_offer": "[PLACEHOLDER] The colony registry requires yearly weights of the feral stock around your farm. Weigh a hen, a goat and a rabbit with the hanging field scale. Only readings from a calibrated scale are accepted.",
+        "colony_wildlife_survey_done": "[PLACEHOLDER] Three species logged on a calibrated scale. The colony registry is updated; 120 CR and 150 lab XP are credited to your account."
       }
     },
     "odalys": {

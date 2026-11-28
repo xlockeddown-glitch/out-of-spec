@@ -11,7 +11,7 @@ const ACTIONS: Array[StringName] = [
 	&"calibrate_at_bench", &"cancel_lab_sitter", &"catch_sentinel", &"catch_stray", &"change_depth", &"check_with_block", &"clear_lab_area", &"collect_animal_find", &"collect_animal_gifts", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"enter_deimos_deep", &"enter_phobos_deep", &"enter_vent", &"fast_travel", &"feed_animals", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
 	&"harvest_crop", &"hit_boulder", &"leave_deimos_deep", &"leave_phobos_deep", &"leave_zone", &"mine_fissure", &"move_rover", &"move_rover_aquifer", &"move_rover_ice", &"move_rover_mine", &"move_rover_olympus", &"move_rover_valles", &"open_cache", &"open_deimos_crate", &"open_test_pod", &"place_beacon", &"place_marker", &"place_stone", &"plant_crop", &"read_farm_board", &"read_probe", &"release_robot", &"remove_robot_card", &"repair_lift", &"report_place",
 	&"sell_harvest_to_lin", &"send_ice_core", &"send_to_oirm", &"service_wheels", &"set_interlock_override", &"set_loadout", &"set_rover_lights", &"shore_room", &"shut_valve", &"shuttle_home", &"slot_spool_into_relay", &"spend_xp_certificate",
-	&"start_lab_grow", &"survey_ore", &"take_find", &"take_phobos_find", &"till", &"use_lift", &"use_pump", &"wipe_deimos_dust", &"wipe_phobos_dust", &"zero_steering", &"set_robot_cosmetic", &"set_lab_coat_color",
+	&"start_lab_grow", &"survey_ore", &"take_find", &"take_phobos_find", &"till", &"use_lift", &"use_pump", &"weigh_animal", &"wipe_deimos_dust", &"wipe_phobos_dust", &"zero_steering", &"set_robot_cosmetic", &"set_lab_coat_color",
 ]
 ## What a player in bed may do and stay in bed: going to bed, paperwork, and
 ## saying where they are.

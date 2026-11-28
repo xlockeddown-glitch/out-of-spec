@@ -372,6 +372,8 @@ func quantity_name() -> String:
 			return "torque"
 		"fractional_e6":
 			return "fractional frequency"
+		"kg":
+			return "mass"
 		_:
 			return error_unit
 

@@ -317,6 +317,9 @@ func verb_target() -> Dictionary:
 	var animal: Dictionary = _animal_in_reach()
 	if not animal.is_empty():
 		return {"at": animal["at"], "verb": animal["verb"], "action": &"interact"}
+	var weigh: Dictionary = _weigh_animal_in_reach()
+	if not weigh.is_empty() and GameState.wildlife_survey_active():
+		return {"at": weigh["at"], "verb": weigh["verb"], "action": &"survey"}
 	if CoopWalkers.on_foot():
 		if _walkers != null and _walkers.rover_in_reach():
 			return {"at": _rover.global_position, "verb": VERB_ROVER, "action": &"get_out_in"}
@@ -386,7 +389,7 @@ func _process(delta: float) -> void:
 		_hover_hint.text = hovered.hint
 		return
 	var lines: PackedStringArray = []
-	for line: String in [_rover.away_text(), _walkers.hint(), _terminal_prompt()]:
+	for line: String in [_rover.away_text(), _walkers.hint(), _terminal_prompt(), _weigh_prompt()]:
 		if line != "":
 			lines.append(line)
 	_hover_hint.text = "  ·  ".join(lines)
@@ -801,6 +804,39 @@ func _animal_in_reach() -> Dictionary:
 	return _animals.interact_target(GameState.standing_at(GameState.local_player_id))
 
 
+func _weigh_animal_in_reach() -> Dictionary:
+	if _animals == null:
+		return {}
+	return _animals.weigh_target(GameState.standing_at(GameState.local_player_id))
+
+
+func _weigh_prompt() -> String:
+	var weigh: Dictionary = _weigh_animal_in_reach()
+	if weigh.is_empty() or _animal_in_reach().is_empty() or not GameState.wildlife_survey_active():
+		return ""
+	return "%s: press %s." % [String(weigh["verb"]), Controls.prompt(&"survey")]
+
+
+func _weigh_animal(target: Dictionary) -> void:
+	var group_id: String = str(target.get("group_id", ""))
+	if group_id == "":
+		return
+	var spec: Dictionary = GameState.animal_group(group_id)
+	var singular: String = str(spec.get("singular", spec.get("name", group_id)))
+	var res: Variant = await FarmCommands.request(&"weigh_animal", [group_id])
+	if not res is Dictionary:
+		return
+	var d: Dictionary = res as Dictionary
+	if d.get("accepted", false):
+		_hud.push_log("SURVEY: %s weighed %s kg — accepted." % [
+			singular.capitalize(), SP811.number(float(d.get("reading_kg", 0.0)), 2)])
+	elif d.has("reading_kg"):
+		_hud.push_log("SURVEY: %s read %s kg — rejected. %s" % [
+			singular.capitalize(), SP811.number(float(d.get("reading_kg", 0.0)), 2), str(d.get("reason", ""))])
+	else:
+		_hud.push_log("SURVEY: " + str(d.get("reason", "Could not weigh.")))
+
+
 func _interact_animal(target: Dictionary) -> void:
 	var group_id: String = str(target.get("group_id", ""))
 	if group_id == "":
@@ -854,6 +890,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed(&"interact") and not _animal_in_reach().is_empty():
 		get_viewport().set_input_as_handled()
 		_interact_animal(_animal_in_reach())
+	elif event.is_action_pressed(&"survey") and not _weigh_animal_in_reach().is_empty():
+		get_viewport().set_input_as_handled()
+		_weigh_animal(_weigh_animal_in_reach())
 	elif CoopWalkers.on_foot():
 		if (FARM_KEYS.any(func(key: StringName) -> bool: return event.is_action_pressed(key))
 				or ON_FOOT_REFUSED.any(func(key: StringName) -> bool: return event.is_action_pressed(key))):

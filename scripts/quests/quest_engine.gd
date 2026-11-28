@@ -114,7 +114,7 @@ const PROMPT_KEY: String = "prompt"
 const NOT_PREFIX: String = "not_"
 ## The checks check_value() knows: what a step's `check` may be, and with
 ## `always`, `day_at_least` and `day_at_most` (WHENS) what a `when` may be.
-const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due", "beacons_placed", "relay_spool", "master_audit_passed", "silk_stock"]
+const CHECKS: Array[String] = ["stat_at_least", "flag", "band_at_least", "owns_standard", "lab_size", "count", "state_is", "level", "counter", "quest_job", "found_blocks", "plot_untilled", "fissures_open", "wheels_due", "beacons_placed", "relay_spool", "master_audit_passed", "silk_stock", "animal_trust_reached"]
 ## A `when` that is not a step check (offer_holds).
 const WHENS: Array[String] = ["always", "day_at_least", "day_at_most"]
 ## A reward of skill XP is "xp_<skill id>".
@@ -125,6 +125,9 @@ const XP_CERTIFICATE: String = "xp_certificate"
 ## A `counter` that is not a source of data/skills.json: what Lin has bought in
 ## spec, of the crop `where.crop_id` names or of every crop.
 const SOLD_IN_SPEC: String = "crops_sold_in_spec"
+## A `counter` that is not a source of data/skills.json: accepted wildlife survey
+## weighings, of the group `where.group_id` names or of every group.
+const SURVEY_WEIGHINGS: String = "survey_weighings"
 ## A quest's key for the zone whose camp it opens for the farm (Camp, zones doc 6.2).
 const CAMP: String = "camp"
 ## The mini-games a step may carry in `minigame`. A Set the Zero step is a
@@ -1095,6 +1098,8 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 		"counter":
 			if str(step.get("counter", "")) == SOLD_IN_SPEC:
 				return _sold_in_spec(farm, step.get("where", {}))
+			if str(step.get("counter", "")) == SURVEY_WEIGHINGS:
+				return _survey_weighings(farm, step.get("where", {}))
 			# The farm's, whoever dug them up: the blocks are shared.
 			if str(step.get("counter", "")) == BLOCKS_FOUND:
 				return (farm.found_blocks as Dictionary).size()
@@ -1125,6 +1130,8 @@ static func check_value(farm: Node, step: Dictionary, present: Array[String], ow
 			return int(bool(farm.master_audit_passed))
 		"silk_stock":
 			return farm.whole_spools_of(StringName(str(step.get("species", ""))))
+		"animal_trust_reached":
+			return farm.max_animal_trust()
 	return 0
 
 
@@ -1147,6 +1154,16 @@ static func _sold_in_spec(farm: Node, where: Variant) -> int:
 		return int(sold.get(str(where["crop_id"]), 0))
 	var total: int = 0
 	for count: Variant in sold.values():
+		total += int(count)
+	return total
+
+
+static func _survey_weighings(farm: Node, where: Variant) -> int:
+	var weighings: Dictionary = farm.survey_weighings
+	if where is Dictionary and where.has("group_id"):
+		return int(weighings.get(str(where["group_id"]), 0))
+	var total: int = 0
+	for count: Variant in weighings.values():
 		total += int(count)
 	return total
 

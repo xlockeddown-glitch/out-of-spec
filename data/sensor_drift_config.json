@@ -280,6 +280,21 @@
       "initial_interval_days": 30,
       "_note": "Tier 0 reference for the soil probe: soil samples weighed wet, oven-dried and weighed again (the gravimetric method), with a certified balance. Agent's proposal, not yet Ryan's; no maker name. Every number is [PLACEHOLDER]; drift takes it to its MPE in about 60 days like the other Tier 0 standards."
     },
+    "field_hanging_scale": {
+      "role": "unit",
+      "display_name": "Hanging Field Scale",
+      "short_name": "Field scale",
+      "error_unit": "kg",
+      "daily_drift_rate": 0.05,
+      "max_permissible_error": 0.2,
+      "as_left_residual": 0.01,
+      "resolution": 0.01,
+      "display_decimals": 2,
+      "calibrated_by": "gravimetric_kit",
+      "standard_sensitivity": 0.05,
+      "bench_minutes": 25,
+      "_note": "Colony wildlife survey (docs/design/farm_animals.md section 4). Every number is [PLACEHOLDER]: MPE ±0.20 kg, drifts to MPE in 4 days without calibration, 0.01 kg display, calibrated on the bench against the gravimetric kit's certified balance (standard_sensitivity 0.05 keeps TUR above 4:1)."
+    },
     "_note": "role unit = audited and calibrated at the bench against calibrated_by; role standard = Tier 0 reference, drifts, audited for a lapsed certificate only (not while at OIRM); starts with a founding-stock OIRM certificate. Tier 0 standards' daily_drift_rate takes one from zero to its MPE in about 60 days, Tier 1 in about 120 days (Ryan, 2026-11-22), so skipping an OIRM cycle risks a recall. resolution (one digit of the unit under test), bench_minutes and the standards' specs and drift rates are placeholders (docs/design/equipment_skills_robots.md section 1.5). tier 0 (or absent) = owned from the start; tier 1+ = bought, arrives with a maker's certificate traceable to OIRM (section 1.7). A unit is in service (audited, on the bench) only while its calibrated_by standard is owned. standard_sensitivity (default 1) converts the standard's unit into the unit's own. display_decimals sets how many decimals readings show."
   },
   "robot_sensors": {

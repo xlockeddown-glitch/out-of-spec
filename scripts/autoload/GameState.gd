@@ -131,6 +131,8 @@ const OLD_LAB_SKILL: String = "instrumentation"
 ## The most XP a converted skill holds: CoopProfile.MOST_XP.
 const MOST_SKILL_XP: int = 1000000000
 const SOIL_PROBE_ID: String = "soil_probe"
+const HANGING_SCALE_ID: String = "field_hanging_scale"
+const WILDLIFE_SURVEY_QUEST: String = "colony_wildlife_survey"
 ## Who did a calibration when it wasn't a player: the manager's grace cal.
 ## Player ids must never be this or LEGACY_LOCAL_PERFORMER.
 const MANAGER_ID: String = "Manager"
@@ -605,6 +607,10 @@ var harvest_bin: Array[Dictionary] = []
 var feed_bin: Dictionary = {}
 ## Wild farm animal groups: group_id -> { trust, fed_today, unfed_streak, gifts, find_pending }.
 var animal_groups: Dictionary = {}
+## Accepted wildlife survey weighings per group_id (group_id -> int).
+var survey_weighings: Dictionary = {}
+## Day index of the last accepted farm animal weighing (-1 = none). [PLACEHOLDER: 1 per farm per day]
+var animal_weighed_day: int = -1
 ## The crop the next planting uses ("" = the first in data/crops.json).
 var seed_crop_id: String = ""
 ## Irrigation offset (in SETPOINT_STEP steps) that new plantings start with,
@@ -893,7 +899,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "olympus_markers", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "test_pod", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened", "odalys_mug_sent", "master_audit_passed", "master_audit", "last_interlock_override_day", "intrinsic_standard", "feed_bin", "animal_groups"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "olympus_markers", "enclosure_origins", "strays_caught", "has_ice_studs", "deimos_cache", "test_pod", "ice_cores_held", "phobos_finds_taken", "deimos_crates_opened", "odalys_mug_sent", "master_audit_passed", "master_audit", "last_interlock_override_day", "intrinsic_standard", "feed_bin", "animal_groups", "survey_weighings", "animal_weighed_day"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -1208,6 +1214,11 @@ func farm_dict_problem(data: Dictionary) -> String:
 		quest_problem = xp_certificates_problem(data.get("xp_certificates", {}), data.get("xp_certificates_given", 0))
 	if quest_problem == "" and not QuestEngine._text_to_counts(data.get("crops_sold_in_spec", {})):
 		quest_problem = "'crops_sold_in_spec' has a count that is not a whole number."
+	if quest_problem == "" and not QuestEngine._text_to_counts(data.get("survey_weighings", {})):
+		quest_problem = "'survey_weighings' has a count that is not a whole number."
+	var weighed_day: Variant = data.get("animal_weighed_day", -1)
+	if quest_problem == "" and (not weighed_day is int or int(weighed_day) < -1):
+		quest_problem = "'animal_weighed_day' is not a valid day index."
 	if quest_problem == "":
 		quest_problem = QuestEngine.player_state_problem(data.get("player_quest_state", {}))
 	if quest_problem == "":
@@ -1539,9 +1550,22 @@ func get_sensor(instrument_id: String) -> DriftingSensor:
 
 ## Ids of the instruments Vance audits and the bench calibrates, in data order:
 ## the units in service, whose standard is on the colony. An unreleased robot's
-## sensors are not among them (see bench_unit_ids).
+## sensors are not among them (see bench_unit_ids), and the hanging field scale
+## stays out of audits until the colony wildlife survey quest is offered and the
+## scale has had its first calibration (it drifts from day 0, so auditing it at
+## the offer would fine the farm for an instrument it was never told about).
 func unit_ids() -> Array[String]:
-	return bench_unit_ids().filter(func(id: String) -> bool: return not is_commissioning(id))
+	return bench_unit_ids().filter(func(id: String) -> bool:
+		return not is_commissioning(id) and (id != HANGING_SCALE_ID or hanging_scale_in_service()))
+
+
+## The hanging field scale is audited once the survey quest is offered and the
+## scale has been calibrated at least once.
+func hanging_scale_in_service() -> bool:
+	if not quest_state.has(WILDLIFE_SURVEY_QUEST):
+		return false
+	var scale: DriftingSensor = sensors.get(HANGING_SCALE_ID) as DriftingSensor
+	return scale != null and scale.last_cal_day >= 0
 
 
 ## unit_ids() and the sensors of robots not released yet, in data order.
@@ -10309,3 +10333,82 @@ func collect_animal_find(group_id: String, player_id: String = "") -> Dictionary
 		add_credits(amount)
 	animals_changed.emit()
 	return { "ok": true, "kind": kind, "amount": amount }
+
+
+const ANIMAL_WEIGHT_TAG: int = 0x3c6ef372
+
+
+func max_animal_trust() -> int:
+	var best: int = 0
+	for group_id: String in animal_group_ids():
+		best = maxi(best, animal_trust(group_id))
+	return best
+
+
+func animal_weighed_today() -> bool:
+	return animal_weighed_day == GameClock.get_day_index()
+
+
+## The survey quest has been offered (active or done): weighing is open from then on.
+func wildlife_survey_offered() -> bool:
+	return quest_state.has(WILDLIFE_SURVEY_QUEST)
+
+
+func wildlife_survey_active() -> bool:
+	if not quest_state.has(WILDLIFE_SURVEY_QUEST):
+		return false
+	return int((quest_state[WILDLIFE_SURVEY_QUEST] as Dictionary).get("done", -1)) < 0
+
+
+## Pure deterministic true mass in kg for `group_id` on `day`, within ±spread_frac
+## of `base_kg` ([PLACEHOLDER] ±10 %). Same world seed, group id and day always
+## produce the same mass.
+static func animal_true_weight_kg(seed_value: int, group_id: String, day: int, base_kg: float, spread_frac: float = 0.1) -> float:
+	var h: int = (seed_value ^ (day * 0x9e3779b1) ^ (hash(group_id) * 0x85ebca6b) ^ ANIMAL_WEIGHT_TAG) & 0x7fffffff
+	var frac: float = (float(h % 2001) / 1000.0) - 1.0
+	return base_kg * (1.0 + frac * spread_frac)
+
+
+## Weighs one trusting animal from `group_id` on the hanging field scale.
+## Host-authoritative (one accepted weighing per farm per day [PLACEHOLDER]).
+## Accepted only when the scale is within MPE (not red) and not overdue.
+## A rejected weighing returns the reading and reason without consuming the day's weighing.
+func weigh_animal(group_id: String, player_id: String = "") -> Dictionary:
+	if not animal_group_exists(group_id):
+		return { "ok": false, "accepted": false, "reason": "Unknown animal group." }
+	var approach_min: int = int(animal_trust_rule("approach_min", 1.0))
+	if animal_trust(group_id) < approach_min:
+		return { "ok": false, "accepted": false, "reason": "Too shy to weigh. Build trust first." }
+	var today: int = GameClock.get_day_index()
+	if animal_weighed_day == today:
+		return { "ok": false, "accepted": false, "reason": "Already logged a weighing today." }
+	var spec: Dictionary = animal_group(group_id)
+	var base_kg: float = float(spec.get("weight_kg", 1.0))
+	var spread: float = DataManager.get_number(ANIMALS_TABLE, "survey/weight_spread_frac", 0.1)
+	var true_kg: float = animal_true_weight_kg(world_seed, group_id, today, base_kg, spread)
+	var scale: DriftingSensor = get_sensor(HANGING_SCALE_ID)
+	var reading_kg: float = maxf(0.0, true_kg + (scale.error if scale != null else 0.0))
+	var in_tolerance: bool = (scale != null
+		and scale.get_band() != DriftingSensor.Band.OUT_OF_TOLERANCE
+		and not scale.is_overdue(today))
+	if not in_tolerance:
+		return {
+			"ok": false,
+			"accepted": false,
+			"group_id": group_id,
+			"reading_kg": reading_kg,
+			"true_kg": true_kg,
+			"reason": "Scale out of tolerance. Calibrate it first.",
+		}
+	animal_weighed_day = today
+	survey_weighings[group_id] = int(survey_weighings.get(group_id, 0)) + 1
+	_award_xp("weigh_animal", player_id)
+	animals_changed.emit()
+	return {
+		"ok": true,
+		"accepted": true,
+		"group_id": group_id,
+		"reading_kg": reading_kg,
+		"true_kg": true_kg,
+		"reason": "",
+	}

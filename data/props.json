@@ -119,5 +119,9 @@
   "phobos_shed_skin": {
     "display_name": "Shed Skin by the Grille",
     "description": "A papery shed skin, caught on the torn mesh of a service-tunnel grille. Something went through here, and it was warm in there."
+  },
+  "field_hanging_scale": {
+    "display_name": "Hanging Field Scale",
+    "description": "A hanging spring scale on a short post by the scrub, used to weigh feral stock."
   }
 }

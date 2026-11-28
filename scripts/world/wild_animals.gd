@@ -223,6 +223,42 @@ func _collect_verb(group_id: String) -> String:
 	return "Collect " + gift_label
 
 
+func _weigh_verb(group_id: String) -> String:
+	var spec: Dictionary = GameState.animal_group(group_id)
+	var singular: String = str(spec.get("singular", spec.get("name", group_id))).to_lower()
+	return "Weigh " + singular
+
+
+## Returns { kind, group_id, at, verb } for the closest trusting animal group
+## within INTERACT_REACH_M of `player_pos` once the wildlife survey quest has
+## been offered (active or done: weighing after the quest is allowed) and today's
+## weighing has not yet been logged, or {} otherwise. The prompt itself shows only
+## while the quest is active (main_farm._weigh_prompt).
+func weigh_target(player_pos: Vector3) -> Dictionary:
+	if not GameState.wildlife_survey_offered() or GameState.animal_weighed_today():
+		return {}
+	var approach_min: int = int(GameState.animal_trust_rule("approach_min", 1.0))
+	var best: Dictionary = {}
+	var best_dist: float = INTERACT_REACH_M
+	var p2 := Vector2(player_pos.x, player_pos.z)
+	for group_id: String in _groups:
+		if GameState.animal_trust(group_id) < approach_min:
+			continue
+		var g: Dictionary = _groups[group_id]
+		var spot: Vector3 = g["spot_pos"]
+		var sdist: float = p2.distance_to(Vector2(spot.x, spot.z))
+		if sdist <= best_dist:
+			best_dist = sdist
+			best = { "kind": "weigh", "group_id": group_id, "at": spot, "verb": _weigh_verb(group_id) }
+		for entry: Dictionary in g["animals"]:
+			var node := entry["node"] as Node3D
+			var adist: float = p2.distance_to(Vector2(node.position.x, node.position.z))
+			if adist <= best_dist:
+				best_dist = adist
+				best = { "kind": "weigh", "group_id": group_id, "at": node.position, "verb": _weigh_verb(group_id) }
+	return best
+
+
 ## Returns { kind, group_id, at, verb } for the closest actionable feeding spot
 ## or pending find within INTERACT_REACH_M of `player_pos`, or {} if none is in reach.
 func interact_target(player_pos: Vector3) -> Dictionary:
