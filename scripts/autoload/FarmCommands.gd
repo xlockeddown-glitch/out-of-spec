@@ -9,7 +9,7 @@ const ACTIONS: Array[StringName] = [
 	&"accept_job", &"add_robot_calibrate_card", &"add_robot_card", &"add_robot_collect_card",
 	&"adjust_setpoint", &"book_expedition", &"book_lab_sitter", &"book_shuttle", &"build_block_stack", &"build_robot", &"buy_camp_supplies", &"buy_from_kestrel", &"buy_heater", &"buy_ice_studs", &"buy_mine_props", &"buy_pump", &"buy_standard", &"buy_wide_treads",
 	&"calibrate_at_bench", &"catch_sentinel", &"catch_stray", &"change_depth", &"check_with_block", &"clear_lab_area", &"collect_enclosure_spool", &"collect_spool", &"complete_job", &"dig", &"enter_vent", &"fast_travel", &"fill", &"fit_lab_area", &"get_into_rover", &"get_out_of_rover", &"get_up", &"go_to_bed",
-	&"harvest_crop", &"hit_boulder", &"ice_skid", &"leave_zone", &"mine_fissure", &"move_rover", &"move_rover_aquifer", &"move_rover_ice", &"move_rover_mine", &"place_beacon", &"place_stone", &"plant_crop", &"read_farm_board", &"read_probe", &"release_robot", &"remove_robot_card", &"repair_lift", &"report_place",
+	&"harvest_crop", &"hit_boulder", &"leave_zone", &"mine_fissure", &"move_rover", &"move_rover_aquifer", &"move_rover_ice", &"move_rover_mine", &"place_beacon", &"place_stone", &"plant_crop", &"read_farm_board", &"read_probe", &"release_robot", &"remove_robot_card", &"repair_lift", &"report_place",
 	&"sell_harvest_to_lin", &"send_to_oirm", &"service_wheels", &"set_interlock_override", &"set_loadout", &"set_rover_lights", &"shore_room", &"shut_valve", &"shuttle_home", &"slot_spool_into_relay", &"spend_xp_certificate",
 	&"start_lab_grow", &"survey_ore", &"take_find", &"till", &"use_lift", &"use_pump", &"zero_steering",
 ]
@@ -20,7 +20,7 @@ const NO_WAKE: Array[StringName] = [&"buy_camp_supplies", &"go_to_bed", &"report
 ## in flight at the 02:00 rescue) is refused by the farm and must not wake them from the
 ## bed they were put in.
 const BELOW_ONLY: Array[StringName] = [
-	&"buy_camp_supplies", &"buy_heater", &"buy_mine_props", &"buy_pump", &"catch_sentinel", &"change_depth", &"enter_vent", &"hit_boulder", &"ice_skid", &"leave_zone", &"mine_fissure",
+	&"buy_camp_supplies", &"buy_heater", &"buy_mine_props", &"buy_pump", &"catch_sentinel", &"change_depth", &"enter_vent", &"hit_boulder", &"leave_zone", &"mine_fissure",
 	&"place_beacon", &"repair_lift", &"set_interlock_override", &"shore_room", &"shut_valve", &"survey_ore", &"take_find", &"use_lift", &"use_pump",
 ]
 ## What is done at a cell of the farm's ground: the cell in front of the rover, or

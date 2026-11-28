@@ -403,14 +403,6 @@ func away_text() -> String:
 	return "The rover is %s. Press %s to go there." % [("in the tunnels" if GameState.rover_in_tunnels else "on the farm"), Controls.prompt(&"interact")]
 
 
-## A skid (the Ice Caves' slick ice): the rover is carried to `at` (x and z), stopped there.
-## The target is a pure function of the grid (IceSlick.skid_target), so every PC agrees on it.
-func skid_to(at: Vector3) -> void:
-	global_position = Vector3(at.x, global_position.y, at.z)
-	_speed_mps = 0.0
-	velocity = Vector3.ZERO
-
-
 ## The one rover is on the farm or in the tunnels. In the other scene it is gone.
 func _show_place() -> void:
 	# A change that is another rover's alone (a field rover starting or going) leaves

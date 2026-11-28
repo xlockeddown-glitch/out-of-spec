@@ -95,10 +95,9 @@ func _draw_sign() -> void:
 
 # --- Slick ice and white-out (IceSlick holds the rules) ----------------------------
 
-## Today's slick cells (depth 1), the cell the rover was last seen on, and whether a skid is being asked.
+## Today's slick cells (depth 1) and the cell the rover was last seen on.
 var _slick: Array[Vector2i] = []
 var _slick_last: Vector2i = Vector2i(-1, -1)
-var _skid_asking: bool = false
 var _whiteout_on: bool = false
 var _environment: Environment
 
@@ -117,10 +116,12 @@ func _build_ice_hazards() -> void:
 		IceLook.add_slick_patch(_decor, TunnelRock.at_in(grid, cell))
 
 
-## The rover rolling onto a slick cell asks the host for the skid (wear, studs, the cell are
-## the host's to check) and, if it is on, slides on one more cell if that is open.
+## The host's own rover rolling onto a slick cell: the host decides the skid (GameState.ice_rolled
+## parks the rover and bumps its epoch, and every PC snaps to the place). A guest's drive is
+## watched by the host from the poses it accepts (CoopRovers), so a guest sends nothing and does
+## nothing here.
 func _watch_ice() -> void:
-	if not _below or _slick.is_empty():
+	if not _below or _slick.is_empty() or FarmCommands.guest:
 		return
 	var free: bool = _rover.away_text() == "" and not SceneSwitcher.is_busy() and not _moving \
 			and CoopRovers.driver(GameState.TUNNEL_ROVER) in ["", GameState.local_player_id]
@@ -129,38 +130,11 @@ func _watch_ice() -> void:
 	var cell: Vector2i = ZoneHazards.cell_of(_rover.global_position)
 	if cell == _slick_last:
 		return
-	var dir: Vector2i = IceSlick.step_between(_slick_last, cell)
+	var from: Vector2i = _slick_last
 	_slick_last = cell
-	if dir == Vector2i.ZERO or _skid_asking or GameState.has_ice_studs or not IceSlick.is_slick(_slick, cell):
-		return
-	_skid(cell, dir)
-
-
-func _skid(cell: Vector2i, dir: Vector2i) -> void:
-	_skid_asking = true
-	var problem: String = await FarmCommands.request(&"ice_skid", [cell.x, cell.y, dir.x, dir.y, _built_day])
-	_skid_asking = false
-	if not is_inside_tree():
-		return
-	if problem == "Still waiting for the host.":
-		_slick_last = Vector2i(-1, -1)  # ask again if the rover is still on the ice
-		return
-	if problem != "":
-		_hud.push_log("ICE: " + problem)
-		return
-	var grid: PackedStringArray = ZoneDepth.local_layout["grid"]
-	var target: Vector2i = IceSlick.skid_target(grid, _find_cells(), cell, dir)
-	if target != cell:
-		_rover.skid_to(TunnelRock.at_in(grid, target))
-		_slick_last = target
-	_hud.push_log("ICE: " + IceSlick.WORDS["skid"])
-
-
-func _find_cells() -> Array:
-	var out: Array = []
-	for find: Variant in ZoneDepth.local_layout.get("finds", []):
-		out.append((find as Dictionary)["cell"])
-	return out
+	if GameState.ice_rolled(GameState.local_player_id, from, cell, _rover.global_basis):
+		_hud.push_log("ICE: " + IceSlick.WORDS["skid"])
+		_slick_last = Vector2i(-1, -1)  # the rover was put on a new place: look again from there
 
 
 ## Fog by the synced clock and the seed (a pure function: every PC agrees); finds beyond

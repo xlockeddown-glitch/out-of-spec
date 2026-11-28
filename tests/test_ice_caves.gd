@@ -448,7 +448,7 @@ func test_a_host_who_joins_a_rover_already_in_the_caves_gets_a_cold_stamp() -> S
 ".join(problems)
 
 
-func test_the_protocol_is_38() -> String:
+func test_the_protocol_is_the_current_one() -> String:
 	return "" if CoopSession.PROTOCOL == 43 else "The protocol is %d, not 43." % CoopSession.PROTOCOL
 
 

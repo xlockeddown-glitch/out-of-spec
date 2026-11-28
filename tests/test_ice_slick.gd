@@ -3,11 +3,16 @@ extends RefCounted
 ## feat/ice-slick). Every number is a [PLACEHOLDER].
 
 const GameStateScript: GDScript = preload("res://scripts/autoload/GameState.gd")
+const RoversScript: GDScript = preload("res://scripts/autoload/CoopRovers.gd")
 const HOST := "player_1"
 const GUEST := "player_2"
+const GUEST_2 := "player_3"
 const SEED := 424242
 const ZONE: String = "ice_caves"
 const HOUR: float = 1.0 / 24.0
+
+## Everything a test made, freed by _end whatever way the test returns.
+var _made: Array[Object] = []
 
 
 ## Stands in for CoopBeds where a test only needs to know who was put to bed.
@@ -19,12 +24,55 @@ class _NoBeds:
 		put_to_bed.append(player_id)
 
 
+## A host session with two players, for CoopRovers: it only has what CoopRovers asks of one.
+class _Session:
+	extends Node
+	@warning_ignore("unused_signal")
+	signal rover_driven(player_id: String, rover_id: String, pose: Array)
+	@warning_ignore("unused_signal")
+	signal rover_told(rover_id: String, driver_id: String, pose: Array)
+	@warning_ignore("unused_signal")
+	signal player_left(player_id: String)
+	@warning_ignore("unused_signal")
+	signal joined(player_id: String)
+	var players: Array = ["player_1", "player_2", "player_3"]
+	var guest: bool = false
+	var requests: int = 0
+
+	func is_hosting() -> bool:
+		return true
+
+	func is_guest() -> bool:
+		return false
+
+	func _farm_commands() -> Object:
+		return self
+
+	func note_refusal(_player_id: String, _what: String, _now: int) -> void:
+		pass
+
+	func tell_rover(_rover_id: String, _who: String, _pose: Array) -> void:
+		pass
+
+	func drive(_rover_id: String, _pose: Array) -> void:
+		requests += 1
+
+
 func _state() -> GameStateScript:
 	var gs: GameStateScript = GameStateScript.new()
 	gs.build_registry()
 	gs.set_world_seed(SEED)
 	gs.local_player_id = HOST
+	_made.append(gs)
 	return gs
+
+
+func _end(problem: String) -> String:
+	for thing: Object in _made:
+		if is_instance_valid(thing):
+			thing.free()
+	_made.clear()
+	return problem
 
 
 func _at(elapsed: float, body: Callable) -> String:
@@ -63,6 +111,41 @@ func _spell_day(from: int) -> int:
 		if not IceSlick.spell_of(SEED, day).is_empty():
 			return day
 	return -1
+
+
+## A day, a slick cell on it, a side cell to roll in from, and the cell the skid ends on (not the
+## slick cell itself): { day, slick, from, dir, target }, or {} if no day in 60 has one.
+func _roll(from_day: int) -> Dictionary:
+	for day: int in range(from_day, from_day + 60):
+		var today: Dictionary = IceDepth.layout(SEED, 1, day)
+		var grid: PackedStringArray = today["grid"]
+		var finds: Array = []
+		for find: Dictionary in today["finds"]:
+			finds.append(find["cell"])
+		for cell: Vector2i in IceSlick.slick_cells(SEED, 1, day):
+			for dir: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+				var behind: Vector2i = cell - dir
+				var target: Vector2i = IceSlick.skid_target(grid, finds, cell, dir)
+				if behind.x >= 0 and behind.y >= 0 and behind.x < ZoneDepth.WIDTH and behind.y < ZoneDepth.HEIGHT \
+						and grid[behind.y][behind.x] == "." and target != cell:
+					return { "day": day, "slick": cell, "from": behind, "dir": dir, "target": target }
+	return {}
+
+
+func _pose(gs: GameStateScript, cell: Vector2i, day: int) -> Array:
+	var at: Vector3 = TunnelRock.at_in(IceDepth.layout(SEED, 1, day)["grid"], cell)
+	return [at.x, at.y, at.z, 0.0, 0.0, true, gs.rover_epoch]
+
+
+## A host's CoopRovers for `gs`, hearing guests.
+func _rovers(gs: GameStateScript) -> Array:
+	var session := _Session.new()
+	var rovers: Node = RoversScript.new()
+	rovers.start(session, gs)
+	gs.rovers_node = rovers
+	_made.append(rovers)
+	_made.append(session)
+	return [session, rovers]
 
 
 # --- Slick cells ---------------------------------------------------------------------
@@ -155,72 +238,144 @@ func test_a_skid_goes_one_more_cell_when_open_and_never_into_rock_finds_the_way_
 	return ""
 
 
-func test_a_slick_skid_is_host_run_and_adds_the_wear_once_per_skid() -> String:
+# The host decides every skid (GameState.ice_rolled), from the poses it accepts from a guest
+# (CoopRovers._on_driven) or from its own driving. These drive it the way both do.
+
+func test_a_guest_skid_is_applied_by_the_host_with_no_request_and_costs_the_wear_once() -> String:
+	var found: Dictionary = _roll(2)
+	if found.is_empty():
+		return _end("No day in 60 had a slick cell to roll onto with room to slide.")
+	var day: int = found["day"]
 	var problems: Array[String] = []
-	var day: int = _slick_day(2)
 	var run: String = _at(float(day - 1), func() -> String:
 		var gs: GameStateScript = _state()
 		if _below(gs) != "":
 			return "The rover did not go in."
-		var cell: Vector2i = IceSlick.slick_cells(SEED, 1, day)[0]
-		_rover_at(gs, cell, day)
+		gs.player_places[GUEST] = [ZONE, 1]
+		var heard: Array = _rovers(gs)
+		var session: _Session = heard[0]
+		var rovers: Node = heard[1]
+		_rover_at(gs, found["from"], day)
+		var epoch: int = gs.rover_epoch
 		var before: float = absf(gs.steering.error)
-		var why: String = gs.ice_skid(cell.x, cell.y, 0, -1, day, HOST)
-		if why != "":
-			return "A skid on slick ice was refused: '%s'" % why
-		var after: float = absf(gs.steering.error)
-		if after <= before:
-			problems.append("The skid added no steering wear.")
-		var expected: float = IceSlick.SKID_WEAR_M * gs.steering.usage_drift_rate
-		if not is_equal_approx(after - before, expected):
-			problems.append("The skid wear is %f, not %f." % [after - before, expected])
-		if gs.ice_skid(cell.x, cell.y, 0, -1, day, HOST) != "" and absf(gs.steering.error) <= after:
-			problems.append("A second skid added no wear of its own.")
-		var twice: float = absf(gs.steering.error)
-		if not is_equal_approx(twice - before, 2.0 * expected):
-			problems.append("Two skids did not wear twice: %f." % (twice - before))
-		# What the host will not take.
-		var bad: Dictionary = {
-			"yesterday": gs.ice_skid(cell.x, cell.y, 0, -1, day - 1, HOST),
-			"diagonal": gs.ice_skid(cell.x, cell.y, 1, 1, day, HOST),
-			"not slick": gs.ice_skid(ZoneDepth.START_CELL.x, ZoneDepth.START_CELL.y, 0, -1, day, HOST),
-		}
-		for name: String in bad:
-			if bad[name] == "":
-				problems.append("A skid was accepted: %s." % name)
-		var far_cell: Vector2i = ZoneDepth.START_CELL
-		_rover_at(gs, far_cell, day)
-		if gs.ice_skid(cell.x, cell.y, 0, -1, day, HOST) == "":
-			problems.append("A skid was accepted with the host's rover elsewhere.")
-		gs.player_places[HOST] = [ZonePresence.FARM, 0]
-		_rover_at(gs, cell, day)
-		if gs.ice_skid(cell.x, cell.y, 0, -1, day, HOST) == "":
-			problems.append("A skid was accepted from a player who is not in the caves.")
-		gs.free()
+		var run_m: float = 3.0  # one cell
+		rovers._on_driven(GUEST, gs.TUNNEL_ROVER, _pose(gs, found["slick"], day), 1000)
+		var worn: float = absf(gs.steering.error) - before
+		var rate: float = gs.steering.usage_drift_rate
+		var expected: float = (run_m + IceSlick.SKID_WEAR_M) * rate
+		if not is_equal_approx(worn, expected):
+			problems.append("The guest's skid cost %f of wear, not %f (one move of %.0f m and one skid)." % [worn, expected, run_m])
+		var now_at: Vector2i = ZoneHazards.cell_of(gs.rover_transforms[gs.TUNNEL_ROVER].origin)
+		if now_at != found["target"]:
+			problems.append("The host parked the rover at %s, not at %s." % [now_at, found["target"]])
+		if gs.rover_epoch != epoch + 1:
+			problems.append("The skid bumped the epoch to %d, not %d." % [gs.rover_epoch, epoch + 1])
+		if session.requests != 0:
+			problems.append("The guest sent a request.")
 		return "")
-	if day < 0:
-		return "No day had slick cells."
-	return run if run != "" else "\n".join(problems)
+	return _end(run if run != "" else "\n".join(problems))
+
+
+func test_the_hosts_own_skid_moves_the_rover_once_and_a_repeat_on_the_same_cell_adds_no_wear() -> String:
+	var found: Dictionary = _roll(2)
+	if found.is_empty():
+		return _end("No day in 60 had a slick cell to roll onto with room to slide.")
+	var day: int = found["day"]
+	var problems: Array[String] = []
+	var run: String = _at(float(day - 1), func() -> String:
+		var gs: GameStateScript = _state()
+		if _below(gs) != "":
+			return "The rover did not go in."
+		_rover_at(gs, found["from"], day)
+		var rate: float = gs.steering.usage_drift_rate
+		var before: float = absf(gs.steering.error)
+		if not gs.ice_rolled(HOST, found["from"], found["slick"]):
+			return "The host's roll onto slick ice was not a skid."
+		var once: float = absf(gs.steering.error)
+		if not is_equal_approx(once - before, IceSlick.SKID_WEAR_M * rate):
+			problems.append("The skid wear is %f, not %f." % [once - before, IceSlick.SKID_WEAR_M * rate])
+		# The same cell again: no more wear.
+		if gs.ice_rolled(HOST, found["from"], found["slick"]):
+			problems.append("A repeat on the same cell was a second skid.")
+		if absf(gs.steering.error) != once:
+			problems.append("A repeat on the same cell added wear.")
+		# Rolling onto some other cell and back is a fresh skid.
+		gs.ice_rolled(HOST, found["slick"], found["from"])
+		var epoch: int = gs.rover_epoch
+		if not gs.ice_rolled(HOST, found["from"], found["slick"]):
+			problems.append("Leaving the cell and rolling onto it again was not a skid.")
+		elif absf(gs.steering.error) <= once:
+			problems.append("The second, separate skid added no wear.")
+		if gs.rover_epoch != epoch + 1:
+			problems.append("The second skid did not move the rover.")
+		# What the host will not take: not slick, a diagonal, the wrong place.
+		if gs.ice_rolled(HOST, found["from"], ZoneDepth.START_CELL):
+			problems.append("A roll onto a cell that is not slick was a skid.")
+		if gs.ice_rolled(HOST, found["slick"] + Vector2i(1, 1), found["slick"]):
+			problems.append("A diagonal roll was a skid.")
+		gs.player_places[HOST] = [ZonePresence.FARM, 0]
+		if gs.ice_rolled(HOST, found["from"], found["slick"]):
+			problems.append("A player who is not in the caves caused a skid.")
+		return "")
+	return _end(run if run != "" else "\n".join(problems))
+
+
+func test_a_passenger_cannot_cause_wear() -> String:
+	var found: Dictionary = _roll(2)
+	if found.is_empty():
+		return _end("No day in 60 had a slick cell to roll onto with room to slide.")
+	var day: int = found["day"]
+	var problems: Array[String] = []
+	var run: String = _at(float(day - 1), func() -> String:
+		var gs: GameStateScript = _state()
+		if _below(gs) != "":
+			return "The rover did not go in."
+		gs.player_places[GUEST] = [ZONE, 1]
+		gs.player_places[GUEST_2] = [ZONE, 1]
+		var heard: Array = _rovers(gs)
+		var rovers: Node = heard[1]
+		_rover_at(gs, found["from"], day)
+		# The guest drives (a pose where the rover already is: it leases it, moves nothing).
+		rovers._on_driven(GUEST, gs.TUNNEL_ROVER, _pose(gs, found["from"], day), 1000)
+		if rovers.driver(gs.TUNNEL_ROVER) != GUEST:
+			return "The guest did not take the lease."
+		var before: float = absf(gs.steering.error)
+		var epoch: int = gs.rover_epoch
+		# The host rides along and "rolls" onto slick ice, again and again.
+		for i: int in 5:
+			if gs.ice_rolled(HOST, found["from"], found["slick"]):
+				problems.append("The host, a passenger, caused a skid.")
+		# A second guest's drive is refused, so no skid there either.
+		rovers._on_driven(GUEST_2, gs.TUNNEL_ROVER, _pose(gs, found["slick"], day), 1100)
+		if gs.ice_rolled(GUEST_2, found["from"], found["slick"]):
+			problems.append("A second guest, a passenger, caused a skid.")
+		if absf(gs.steering.error) != before:
+			problems.append("A passenger added %f of wear." % (absf(gs.steering.error) - before))
+		if gs.rover_epoch != epoch:
+			problems.append("A passenger moved the rover.")
+		return "")
+	return _end(run if run != "" else "\n".join(problems))
 
 
 func test_the_skid_goes_through_the_wear_that_the_cold_multiplies() -> String:
+	var found: Dictionary = _roll(2)
+	if found.is_empty():
+		return _end("No day in 60 had a slick cell to roll onto with room to slide.")
+	var day: int = found["day"]
 	var problems: Array[String] = []
-	var day: int = _slick_day(2)
 	var run: String = _at(float(day - 1), func() -> String:
 		var gs: GameStateScript = _state()
 		_below(gs)
-		var cell: Vector2i = IceSlick.slick_cells(SEED, 1, day)[0]
-		_rover_at(gs, cell, day)
+		_rover_at(gs, found["from"], day)
 		gs.cold_since[HOST] = float(day - 1) - 20.0 * HOUR  # 200 percent: capped, well past the threshold
 		var before: float = absf(gs.steering.error)
-		gs.ice_skid(cell.x, cell.y, 0, -1, day, HOST)
+		gs.ice_rolled(HOST, found["from"], found["slick"])
 		var worn: float = absf(gs.steering.error) - before
 		var plain: float = IceSlick.SKID_WEAR_M * gs.steering.usage_drift_rate
 		if not is_equal_approx(worn, plain * IceDepth.DRIFT_MULTIPLIER):
 			problems.append("A skid in the drift is %f, not %f times %f." % [worn, IceDepth.DRIFT_MULTIPLIER, plain])
-		gs.free()
 		return "")
-	return run if run != "" else "\n".join(problems)
+	return _end(run if run != "" else "\n".join(problems))
 
 
 # --- Studs ---------------------------------------------------------------------------
@@ -229,36 +384,60 @@ func test_buying_studs_charges_once_and_is_refused_without_credits_or_when_fitte
 	var gs: GameStateScript = _state()
 	gs.credits = IceSlick.STUD_COST_CREDITS - 1
 	if gs.buy_ice_studs(HOST) == "" or gs.has_ice_studs or gs.credits != IceSlick.STUD_COST_CREDITS - 1:
-		return "Studs were sold without the credits."
+		return _end("Studs were sold without the credits.")
 	gs.credits = IceSlick.STUD_COST_CREDITS + 5
 	var why: String = gs.buy_ice_studs(HOST)
 	if why != "" or not gs.has_ice_studs or gs.credits != 5:
-		return "Buying studs: '%s', fitted %s, %d credits left." % [why, gs.has_ice_studs, gs.credits]
+		return _end("Buying studs: '%s', fitted %s, %d credits left." % [why, gs.has_ice_studs, gs.credits])
 	gs.credits = 1000
 	if gs.buy_ice_studs(HOST) == "" or gs.credits != 1000:
-		return "Studs were charged a second time."
-	gs.free()
-	return ""
+		return _end("Studs were charged a second time.")
+	return _end("")
+
+
+func test_studs_are_refused_while_the_rover_is_lent_and_away_from_the_farm() -> String:
+	var gs: GameStateScript = _state()
+	gs.credits = 500
+	if _below(gs) != "":
+		return _end("The rover did not go in.")
+	gs.rover_lent = true
+	gs.player_places[HOST] = [ZonePresence.FARM, 0]
+	if gs.buy_ice_studs(HOST) == "" or gs.has_ice_studs or gs.credits != 500:
+		return _end("Studs were sold while the rover was lent.")
+	gs.rover_lent = false
+	gs.player_places[HOST] = [ZONE, 1]
+	if gs.buy_ice_studs(HOST) == "" or gs.has_ice_studs or gs.credits != 500:
+		return _end("Studs were sold to a buyer in the caves.")
+	gs.player_places[HOST] = [ZonePresence.DOME, 0]
+	if gs.buy_ice_studs(HOST) == "" or gs.has_ice_studs or gs.credits != 500:
+		return _end("Studs were sold to a buyer who is not on the farm.")
+	gs.player_places[HOST] = [ZonePresence.FARM, 0]
+	var why: String = gs.buy_ice_studs(HOST)
+	if why != "" or not gs.has_ice_studs:
+		return _end("Studs were not sold on the farm with the rover home: '%s'." % why)
+	return _end("")
 
 
 func test_studs_stop_the_skid() -> String:
+	var found: Dictionary = _roll(2)
+	if found.is_empty():
+		return _end("No day in 60 had a slick cell to roll onto with room to slide.")
+	var day: int = found["day"]
 	var problems: Array[String] = []
-	var day: int = _slick_day(2)
 	var run: String = _at(float(day - 1), func() -> String:
 		var gs: GameStateScript = _state()
-		_below(gs)
-		var cell: Vector2i = IceSlick.slick_cells(SEED, 1, day)[0]
-		_rover_at(gs, cell, day)
 		gs.credits = 500
-		gs.buy_ice_studs(HOST)
+		gs.buy_ice_studs(HOST)  # on the farm, rover home
+		_below(gs)
+		_rover_at(gs, found["from"], day)
 		var before: float = absf(gs.steering.error)
-		if gs.ice_skid(cell.x, cell.y, 0, -1, day, HOST) == "":
+		var epoch: int = gs.rover_epoch
+		if gs.ice_rolled(HOST, found["from"], found["slick"]):
 			problems.append("A rover with studs skidded.")
-		if absf(gs.steering.error) != before:
-			problems.append("Studs still took wear.")
-		gs.free()
+		if absf(gs.steering.error) != before or gs.rover_epoch != epoch:
+			problems.append("Studs still took wear or moved the rover.")
 		return "")
-	return run if run != "" else "\n".join(problems)
+	return _end(run if run != "" else "\n".join(problems))
 
 
 func test_studs_are_saved_old_saves_have_none_and_a_bad_value_is_refused() -> String:
@@ -267,25 +446,22 @@ func test_studs_are_saved_old_saves_have_none_and_a_bad_value_is_refused() -> St
 	gs.buy_ice_studs(HOST)
 	var data: Dictionary = bytes_to_var(var_to_bytes(gs.farm_to_dict()))
 	if data.get("has_ice_studs", false) != true:
-		return "The studs were not saved."
+		return _end("The studs were not saved.")
 	if not "has_ice_studs" in GameStateScript.SAVED_LATER:
-		return "has_ice_studs is not in SAVED_LATER."
+		return _end("has_ice_studs is not in SAVED_LATER.")
 	var back: GameStateScript = _state()
 	if back.farm_from_dict(data) != "" or not back.has_ice_studs:
-		return "A save with studs did not load them."
+		return _end("A save with studs did not load them.")
 	var old: Dictionary = data.duplicate(true)
 	old.erase("has_ice_studs")
 	var fresh: GameStateScript = _state()
 	if fresh.farm_from_dict(old) != "" or fresh.has_ice_studs:
-		return "A save from before the studs did not load with none."
+		return _end("A save from before the studs did not load with none.")
 	var junk: Dictionary = data.duplicate(true)
 	junk["has_ice_studs"] = "yes"
 	if gs.farm_dict_problem(junk) == "":
-		return "A studs value that is not a yes or no was accepted."
-	gs.free()
-	back.free()
-	fresh.free()
-	return ""
+		return _end("A studs value that is not a yes or no was accepted.")
+	return _end("")
 
 
 # --- The white-out -------------------------------------------------------------------
@@ -353,7 +529,7 @@ func test_a_recall_at_two_oclock_still_runs_after_a_white_out() -> String:
 	var problems: Array[String] = []
 	var day: int = _spell_day(1)
 	if day < 0:
-		return "No day had a spell."
+		return "No day in 120 had a spell."
 	var spell: Dictionary = IceSlick.spell_of(SEED, day)
 	var inside: float = float(day - 1) + (float(spell["start"]) + 5.0) / 1440.0
 	var run: String = _at(inside, func() -> String:
@@ -372,9 +548,8 @@ func test_a_recall_at_two_oclock_still_runs_after_a_white_out() -> String:
 			problems.append("The 02:00 rescue did not run on a white-out day (rescued day %d)." % gs._recall_rescued_day)
 		if gs.rover_zone != "" or gs.place_of(HOST) != ZonePresence.FARM:
 			problems.append("The player and the rover are not home.")
-		gs.free()
 		return "")
-	return run if run != "" else "\n".join(problems)
+	return _end(run if run != "" else "\n".join(problems))
 
 
 # --- Co-op ---------------------------------------------------------------------------
@@ -383,6 +558,8 @@ func test_a_guest_gets_the_studs_on_joining_and_on_an_update_and_the_same_white_
 	var problems: Array[String] = []
 	var held_guest: bool = FarmCommands.guest
 	var day: int = _spell_day(1)
+	if day < 0:
+		return "No day in 120 had a spell."
 	var run: String = _at(float(day - 1) + 8.0 / 24.0, func() -> String:
 		var host: GameStateScript = _state()
 		var guest: GameStateScript = _state()
@@ -395,9 +572,10 @@ func test_a_guest_gets_the_studs_on_joining_and_on_an_update_and_the_same_white_
 		if joined != "" or not guest.has_ice_studs:
 			problems.append("A joining guest does not see the studs: '%s'." % joined)
 		var late: GameStateScript = _state()
+		var bare: GameStateScript = _state()
 		FarmCommands.guest = true
-		late.local_player_id = "player_3"
-		FarmSync.join(FarmSync.capture(_state()), late)
+		late.local_player_id = GUEST_2
+		FarmSync.join(FarmSync.capture(bare), late)
 		FarmCommands.guest = false
 		if late.has_ice_studs:
 			problems.append("A farm with no studs showed them.")
@@ -411,39 +589,45 @@ func test_a_guest_gets_the_studs_on_joining_and_on_an_update_and_the_same_white_
 		# The white-out is a pure function of the clock and the seed, which a guest has.
 		if IceSlick.whiteout_active(host.world_seed, GameClock.elapsed_days) != IceSlick.whiteout_active(guest.world_seed, GameClock.elapsed_days):
 			problems.append("A guest and the host disagree about the white-out.")
-		host.free()
-		guest.free()
-		late.free()
 		return "")
 	FarmCommands.guest = held_guest
-	return run if run != "" else "\n".join(problems)
+	return _end(run if run != "" else "\n".join(problems))
 
 
-func test_the_new_commands_are_listed_the_skid_is_a_zone_command_and_the_protocol_moved_once() -> String:
-	for action: StringName in [&"buy_ice_studs", &"ice_skid"]:
-		if not action in FarmCommands.ACTIONS:
-			return "%s is not a command." % action
-	if not &"ice_skid" in FarmCommands.BELOW_ONLY or &"buy_ice_studs" in FarmCommands.BELOW_ONLY:
-		return "The skid is a zone command and the studs are bought on the farm."
+func test_the_commands_are_listed_there_is_no_skid_request_and_the_protocol_moved_once() -> String:
+	if not &"buy_ice_studs" in FarmCommands.ACTIONS:
+		return "buy_ice_studs is not a command."
+	if &"buy_ice_studs" in FarmCommands.BELOW_ONLY:
+		return "The studs are bought on the farm."
+	if &"ice_skid" in FarmCommands.ACTIONS or &"ice_skid" in FarmCommands.BELOW_ONLY:
+		return "The host decides the skid: there is no ice_skid request."
 	return "" if CoopSession.PROTOCOL == 43 else "The protocol is %d, not 43." % CoopSession.PROTOCOL
 
 
 func test_the_lava_aquifer_and_mine_floors_have_no_slick_ice() -> String:
+	var found: Dictionary = _roll(2)
+	if found.is_empty():
+		return _end("No day in 60 had a slick cell to roll onto with room to slide.")
+	var day: int = found["day"]
 	var problems: Array[String] = []
-	var day: int = _slick_day(2)
 	var run: String = _at(float(day - 1), func() -> String:
 		for zone: String in [ZoneDepth.ZONE, AquiferDepth.ZONE, MineDepth.ZONE]:
 			var gs: GameStateScript = _state()
 			gs.rover_zone = zone
 			gs.rover_depth = 1
+			gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, Vector3.ZERO)
 			gs.player_places[HOST] = [zone, 1]
-			var cell: Vector2i = IceSlick.slick_cells(SEED, 1, day)[0]
-			if gs.ice_skid(cell.x, cell.y, 0, -1, day, HOST) == "":
+			var before: float = absf(gs.steering.error)
+			if gs.ice_rolled(HOST, found["from"], found["slick"]) or absf(gs.steering.error) != before:
 				problems.append("%s skidded the rover." % zone)
-			gs.free()
 		return "")
-	# And their layouts are untouched by the new tags: the same hash, the same finds.
-	var lava: Dictionary = ZoneDepth.layout(SEED, ZoneDepth.ZONE, 1, 5)
-	if lava.is_empty() or lava["finds"] != ZoneDepth.layout(SEED, ZoneDepth.ZONE, 1, 5)["finds"]:
-		problems.append("The Lava Tubes' layout is not steady.")
-	return run if run != "" else "\n".join(problems)
+	# The slick tags sit above every tag another zone's layout draws (Aquifer 300, Mine 301 and 302),
+	# and the spell is drawn on the hub's stream, so no other zone's hash is touched.
+	if IceSlick.TAG_SLICK <= 302:
+		problems.append("The slick tags (from %d) overlap the Aquifer's or the Mine's." % IceSlick.TAG_SLICK)
+	for day_n: int in range(1, 6):
+		if ZoneDepth.stream(SEED, ZoneDepth.ZONE, 1, day_n) == ZoneDepth.stream(SEED, IceDepth.ZONE, 1, day_n):
+			problems.append("The Lava Tubes and the Ice Caves share a stream on day %d." % day_n)
+		if ZoneDepth.stream(SEED, IceDepth.ZONE, 0, day_n) == ZoneDepth.stream(SEED, IceDepth.ZONE, 1, day_n):
+			problems.append("The Ice Caves' hub and depth 1 share a stream on day %d." % day_n)
+	return _end(run if run != "" else "\n".join(problems))

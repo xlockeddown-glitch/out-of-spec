@@ -8,8 +8,8 @@ extends RefCounted
 ## layout (ZoneDepth.stream, tags 400 and up). Never on the way up, the start, a find or any
 ## cell touching one of those. A rover driving onto a slick cell slides one more cell the way
 ## it was going, if that cell is open (floor, not a find, not the start or the way up). The
-## target is a pure function of the grid, so host and guests agree on it; the host adds the
-## wear. Ice studs (Bram, credits) stop the skid altogether.
+## target is a pure function of the grid. The host decides the skid (GameState.ice_rolled), parks
+## the rover there, bumps the epoch and adds the wear. Ice studs (Bram, credits) stop it.
 ##
 ## White-out: on about one day in three a spell comes down in the caves, for 60 to 120 game
 ## minutes, between 08:00 and 18:00. A pure function of the world seed and the shared clock,
@@ -28,8 +28,6 @@ const SLICK_ONE_IN: int = 7
 const SKID_WEAR_M: float = 6.0
 ## Ice studs cost this many credits at Bram's bay [PLACEHOLDER].
 const STUD_COST_CREDITS: int = 60
-## A client's word for where it skidded is held to this slack around the cell middle (metres).
-const SKID_REACH_M: float = 2.1
 ## One day in this many has a white-out [PLACEHOLDER].
 const SPELL_ONE_IN: int = 3
 ## A spell starts this many minutes after 06:00 at the earliest, and at most SPELL_START_SPREAD more.
@@ -129,30 +127,6 @@ static func skid_target(grid: PackedStringArray, find_cells: Array, cell: Vector
 	if next in find_cells or next == ZoneDepth.START_CELL or next == ZoneDepth.UP_CELL or next == IceDepth.HATCH_CELL:
 		return cell
 	return next
-
-
-## Why a skid at `cell` going `dir` can't be taken as asked, or "". `studs` whether the
-## farm's rover has them. The host's rule; nearness is its own check (reach_problem).
-static func skid_problem(slick: Array[Vector2i], cell: Vector2i, dir: Vector2i, studs: bool, place: String, depth: int, rover_zone: String, rover_depth: int) -> String:
-	if place != IceDepth.ZONE or depth != ZoneDepth.DEPTH or rover_zone != IceDepth.ZONE or rover_depth != ZoneDepth.DEPTH:
-		return "Slick ice is in the Ice Caves, one level down."
-	if not is_side(dir):
-		return "The rover can only skid straight on."
-	if not is_slick(slick, cell):
-		return "That ice is not slick today."
-	if studs:
-		return "The studs hold."
-	return ""
-
-
-## Why the rover is not at a slick cell, or "": the host's copy of the rover decides.
-static func reach_problem(there: Vector3, known: bool, at: Vector3) -> String:
-	if not known:
-		return "The rover is not in the Ice Caves."
-	if Vector2(there.x - at.x, there.z - at.z).length() > SKID_REACH_M:
-		return "The rover is not at that ice."
-	return ""
-
 
 ## Why the studs can't be bought now, or "". Bram sells them to the farm once.
 static func studs_problem(has: bool, credits: int) -> String:
