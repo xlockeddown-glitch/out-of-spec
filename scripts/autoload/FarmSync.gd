@@ -21,6 +21,7 @@ const SHOWN_BY: Dictionary = {
 	&"molt_changed": ["dome_species_id", "molt_progress", "molt_stage", "exuvia_until_day"],
 	&"enclosures_changed": ["enclosures", "enclosure_origins"],
 	&"strays_changed": ["strays_caught"],
+	&"deimos_cache_changed": ["deimos_cache"],
 	&"silk_changed": ["optical_silk_spools", "_spool_species", "_spool_damaged"],
 	&"relay_changed": ["relay_slotted", "slotted_spool_species", "slotted_spool_damaged"],
 	&"credits_changed": ["credits"],

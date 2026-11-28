@@ -300,6 +300,13 @@
         "spot_placed": "That one is lit. I can see it from here, or I could if I were there.",
         "spot_needs_beacon": "Nothing in your hands. The rack by the mouth has the beacons."
       }
+    },
+    "kestrel": {
+      "name": "Kestrel",
+      "quests": {
+        "a_quiet_crate_offer": "[PLACEHOLDER] So you made it out to Deimos. There is a warm crate on the pad that does not belong to OIRM and does not open for polite knocking. Take my proof, pop the latch, and keep whatever has eight legs inside. No certificate.",
+        "a_quiet_crate_done": "[PLACEHOLDER] Latch off, stock moved, nobody filed a form. Keep the dome warm for it. We are square."
+      }
     }
   }
 }

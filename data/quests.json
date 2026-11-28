@@ -360,6 +360,17 @@
       "rewards": { "xp_husbandry": 100, "phone": "npcs/odalys/quests/strays_done" }
     },
     {
+      "id": "a_quiet_crate", "kind": "personal", "giver": "kestrel", "title": "A Quiet Crate", "scope": "player", "zone": "deimos",
+      "gates": {},
+      "offer": { "when": "counter", "counter": "reached_deimos", "at_least": 1 },
+      "offer_line": "npcs/kestrel/quests/a_quiet_crate_offer",
+      "steps": [
+        { "id": "open", "text": "Open a smuggler's cache on Deimos with Kestrel's proof.",
+          "check": "counter", "counter": "open_cache" }
+      ],
+      "rewards": { "xp_husbandry": 150, "phone": "npcs/kestrel/quests/a_quiet_crate_done" }
+    },
+    {
       "id": "deimos_survey", "kind": "personal", "giver": "vance", "title": "Deimos Survey", "scope": "player", "camp": "deimos",
       "gates": { "lab_gate": "expedition_permit" },
       "offer": { "when": "always" },

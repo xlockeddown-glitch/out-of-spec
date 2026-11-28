@@ -110,7 +110,7 @@
   },
   "deimos_cache": {
     "display_name": "Smuggler Cache",
-    "description": "A stack of ochre crates under one tidy padlock, swept clean of dust on purpose. Locked. Needs a key or a proof. [later]"
+    "description": "A stack of ochre crates under one tidy padlock, swept clean of dust on purpose. Locked. Needs Kestrel's proof to open."
   },
   "deimos_test_pod": {
     "display_name": "Test Pod",

@@ -12,6 +12,7 @@ signal enclosures_changed
 ## The Cobalt Sentinel came out in the tunnels, or is gone.
 signal sentinel_changed
 signal strays_changed  # a Phobos service-tunnel stray was caught today
+signal deimos_cache_changed  # the Deimos smuggler cache was opened today
 signal rover_lights_changed
 ## A beacon was set down in the Lava Tubes.
 signal beacons_changed
@@ -151,16 +152,28 @@ const PRE_MOLT_AT: float = 0.8
 ## burrow (hidden) until then, since the two can't share the tank floor.
 const EXUVIA_LINGER_DAYS: int = 1
 ## Tarantulas that can be caught. Each has a tank waiting in the dome.
-const CATCHABLE: Array[StringName] = [&"cobalt_sentinel", &"banded_regolith_runner"]
+const CATCHABLE: Array[StringName] = [&"cobalt_sentinel", &"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace"]
 ## The Banded Regolith Runner: station stock that got loose in Phobos's warm service
 ## tunnels, caught there (catch_stray). Its tank record stays the three-field molt
 ## record every tank has (_is_tank), so the marker that it is station stock is kept
 ## beside it, in enclosure_origins.
 const RUNNER: StringName = &"banded_regolith_runner"
 const STATION_ORIGIN: String = "phobos_station"
+## Deimos smuggler-cache stock: warm-crate species from data/tarantula_species.json
+## (found_in == "deimos"), opened with Kestrel's proof (open_cache), picked in listed order.
+const DEIMOS_CACHE_SPECIES: Array[StringName] = [&"low_g_titan_carapace", &"brass_glint_reticle"]
+const CACHE_ORIGIN: String = "deimos_cache"
+const CACHE_LINE: String = "Smuggled stock, found in a warm crate on Deimos"
+const CACHE_QUEST: String = "a_quiet_crate"
+const CACHE_COUNT: String = "open_cache"
+const DEIMOS_CACHE_LOCKED_LINE: String = "Locked. Kestrel would know who has the proof."
+const DEIMOS_CACHE_FALLBACK_CREDITS: int = 30
+const DEIMOS_CACHE_EMPTY_LINE: String = "Empty but for straw and a forged manifest."
+const DEIMOS_CACHE_WRONG_LABEL_MOD: int = 3
+const DEIMOS_CACHE_LABEL_TAG: int = 701
 ## Species caught with a tank record but no dome tank yet: they sit out the molt and the
 ## lab sitter's round until the tank exists (nothing could show or collect them).
-const NO_DOME_TANK: Array[StringName] = [&"banded_regolith_runner"]
+const NO_DOME_TANK: Array[StringName] = [&"banded_regolith_runner", &"brass_glint_reticle", &"low_g_titan_carapace"]
 const STATION_LINE: String = "Station stock, caught in a Phobos service tunnel"
 ## What a catch is counted under in action_counts (the Strays quest reads it), and the
 ## prefix of a count of arriving on a moon ("reached_phobos"): both with no XP.
@@ -223,6 +236,9 @@ var enclosure_origins: Dictionary = {}
 ## stray spot indices (PhobosServiceTunnel) }. Only today's count; another day's
 ## record is dropped. Host-run, saved, shown to guests.
 var strays_caught: Dictionary = {}
+## Today's Deimos smuggler cache state: { "day": int, "opened": true }, or {} when not
+## opened today. Pruned to today on save and load. Host-run, saved, shown to guests.
+var deimos_cache: Dictionary = {}
 ## The wild Cobalt Sentinel: out by the sump today, and the mornings since it was
 ## last scared off.
 var sentinel_out: bool = false
@@ -807,7 +823,7 @@ const SAVED_LATER: Array[String] = ["traceable_lab", "rover_uplinks", "player_sk
 	"skill_effect_floor", "skill_curve", "action_counts", "lab_xp", "lab_areas_paid", "dug_paid",
 	"quest_state", "quest_points", "xp_certificates", "xp_certificates_given", "crops_sold_in_spec",
 	"player_quest_state", "xp_certificates_spent", "wheel_meters", "lab_gates_kept", "one_use_held", "beacons_placed", "finds_taken", "rover_depth", "rover_epoch", "rover_lent", "zones_unlocked",
-	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught"]
+	"lifts_repaired", "deepest_depth", "lab_sitter", "shuttle_licensed", "shuttle_trips", "player_loadouts", "pump_owned", "pools_drained", "valves_shut", "packs_wet", "camps_open", "camp_supplies", "mine_gate_open", "mine_props", "rooms_shored", "cold_since", "enclosure_origins", "strays_caught", "deimos_cache"]
 ## Variables not in SAVED_FIELDS: saved on their own (seed, generator, sensors),
 ## rebuilt from the logs, per machine, or only used within one call.
 const NOT_SAVED: Array[String] = [
@@ -837,6 +853,7 @@ func farm_to_dict() -> Dictionary:
 	out["packs_wet"] = AquiferDepth.prune_packs_wet(packs_wet, GameClock.get_day_index())
 	out["rooms_shored"] = ZoneDepth.prune(rooms_shored, GameClock.get_day_index())
 	out["strays_caught"] = _strays_today()
+	out["deimos_cache"] = _deimos_cache_today()
 	out["cold_since"] = _cold_in_caves()  # the stamps of whoever is in the caves: the rest are stale
 	return out
 
@@ -990,6 +1007,9 @@ func farm_dict_problem(data: Dictionary) -> String:
 	var stray_problem: String = _stray_problem(data.get("strays_caught", {}), data.get("enclosure_origins", {}), tanks)
 	if stray_problem != "":
 		return stray_problem
+	var cache_problem: String = _deimos_cache_problem(data.get("deimos_cache", {}))
+	if cache_problem != "":
+		return cache_problem
 	if not _optional_fields(data["lab_build"], ["kind", "discipline"], ["size", "done_day"]):
 		return "'lab_build' has a field of the wrong type."
 	for list: String in ["job_board", "active_jobs"]:
@@ -1181,8 +1201,32 @@ static func _stray_problem(strays: Variant, origins: Variant, tanks: Dictionary)
 			if not stray is int or stray < 0 or stray >= PhobosServiceTunnel.STRAY_SPOTS.size() or (ids as Array).count(stray) != 1:
 				return "'strays_caught' holds a stray that is not one."
 	for id: Variant in origins:
-		if not id is String or id != String(RUNNER) or not tanks.has(id) or not origins[id] is String or origins[id] != STATION_ORIGIN:
+		var ok_station: bool = id is String and id == String(RUNNER) and origins[id] is String and origins[id] == STATION_ORIGIN
+		var ok_cache: bool = id is String and StringName(id) in DEIMOS_CACHE_SPECIES and origins[id] is String and origins[id] == CACHE_ORIGIN
+		if not (ok_station or ok_cache) or not tanks.has(id):
 			return "'enclosure_origins' has an entry that is not a caught tarantula's origin."
+	return ""
+
+
+## Why a save's deimos_cache can't load, or "".
+static func _deimos_cache_problem(cache: Variant) -> String:
+	if not cache is Dictionary:
+		return "'deimos_cache' must be a dictionary."
+	var dict: Dictionary = cache as Dictionary
+	for key: Variant in dict:
+		if not key in ["day", "opened", "fallback_paid"]:
+			return "'deimos_cache' has an unknown field."
+	var has_day: bool = dict.has("day")
+	var has_opened: bool = dict.has("opened")
+	if has_day != has_opened:
+		return "'deimos_cache' is not a day and its opened state."
+	if has_day:
+		var day: Variant = dict.get("day")
+		var opened: Variant = dict.get("opened")
+		if not day is int or day < 0 or not opened is bool:
+			return "'deimos_cache' is not a day and its opened state."
+	if dict.has("fallback_paid") and not dict.get("fallback_paid") is bool:
+		return "'deimos_cache' fallback_paid must be a bool."
 	return ""
 
 
@@ -1217,6 +1261,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	_prune_cold()
 	_cold_kept.clear()
 	strays_caught = _strays_today()
+	deimos_cache = _deimos_cache_today()
 	_settle_trips_on_load()
 	_recall_warned_day = 0
 	_recall_rescued_day = 0
@@ -1238,6 +1283,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	loadouts_changed.emit()
 	molt_changed.emit(molt_progress, molt_stage)
 	enclosures_changed.emit()
+	deimos_cache_changed.emit()
 	silk_changed.emit(optical_silk_spools)
 	relay_changed.emit(relay_slotted)
 	credits_changed.emit(credits)
@@ -6366,6 +6412,111 @@ func catch_stray(stray_index: int, layout_day: int, player_id: String = "") -> S
 	return ""
 
 
+# --- Deimos smuggler cache (zones.md §2, §5, §10.3) -----------------------------
+
+## Deterministic 32-bit integer mix for Deimos cache rules (no floats, no randf).
+static func _deimos_cache_hash(seed_value: int, day: int, tag: int) -> int:
+	var h: int = (seed_value ^ (day * 0x9e3779b1) ^ (tag * 0x85ebca6b)) & 0x7fffffff
+	h = ((h ^ (h >> 16)) * 0x45d9f3b) & 0x7fffffff
+	h = ((h ^ (h >> 16)) * 0x45d9f3b) & 0x7fffffff
+	return (h ^ (h >> 16)) & 0x7fffffff
+
+
+## True on days when the Deimos cache's exterior label is wrong [PLACEHOLDER: 1 day in 3].
+## Pure function of seed and day, so host, guests and reloads agree.
+static func deimos_cache_wrong_label(seed_value: int, day: int) -> bool:
+	return _deimos_cache_hash(seed_value, day, DEIMOS_CACHE_LABEL_TAG) % DEIMOS_CACHE_WRONG_LABEL_MOD == 0
+
+
+## Whether today's (or `day`'s) Deimos cache has a wrong exterior label.
+func is_deimos_cache_mislabeled(day: int = -1) -> bool:
+	return deimos_cache_wrong_label(world_seed, GameClock.get_day_index() if day < 0 else day)
+
+
+## Whether `player_id` holds Kestrel's proof for the Deimos smuggler cache.
+## Accepting Kestrel's personal quest `a_quiet_crate` grants the proof (reusing
+## player_quest_state, done or not, so future days stay open once earned).
+func has_kestrel_proof(player_id: String = "") -> bool:
+	var who: String = _player(player_id)
+	var own: Variant = player_quest_state.get(who, {})
+	return own is Dictionary and (own as Dictionary).has(CACHE_QUEST)
+
+
+## Today's Deimos cache state (pruned to today's opened state while keeping farm-wide
+## fallback_paid if set), or {} when unopened today and fallback not yet paid.
+func _deimos_cache_today() -> Dictionary:
+	var out: Dictionary = {}
+	if not deimos_cache.is_empty() and int(deimos_cache.get("day", -1)) == GameClock.get_day_index() and bool(deimos_cache.get("opened", false)):
+		out["day"] = int(deimos_cache["day"])
+		out["opened"] = true
+	if bool(deimos_cache.get("fallback_paid", false)):
+		out["fallback_paid"] = true
+	return out
+
+
+## Whether today's Deimos smuggler cache has already been opened by the farm.
+func deimos_cache_opened_today() -> bool:
+	return bool(_deimos_cache_today().get("opened", false))
+
+
+## Whether the one-time all-held credit fallback has already been paid for this farm.
+func deimos_cache_fallback_paid() -> bool:
+	return bool(deimos_cache.get("fallback_paid", false))
+
+
+## Picks the first unheld species from DEIMOS_CACHE_SPECIES in its listed order,
+## keeping the picker and the save check's allowed-id list in lockstep.
+## Returns "" when every eligible species is already held.
+static func pick_deimos_cache_species(_seed_value: int, held: Dictionary) -> String:
+	for species: StringName in DEIMOS_CACHE_SPECIES:
+		var id: String = String(species)
+		if species in CATCHABLE and not held.has(id):
+			return id
+	return ""
+
+
+## Host: the player opens today's Deimos smuggler cache. `player_id` comes from the
+## connection (FarmCommands). Must be away on Deimos, must hold Kestrel's proof, and
+## today's cache must not be opened yet (one cache a day for the farm [PLACEHOLDER]).
+## Grants one unheld Deimos species through catch_species with origin `deimos_cache`,
+## or a one-time credit sum [PLACEHOLDER] on the first all-held opening, then a short
+## empty-crate line on later all-held openings. Counts `open_cache` per player (no XP).
+## Returns "" on species catch, a reply string on fallback/empty, or the refusal reason.
+func open_cache(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host opens a cache."
+	var who: String = _player(player_id)
+	if place_of(who) != Shuttle.DEIMOS:
+		return "The smuggler cache is on Deimos."
+	if not has_kestrel_proof(who):
+		return DEIMOS_CACHE_LOCKED_LINE
+	var day: int = GameClock.get_day_index()
+	if deimos_cache_opened_today():
+		return "Today's cache is already opened."
+	var paid: bool = deimos_cache_fallback_paid()
+	deimos_cache = { "day": day, "opened": true }
+	if paid:
+		deimos_cache["fallback_paid"] = true
+	var reply: String = ""
+	var species_id: String = pick_deimos_cache_species(world_seed, enclosures)
+	if species_id != "" and catch_species(species_id):
+		enclosure_origins[species_id] = CACHE_ORIGIN
+		var display_name: String = str(DataManager.get_record(SPECIES_TABLE, StringName(species_id)).get("common_name", species_id))
+		var prefix: String = "Wrong label on the crate, warm inside. " if is_deimos_cache_mislabeled(day) else ""
+		post_phone(prefix + "A %s. %s. It is kept for the dome." % [display_name, CACHE_LINE])
+	elif not paid:
+		deimos_cache["fallback_paid"] = true
+		add_credits(DEIMOS_CACHE_FALLBACK_CREDITS)
+		reply = "The warm crate held no new species: every Deimos morph is already in the dome. Found %s CR in smuggled spares." % SP811.integer(DEIMOS_CACHE_FALLBACK_CREDITS)
+	else:
+		reply = DEIMOS_CACHE_EMPTY_LINE
+	if who != MANAGER_ID:
+		var done: Dictionary = (action_counts.get_or_add(who, {}) as Dictionary).get_or_add(CACHE_COUNT, { "count": 0, "xp": 0 })
+		done["count"] = int(done["count"]) + 1
+	deimos_cache_changed.emit()
+	return reply
+
+
 func is_caught(species_id: String) -> bool:
 	return enclosures.has(species_id)
 
@@ -6813,8 +6964,11 @@ func enclosure_text(species_id: String) -> String:
 	var line: String = _molt_line(enclosures[species_id]["molt_progress"], enclosures[species_id]["molt_stage"],
 		enclosure_pause_reason(species_id))
 	# One plain line says where it came from (no full stop: the caller ends the sentence).
-	if enclosure_origins.get(species_id, "") == STATION_ORIGIN:
+	var origin: String = str(enclosure_origins.get(species_id, ""))
+	if origin == STATION_ORIGIN:
 		return line + ". " + STATION_LINE
+	if origin == CACHE_ORIGIN:
+		return line + ". " + CACHE_LINE
 	return line
 
 
