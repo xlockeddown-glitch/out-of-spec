@@ -64,7 +64,7 @@
     { "id": "ice_caves_hub", "level": 18, "opens": "Polar Ice Caves hub (warning below this level)", "built": false },
     { "id": "medium_lab", "level": 20, "opens": "Medium lab" },
     { "id": "shuttle_license", "level": 20, "opens": "The shuttle license: day trips to Phobos", "needs": "an OIRM account", "built": false },
-    { "id": "mine_deep", "level": 24, "opens": "Colony Mine depth 5 and below", "needs": "a lift repaired at depth 4", "built": false },
+    { "id": "mine_deep", "level": 24, "opens": "Colony Mine depth 4 and below", "needs": "the lift at depth 3 repaired", "built": true },
     { "id": "robot_1", "level": 25, "opens": "The first robot and its WATER card", "needs": "Robotics and a torque standard" },
     { "id": "deimos_hub", "level": 26, "opens": "Deimos hub (warning below this level)", "needs": "the shuttle license", "built": false },
     { "id": "board_4_jobs", "level": 28, "opens": "A fourth job on the board", "built": false },

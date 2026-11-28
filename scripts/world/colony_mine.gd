@@ -1,8 +1,8 @@
 class_name ColonyMine
 extends "res://scripts/basalt_tunnels.gd"
 ## The Abandoned Colony Mine's scene (zones step 14): the Lava Tubes' scene with the Mine's
-## hub (the way down, a notice board, the crate that sells shoring props) and its one depth
-## (rooms, finds, rockfalls). Built in code from primitives; the rules are MineDepth's and
+## hub (the way down, a notice board, the crate that sells shoring props) and its depths 1
+## to 6 (rooms, finds, rockfalls, lifts at 3 and 6). Built in code from primitives; the rules are MineDepth's and
 ## the host's. A look [PLACEHOLDER]: no art yet.
 
 const CRATE: String = "crate"
@@ -13,6 +13,9 @@ const ROCKFALL: String = "rockfall"
 const RUBBLE_SCALE: float = 2.2
 const ARCH_SPAN_M: float = 3.0
 const ARCH_HEIGHT_M: float = 2.2
+## Each depth below 1 is this much darker, to a floor [PLACEHOLDER].
+const DIM_PER_LEVEL: float = 0.08
+const DIM_FLOOR: float = 0.5
 
 ## The rooms shored when this scene was built; shoring one builds it again.
 var _built_shored: Array = []
@@ -28,7 +31,7 @@ func _build_zone() -> void:
 	_below = ZoneDepth.local_depth > 0 and not ZoneDepth.local_layout.is_empty()
 	_built_depth = ZoneDepth.local_depth if _below else 0
 	_built_day = GameClock.get_day_index()
-	_built_shored = MineDepth.shored_today(GameState.rooms_shored, _built_day)
+	_built_shored = MineDepth.shored_today(GameState.rooms_shored, _built_day, _built_depth)
 	GameClock.day_started.connect(_on_new_day)
 	_depth_props = ZoneDepthProps.new()
 	_rover.get_parent().add_child(_depth_props)
@@ -44,12 +47,18 @@ func _build_zone() -> void:
 		for fall: Dictionary in ZoneDepth.local_layout.get("rockfalls", []):
 			_draw_rockfall(fall)
 		_build_depth_decor()
+		if ZoneDepth.has_way_down(_built_depth):
+			_depth_props.build_hatch(_built_depth)
 		GameState.finds_changed.connect(_on_finds_changed)
 	else:
 		_depth_props.build_hatch()
 		_draw_crate()
 		_draw_sign()
 		_build_hub_decor()
+	# The lift station: at the hub, and at the depths that have one (3 and 6). Broken until repaired.
+	if ZoneDepth.is_lift_depth(_built_depth) or _built_depth == 0:
+		_depth_props.build_lift(_built_depth, GameState.is_lift_repaired(MineDepth.ZONE, _lift_depth()))
+		GameState.lifts_changed.connect(_on_lifts_changed)
 
 
 ## Hub dressing: old timber sets along the passages, a short abandoned rail
@@ -60,19 +69,42 @@ func _build_hub_decor() -> void:
 	MineLook.add_timber_set(_decor, Vector3(-1.5, 0.0, 13.5), 7.8, 3.0, 0.0, true)
 	MineLook.add_timber_set(_decor, Vector3(-1.5, 0.0, 7.5), 7.8, 3.0, 0.0, false)
 	MineLook.add_timber_set(_decor, Vector3(-4.5, 0.0, 3.0), 5.4, 2.9, 90.0, true)
-	MineLook.add_rail_track(_decor, Vector3(-1.5, 0.0, 16.5), 10.5, 0.0, true)
+	MineLook.add_rail_track(_decor, Vector3(-1.5, 0.0, 21.6), 5.0, 0.0, true)  # north of the lift station
 	MineLook.add_stencil_sign(_decor, Vector3(2.4, 0.0, 23.4), "COLONY MINE 01", "ORE DRIFT // KEEP CLEAR", -90.0)
 
 
-## Depth 1 dressing: timber sets along the main north-south trunk, a short
+## Depth dressing (every depth below the hub): timber sets along the main north-south trunk, a short
 ## abandoned rail track, dead hanging lamps, and a faded stencil sign tucked
 ## against the landing wall (visual only, zero collision) [PLACEHOLDER].
 func _build_depth_decor() -> void:
-	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, 7.5), 5.4, 2.9, 0.0, true)
+	# Nothing stands on the hatch (x -1.5, z 7.5, a 1.4 m disc): the first set is beyond it.
+	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, 10.5), 5.4, 2.9, 0.0, true)
 	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, -1.5), 5.4, 2.9, 0.0, false)
 	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, -10.5), 5.4, 2.9, 0.0, true)
-	MineLook.add_rail_track(_decor, Vector3(0.0, 0.0, -1.5), 15.0, 0.0, true)
-	MineLook.add_stencil_sign(_decor, Vector3(9.6, 0.0, 13.5), "LEVEL 01 DRIFT", "SHORE BEFORE ENTRY", -90.0)
+	MineLook.add_rail_track(_decor, Vector3(0.0, 0.0, -2.0), 14.0, 0.0, true)
+	MineLook.add_stencil_sign(_decor, Vector3(9.6, 0.0, 13.5), "LEVEL %02d DRIFT" % _built_depth, "SHORE BEFORE ENTRY", -90.0)
+	_darken_decor()
+
+
+## A little darker each depth [PLACEHOLDER]: a dark slab laid over the floor decor would be
+## new art, so the decor is dimmed through the material's own albedo, and no light is added
+## (the Mine has none). Only the decor is dimmed, not the rock or the labels. Depth 1 is as it was.
+func _darken_decor() -> void:
+	var keep: float = depth_dim(_built_depth)
+	if keep >= 1.0:
+		return
+	for node: Node in _decor.find_children("*", "MeshInstance3D", true, false):
+		var mesh: MeshInstance3D = node as MeshInstance3D
+		if mesh.material_override is StandardMaterial3D:
+			var dimmed: StandardMaterial3D = (mesh.material_override as StandardMaterial3D).duplicate()
+			dimmed.albedo_color = dimmed.albedo_color.darkened(1.0 - keep)
+			mesh.material_override = dimmed
+
+
+## How much of depth 1's brightness a depth keeps: 8 % less a level, to a floor of 50 %
+## [PLACEHOLDER] (as the Aquifer's lamps).
+static func depth_dim(depth: int) -> float:
+	return maxf(DIM_FLOOR, 1.0 - DIM_PER_LEVEL * maxi(depth - 1, 0))
 
 
 ## A rockfall: an ore-stained rubble pile in the side room's mouth; once shored,
@@ -147,16 +179,22 @@ func _mine_near() -> Dictionary:
 	if not _below:
 		if MineDepth.near_hatch(at):
 			return { "kind": HATCH, "id": "" }
+		if ZoneDepth.near_lift(at, 0):
+			return _station_near()
 		if MineDepth.near_crate(at):
 			return { "kind": CRATE, "id": "" }
 		if MineDepth.near_sign(at):
 			return { "kind": SIGN, "id": "" }
 		return {}
+	if ZoneDepth.has_way_down(_built_depth) and ZoneDepth.near_descent(at, _built_depth):
+		return { "kind": HATCH, "id": "" }
 	var found: Dictionary = _nearest_find()
 	var fall_near: Dictionary = _rockfall_near(at)
 	# A find in a buried room cannot be taken yet: the rockfall in reach is the better prompt.
 	if not found.is_empty() and not MineDepth.prefer_rockfall(ZoneDepth.local_layout, str(found.get("id", "")), not fall_near.is_empty()):
-		return found
+		return found  # a find beside the lift wins over the lift
+	if ZoneDepth.is_lift_depth(_built_depth) and ZoneDepth.near_lift(at, _built_depth):
+		return _station_near()
 	return fall_near
 
 
@@ -177,7 +215,10 @@ func _tell_hub() -> void:
 	_told_hub = key
 	match _hub_near.get("kind", ""):
 		HATCH:
-			_hud.push_log("WAY DOWN: press " + Controls.prompt(&"interact") + " to go down.")
+			var shut: String = GameState.deep_problem(MineDepth.ZONE) if ZoneDepth.is_deep(_built_depth + 1) else ""
+			_hud.push_log("WAY DOWN: press " + Controls.prompt(&"interact") + " to go down." if shut == "" else "WAY DOWN: " + shut)
+		LIFT:
+			_hud.push_log(_lift_prompt())
 		FIND:
 			_hud.push_log("FIND: press " + Controls.prompt(&"interact") + " to take it.")
 		CRATE:
@@ -231,20 +272,31 @@ func _use_find(find_id: String) -> void:
 		_hud.push_log("FIND: " + reply)
 		return
 	var find: Dictionary = ZoneDepth.find_in(ZoneDepth.local_layout, find_id)
-	_hud.push_log("FIND: " + (reply if reply != "" else MineDepth.reward_text(str(find.get("kind", "")))))
+	_hud.push_log("FIND: " + (reply if reply != "" else MineDepth.reward_text(str(find.get("kind", "")), _built_depth)))
 
 
-## A room was shored (here or by a friend), so this depth is built again with the rover
-## where it is.
+## A room was shored (here or by a friend): the rockfalls are redrawn in place, so the
+## scene (and a co-op driver's rover, and the HUD's lines) stays as it is.
 func _resync_depth() -> void:
 	super._resync_depth()
 	if _below and not SceneSwitcher.is_busy() and GameState.rover_zone == MineDepth.ZONE and _rover.away_text() == "" and not _moving:
-		var now: Array = MineDepth.shored_today(GameState.rooms_shored, _built_day)
+		var now: Array = MineDepth.shored_today(GameState.rooms_shored, _built_day, _built_depth)
 		if now.size() != _built_shored.size() or now.any(func(id: Variant) -> bool: return not id in _built_shored):
-			_moving = true
-			ZoneDepth.arrive_at = _rover.global_transform
-			ZoneDepth.arrive_pending = true
-			SceneSwitcher.swap_to(SceneSwitcher.MINE_SCENE)
+			_rebuild_rockfalls(now)
+
+
+## Draws this depth's rockfalls again from `shored` (the ids shored today), and marks them
+## in the local layout so the prompts see the same.
+func _rebuild_rockfalls(shored: Array) -> void:
+	_built_shored = shored
+	for child: Node in _rockfalls.get_children():
+		_rockfalls.remove_child(child)
+		child.free()
+	for fall: Variant in ZoneDepth.local_layout.get("rockfalls", []):
+		if fall is Dictionary:
+			fall["shored"] = str(fall["id"]) in shored
+			_draw_rockfall(fall)
+	_told_hub = ""
 
 
 func _on_rover_entered_exit() -> void:
