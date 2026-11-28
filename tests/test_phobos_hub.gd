@@ -390,8 +390,8 @@ func test_shuttle_home_is_a_host_command_allowed_on_foot_in_phobos_only() -> Str
 	var till: Variant = commands.execute(HOST, &"till", [Vector3i(1, 0, 1)])
 	if till != false:
 		problems.append("A traveller on Phobos cannot till the farm.")
-	if CoopSession.PROTOCOL != 39:
-		problems.append("The protocol is %d, not 39." % CoopSession.PROTOCOL)
+	if CoopSession.PROTOCOL != 40:
+		problems.append("The protocol is %d, not 40." % CoopSession.PROTOCOL)
 	if not FarmSync.SHOWN_BY.has(&"shuttle_trips_changed"):
 		problems.append("The trips are shown to a guest.")
 	commands.free()
