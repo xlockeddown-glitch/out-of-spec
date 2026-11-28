@@ -1,5 +1,5 @@
 {
-  "_note": "Wild farm animals (docs/design/farm_animals.md). Numbers marked [PLACEHOLDER]: group_size (hens 4, goats 3, rabbits 3), model_scale (rabbit scaled to 0.06 so it reads smaller than the hen at 0.1), gift_price (12, 30, 40 CR), trust rules (max 5, +1 per fed day, -1 after 3 unfed days, approach 1, gifts 2, finds 4 at 1 in 5 days), and find_reward (1 crystal_ore).",
+  "_note": "Wild farm animals (docs/design/farm_animals.md). Numbers marked [PLACEHOLDER]: group_size (hens 4, goats 3, rabbits 3), model_scale (rabbit scaled to 0.06 so it reads smaller than the hen at 0.1), gift_price (12, 30, 40 CR), trust rules (max 5, +1 per fed day, -1 after 3 unfed days, approach 1, gifts 2, gift_cap_days 3, finds 4 at 1 in 5 days), and find_reward (1 crystal_ore).",
   "trust": {
     "max": 5,
     "gain_per_fed_day": 1,
@@ -7,6 +7,7 @@
     "drop_per_streak": 1,
     "approach_min": 1,
     "gifts_min": 2,
+    "gift_cap_days": 3,
     "finds_min": 4,
     "find_chance_denom": 5
   },
@@ -22,6 +23,7 @@
       "home_kind": "scrub",
       "gift_id": "hen_egg",
       "gift_name": "Egg",
+      "gift_plural": "Eggs",
       "gift_count": 2,
       "gift_price": 12,
       "model_path": "res://assets/voxels/dome_hen.glb",
@@ -34,6 +36,7 @@
       "home_kind": "plateau_rim",
       "gift_id": "goat_cashmere",
       "gift_name": "Goat cashmere",
+      "gift_plural": "Goat cashmere",
       "gift_count": 1,
       "gift_price": 30,
       "model_path": "res://assets/voxels/dome_goat.glb",
@@ -46,6 +49,7 @@
       "home_kind": "gulch",
       "gift_id": "rabbit_fur",
       "gift_name": "Rabbit fur",
+      "gift_plural": "Rabbit fur",
       "gift_count": 1,
       "gift_price": 40,
       "model_path": "res://assets/voxels/dome_rabbit.glb",

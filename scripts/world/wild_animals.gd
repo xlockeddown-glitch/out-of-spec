@@ -18,7 +18,7 @@ const FIND_OFFSETS: Dictionary = {
 
 ## [PLACEHOLDER] Short interact verbs matching main_farm.gd wording style.
 const VERB_FEED: String = "Leave feed"
-const VERB_COLLECT: String = "Collect"
+const VERB_FIND: String = "Pick up find"
 
 ## [PLACEHOLDER] Movement and interaction tuning (metres, m/s, seconds).
 const INTERACT_REACH_M: float = 3.5
@@ -217,8 +217,14 @@ func keep_above_ground() -> void:
 			node.position.y = Terrain.height(Vector2(node.position.x, node.position.z), GameState.dug)
 
 
-## Returns { kind, group_id, at, verb } for the closest feeding spot or pending
-## find within INTERACT_REACH_M of `player_pos`, or {} if none is in reach.
+func _collect_verb(group_id: String) -> String:
+	var spec: Dictionary = GameState.animal_group(group_id)
+	var gift_label: String = str(spec.get("gift_plural", spec.get("gift_name", "gifts"))).to_lower()
+	return "Collect " + gift_label
+
+
+## Returns { kind, group_id, at, verb } for the closest actionable feeding spot
+## or pending find within INTERACT_REACH_M of `player_pos`, or {} if none is in reach.
 func interact_target(player_pos: Vector3) -> Dictionary:
 	var best: Dictionary = {}
 	var best_dist: float = INTERACT_REACH_M
@@ -230,18 +236,26 @@ func interact_target(player_pos: Vector3) -> Dictionary:
 			var fdist: float = p2.distance_to(Vector2(fpos.x, fpos.z))
 			if fdist <= best_dist:
 				best_dist = fdist
-				best = { "kind": "find", "group_id": group_id, "at": fpos, "verb": VERB_COLLECT }
+				best = { "kind": "find", "group_id": group_id, "at": fpos, "verb": VERB_FIND }
 		var spot: Vector3 = g["spot_pos"]
 		var sdist: float = p2.distance_to(Vector2(spot.x, spot.z))
 		if sdist <= best_dist:
-			best_dist = sdist
-			var has_gifts: bool = GameState.animal_gifts_waiting(group_id) > 0
-			best = {
-				"kind": "collect" if has_gifts else "feed",
-				"group_id": group_id,
-				"at": spot,
-				"verb": VERB_COLLECT if has_gifts else VERB_FEED,
-			}
+			if GameState.animal_gifts_waiting(group_id) > 0:
+				best_dist = sdist
+				best = {
+					"kind": "collect",
+					"group_id": group_id,
+					"at": spot,
+					"verb": _collect_verb(group_id),
+				}
+			elif not GameState.animal_fed_today(group_id):
+				best_dist = sdist
+				best = {
+					"kind": "feed",
+					"group_id": group_id,
+					"at": spot,
+					"verb": VERB_FEED,
+				}
 	return best
 
 

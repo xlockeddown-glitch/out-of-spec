@@ -1418,6 +1418,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	oirm_changed.emit()
 	credibility_changed.emit(credibility)
 	crops_changed.emit()
+	animals_changed.emit()
 	jobs_changed.emit()
 	lab_changed.emit()
 	robots_changed.emit()
@@ -10224,15 +10225,17 @@ func feed_animals(group_id: String, player_id: String = "") -> String:
 	return ""
 
 
-## Dawn step for wild animals: updates trust from yesterday's feeding, places
-## dawn gifts at trust >= gifts_min, rolls a deterministic find at trust >= finds_min,
-## and clears the fed-today flags.
+## Dawn step for wild animals: updates trust from yesterday's feeding, adds
+## dawn gifts at trust >= gifts_min (capped at gift_cap_days days' worth without
+## wiping waiting gifts if trust drops), rolls a deterministic find at trust >=
+## finds_min when none is already pending, and clears the fed-today flags.
 func _step_animals_dawn(day: int) -> void:
 	var max_trust: int = int(animal_trust_rule("max", 5.0))
 	var gain: int = int(animal_trust_rule("gain_per_fed_day", 1.0))
 	var unfed_days: int = maxi(1, int(animal_trust_rule("unfed_days_to_drop", 3.0)))
 	var drop: int = int(animal_trust_rule("drop_per_streak", 1.0))
 	var gifts_min: int = int(animal_trust_rule("gifts_min", 2.0))
+	var gift_cap_days: int = maxi(1, int(animal_trust_rule("gift_cap_days", 3.0)))
 	var finds_min: int = int(animal_trust_rule("finds_min", 4.0))
 	var find_denom: int = maxi(1, int(animal_trust_rule("find_chance_denom", 5.0)))
 	for group_id: String in animal_group_ids():
@@ -10250,8 +10253,12 @@ func _step_animals_dawn(day: int) -> void:
 		st["trust"] = trust
 		st["fed_today"] = false
 		var spec: Dictionary = animal_group(group_id)
-		st["gifts"] = int(spec.get("gift_count", 1)) if trust >= gifts_min else 0
-		st["find_pending"] = animal_find_roll(world_seed, group_id, day, find_denom) if trust >= finds_min else false
+		if trust >= gifts_min:
+			var gift_count: int = maxi(1, int(spec.get("gift_count", 1)))
+			var waiting: int = maxi(0, int(st.get("gifts", 0)))
+			st["gifts"] = mini(gift_count * gift_cap_days, waiting + gift_count)
+		if not bool(st.get("find_pending", false)) and trust >= finds_min:
+			st["find_pending"] = animal_find_roll(world_seed, group_id, day, find_denom)
 	animals_changed.emit()
 
 
@@ -10280,8 +10287,9 @@ func collect_animal_gifts(group_id: String, player_id: String = "") -> int:
 	return count
 
 
-## Collects a pending trust-4+ find for `group_id`. Pays once (crystal_ore [PLACEHOLDER]).
-## Returns { ok, kind, amount } on success, or {} if no find is waiting.
+## Collects a pending trust-4+ find for `group_id`. Pays once for known kinds
+## (crystal_ore [PLACEHOLDER], credits). Unknown kinds pay nothing.
+## Returns { ok, kind, amount } on success, or {} if no find is waiting or kind is unknown.
 func collect_animal_find(group_id: String, player_id: String = "") -> Dictionary:
 	var _actor: String = _player(player_id)
 	if not animal_group_exists(group_id):
@@ -10289,13 +10297,15 @@ func collect_animal_find(group_id: String, player_id: String = "") -> Dictionary
 	var st: Dictionary = _ensure_animal_state(group_id)
 	if not bool(st.get("find_pending", false)):
 		return {}
-	st["find_pending"] = false
 	var kind: String = str(DataManager.get_value(ANIMALS_TABLE, "find_reward/kind", "crystal_ore"))
+	if not kind in DataManager.ANIMAL_FIND_KINDS:
+		return {}
+	st["find_pending"] = false
 	var amount: int = maxi(1, int(DataManager.get_number(ANIMALS_TABLE, "find_reward/amount", 1.0)))
 	if kind == "crystal_ore":
 		crystal_ore += amount
 		ore_changed.emit(crystal_ore)
-	else:
+	elif kind == "credits":
 		add_credits(amount)
 	animals_changed.emit()
 	return { "ok": true, "kind": kind, "amount": amount }

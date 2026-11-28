@@ -80,6 +80,9 @@ const RECORD_SECTIONS: Dictionary = {
 	},
 }
 
+## Allowed `find_reward/kind` values in data/animals.json.
+const ANIMAL_FIND_KINDS: Array[String] = ["crystal_ore", "credits"]
+
 var is_loaded: bool = false
 
 var _raw: Dictionary = {}      # StringName table -> Variant (parsed JSON root)
@@ -197,8 +200,20 @@ func _load_table(table: StringName, path: String) -> bool:
 			source as Array,
 			sections[section] as Array)
 
+	if table == &"animals":
+		var find_problem: String = animal_find_kind_problem(get_value(table, "find_reward/kind"))
+		if find_problem != "":
+			all_ok = _fail(table, "%s: %s" % [path, find_problem]) and all_ok
+
 	print_verbose("DataManager: %s loaded." % table)
 	return all_ok
+
+
+## Why an animals.json find_reward/kind is invalid, or "".
+static func animal_find_kind_problem(kind: Variant) -> String:
+	if not kind is String or not (kind as String) in ANIMAL_FIND_KINDS:
+		return "unknown find_reward/kind '%s' (expected %s)" % [str(kind), ", ".join(ANIMAL_FIND_KINDS)]
+	return ""
 
 
 func _index_records(label: String, raw_records: Array, required: Array) -> Dictionary:

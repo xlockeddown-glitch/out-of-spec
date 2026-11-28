@@ -526,7 +526,7 @@ func _on_tilled_cell_used(cell: Vector3i, seed_id: String, offset_steps: int) ->
 			else "OFF SPEC: the soil left its moisture band on %s days" % SP811.integer(entry["out_of_band_days"]))
 		# A guest's copy of the bin may lag the host's.
 		_hud.push_log("HARVESTED %s, %s.%s" % [GameState.crop_name(entry["crop_id"]), grade, "" if FarmCommands.guest
-			else " Bin: %s crops for Lin at Bram's bay." % SP811.integer(GameState.harvest_bin.size())])
+			else " Bin: %s items for Lin at Bram's bay." % SP811.integer(GameState.harvest_bin.size())])
 	elif GameState.plantings.has(cell):
 		_hud.push_log(GameState.crop_status_text(cell) + ". %s and %s move the set point." % [Controls.prompt(&"setpoint_down"), Controls.prompt(&"setpoint_up")])
 	else:
@@ -812,12 +812,19 @@ func _interact_animal(target: Dictionary) -> void:
 			var res: Variant = await FarmCommands.request(&"collect_animal_find", [group_id])
 			if res is Dictionary and res.get("ok", false):
 				var amount: int = int(res.get("amount", 1))
-				var what: String = "crystal ore" if str(res.get("kind", "")) == "crystal_ore" else "CR"
-				_hud.push_log("ANIMALS: Found %s %s." % [SP811.integer(amount), what])
+				var what: String = ""
+				match str(res.get("kind", "")):
+					"crystal_ore":
+						what = "crystal ore"
+					"credits":
+						what = "CR"
+				if what != "":
+					_hud.push_log("ANIMALS: Found %s %s." % [SP811.integer(amount), what])
 		"collect":
 			var count: int = int(await FarmCommands.request(&"collect_animal_gifts", [group_id]))
 			if count > 0:
-				var gift_name: String = str(spec.get("gift_name", "gift")).to_lower()
+				var gift_key: String = "gift_name" if count == 1 else "gift_plural"
+				var gift_name: String = str(spec.get(gift_key, spec.get("gift_name", "gift"))).to_lower()
 				_hud.push_log("ANIMALS: Collected %s %s." % [SP811.integer(count), gift_name])
 		"feed":
 			var problem: String = str(await FarmCommands.request(&"feed_animals", [group_id]))
@@ -1143,7 +1150,7 @@ func _on_rover_entered_bay() -> void:
 	else:
 		_bram_line = "Bring me %d crystal ore and I'll bolt wider treads onto your tractor. Carrying %d." % [cost, GameState.crystal_ore]
 	if not GameState.harvest_bin.is_empty():
-		_hud.push_log("LIN: %s crops in your bin, %s CR for the lot. Press %s to sell." % [
+		_hud.push_log("LIN: %s items in your bin, %s CR for the lot. Press %s to sell." % [
 			SP811.integer(GameState.harvest_bin.size()), SP811.integer(GameState.harvest_bin_value()), Controls.prompt(&"sell_lin")])
 	if GameState.owned_standards.has("torque_standard") or not GameState.robots.is_empty():
 		_hud.push_log("BRAM: robots are built here. Press " + Controls.prompt(&"open_robots") + ".")
