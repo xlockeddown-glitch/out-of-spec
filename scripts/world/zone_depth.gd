@@ -774,4 +774,18 @@ static func deepest_problem(deepest: Variant) -> String:
 ## The phone line for the deepest depth reached in `zone`, or "" before any.
 static func deepest_text(deepest: Dictionary, zone: String) -> String:
 	var depth: int = int(deepest.get(zone, 0))
-	return "" if depth <= 0 else "Deepest: Lava Tubes, depth %d" % depth
+	if depth <= 0:
+		return ""
+	var named: String = str(ZoneData.zone(StringName(zone)).get("name", zone))
+	return "Deepest: %s, depth %d" % [named, depth]
+
+
+## One phone line per zone the rover has been below in (in the zones' own order), joined.
+static func deepest_lines(deepest: Dictionary) -> String:
+	var lines: PackedStringArray = []
+	for zone: StringName in ZoneData.ids():
+		var line: String = deepest_text(deepest, String(zone))
+		if line != "":
+			lines.append(line)
+	return "
+".join(lines)
