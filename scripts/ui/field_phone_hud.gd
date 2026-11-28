@@ -342,11 +342,14 @@ func set_drift(drift_deg: float, band: int) -> void:
 			_set_status("OUT OF TOLERANCE", COLOR_FAIL)
 
 
-func set_relay(slotted: bool, damaged: bool, spools: String, can_slot: bool) -> void:
-	_relay_status_label.text = "RELAY: STOCK TRANSCEIVER" if not slotted \
+func set_relay(slotted: bool, damaged: bool, spools: String, can_slot: bool, gossamer: String = "", gossamer_up: bool = true) -> void:
+	var base: String = "RELAY: STOCK TRANSCEIVER" if not slotted \
 			else "RELAY: DAMAGED SILK" if damaged else "RELAY: OPTICAL SILK"
-	_relay_status_label.add_theme_color_override(
-		"font_color", ScopeTheme.INK_MUTED if not slotted else COLOR_WARN if damaged else ScopeTheme.TEAL)
+	_relay_status_label.text = base if gossamer == "" else "%s · %s" % [base, gossamer]
+	var color: Color = ScopeTheme.INK_MUTED if not slotted else COLOR_WARN if damaged else ScopeTheme.TEAL
+	if gossamer != "" and not gossamer_up:
+		color = COLOR_WARN
+	_relay_status_label.add_theme_color_override("font_color", color)
 	_spool_label.text = "SILK SPOOLS %s" % spools
 	_slot_spool_button.disabled = not can_slot
 
