@@ -183,7 +183,10 @@ func _build_world() -> void:
 		MoonLook.add_crater(self, crater_spots[i], 4.0, MoonLook.PHOBOS_CRATER, MoonLook.PHOBOS_RIM, 11 + i)
 	MoonLook.add_outer_rocks(self, 101, MoonLook.PHOBOS_BOULDER, MoonLook.PHOBOS_RIM, false)
 	MoonLook.add_lander_pad(self, Vector3(-14.0, 0.0, 1.0), false)
-	# Mars: a big flat-shaded sphere low on the horizon, behind the station.
+	MoonLook.add_pad_edge_lights(self, Vector3(-14.0, 0.0, 1.0), false)
+	# Mars: a big flat-shaded sphere low on the horizon, behind the station, with sky stars and faint horizon glow.
+	MoonLook.add_starfield(self, MoonLook.STAR_SEED_PHOBOS, MoonLook.STAR_COUNT_PHOBOS)
+	MoonLook.add_mars_horizon_glow(self, Vector3(-75.0, 12.0, -90.0), 60.0, MoonLook.MARS_GLOW_PHOBOS, MoonLook.MARS_GLOW_ALPHA_PHOBOS)
 	MoonLook.add_mars(self, Vector3(-75.0, 12.0, -90.0), 60.0, MoonLook.PHOBOS_MARS)
 	# The parked shuttle: solid collision boxes + visual details.
 	add_child(_part("ShuttleBody", Vector3(-14.0, 1.6, 1.0), Vector3(9.0, 3.2, 3.6), MoonLook.PHOBOS_HULL, true))
@@ -196,6 +199,23 @@ func _build_world() -> void:
 	add_child(_part("StationDoor", Vector3(2.0, 1.4, -10.45), Vector3(2.2, 2.8, 0.2), MoonLook.DARK_METAL))
 	add_child(_part("StationDome", Vector3(8.0, 4.8, -14.0), Vector3(4.0, 1.2, 4.0), MoonLook.PHOBOS_WING, true))
 	MoonLook.add_phobos_station_detail(self)
+	MoonLook.add_utility_props(self, false)
+	var clear_spots: Array[Vector3] = [ARRIVE_AT, SPOTS["Hatch"] + HATCH_ARRIVE_OFFSET]
+	for spot: Vector3 in SPOTS.values():
+		clear_spots.append(spot)
+	MoonLook.add_regolith_scatter(
+		self,
+		MoonLook.SCATTER_SEED_PHOBOS,
+		MoonLook.SCATTER_DRIFTS_PHOBOS,
+		MoonLook.SCATTER_ROCKS_PHOBOS,
+		MoonLook.DRIFT_PHOBOS,
+		MoonLook.DRIFT_PHOBOS_LIGHT,
+		MoonLook.PHOBOS_BOULDER,
+		MoonLook.PHOBOS_RIM,
+		clear_spots,
+		false
+	)
+	MoonLook.add_tunnel_mouth_dressing(self, SPOTS["Hatch"])
 	console_click = _make_console()
 	board_click = _make_board()
 	hook_click = _make_hook_sign()
