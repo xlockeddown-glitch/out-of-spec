@@ -473,7 +473,9 @@ func _on_crate_clicked(at: Vector3, crate_id: String, kind: String, locked: bool
 		dusty = false
 		_toast(DeimosDepth.reward_text(kind, locked, mislabeled, false))
 	else:
-		_toast(DeimosDepth.reward_text(kind, locked, mislabeled, dusty))
+		# The wallet moved by something else too: claim no amount the host
+		# did not confirm.
+		_toast("Crate opened.")
 
 
 func _show_crates() -> void:

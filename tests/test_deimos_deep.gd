@@ -399,19 +399,25 @@ func test_scene_leaving_never_blocked_wrong_label_hidden_until_opened_and_hub_ha
 	var held_deck: Dictionary = GameState._on_deimos_deck.duplicate(true)
 	var held_quests: Dictionary = GameState.player_quest_state.duplicate(true)
 	var held_actions: Dictionary = GameState.action_counts.duplicate(true)
+	var held_farm_quests: Dictionary = GameState.quest_state.duplicate(true)
+	var held_points: Dictionary = GameState.quest_points.duplicate(true)
+	var held_one_use: Dictionary = GameState.one_use_held.duplicate(true)
+	var held_lab_xp: int = GameState.lab_xp
 	var held_walkers: Dictionary = CoopWalkers.out.duplicate(true)
 	var held_credits: int = GameState.credits
 
 	# Pick a day that has a mislabelled crate for GameState.world_seed.
-	var test_day: int = 6
-	for d: int in range(1, 30):
+	var test_day: int = -1
+	for d: int in range(1, 60):
 		var layout: Dictionary = DeimosDepth.layout(GameState.world_seed, d)
 		for c: Dictionary in layout["crates"]:
 			if bool(c["mislabeled"]):
 				test_day = d
 				break
-		if test_day == d:
+		if test_day > 0:
 			break
+	if test_day < 0:
+		return "No day in 1-59 has a mislabelled crate for this seed."
 	GameClock.elapsed_days = float(test_day - 1) + 0.25
 	GameState.shuttle_trips[GameState.local_player_id] = { "moon": Shuttle.DEIMOS, "ends_at": 1.0e9 }
 	GameState.player_places[GameState.local_player_id] = [Shuttle.DEIMOS, 0]
@@ -467,7 +473,9 @@ func test_scene_leaving_never_blocked_wrong_label_hidden_until_opened_and_hub_ha
 				if deep2.crate_mislabeled[i]:
 					wrong_i = i
 					break
-			if wrong_i >= 0:
+			if wrong_i < 0:
+				problem = "The scene shows no mislabelled crate on day %d." % test_day
+			else:
 				var at: Vector3 = deep2.crate_nodes[wrong_i].position
 				deep2.walker.position = at
 				await deep2._on_crate_clicked(at, deep2.crate_ids[wrong_i], deep2.crate_kinds[wrong_i], deep2.crate_locked[wrong_i], true, test_day)
@@ -494,6 +502,10 @@ func test_scene_leaving_never_blocked_wrong_label_hidden_until_opened_and_hub_ha
 	CoopWalkers.out = held_walkers
 	GameState.action_counts = held_actions
 	GameState.player_quest_state = held_quests
+	GameState.quest_state = held_farm_quests
+	GameState.quest_points = held_points
+	GameState.one_use_held = held_one_use
+	GameState.lab_xp = held_lab_xp
 	GameState._on_deimos_deck = held_deck
 	GameState._deimos_wiped = held_wiped
 	GameState.deimos_crates_opened = held_opened
