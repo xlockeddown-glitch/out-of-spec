@@ -351,8 +351,8 @@ func test_a_deep_save_round_trips_and_an_old_save_loads() -> String:
 	var old: GameStateScript = _state(1, false)
 	if old.farm_from_dict(data) != "" or old.is_lift_repaired("lava_tubes", 6) or old.lava_deep_problem() == "":
 		problems.append("An old save was refused or let in below depth 3.")
-	if CoopSession.PROTOCOL != 47:
-		problems.append("The protocol is %d, not 47." % CoopSession.PROTOCOL)
+	if CoopSession.PROTOCOL != 48:
+		problems.append("The protocol is %d, not 48." % CoopSession.PROTOCOL)
 	gs.free()
 	back.free()
 	old.free()
