@@ -1254,6 +1254,7 @@ func farm_from_dict(data: Dictionary) -> String:
 		return problem
 	put_farm(data)
 	_hold_deep_rover()
+	_skid_last = []
 	finds_taken = ZoneDepth.prune(finds_taken, GameClock.get_day_index())
 	pools_drained = ZoneDepth.prune(pools_drained, GameClock.get_day_index())
 	valves_shut = ZoneDepth.prune(valves_shut, GameClock.get_day_index())
@@ -6761,8 +6762,10 @@ func ice_rolled(player_id: String, from: Vector2i, to: Vector2i, heading: Basis 
 	var grid: PackedStringArray = today["grid"]
 	var target: Vector2i = IceSlick.skid_target(grid, finds, to, dir)
 	add_rover_usage(IceSlick.SKID_WEAR_M, who, TUNNEL_ROVER)
-	if target != to:
-		rover_transforms[TUNNEL_ROVER] = Transform3D(heading, TunnelRock.at_in(grid, target))
+	# Parked square to the skid line (a driver's yaw could poke a corner into rock), and only where the body fits.
+	var parked := Transform3D(Basis.looking_at(Vector3(dir.x, 0.0, dir.y)), TunnelRock.at_in(grid, target))
+	if target != to and TunnelRock.holds_body_in(grid, parked):
+		rover_transforms[TUNNEL_ROVER] = parked
 		rover_epoch += 1
 		_emit_field_rover_changed()
 	_skid_last = [rover_epoch, day, to]

@@ -631,3 +631,59 @@ func test_the_lava_aquifer_and_mine_floors_have_no_slick_ice() -> String:
 		if ZoneDepth.stream(SEED, IceDepth.ZONE, 0, day_n) == ZoneDepth.stream(SEED, IceDepth.ZONE, 1, day_n):
 			problems.append("The Ice Caves' hub and depth 1 share a stream on day %d." % day_n)
 	return _end(run if run != "" else "\n".join(problems))
+
+
+func test_a_skid_parks_the_rover_square_to_the_slide_and_only_where_its_body_fits() -> String:
+	var found: Dictionary = _roll(2)
+	if found.is_empty():
+		return _end("No day in 60 had a slick cell to roll onto with room to slide.")
+	var day: int = found["day"]
+	var run: String = _at(float(day - 1), func() -> String:
+		var gs: GameStateScript = _state()
+		if _below(gs) != "":
+			return "The rover did not go in."
+		_rover_at(gs, found["from"], day)
+		var crooked := Basis(Vector3.UP, 0.6)
+		if not gs.ice_rolled(HOST, found["from"], found["slick"], crooked):
+			return "The roll onto slick ice was not a skid."
+		var parked: Transform3D = gs.rover_transforms[gs.TUNNEL_ROVER]
+		var square := Basis.looking_at(Vector3(found["dir"].x, 0.0, found["dir"].y))
+		if not parked.basis.is_equal_approx(square):
+			return "The rover was parked at the driver's yaw, not square to the slide."
+		var grid: PackedStringArray = IceDepth.layout(SEED, 1, day)["grid"]
+		if not TunnelRock.holds_body_in(grid, parked):
+			return "The rover was parked with its body in the rock."
+		return "")
+	return _end(run)
+
+
+func test_a_skid_into_a_spot_where_the_body_does_not_fit_leaves_the_rover_on_the_slick_cell() -> String:
+	# Look for a day with a slide whose square-parked body would clip rock; none may exist.
+	for day: int in range(2, 62):
+		var today: Dictionary = IceDepth.layout(SEED, 1, day)
+		var grid: PackedStringArray = today["grid"]
+		var finds: Array = []
+		for find: Dictionary in today["finds"]:
+			finds.append(find["cell"])
+		for cell: Vector2i in IceSlick.slick_cells(SEED, 1, day):
+			for dir: Vector2i in [Vector2i.UP, Vector2i.DOWN, Vector2i.LEFT, Vector2i.RIGHT]:
+				var behind: Vector2i = cell - dir
+				var target: Vector2i = IceSlick.skid_target(grid, finds, cell, dir)
+				if target == cell or behind.x < 0 or behind.y < 0 or behind.x >= ZoneDepth.WIDTH or behind.y >= ZoneDepth.HEIGHT or grid[behind.y][behind.x] != ".":
+					continue
+				var parked := Transform3D(Basis.looking_at(Vector3(dir.x, 0.0, dir.y)), TunnelRock.at_in(grid, target))
+				if TunnelRock.holds_body_in(grid, parked):
+					continue
+				var problem: String = _at(float(day - 1), func() -> String:
+					var gs: GameStateScript = _state()
+					if _below(gs) != "":
+						return "The rover did not go in."
+					_rover_at(gs, behind, day)
+					var epoch: int = gs.rover_epoch
+					if not gs.ice_rolled(HOST, behind, cell, Basis.IDENTITY):
+						return "The roll was not a skid."
+					if gs.rover_epoch != epoch:
+						return "The rover was moved to a spot where its body does not fit."
+					return "")
+				return _end(problem)
+	return _end("")

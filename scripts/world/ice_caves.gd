@@ -108,6 +108,11 @@ func _build_ice_hazards() -> void:
 	if holder != null and holder.environment != null:
 		_environment = holder.environment.duplicate() as Environment
 		holder.environment = _environment
+		_whiteout_on = IceSlick.whiteout_active(GameState.world_seed, GameClock.elapsed_days)
+		if _whiteout_on:
+			_environment.fog_enabled = true
+			_environment.fog_light_color = IceLook.ICE_PALE
+			_environment.fog_density = IceSlick.FOG_DENSITY
 	if not _below:
 		return
 	_slick = IceSlick.slick_cells(GameState.world_seed, _built_depth, _built_day)
@@ -123,15 +128,15 @@ func _build_ice_hazards() -> void:
 func _watch_ice() -> void:
 	if not _below or _slick.is_empty() or FarmCommands.guest:
 		return
-	var free: bool = _rover.away_text() == "" and not SceneSwitcher.is_busy() and not _moving \
-			and CoopRovers.driver(GameState.TUNNEL_ROVER) in ["", GameState.local_player_id]
-	if not free:
-		return
 	var cell: Vector2i = ZoneHazards.cell_of(_rover.global_position)
 	if cell == _slick_last:
 		return
 	var from: Vector2i = _slick_last
-	_slick_last = cell
+	_slick_last = cell  # always current, so a lapsed guest lease cannot read an old cell as a step
+	var free: bool = _rover.away_text() == "" and not SceneSwitcher.is_busy() and not _moving \
+			and CoopRovers.driver(GameState.TUNNEL_ROVER) in ["", GameState.local_player_id]
+	if not free:
+		return
 	if GameState.ice_rolled(GameState.local_player_id, from, cell, _rover.global_basis):
 		_hud.push_log("ICE: " + IceSlick.WORDS["skid"])
 		_slick_last = Vector2i(-1, -1)  # the rover was put on a new place: look again from there
