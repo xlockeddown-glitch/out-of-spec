@@ -51,7 +51,7 @@ func _ready() -> void:
 	dusty = true
 	_toast(PhobosDepth.DUSTY_START_TEXT)
 	if _seen_trip:
-		_notify_enter_deep.call_deferred()
+		_notify_enter_deep()
 
 
 func _exit_tree() -> void:
@@ -76,6 +76,11 @@ func _process(delta: float) -> void:
 		_build_deck(day)
 		if walker != null:
 			walker.position = PhobosDepth.cell_to_world(PhobosDepth.START_CELL)
+		dusty = true
+		if _seen_trip:
+			_notify_enter_deep()
+	if not FarmCommands.guest:
+		dusty = GameState.is_phobos_dusty(GameState.local_player_id)
 	var dust_tag: String = "DUSTY" if dusty else "CLEAN"
 	_clock.text = "%s   %s CR   %s   [%s]" % [GameClock.format_now(), SP811.integer(GameState.credits), PhobosDepth.TITLE_TEXT, dust_tag]
 	if _toast_left > 0.0:
@@ -92,7 +97,11 @@ func _process(delta: float) -> void:
 func _notify_enter_deep() -> void:
 	if not is_inside_tree():
 		return
-	await FarmCommands.request(&"enter_phobos_deep")
+	var problem: Variant = await FarmCommands.request(&"enter_phobos_deep")
+	if not is_inside_tree():
+		return
+	if str(problem) == "":
+		dusty = true if FarmCommands.guest else GameState.is_phobos_dusty(GameState.local_player_id)
 
 
 func _has_trip() -> bool:
@@ -102,7 +111,9 @@ func _has_trip() -> bool:
 
 func _on_trips_changed() -> void:
 	if _has_trip():
-		_seen_trip = true
+		if not _seen_trip:
+			_seen_trip = true
+			_notify_enter_deep()
 	elif _seen_trip:
 		_go_home()
 
@@ -398,6 +409,7 @@ func _on_hatch_up() -> void:
 	if _leaving or not _near(PhobosDepth.cell_to_world(PhobosDepth.HATCH_CELL)):
 		return
 	_leaving = true
+	FarmCommands.request(&"leave_phobos_deep")
 	PhobosServiceTunnel.arrive_at_deep_hatch = true
 	_swap_to(PhobosServiceTunnel.SCENE_PATH)
 
@@ -405,6 +417,8 @@ func _on_hatch_up() -> void:
 func _on_wipe_stop() -> void:
 	if _busy or not _near(PhobosDepth.cell_to_world(PhobosDepth.WIPE_CELL)):
 		return
+	if not FarmCommands.guest:
+		dusty = GameState.is_phobos_dusty(GameState.local_player_id)
 	if not dusty:
 		_toast(PhobosDepth.ALREADY_WIPED_TEXT)
 		return
@@ -416,7 +430,7 @@ func _on_wipe_stop() -> void:
 	if str(problem) != "":
 		_toast(str(problem))
 	else:
-		dusty = false
+		dusty = false if FarmCommands.guest else GameState.is_phobos_dusty(GameState.local_player_id)
 		_toast(PhobosDepth.DUSTY_WIPED_TEXT)
 
 
@@ -424,15 +438,28 @@ func _on_find_clicked(at: Vector3, find_id: String, kind: String, layout_day: in
 	if _busy or not _near(at):
 		return
 	_busy = true
-	var was_dusty: bool = dusty
+	var before_cr: int = GameState.credits
 	var problem: Variant = await FarmCommands.request(&"take_phobos_find", [find_id, layout_day])
 	_busy = false
 	if not is_inside_tree():
 		return
 	if str(problem) != "":
 		_toast(str(problem))
+		return
+	var paid: int = GameState.credits - before_cr
+	var full_pay: int = PhobosDepth.reward_credits(kind, false)
+	var dusty_pay: int = PhobosDepth.reward_credits(kind, true)
+	if not FarmCommands.guest:
+		dusty = GameState.is_phobos_dusty(GameState.local_player_id)
+		_toast(PhobosDepth.reward_text(kind, dusty))
+	elif paid == dusty_pay:
+		dusty = true
+		_toast(PhobosDepth.reward_text(kind, true))
+	elif paid == full_pay:
+		dusty = false
+		_toast(PhobosDepth.reward_text(kind, false))
 	else:
-		_toast(PhobosDepth.reward_text(kind, was_dusty))
+		_toast("Took %s." % str(PhobosDepth.NAMES.get(kind, kind)))
 
 
 func _show_finds() -> void:

@@ -242,6 +242,8 @@ var strays_caught: Dictionary = {}
 var phobos_finds_taken: Dictionary = {}
 ## Host-only per-trip dust wipe flags: player_id -> true while wiped on the current trip down.
 var _phobos_wiped: Dictionary = {}
+## Host-only per-player deck flags: player_id -> true while down on Phobos Station deck 1.
+var _on_phobos_deck: Dictionary = {}
 ## Today's Deimos smuggler cache state: { "day": int, "opened": true }, or {} when not
 ## opened today. Pruned to today on save and load. Host-run, saved, shown to guests.
 var deimos_cache: Dictionary = {}
@@ -841,7 +843,7 @@ const NOT_SAVED: Array[String] = [
 	"_seep_days", "_seep_full", "world_seed", "rng", "sensors", "steering", "hygrometer", "last_cal_records",
 	"certificates", "local_player_id", "_morning", "_morning_notes", "sentinel_sighted",
 	"rover_place_scope", "_skid_last", "rovers_node", "_recall_warned_day", "_recall_rescued_day", "_expedition_warned_day", "_expedition_rescued_day", "_guest_warned_day", "_guest_rescued_day", "recall_told", "_rescue_notes", "recall_in_tunnels", "recall_beds", "_ore_at_entry", "_console_arrivals", "_trip_players", "_campers", "_cold_kept",
-	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip", "_phobos_wiped",
+	"rover_in_tunnels", "player_places", "settle_due", "zone_heat_trip", "_phobos_wiped", "_on_phobos_deck",
 ]
 
 
@@ -1287,6 +1289,7 @@ func farm_from_dict(data: Dictionary) -> String:
 	strays_caught = _strays_today()
 	phobos_finds_taken = _phobos_finds_today()
 	_phobos_wiped.clear()
+	_on_phobos_deck.clear()
 	deimos_cache = _deimos_cache_today()
 	_settle_trips_on_load()
 	_recall_warned_day = 0
@@ -4162,6 +4165,8 @@ func _return_traveller(player_id: String, line: String, completed: bool = false)
 	shuttle_trips.erase(player_id)
 	_beds().get_up(player_id)  # up from the camp's bed, if they slept there
 	_campers.erase(player_id)
+	_phobos_wiped.erase(player_id)
+	_on_phobos_deck.erase(player_id)
 	_set_place(player_id, ZonePresence.FARM, 0)
 	_stand_at_pad(player_id)
 	shuttle_trips_changed.emit()
@@ -4272,6 +4277,8 @@ func _sitter_tend() -> void:
 func _on_day_started(day: int) -> void:
 	_campers.clear()  # the night at a camp is over: they wake there, and the recall is theirs again
 	_cold_kept.clear()  # yesterday's cold never comes back, whatever the grace
+	_phobos_wiped.clear()
+	_on_phobos_deck.clear()
 	# A rover below stands on the new day's floor.
 	settle_rover_depth()
 	zone_heat_trip = false  # a heat trip is one day's trip
@@ -5226,6 +5233,8 @@ func forget_place(player_id: String) -> void:
 	_campers.erase(player_id)  # a camper who drops is out of bed (CoopBeds drops them too)
 	_console_arrivals.erase(player_id)
 	_trip_players.erase(player_id)
+	_phobos_wiped.erase(player_id)
+	_on_phobos_deck.erase(player_id)
 	# Gone mid-trip: the day trip is over with them, and nothing is charged. The shuttle
 	# is not the farm's rover, so nothing is sent home.
 	if not FarmCommands.guest and shuttle_trips.has(player_id):
@@ -6581,6 +6590,17 @@ func enter_phobos_deep(player_id: String = "") -> String:
 	var who: String = _player(player_id)
 	if place_of(who) != Shuttle.PHOBOS:
 		return "Station deck 1 is on Phobos."
+	_on_phobos_deck[who] = true
+	_phobos_wiped.erase(who)
+	return ""
+
+
+## Host: clears a player's Phobos depth-1 deck flag when they climb up the hatch.
+func leave_phobos_deep(player_id: String = "") -> String:
+	if FarmCommands.guest:
+		return "Only the host tracks Phobos trips."
+	var who: String = _player(player_id)
+	_on_phobos_deck.erase(who)
 	_phobos_wiped.erase(who)
 	return ""
 
@@ -6592,6 +6612,8 @@ func wipe_phobos_dust(player_id: String = "") -> String:
 	var who: String = _player(player_id)
 	if place_of(who) != Shuttle.PHOBOS:
 		return "The wipe stop is on Phobos."
+	if not bool(_on_phobos_deck.get(who, false)):
+		return "Go down to Station deck 1 first."
 	_phobos_wiped[who] = true
 	return ""
 
@@ -6606,6 +6628,8 @@ func take_phobos_find(find_id: String, layout_day: int, player_id: String = "") 
 	var day: int = GameClock.get_day_index()
 	if place_of(who) != Shuttle.PHOBOS:
 		return "Finds lie in Phobos Station deck 1."
+	if not bool(_on_phobos_deck.get(who, false)):
+		return "Go down to Station deck 1 first."
 	if layout_day != day:
 		return "That was yesterday's deck. Look again."
 	var today: Dictionary = PhobosDepth.layout(world_seed, day)

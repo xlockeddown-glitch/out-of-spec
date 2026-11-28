@@ -88,9 +88,16 @@ func test_find_pays_once_refuses_second_take_and_refuses_off_phobos() -> String:
 		var fid: String = str(first["id"])
 		var kind: String = str(first["kind"])
 		var before_cr: int = gs.credits
-		# Wiped first so we verify base pay cleanly here.
+		# Refused from the hub before entering Station deck 1.
+		if gs.wipe_phobos_dust() == "" or gs.take_phobos_find(fid, day) == "":
+			return "wipe_phobos_dust and take_phobos_find must be refused from the hub before enter_phobos_deep."
+		if gs.credits != before_cr:
+			return "Refused hub take must pay nothing."
+		# Enter deck 1, then wipe so we verify base pay cleanly here.
+		if gs.enter_phobos_deep() != "":
+			return "enter_phobos_deep must succeed on Phobos."
 		if gs.wipe_phobos_dust() != "":
-			return "wipe_phobos_dust must succeed on Phobos."
+			return "wipe_phobos_dust must succeed after enter_phobos_deep."
 		var expected: int = PhobosDepth.reward_credits(kind, false)
 		var err: String = gs.take_phobos_find(fid, day)
 		if err != "":
@@ -108,14 +115,57 @@ func test_find_pays_once_refuses_second_take_and_refuses_off_phobos() -> String:
 		var missing: String = gs.take_phobos_find("d1_f99", day)
 		if missing == "":
 			return "Unknown find id must be refused."
-		# Off Phobos (farm and Deimos) must be refused.
+		# Leaving the deck refuses further takes and wipes until re-entered.
 		var next_id: String = str(data["finds"][1]["id"])
+		if gs.leave_phobos_deep() != "":
+			return "leave_phobos_deep must succeed."
+		if gs.take_phobos_find(next_id, day) == "" or gs.wipe_phobos_dust() == "":
+			return "take_phobos_find and wipe_phobos_dust must be refused after leave_phobos_deep."
+		# Off Phobos (farm and Deimos) must be refused even if deck flag were set.
+		gs.enter_phobos_deep()
 		gs.player_places[HOST] = [ZonePresence.FARM, 0]
 		var from_farm: String = gs.take_phobos_find(next_id, day)
 		gs.player_places[HOST] = [Shuttle.DEIMOS, 0]
 		var from_deimos: String = gs.take_phobos_find(next_id, day)
 		if from_farm == "" or from_deimos == "" or gs.credits != before_cr + expected:
 			return "Taking off Phobos must be refused: '%s' / '%s'" % [from_farm, from_deimos]
+		return "")
+
+
+func test_wiped_and_deck_flag_clear_on_forget_place_day_start_and_trip_end() -> String:
+	return _on_phobos(func(gs: GameStateScript) -> String:
+		var day: int = GameClock.get_day_index()
+		var data: Dictionary = PhobosDepth.layout(gs.world_seed, day)
+		var fid: String = str(data["finds"][0]["id"])
+		gs.player_places[GUEST] = [Shuttle.PHOBOS, 0]
+
+		# forget_place clears both _phobos_wiped and _on_phobos_deck for that player only.
+		gs.enter_phobos_deep(HOST)
+		gs.wipe_phobos_dust(HOST)
+		gs.enter_phobos_deep(GUEST)
+		gs.wipe_phobos_dust(GUEST)
+		gs.forget_place(GUEST)
+		if not gs.is_phobos_dusty(GUEST) or gs._on_phobos_deck.has(GUEST):
+			return "forget_place must clear _phobos_wiped and _on_phobos_deck for the dropped player."
+		if gs.is_phobos_dusty(HOST) or not bool(gs._on_phobos_deck.get(HOST, false)):
+			return "forget_place(GUEST) must not clear HOST's Phobos deck or wipe state."
+
+		# _on_day_started clears both _phobos_wiped and _on_phobos_deck for everyone.
+		gs._on_day_started(day + 1)
+		if not gs.is_phobos_dusty(HOST) or not gs._on_phobos_deck.is_empty():
+			return "_on_day_started must clear _phobos_wiped and _on_phobos_deck."
+		if gs.take_phobos_find(fid, day) == "" or gs.wipe_phobos_dust() == "":
+			return "After _on_day_started, take and wipe must be refused until re-entering."
+
+		# Ending a moon trip via shuttle_home clears _on_phobos_deck and _phobos_wiped.
+		gs.shuttle_trips[HOST] = { "moon": Shuttle.PHOBOS, "ends_at": 1.0e9 }
+		gs.player_places[HOST] = [Shuttle.PHOBOS, 0]
+		gs.enter_phobos_deep(HOST)
+		gs.wipe_phobos_dust(HOST)
+		if gs.shuttle_home(HOST) != "":
+			return "shuttle_home must succeed for a player on Phobos."
+		if gs._on_phobos_deck.has(HOST) or not gs.is_phobos_dusty(HOST):
+			return "Ending the moon trip must clear _on_phobos_deck and _phobos_wiped."
 		return "")
 
 
@@ -132,15 +182,31 @@ func test_guest_find_and_wipe_go_through_host_and_sync_to_late_joiner() -> Strin
 	var second: Dictionary = data["finds"][1]
 	var problem: String = ""
 
+	# Guest cannot take or wipe from the hub before enter_phobos_deep.
+	var hub_take: Array = _request(guest, &"take_phobos_find", [str(first["id"]), day])
+	_until(func() -> bool: return not hub_take.is_empty())
+	var hub_wipe: Array = _request(guest, &"wipe_phobos_dust", [])
+	_until(func() -> bool: return not hub_wipe.is_empty())
+	if hub_take == [""] or hub_wipe == [""]:
+		problem = "Guest take/wipe from hub before enter_phobos_deep must be refused: %s / %s" % [hub_take, hub_wipe]
+
+	# Guest enters deck 1 via host.
+	if problem == "":
+		var entered: Array = _request(guest, &"enter_phobos_deep", [])
+		_until(func() -> bool: return not entered.is_empty())
+		if entered != [""] or not bool(farm._on_phobos_deck.get(GUEST, false)):
+			problem = "Host must record guest enter_phobos_deep: %s" % [entered]
+
 	# Guest takes first find while dusty -> host decides and pays 75 %.
-	var before_cr: int = farm.credits
-	var dusty_pay: int = PhobosDepth.reward_credits(str(first["kind"]), true)
-	var got: Array = _request(guest, &"take_phobos_find", [str(first["id"]), day])
-	_until(func() -> bool: return not got.is_empty())
-	if got != [""] or farm.credits != before_cr + dusty_pay or not str(first["id"]) in farm.phobos_finds_taken_today():
-		problem = "Host must process guest dusty find: reply=%s cr=%d" % [got, farm.credits - before_cr]
-	elif not guest.commands.state.phobos_finds_taken_today().is_empty():
-		problem = "Guest state must not mutate locally before host sync."
+	if problem == "":
+		var before_cr: int = farm.credits
+		var dusty_pay: int = PhobosDepth.reward_credits(str(first["kind"]), true)
+		var got: Array = _request(guest, &"take_phobos_find", [str(first["id"]), day])
+		_until(func() -> bool: return not got.is_empty())
+		if got != [""] or farm.credits != before_cr + dusty_pay or not str(first["id"]) in farm.phobos_finds_taken_today():
+			problem = "Host must process guest dusty find: reply=%s cr=%d" % [got, farm.credits - before_cr]
+		elif not guest.commands.state.phobos_finds_taken_today().is_empty():
+			problem = "Guest state must not mutate locally before host sync."
 
 	# Guest wipes dust via host, then takes second find for full pay.
 	if problem == "":
@@ -183,6 +249,74 @@ func test_guest_find_and_wipe_go_through_host_and_sync_to_late_joiner() -> Strin
 	return _finish(problem)
 
 
+func test_guest_cannot_spoof_player_id_and_off_phobos_guest_is_refused() -> String:
+	var held: float = GameClock.elapsed_days
+	GameClock.elapsed_days = 6.25
+	var host: Node = _host()
+	var farm: GameStateScript = host.commands.state
+	farm.player_places[HOST] = [Shuttle.PHOBOS, 0]
+	farm.enter_phobos_deep(HOST)
+	farm.player_places[GUEST] = [ZonePresence.FARM, 0]
+	var guest: Node = _guest(host)
+	var day: int = GameClock.get_day_index()
+	var data: Dictionary = PhobosDepth.layout(farm.world_seed, day)
+	var fid: String = str(data["finds"][0]["id"])
+	var before_cr: int = farm.credits
+	var problem: String = ""
+
+	# Guest off Phobos (on Farm) is refused for enter, wipe, and take.
+	var off_enter: Array = _request(guest, &"enter_phobos_deep", [])
+	_until(func() -> bool: return not off_enter.is_empty())
+	var off_wipe: Array = _request(guest, &"wipe_phobos_dust", [])
+	_until(func() -> bool: return not off_wipe.is_empty())
+	var off_take: Array = _request(guest, &"take_phobos_find", [fid, day])
+	_until(func() -> bool: return not off_take.is_empty())
+	if off_enter == [""] or off_wipe == [""] or off_take == [""]:
+		problem = "Guest on Farm must be refused Phobos deep actions: %s / %s / %s" % [off_enter, off_wipe, off_take]
+
+	# Guest on Deimos is also refused.
+	if problem == "":
+		farm.player_places[GUEST] = [Shuttle.DEIMOS, 0]
+		var deimos_enter: Array = _request(guest, &"enter_phobos_deep", [])
+		_until(func() -> bool: return not deimos_enter.is_empty())
+		var deimos_take: Array = _request(guest, &"take_phobos_find", [fid, day])
+		_until(func() -> bool: return not deimos_take.is_empty())
+		if deimos_enter == [""] or deimos_take == [""]:
+			problem = "Guest on Deimos must be refused Phobos deep actions: %s / %s" % [deimos_enter, deimos_take]
+
+	# Guest cannot spoof HOST's player_id via extra arguments: host rejects bad arg count and uses connection id.
+	if problem == "":
+		var spoof_enter: Array = _request(guest, &"enter_phobos_deep", [HOST])
+		_until(func() -> bool: return not spoof_enter.is_empty())
+		var spoof_wipe: Array = _request(guest, &"wipe_phobos_dust", [HOST])
+		_until(func() -> bool: return not spoof_wipe.is_empty())
+		var spoof_take: Array = _request(guest, &"take_phobos_find", [fid, day, HOST])
+		_until(func() -> bool: return not spoof_take.is_empty())
+		var spoof_leave: Array = _request(guest, &"leave_phobos_deep", [HOST])
+		_until(func() -> bool: return not spoof_leave.is_empty())
+		if spoof_enter == [""] or spoof_wipe == [""] or spoof_take == [""] or spoof_leave == [""]:
+			problem = "Spoofed player_id arguments must be refused: %s / %s / %s / %s" % [spoof_enter, spoof_wipe, spoof_take, spoof_leave]
+		elif not farm.is_phobos_dusty(HOST) or not bool(farm._on_phobos_deck.get(HOST, false)) or farm.credits != before_cr:
+			problem = "Guest spoof attempts must not alter HOST's deck/dust state or farm credits."
+
+	# Even when guest is on Phobos, guest's wipe/leave only affect GUEST, never HOST.
+	if problem == "":
+		farm.player_places[GUEST] = [Shuttle.PHOBOS, 0]
+		var g_enter: Array = _request(guest, &"enter_phobos_deep", [])
+		_until(func() -> bool: return not g_enter.is_empty())
+		var g_wipe: Array = _request(guest, &"wipe_phobos_dust", [])
+		_until(func() -> bool: return not g_wipe.is_empty())
+		var g_leave: Array = _request(guest, &"leave_phobos_deep", [])
+		_until(func() -> bool: return not g_leave.is_empty())
+		if g_enter != [""] or g_wipe != [""] or g_leave != [""]:
+			problem = "Valid guest Phobos deck actions failed: %s / %s / %s" % [g_enter, g_wipe, g_leave]
+		elif not farm.is_phobos_dusty(HOST) or not bool(farm._on_phobos_deck.get(HOST, false)):
+			problem = "Guest wipe/leave must only affect GUEST, not HOST."
+
+	GameClock.elapsed_days = held
+	return _finish(problem)
+
+
 func test_dust_cuts_pay_until_wiped_reclogs_next_trip_and_never_blocks_leaving() -> String:
 	return _on_phobos(func(gs: GameStateScript) -> String:
 		var day: int = GameClock.get_day_index()
@@ -190,6 +324,8 @@ func test_dust_cuts_pay_until_wiped_reclogs_next_trip_and_never_blocks_leaving()
 		var f0: Dictionary = data["finds"][0]
 		var f1: Dictionary = data["finds"][1]
 		var f2: Dictionary = data["finds"][2]
+		if gs.enter_phobos_deep() != "":
+			return "enter_phobos_deep must succeed on Phobos."
 		if not gs.is_phobos_dusty():
 			return "Player must start dusty on a trip down."
 		var base0: int = PhobosDepth.reward_credits(str(f0["kind"]), false)
@@ -221,16 +357,23 @@ func test_scene_logs_dusty_on_enter_and_wipe_and_leaving_is_never_blocked() -> S
 	var held_trips: Dictionary = GameState.shuttle_trips.duplicate(true)
 	var held_places: Dictionary = GameState.player_places.duplicate(true)
 	var held_finds: Dictionary = GameState.phobos_finds_taken.duplicate(true)
+	var held_wiped: Dictionary = GameState._phobos_wiped.duplicate(true)
+	var held_deck: Dictionary = GameState._on_phobos_deck.duplicate(true)
+	var held_credits: int = GameState.credits
 	GameClock.elapsed_days = 6.25
 	GameState.shuttle_trips[GameState.local_player_id] = { "moon": Shuttle.PHOBOS, "ends_at": 1.0e9 }
 	GameState.player_places[GameState.local_player_id] = [Shuttle.PHOBOS, 0]
 	GameState.phobos_finds_taken = {}
+	GameState._phobos_wiped = {}
+	GameState._on_phobos_deck = {}
 
 	var deep: PhobosDeep = _open(PhobosDeep.SCENE_PATH) as PhobosDeep
 	var problem: String = ""
 	if not deep.dusty or not "Dusty" in deep._hint.text:
 		problem = "Entering Station deck 1 must start dusty and log 'Dusty' on HUD, got '%s'." % deep._hint.text
-	# Leaving while dusty must NEVER be blocked.
+	elif not bool(GameState._on_phobos_deck.get(GameState.local_player_id, false)):
+		problem = "Opening Station deck 1 must mark player on deck."
+	# Leaving while dusty must NEVER be blocked, and clears _on_phobos_deck.
 	if problem == "":
 		var seen: Array[String] = []
 		deep.change_scene = func(path: String) -> void: seen.append(path)
@@ -240,6 +383,8 @@ func test_scene_logs_dusty_on_enter_and_wipe_and_leaving_is_never_blocked() -> S
 			problem = "Leaving up the hatch while dusty must not be blocked: %s" % [seen]
 		elif not PhobosServiceTunnel.arrive_at_deep_hatch:
 			problem = "Leaving up the hatch must set PhobosServiceTunnel.arrive_at_deep_hatch."
+		elif GameState._on_phobos_deck.has(GameState.local_player_id):
+			problem = "Leaving up the hatch must clear _on_phobos_deck."
 	_drop(deep)
 
 	# Re-enter and wipe dust -> logs "Dusty" wiped line.
@@ -250,6 +395,16 @@ func test_scene_logs_dusty_on_enter_and_wipe_and_leaving_is_never_blocked() -> S
 		await deep2._on_wipe_stop()
 		if deep2.dusty or not "Dusty" in deep2._hint.text:
 			problem = "Wiping dust must clear dusty flag and log 'Dusty' wiped line, got '%s'." % deep2._hint.text
+		# Even if local dusty were stale true while host is clean, reward toast must NOT claim a cut.
+		if problem == "" and not deep2.find_ids.is_empty():
+			deep2.dusty = true
+			var fid: String = deep2.find_ids[0]
+			var kind: String = deep2.find_kinds[0]
+			var at: Vector3 = deep2.find_nodes[0].position
+			deep2.walker.position = at
+			await deep2._on_find_clicked(at, fid, kind, GameClock.get_day_index())
+			if deep2.dusty or "cut" in deep2._hint.text or deep2._hint.text != PhobosDepth.reward_text(kind, false):
+				problem = "Reward toast must match host clean payout and never claim a cut: '%s'" % deep2._hint.text
 		_drop(deep2)
 
 	# Service tunnel hatch leads down to Station deck 1.
@@ -264,6 +419,9 @@ func test_scene_logs_dusty_on_enter_and_wipe_and_leaving_is_never_blocked() -> S
 		_drop(tunnel)
 
 	PhobosServiceTunnel.arrive_at_deep_hatch = false
+	GameState.credits = held_credits
+	GameState._on_phobos_deck = held_deck
+	GameState._phobos_wiped = held_wiped
 	GameState.phobos_finds_taken = held_finds
 	GameState.player_places = held_places
 	GameState.shuttle_trips = held_trips
@@ -276,6 +434,7 @@ func test_old_saves_load_and_other_zones_and_strays_unchanged() -> String:
 		var day: int = GameClock.get_day_index()
 		var data: Dictionary = PhobosDepth.layout(gs.world_seed, day)
 		var fid: String = str(data["finds"][0]["id"])
+		gs.enter_phobos_deep()
 		gs.take_phobos_find(fid, day)
 
 		# Save round-trip & pruning of yesterday's finds.
@@ -326,7 +485,7 @@ func test_old_saves_load_and_other_zones_and_strays_unchanged() -> String:
 
 
 func test_protocol_and_commands_registered() -> String:
-	for cmd: StringName in [&"enter_phobos_deep", &"take_phobos_find", &"wipe_phobos_dust"]:
+	for cmd: StringName in [&"enter_phobos_deep", &"leave_phobos_deep", &"take_phobos_find", &"wipe_phobos_dust"]:
 		if not cmd in FarmCommands.ACTIONS or not cmd in FarmCommands.ON_A_MOON:
 			return "%s must be in FarmCommands.ACTIONS and ON_A_MOON." % cmd
 	if CoopSession.PROTOCOL != 46:

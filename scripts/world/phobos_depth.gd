@@ -145,7 +145,7 @@ static func _finds(base: int, grid: PackedStringArray, rooms: Array[Rect2i]) -> 
 	var finds: Array = []
 	for index: int in count:
 		var room_idx: int = (index + ZoneDepth.draw(base, 95, rooms.size())) % rooms.size()
-		var options: Array[Vector2i] = ZoneDepth._floor_cells(grid, rooms[room_idx])
+		var options: Array[Vector2i] = ZoneDepth.floor_cells(grid, rooms[room_idx])
 		var free: Array[Vector2i] = []
 		for option: Vector2i in options:
 			if not option in used:
