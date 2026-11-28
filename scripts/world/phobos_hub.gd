@@ -72,7 +72,7 @@ func _process(delta: float) -> void:
 		_toast_left -= delta
 	else:
 		var hovered: Clickable = Clickable.hovered
-		_hint.text = hovered.hint if hovered != null and hovered.hint != "" else Shuttle.text("hub_low_gravity")
+		_hint.text = hovered.hint if hovered != null and hovered.hint != "" else PhobosWalker.hint_text()
 	if not _seen_trip and not _asking:
 		_since_s += delta
 		if _since_s > GRACE_S:
@@ -233,6 +233,7 @@ func _build_walker() -> void:
 	add_child(camera)
 	walker = PhobosWalker.new()
 	walker.name = "Walker"
+	walker.moon = _moon()
 	walker.camera = camera
 	add_child(walker)
 	if arrive_at_hatch:
