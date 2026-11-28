@@ -1309,7 +1309,9 @@ func put_farm(data: Dictionary) -> void:
 	if not data.has("zones_unlocked") and _has_been_to_tunnels(data) and not zones_unlocked.has(TUNNELS_ZONE):
 		zones_unlocked.append(TUNNELS_ZONE)  # it has been in there
 	if not data.has("deepest_depth") and rover_zone != "" and rover_depth > 0:
-		deepest_depth[rover_zone] = rover_depth  # a save from before the record: where the rover is counts
+		# A save from before the record: where the rover is counts, but never past a shut gate.
+		var held: bool = ZoneDepth.is_deep(rover_depth) and deep_problem(rover_zone) != ""
+		deepest_depth[rover_zone] = ZoneDepth.FIRST_DEEP - 1 if held else rover_depth
 	_level_pads()
 	if not data.has("stone"):
 		# From before stone, so its broken boulders gave none.
@@ -5150,15 +5152,16 @@ func change_depth(target_depth: int, player_id: String = "") -> String:
 	return ""
 
 
-## A loaded farm whose rover is below depth 3 of the Lava Tubes or the Flooded Aquifer while
-## the way there is shut (an old or edited save: the lab level is low, the pump is gone, or
-## the lift at depth 3 is broken) has it back up at depth 3's start: it loads, but the deep
+## A loaded farm whose rover is below depth 3 of the Lava Tubes, the Flooded Aquifer or the
+## Colony Mine while the way there is shut (an old or edited save: the lab level is low, the
+## pump is gone, or the lift at depth 3 is broken) has it back up at depth 3's start: it loads, but the deep
 ## floors stay out of reach until the gate is met [PLACEHOLDER].
 func _hold_deep_rover() -> void:
 	if not ZoneDepth.is_deep(rover_depth) or deep_problem(rover_zone) == "":
 		return
 	rover_depth = ZoneDepth.FIRST_DEEP - 1
-	rover_transforms.erase(TUNNEL_ROVER)  # settle_rover_depth puts it at the start
+	rover_transforms[TUNNEL_ROVER] = ZoneDepth.start_transform()  # always a valid pose, even under a live drive lease
+	rover_epoch += 1
 
 
 ## "" if the farm may go below depth 3 of `zone`, or what is missing in plain words (a zone
@@ -7076,7 +7079,7 @@ func _credibility_after_calibration(record: Dictionary) -> void:
 ## The phone's contract row with the deepest depth reached under it (a line of its own
 ## once the rover has been below, ZoneDepth.deepest_text).
 func contract_phone_text() -> String:
-	var deepest: String = ZoneDepth.deepest_text(deepest_depth, TUNNELS_ZONE)
+	var deepest: String = ZoneDepth.deepest_lines(deepest_depth)
 	var contract: String = contract_text()
 	return contract if deepest == "" else (deepest if contract == "" else contract + "
 " + deepest)

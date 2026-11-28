@@ -189,6 +189,11 @@ func test_the_lift_at_three_has_its_reach_its_ore_and_is_paid_once() -> String:
 	gs.crystal_ore = cost.y - 1
 	if gs.repair_lift() == "" or gs.crystal_ore != cost.y - 1 or gs.credits != 1000 or gs.is_lift_repaired(ZONE, 3):
 		problems.append("One ore short repaired it or took something.")
+	gs.crystal_ore = 20
+	gs.credits = cost.x - 1
+	if gs.repair_lift() == "" or gs.credits != cost.x - 1 or gs.crystal_ore != 20 or gs.is_lift_repaired(ZONE, 3):
+		problems.append("One credit short repaired depth 3's lift or took something.")
+	gs.credits = 1000
 	gs.crystal_ore = cost.y
 	if gs.repair_lift() != "" or gs.crystal_ore != 0 or gs.credits != 1000 - cost.x or not gs.is_lift_repaired(ZONE, 3):
 		problems.append("The exact ore did not repair it, or the charge is wrong (%d CR, %d ore)." % [1000 - gs.credits, cost.y - gs.crystal_ore])
@@ -245,6 +250,11 @@ func test_the_lift_at_six_has_its_reach_its_ore_its_gate_and_its_order() -> Stri
 	gs.crystal_ore = cost.y - 1
 	if gs.repair_lift() == "" or gs.crystal_ore != cost.y - 1 or gs.credits != 1000 or gs.is_lift_repaired(ZONE, 6):
 		problems.append("One ore short repaired depth 6's lift or took something.")
+	gs.crystal_ore = 20
+	gs.credits = cost.x - 1
+	if gs.repair_lift() == "" or gs.credits != cost.x - 1 or gs.crystal_ore != 20 or gs.is_lift_repaired(ZONE, 6):
+		problems.append("One credit short repaired depth 6's lift or took something.")
+	gs.credits = 1000
 	gs.crystal_ore = cost.y
 	if gs.repair_lift() != "" or gs.crystal_ore != 0 or gs.credits != 1000 - cost.x or not gs.is_lift_repaired(ZONE, 6):
 		problems.append("The exact ore did not repair the lift at 6, or the charge is wrong.")
@@ -637,8 +647,9 @@ func test_a_find_in_a_buried_room_waits_for_the_shoring_at_its_own_depth() -> St
 			problems.append("Shoring depth 1's %s opened depth %d's room." % [fall["id"], depth])
 			break
 		gs.rooms_shored = ZoneDepth.with_taken(gs.rooms_shored, ZONE, day, MineDepth.storage_id(depth, str(fall["id"])))
-		if gs.take_find(str(buried["id"]), day, HOST) != "" and not MineDepth.is_case_fallback_reply(gs.take_find(str(buried["id"]) + "x", day, HOST)):
-			pass
+		var first: String = gs.take_find(str(buried["id"]), day, HOST)
+		if first != "" and not MineDepth.is_case_fallback_reply(first):
+			problems.append("Depth %d's find was refused ('%s') after its own room was shored." % [depth, first])
 		if not str(buried["id"]) in ZoneDepth.taken_today(gs.finds_taken, ZONE, day):
 			problems.append("Depth %d's find was not taken after its own room was shored." % depth)
 	gs.free()
@@ -782,13 +793,24 @@ func _scene_at(depth: int) -> Dictionary:
 	var bright: float = 0.0
 	var meshes: int = 0
 	var decor: Node = scene.get("_decor") as Node
+	var clashes: int = 0
+	var spots: Array[Rect2] = []  # the hatch's disc and the lift's deck, as squares on the floor
+	var hatch: Vector3 = ZoneDepth.descent_position(depth)
+	spots.append(Rect2(hatch.x - 1.3, hatch.z - 1.3, 2.6, 2.6))
+	if depth == 0 or ZoneDepth.is_lift_depth(depth):
+		var lift: Vector3 = ZoneDepth.lift_position(depth)
+		spots.append(Rect2(lift.x - 1.2, lift.z - 1.2, 2.4, 2.4))
 	if decor != null:
 		for node: Node in decor.find_children("*", "MeshInstance3D", true, false):
+			var box: AABB = (node as MeshInstance3D).global_transform * (node as MeshInstance3D).get_aabb()
+			for spot: Rect2 in spots:
+				if spot.intersects(Rect2(box.position.x, box.position.z, box.size.x, box.size.z)):
+					clashes += 1
 			var material: Variant = (node as MeshInstance3D).material_override
 			if material is StandardMaterial3D:
 				bright += (material as StandardMaterial3D).albedo_color.v
 				meshes += 1
-	var out: Dictionary = { "lights": _lights(scene) - _lights(rock), "bright": bright, "meshes": meshes }
+	var out: Dictionary = { "lights": _lights(scene) - _lights(rock), "bright": bright, "meshes": meshes, "clashes": clashes }
 	root.remove_child(scene)
 	scene.free()
 	return out
@@ -814,6 +836,10 @@ func test_each_depth_is_a_little_darker_with_no_new_lights() -> String:
 	var saved_local: Array = [ZoneDepth.local_zone, ZoneDepth.local_depth, ZoneDepth.local_layout.duplicate(true), ZoneDepth.arrive_at, ZoneDepth.arrive_pending]
 	GameState.world_seed = SEED
 	GameState.rover_lent = true
+	for depth: int in [0, 1, 2, 3, 6]:
+		var dressed: Dictionary = _scene_at(depth)
+		if int(dressed["clashes"]) != 0:
+			problems.append("Depth %d's decor stands on the hatch or the lift (%d pieces)." % [depth, dressed["clashes"]])
 	var one: Dictionary = _scene_at(1)
 	var previous: float = float(one["bright"])
 	if int(one["meshes"]) == 0 or previous <= 0.0:
@@ -838,6 +864,63 @@ func test_each_depth_is_a_little_darker_with_no_new_lights() -> String:
 	return "\n".join(problems)
 
 
+func test_shoring_a_room_redraws_the_rockfalls_in_place() -> String:
+	var problems: Array[String] = []
+	var saved_zone: String = GameState.rover_zone
+	var saved_depth: int = GameState.rover_depth
+	var saved_transforms: Dictionary = GameState.rover_transforms.duplicate(true)
+	var saved_seed: int = GameState.world_seed
+	var saved_lent: bool = GameState.rover_lent
+	var saved_shored: Dictionary = GameState.rooms_shored.duplicate(true)
+	var saved_local: Array = [ZoneDepth.local_zone, ZoneDepth.local_depth, ZoneDepth.local_layout.duplicate(true), ZoneDepth.arrive_at, ZoneDepth.arrive_pending]
+	GameState.world_seed = SEED
+	GameState.rover_lent = true
+	GameState.rooms_shored = {}
+	GameState.rover_zone = ZONE
+	GameState.rover_depth = 4
+	GameState.rover_transforms.erase(GameState.TUNNEL_ROVER)
+	var root: Window = (Engine.get_main_loop() as SceneTree).root
+	var scene: Node = (load("res://scenes/colony_mine.tscn") as PackedScene).instantiate()
+	root.add_child(scene)
+	var fallen: Node = scene.get("_rockfalls") as Node
+	var day: int = GameClock.get_day_index()
+	var falls: Array = MineDepth.layout(SEED, 4, day)["rockfalls"]
+	var before: Array = []
+	for child: Node in fallen.get_children():
+		before.append(child)
+	GameState.rooms_shored = ZoneDepth.with_taken(GameState.rooms_shored, ZONE, day, MineDepth.storage_id(4, str(falls[0]["id"])))
+	scene.call("_resync_depth")
+	if SceneSwitcher.is_busy():
+		problems.append("Shoring a room swapped the scene.")
+	if not scene.is_inside_tree() or scene.get("_rockfalls") != fallen:
+		problems.append("The scene was rebuilt, not updated.")
+	var labels: PackedStringArray = []
+	for node: Node in fallen.find_children("*", "Label3D", true, false):
+		labels.append((node as Label3D).text)
+	if not ("%s SHORED" % str(falls[0]["id"]).to_upper()) in labels:
+		problems.append("The shored room has no shored label (%s)." % [labels])
+	if labels.size() != falls.size():
+		problems.append("%d rockfall labels for %d rockfalls." % [labels.size(), falls.size()])
+	for fall: Dictionary in ZoneDepth.local_layout.get("rockfalls", []):
+		if bool(fall["shored"]) != (str(fall["id"]) == str(falls[0]["id"])):
+			problems.append("The local layout has %s shored = %s." % [fall["id"], fall["shored"]])
+	root.remove_child(scene)
+	scene.free()
+	GameState.rover_zone = saved_zone
+	GameState.rover_depth = saved_depth
+	GameState.rover_transforms = saved_transforms
+	GameState.world_seed = saved_seed
+	GameState.rover_lent = saved_lent
+	GameState.rooms_shored = saved_shored
+	ZoneDepth.local_zone = str(saved_local[0])
+	ZoneDepth.local_depth = int(saved_local[1])
+	ZoneDepth.local_layout = saved_local[2]
+	ZoneDepth.arrive_at = saved_local[3]
+	ZoneDepth.arrive_pending = bool(saved_local[4])
+	return "
+".join(problems)
+
+
 # --- The other zones are as they were ---------------------------------------------------
 
 func test_the_lava_tubes_and_the_aquifer_keep_their_own_gates() -> String:
@@ -859,3 +942,64 @@ func test_the_protocol_did_not_move_for_depths_two_to_six() -> String:
 	if CoopSession.PROTOCOL != 42:
 		return "PROTOCOL is %d; depths 2 to 6 add no command or synced field, so it stays 42." % CoopSession.PROTOCOL
 	return ""
+
+
+# --- Review fixes: the phone's deepest lines, the held rover, the decor ------------------
+
+func test_the_phone_names_each_zone_the_rover_has_been_below_in() -> String:
+	var problems: Array[String] = []
+	var gs: GameStateScript = _state()
+	if "Deepest" in gs.contract_phone_text():
+		problems.append("A deepest line before any depth.")
+	gs.deepest_depth = {ZONE: 5}
+	if ZoneDepth.deepest_text(gs.deepest_depth, ZONE) != "Deepest: Abandoned Colony Mine, depth 5":
+		problems.append("The Mine's line is '%s'." % ZoneDepth.deepest_text(gs.deepest_depth, ZONE))
+	if not "Abandoned Colony Mine, depth 5" in gs.contract_phone_text() or "Lava Tubes" in gs.contract_phone_text():
+		problems.append("The phone says '%s'." % gs.contract_phone_text())
+	gs.deepest_depth = {ZONE: 5, "lava_tubes": 2}
+	var text: String = gs.contract_phone_text()
+	if not "Lava Tubes, depth 2" in text or not "Colony Mine, depth 5" in text:
+		problems.append("Two zones, but the phone says '%s'." % text)
+	gs.free()
+	return "
+".join(problems)
+
+
+func test_a_held_rover_always_has_a_pose_even_under_a_drive_lease() -> String:
+	var problems: Array[String] = []
+	var gs: GameStateScript = _state(GATE_LEVEL - 1, false)
+	gs.rover_zone = ZONE
+	gs.rover_depth = 5
+	gs.rover_transforms.erase(gs.TUNNEL_ROVER)
+	gs._hold_deep_rover()
+	if gs.rover_depth != 3:
+		problems.append("The held rover is at depth %d, not 3." % gs.rover_depth)
+	if not gs.rover_transforms.has(gs.TUNNEL_ROVER) or (gs.rover_transforms[gs.TUNNEL_ROVER] as Transform3D).origin != ZoneDepth.start_transform().origin:
+		problems.append("The held rover has no pose at depth 3's start.")
+	gs.free()
+	return "
+".join(problems)
+
+
+func test_an_old_save_deep_with_the_gate_shut_records_no_depth_past_three() -> String:
+	var problems: Array[String] = []
+	var source: GameStateScript = _state(GATE_LEVEL - 1, false)
+	source.rover_zone = ZONE
+	source.rover_depth = 5
+	var data: Dictionary = source.farm_to_dict()
+	data.erase("deepest_depth")
+	var gs: GameStateScript = GameStateScript.new()
+	gs.build_registry()
+	var why: String = gs.farm_from_dict(data)
+	if why != "":
+		problems.append("The old save was refused: %s" % why)
+	if gs.rover_depth != 3:
+		problems.append("The rover loaded at depth %d, not 3." % gs.rover_depth)
+	if int(gs.deepest_depth.get(ZONE, 0)) > 3:
+		problems.append("The deepest depth was backfilled as %d past a shut gate." % int(gs.deepest_depth.get(ZONE, 0)))
+	if not gs.rover_transforms.has(gs.TUNNEL_ROVER):
+		problems.append("The loaded, held rover has no pose.")
+	gs.free()
+	source.free()
+	return "
+".join(problems)

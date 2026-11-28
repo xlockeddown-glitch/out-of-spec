@@ -1,7 +1,7 @@
 class_name MineDepth
 extends RefCounted
 ## The Abandoned Colony Mine (docs/design/zones.md section 13, build step 14): its hub and
-## its depth 1, laid out from the same integer hash as the other zones (ZoneDepth.stream),
+## its depths 1 to 6, laid out from the same integer hash as the other zones (ZoneDepth.stream),
 ## on the same 24 by 22 grid of 3 m cells so the tunnels scene, the rover's hold and the
 ## host's checks work unchanged. Pure rules and words; the props are the scene's, the shoring
 ## props and the shored rooms are GameState's (`mine_props`, `rooms_shored`, saved).
@@ -111,7 +111,7 @@ static func _near(there: Vector3, at: Vector3) -> bool:
 	return Vector2(there.x - at.x, there.z - at.z).length() <= ZoneDepth.REACH_M
 
 
-# --- Depth 1 --------------------------------------------------------------------
+# --- The depths --------------------------------------------------------------------
 
 ## Depth `depth` on `day`, with the rooms in `shored` (rockfall ids) cleared: { "depth",
 ## "day", "grid", "start", "rooms", "finds" (Array of { "id", "kind", "cell", "room" }),

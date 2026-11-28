@@ -181,7 +181,7 @@ func test_depth_one_is_the_same_for_the_same_seed_and_day_and_new_the_next_day()
 	if changed < 9:
 		return "The floor changed on only %d of 10 days." % changed
 	if not MineDepth.layout(SEED, 0, 5).is_empty() or not MineDepth.layout(SEED, 7, 5).is_empty():
-		return "Only depth 1 exists: there is no depth 0 floor and no depth 7."
+		return "Depths 1 to 6 exist: there is no depth 0 floor and no depth 7."
 	if a["finds"].size() != MineDepth.find_count():
 		return "The floor has %d finds, not %d." % [a["finds"].size(), MineDepth.find_count()]
 	for day: int in range(1, 60):
@@ -477,7 +477,7 @@ func test_a_guest_sees_the_gate_the_props_and_the_shored_rooms() -> String:
 	return run if run != "" else "\n".join(problems)
 
 
-func test_zone_presence_accepts_depth_one_in_the_mine() -> String:
+func test_zone_presence_accepts_depths_up_to_six_in_the_mine() -> String:
 	for depth: int in [0, 1]:
 		if ZonePresence.place_problem(ZONE, depth) != "":
 			return "Depth %d in the Mine was refused: %s" % [depth, ZonePresence.place_problem(ZONE, depth)]
@@ -499,7 +499,7 @@ func test_the_hatch_takes_the_rover_down_and_back_up_and_the_lava_lift_is_refuse
 		gs.player_places[HOST] = [ZONE, 1]
 		gs.rover_transforms[gs.TUNNEL_ROVER] = Transform3D(Basis.IDENTITY, ZoneDepth.ascent_position())
 		if gs.change_depth(2, HOST) == "" or gs.rover_depth != 1:
-			problems.append("The Mine has no depth 2.")
+			problems.append("The way up must not be a way down: depth 2 is reached from the hatch only.")
 		why = gs.change_depth(0, HOST)
 		if why != "" or gs.rover_depth != 0:
 			problems.append("The way up must bring the rover back: '%s', depth %d." % [why, gs.rover_depth])

@@ -1,8 +1,8 @@
 class_name ColonyMine
 extends "res://scripts/basalt_tunnels.gd"
 ## The Abandoned Colony Mine's scene (zones step 14): the Lava Tubes' scene with the Mine's
-## hub (the way down, a notice board, the crate that sells shoring props) and its one depth
-## (rooms, finds, rockfalls). Built in code from primitives; the rules are MineDepth's and
+## hub (the way down, a notice board, the crate that sells shoring props) and its depths 1
+## to 6 (rooms, finds, rockfalls, lifts at 3 and 6). Built in code from primitives; the rules are MineDepth's and
 ## the host's. A look [PLACEHOLDER]: no art yet.
 
 const CRATE: String = "crate"
@@ -69,7 +69,7 @@ func _build_hub_decor() -> void:
 	MineLook.add_timber_set(_decor, Vector3(-1.5, 0.0, 13.5), 7.8, 3.0, 0.0, true)
 	MineLook.add_timber_set(_decor, Vector3(-1.5, 0.0, 7.5), 7.8, 3.0, 0.0, false)
 	MineLook.add_timber_set(_decor, Vector3(-4.5, 0.0, 3.0), 5.4, 2.9, 90.0, true)
-	MineLook.add_rail_track(_decor, Vector3(-1.5, 0.0, 16.5), 10.5, 0.0, true)
+	MineLook.add_rail_track(_decor, Vector3(-1.5, 0.0, 21.6), 5.0, 0.0, true)  # north of the lift station
 	MineLook.add_stencil_sign(_decor, Vector3(2.4, 0.0, 23.4), "COLONY MINE 01", "ORE DRIFT // KEEP CLEAR", -90.0)
 
 
@@ -77,17 +77,18 @@ func _build_hub_decor() -> void:
 ## abandoned rail track, dead hanging lamps, and a faded stencil sign tucked
 ## against the landing wall (visual only, zero collision) [PLACEHOLDER].
 func _build_depth_decor() -> void:
-	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, 7.5), 5.4, 2.9, 0.0, true)
+	# Nothing stands on the hatch (x -1.5, z 7.5, a 1.4 m disc): the first set is beyond it.
+	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, 10.5), 5.4, 2.9, 0.0, true)
 	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, -1.5), 5.4, 2.9, 0.0, false)
 	MineLook.add_timber_set(_decor, Vector3(0.0, 0.0, -10.5), 5.4, 2.9, 0.0, true)
-	MineLook.add_rail_track(_decor, Vector3(0.0, 0.0, -1.5), 15.0, 0.0, true)
+	MineLook.add_rail_track(_decor, Vector3(0.0, 0.0, -2.0), 14.0, 0.0, true)
 	MineLook.add_stencil_sign(_decor, Vector3(9.6, 0.0, 13.5), "LEVEL %02d DRIFT" % _built_depth, "SHORE BEFORE ENTRY", -90.0)
 	_darken_decor()
 
 
 ## A little darker each depth [PLACEHOLDER]: a dark slab laid over the floor decor would be
 ## new art, so the decor is dimmed through the material's own albedo, and no light is added
-## (the Mine has none). Depth 1 is as it was.
+## (the Mine has none). Only the decor is dimmed, not the rock or the labels. Depth 1 is as it was.
 func _darken_decor() -> void:
 	var keep: float = depth_dim(_built_depth)
 	if keep >= 1.0:
@@ -274,17 +275,28 @@ func _use_find(find_id: String) -> void:
 	_hud.push_log("FIND: " + (reply if reply != "" else MineDepth.reward_text(str(find.get("kind", "")), _built_depth)))
 
 
-## A room was shored (here or by a friend), so this depth is built again with the rover
-## where it is.
+## A room was shored (here or by a friend): the rockfalls are redrawn in place, so the
+## scene (and a co-op driver's rover, and the HUD's lines) stays as it is.
 func _resync_depth() -> void:
 	super._resync_depth()
 	if _below and not SceneSwitcher.is_busy() and GameState.rover_zone == MineDepth.ZONE and _rover.away_text() == "" and not _moving:
 		var now: Array = MineDepth.shored_today(GameState.rooms_shored, _built_day, _built_depth)
 		if now.size() != _built_shored.size() or now.any(func(id: Variant) -> bool: return not id in _built_shored):
-			_moving = true
-			ZoneDepth.arrive_at = _rover.global_transform
-			ZoneDepth.arrive_pending = true
-			SceneSwitcher.swap_to(SceneSwitcher.MINE_SCENE)
+			_rebuild_rockfalls(now)
+
+
+## Draws this depth's rockfalls again from `shored` (the ids shored today), and marks them
+## in the local layout so the prompts see the same.
+func _rebuild_rockfalls(shored: Array) -> void:
+	_built_shored = shored
+	for child: Node in _rockfalls.get_children():
+		_rockfalls.remove_child(child)
+		child.free()
+	for fall: Variant in ZoneDepth.local_layout.get("rockfalls", []):
+		if fall is Dictionary:
+			fall["shored"] = str(fall["id"]) in shored
+			_draw_rockfall(fall)
+	_told_hub = ""
 
 
 func _on_rover_entered_exit() -> void:

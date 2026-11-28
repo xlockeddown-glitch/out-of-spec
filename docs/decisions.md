@@ -13,7 +13,7 @@ Slice 13. Every number and word below is a [PLACEHOLDER].
 - **Rockfalls [PLACEHOLDER]:** depths 1 to 3 keep one or two rockfall rooms (depth 1's rule); depths 4 and 5 always have two; depth 6 has all three. `shore_room` clears one, as before.
 - **Finds pay more deeper [PLACEHOLDER]:** `take_find` adds 3 CR (ore), 6 CR (lost gear) or 4 CR (robot parts) for every level below 1, and ore finds add 1 crystal ore every second level. The colonist's case stays a gauge-block find.
 - **Per-depth state:** `rooms_shored` and the case are keyed by depth. Storage ids are plain at depth 1 and `d<n>_<id>` below (`MineDepth.storage_id`), so old saves load and shoring depth 2 does not shore depth 5. The save shape check accepts only ids that belong to a real depth (1 to 6), so `d7_x` and `d1_x` are refused.
-- **Look [PLACEHOLDER]:** existing MineLook primitives only; each depth is 8 % darker than the last, down to a floor of 50 %, by dimming material colors. Zero new lights, no new art.
+- **Look [PLACEHOLDER]:** existing MineLook primitives only; the Mine decor (timber, rails, lamps, signs' stencils) is 8 % darker each depth than the last, down to a floor of 50 %, by dimming its material colors; the rock walls and floor and the sign labels are not dimmed. Zero new lights, no new art.
 - **Old Props:** its steps are unchanged, so a quest in progress does not break. A lift-repair step can be added later.
 - **Co-op:** everything is host-run. Guests see layouts, lifts and the gate state; a late join gets deep state. No new command or synced field, so `CoopSession.PROTOCOL` stays 42.
 
