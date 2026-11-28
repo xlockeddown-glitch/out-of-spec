@@ -5,8 +5,8 @@ extends Node3D
 ##
 ## What earns a certificate [PLACEHOLDER]:
 ##   - Each clean passed audit in `audit_log` (`passed` true, not `warning`).
-##   - Each completed farm-wide `lab` quest in `quest_state` (with at least one
-##     step done, so quests closed by `closed_when` without pay do not hang).
+##   - Each completed farm-wide `lab` quest in `quest_state` (excluding quests
+##     closed with nothing paid via `QuestLog.is_closed`).
 ## Personal quests are excluded (they have keepsakes on KeepsakeShelf).
 ##
 ## Read-only: no new save fields, commands, or protocol changes. Guests see the
@@ -86,7 +86,9 @@ static func earned_from(farm: Node) -> Array[Dictionary]:
 		if not (report is Dictionary):
 			continue
 		var r: Dictionary = report as Dictionary
-		if bool(r.get("passed", false)) and not bool(r.get("warning", false)):
+		var passed: Variant = r.get("passed")
+		var warning: Variant = r.get("warning")
+		if passed is bool and passed and not (warning is bool and warning):
 			var day: int = int(r.get("day", 0))
 			entries.append({
 				"id": "audit_%d_%d" % [day, i],
@@ -112,8 +114,7 @@ static func earned_from(farm: Node) -> Array[Dictionary]:
 			continue
 		var entry: Dictionary = raw_entry as Dictionary
 		var done_day: int = int(entry.get("done", -1))
-		var steps_done: Variant = entry.get("steps_done", [])
-		if done_day < 0 or not (steps_done is Array) or (steps_done as Array).is_empty():
+		if done_day < 0 or not (entry.get("steps_done") is Array) or QuestLog.is_closed(quest, entry):
 			continue
 		entries.append({
 			"id": "quest_" + qid,
@@ -182,6 +183,7 @@ func refresh() -> void:
 	_shown = visible_certs
 	_clear_wall()
 	if not unlocked:
+		_add_stand(-PLAQUE_SIZE.y / 2.0, PLAQUE_SIZE.x / 2.0 - 0.14, GROUP_PLAQUE)
 		_add_plaque(locked_text(farm), "CERTIFICATE WALL")
 		return
 	_add_board()
@@ -208,15 +210,36 @@ func hidden_count() -> int:
 	return maxi(_total_earned - MAX_SHOWN, 0)
 
 
-## Clears dynamic wall nodes. Hover is a static: drop it before its Clickable
-## goes, so nothing reads a freed one (same pattern as KeepsakeShelf).
+## Clears dynamic wall nodes. Drops any gamepad selection or mouse hover on our
+## children through set_hover(false) so the cursor resets before freeing them.
 func _clear_wall() -> void:
-	if Clickable.hovered != null and (not is_instance_valid(Clickable.hovered) or is_ancestor_of(Clickable.hovered)):
-		Clickable.hovered = null
+	var pad_pointer: DomePadPointer = _find_pad_pointer()
+	if pad_pointer != null and pad_pointer.selected != null \
+			and (not is_instance_valid(pad_pointer.selected) or is_ancestor_of(pad_pointer.selected)):
+		pad_pointer.clear_selection()
+	if Clickable.hovered != null:
+		if not is_instance_valid(Clickable.hovered):
+			Clickable.hovered = null
+			Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+		elif is_ancestor_of(Clickable.hovered):
+			Clickable.hovered.set_hover(false)
 	for child: Node in get_children():
 		if child.is_in_group(GROUP_ITEM) or child.is_in_group(GROUP_PLAQUE) or child.is_in_group(GROUP_BOARD):
 			remove_child(child)
 			child.queue_free()
+
+
+func _find_pad_pointer() -> DomePadPointer:
+	var parent: Node = get_parent()
+	if parent == null:
+		return null
+	var named: DomePadPointer = parent.get_node_or_null("DomePadPointer") as DomePadPointer
+	if named != null:
+		return named
+	for sibling: Node in parent.get_children():
+		if sibling is DomePadPointer:
+			return sibling as DomePadPointer
+	return null
 
 
 func _ensure_materials() -> void:
@@ -246,6 +269,21 @@ func _add_board() -> void:
 	board.material_override = _mat_board
 	board.add_to_group(GROUP_BOARD)
 	add_child(board)
+	_add_stand(-BOARD_SIZE.y / 2.0, BOARD_SIZE.x / 2.0 - 0.14, GROUP_BOARD)
+
+
+## Two slim support posts from `top_y` down to the dome floor (world Y = 0).
+func _add_stand(top_y: float, half_span_x: float, group: StringName) -> void:
+	var post_h: float = maxf(position.y + top_y, 0.2)
+	var post_box := BoxMesh.new()
+	post_box.size = Vector3(0.06, post_h, 0.06)
+	for side: float in [-1.0, 1.0]:
+		var post := MeshInstance3D.new()
+		post.mesh = post_box
+		post.material_override = _mat_board
+		post.position = Vector3(side * half_span_x, top_y - post_h / 2.0, 0.0)
+		post.add_to_group(group)
+		add_child(post)
 
 
 func _add_plaque(text: String, heading: String) -> void:

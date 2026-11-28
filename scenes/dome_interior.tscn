@@ -908,6 +908,6 @@ rotation = Vector3(0, 1.5707964, 0)
 script = ExtResource("41_shelf")
 
 [node name="CertificateWall" type="Node3D" parent="."]
-position = Vector3(6.7, 2.2, -1.8)
-rotation = Vector3(0, -1.5707964, 0)
+position = Vector3(5.05, 2.25, -2.05)
+rotation = Vector3(0, -1.3089969, 0)
 script = ExtResource("42_certwall")
